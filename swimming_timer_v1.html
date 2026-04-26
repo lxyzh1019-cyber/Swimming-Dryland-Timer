@@ -1,0 +1,1848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏊 Jess · Land Training Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Gochi+Hand&family=Caveat:wght@400;700&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #eef6fe;
+    --bg2: #dbedff;
+    --paper: #f5faff;
+    --paper-line: #c3daf0;
+    --ink: #1a2a3a;
+    --ink-light: #4a6278;
+    --jess: #6fb1fc;
+    --jess-deep: #3a7fd4;
+    --accent-orange: #ff7b54;
+    --accent-yellow: #ffd166;
+    --accent-green: #95d5b2;
+    --accent-pink: #ff9eb5;
+    --accent-purple: #c3aed6;
+    --red-flag: #d64545;
+    --rest-blue: #b8d8f0;
+    --evening: #7c6fbf;
+    --evening-deep: #5b50a0;
+    --radius: 18px;
+    --radius-sm: 10px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Patrick Hand', 'Nunito', sans-serif;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 10% 20%, rgba(111, 177, 252, 0.1) 0%, transparent 40%),
+      radial-gradient(circle at 90% 80%, rgba(149, 213, 178, 0.08) 0%, transparent 40%);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 1rem;
+    font-size: 1.15rem;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Gochi Hand', 'Caveat', cursive;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    margin: 0;
+  }
+
+  .wrap { max-width: 580px; margin: 0 auto; }
+
+  .header { text-align: center; padding: 0.5rem 0 1rem; }
+  .header h1 { font-size: 2.6rem; color: var(--jess-deep); margin-bottom: 0.2rem; }
+  .header .sub { font-family: 'Caveat', cursive; font-size: 1.4rem; color: var(--ink-light); }
+
+  /* Modal overlay */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+
+  .modal {
+    background: var(--paper);
+    border: 4px solid var(--ink);
+    border-radius: 24px;
+    padding: 2rem;
+    max-width: 520px;
+    box-shadow: 8px 8px 0 var(--ink);
+    text-align: center;
+  }
+
+  .modal h2 {
+    font-size: 2.2rem;
+    color: var(--ink);
+    margin-bottom: 0.5rem;
+  }
+
+  .modal p {
+    font-family: 'Caveat', cursive;
+    font-size: 1.3rem;
+    color: var(--ink-light);
+    margin-bottom: 1.5rem;
+  }
+
+  .modal-day-buttons {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    margin-bottom: 1.5rem;
+  }
+
+  .modal-day-btn {
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1.1rem;
+    font-weight: bold;
+    padding: 0.6rem 0.2rem;
+    border: 3px solid var(--ink);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    color: var(--ink);
+    cursor: pointer;
+    transition: all 0.15s;
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+
+  .modal-day-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+
+  .modal-day-btn.selected {
+    background: var(--jess);
+    color: white;
+    border-width: 4px;
+  }
+
+  .modal-day-btn.today {
+    background: var(--accent-yellow);
+    color: var(--ink);
+  }
+
+  .modal-day-btn.rest {
+    opacity: 0.5;
+  }
+
+  /* Session picker (morning / evening) */
+  .modal-session-picker {
+    display: none;
+    margin: 1rem 0 1.5rem;
+  }
+  .modal-session-picker.show { display: block; }
+
+  .modal-session-picker .label {
+    font-family: 'Caveat', cursive;
+    font-size: 1.2rem;
+    color: var(--ink-light);
+    margin-bottom: 0.6rem;
+  }
+
+  .session-btns {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .session-btn {
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1.15rem;
+    padding: 0.7rem 1.2rem;
+    border: 3px solid var(--ink);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    color: var(--ink);
+    cursor: pointer;
+    box-shadow: 3px 3px 0 var(--ink);
+    transition: all 0.15s;
+    flex: 1;
+    max-width: 200px;
+  }
+
+  .session-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+
+  .session-btn.selected {
+    border-width: 4px;
+  }
+
+  .session-btn.morning.selected {
+    background: var(--jess);
+    color: white;
+  }
+
+  .session-btn.evening.selected {
+    background: var(--evening);
+    color: white;
+  }
+
+  .modal-confirm-msg {
+    font-family: 'Caveat', cursive;
+    font-size: 1.2rem;
+    color: var(--jess-deep);
+    margin-bottom: 1rem;
+    min-height: 1.5rem;
+  }
+
+  .modal-btn {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 1.3rem;
+    padding: 1rem 1.5rem;
+    border: 3px solid var(--ink);
+    border-radius: var(--radius-sm);
+    background: var(--accent-green);
+    color: var(--ink);
+    cursor: pointer;
+    box-shadow: 5px 5px 0 var(--ink);
+    transition: all 0.1s;
+  }
+
+  .modal-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+
+  .modal-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+
+  .modal-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Main page (hidden until modal closes) */
+  .page-content {
+    display: none;
+  }
+
+  .page-content.show {
+    display: block;
+  }
+
+  .day-tabs {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+    margin-bottom: 1rem; background: var(--paper); border: 2px solid var(--ink);
+    border-radius: var(--radius); padding: 6px; box-shadow: 3px 3px 0 var(--ink);
+  }
+  .day-tab {
+    text-align: center; padding: 0.45rem 0.2rem; border-radius: var(--radius-sm);
+    cursor: pointer; font-family: 'Patrick Hand', sans-serif; font-size: 0.95rem;
+    color: var(--ink-light); border: 2px solid transparent;
+    transition: all 0.15s; user-select: none;
+  }
+  .day-tab:hover { background: var(--bg2); }
+  .day-tab.today { background: var(--accent-yellow); color: var(--ink); }
+  .day-tab.active { background: var(--jess); color: white; border-color: var(--ink); font-weight: bold; }
+  .day-tab.rest { opacity: 0.6; }
+
+  .card {
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 24px;
+    padding: 1.5rem; box-shadow: 5px 5px 0 var(--ink); margin-bottom: 1rem;
+  }
+
+  .day-header {
+    text-align: center; border-bottom: 3px dashed var(--paper-line);
+    padding-bottom: 1rem; margin-bottom: 1rem;
+  }
+  .session-active .day-header { display: none; }
+  .day-badge {
+    display: inline-block; background: var(--jess); color: white;
+    padding: 0.4rem 1.2rem; border-radius: 50px; border: 2px solid var(--ink);
+    box-shadow: 2px 2px 0 var(--ink); font-family: 'Nunito', sans-serif;
+    font-weight: 900; font-size: 0.9rem; letter-spacing: 1px; margin-bottom: 0.6rem;
+  }
+  .day-badge.evening-badge {
+    background: var(--evening);
+  }
+  .day-title { font-size: 2rem; color: var(--ink); margin: 0.2rem 0 0.1rem; }
+  .day-subtitle { font-family: 'Caveat', cursive; font-size: 1.3rem; color: var(--ink-light); }
+
+  .brief { padding: 0.5rem 0; }
+  .brief-section {
+    background: var(--bg); border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    padding: 0.8rem 1rem; margin-bottom: 0.8rem; box-shadow: 2px 2px 0 var(--ink);
+  }
+  .brief-section ul { list-style: none; padding: 0; margin: 0.3rem 0 0; font-size: 1.05rem; }
+  .brief-section li { padding: 0.15rem 0; line-height: 1.4; }
+  .brief-section li::before { content: "• "; color: var(--jess-deep); font-weight: bold; }
+  .brief-section .ex-line { display: flex; justify-content: space-between; gap: 0.5rem; }
+  .brief-section .ex-line .ex-meta {
+    color: var(--ink-light); font-family: 'Caveat', cursive; font-size: 1.1rem;
+  }
+  .readiness {
+    background: var(--bg2); border: 2px dashed var(--paper-line);
+    border-radius: var(--radius-sm); padding: 0.8rem; margin-bottom: 0.8rem; text-align: center;
+  }
+  .readiness-buttons { display: flex; gap: 0.5rem; margin-top: 0.5rem; justify-content: center; }
+  .readiness-buttons button {
+    flex: 1; font-family: 'Nunito', sans-serif; font-weight: 700;
+    padding: 0.5rem; border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    background: var(--paper); box-shadow: 2px 2px 0 var(--ink);
+    cursor: pointer; font-size: 0.95rem;
+  }
+  .readiness-buttons button.selected { background: var(--jess); color: white; }
+  .readiness-buttons button:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink); }
+
+  .timer-zone { text-align: center; padding: 1rem 0; transition: background 0.3s ease; }
+  .timer-zone.work       { background: linear-gradient(180deg, transparent, rgba(255, 209, 102, 0.18)); }
+  .timer-zone.rest       { background: linear-gradient(180deg, transparent, rgba(184, 216, 240, 0.35)); }
+  .timer-zone.warmup     { background: linear-gradient(180deg, transparent, rgba(149, 213, 178, 0.25)); }
+  .timer-zone.roundrest  { background: linear-gradient(180deg, transparent, rgba(195, 174, 214, 0.3)); }
+  .timer-zone.sideswitch { background: linear-gradient(180deg, transparent, rgba(255, 158, 181, 0.25)); }
+  .timer-zone.evening    { background: linear-gradient(180deg, transparent, rgba(124, 111, 191, 0.18)); }
+
+  .timer {
+    font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 6.5rem;
+    line-height: 1; color: var(--ink); letter-spacing: -3px; transition: color 0.2s;
+  }
+  .timer.urgent { color: var(--accent-orange); }
+
+  .progress {
+    display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap;
+    margin-top: 0.5rem; font-family: 'Caveat', cursive; font-size: 1.3rem;
+    color: var(--ink-light);
+  }
+  .progress .chip {
+    background: var(--bg2); border: 2px solid var(--ink); border-radius: 50px;
+    padding: 0.1rem 0.7rem; box-shadow: 2px 2px 0 var(--ink);
+  }
+  .progress .chip.phase { background: var(--jess); color: white; }
+
+  .exercise {
+    background: var(--bg); border: 2px solid var(--ink); border-radius: var(--radius);
+    padding: 1rem 1.2rem; margin: 1rem 0; box-shadow: 3px 3px 0 var(--ink);
+    min-height: 130px;
+  }
+  .ex-name {
+    font-family: 'Gochi Hand', cursive; font-size: 2.21rem;
+    color: var(--ink); margin-bottom: 0.3rem; text-align: center;
+  }
+  .ex-detail {
+    font-family: 'Caveat', cursive; font-size: 1.3rem;
+    color: var(--jess-deep); margin-bottom: 0.5rem;
+  }
+  .ex-cue {
+    font-family: 'Patrick Hand', sans-serif; font-size: 1.1rem;
+    color: var(--ink); line-height: 1.4;
+  }
+  .ex-redflag {
+    margin-top: 0.7rem; padding-top: 0.5rem; border-top: 2px dotted var(--paper-line);
+    font-family: 'Patrick Hand', sans-serif; font-size: 1rem;
+    color: var(--red-flag); line-height: 1.4;
+  }
+  .ex-redflag::before { content: "🔴 "; }
+  .ex-hydrate {
+    margin-top: 0.6rem; padding-top: 0.5rem; border-top: 2px dotted var(--paper-line);
+    text-align: center; font-family: 'Caveat', cursive; font-size: 1.4rem;
+    color: var(--jess-deep);
+  }
+
+  .upnext {
+    text-align: center; font-family: 'Caveat', cursive; font-size: 1.95rem;
+    color: var(--ink-light); margin: 0.8rem 0; min-height: 2.5rem;
+  }
+  .upnext .label { color: var(--ink-light); }
+  .upnext .name { color: var(--jess-deep); font-weight: 700; }
+
+  .btn-row { display: flex; gap: 0.5rem; margin-top: 0.8rem; flex-wrap: wrap; }
+  .btn {
+    font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 1.1rem;
+    padding: 0.85rem 0.7rem; border: 3px solid var(--ink); border-radius: var(--radius-sm);
+    box-shadow: 4px 4px 0 var(--ink); cursor: pointer; color: var(--ink);
+    transition: transform 0.08s, box-shadow 0.08s; letter-spacing: 0.5px;
+  }
+  .btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--ink); }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary { background: var(--accent-green); flex: 1 1 100%; font-size: 1.4rem; padding: 1rem; }
+  .btn-pause   { background: var(--accent-yellow); flex: 1; min-width: 90px; }
+  .btn-skip    { background: var(--paper); flex: 1; font-size: 0.95rem; min-width: 90px; }
+  .btn-form    { background: var(--accent-purple); flex: 1; font-size: 0.95rem; min-width: 90px; }
+  .btn-done    { background: var(--accent-orange); color: white; flex: 1 1 100%; font-size: 1.4rem; padding: 1rem; }
+  .btn-stop    { background: var(--accent-pink); flex: 1; font-size: 0.9rem; min-width: 80px; }
+
+  .reflect { text-align: center; padding: 1rem 0; }
+  .reflect h3 { font-size: 1.6rem; color: var(--accent-orange); margin-bottom: 0.5rem; }
+  .reflect-buttons { display: flex; gap: 0.5rem; justify-content: center; margin-top: 0.8rem; }
+  .reflect-buttons button {
+    flex: 1; font-family: 'Patrick Hand', sans-serif; font-size: 1.1rem;
+    padding: 0.9rem 0.5rem; border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    background: var(--paper); box-shadow: 3px 3px 0 var(--ink); cursor: pointer;
+  }
+  .reflect-buttons button:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
+  .reflect-thanks {
+    margin-top: 1rem; font-family: 'Gochi Hand', cursive;
+    font-size: 1.4rem; color: var(--accent-green);
+  }
+
+  .rest-day { text-align: center; padding: 2rem 1rem; }
+  .rest-day .emoji { font-size: 4rem; margin-bottom: 0.5rem; }
+  .rest-day h2 { font-size: 2.4rem; color: var(--accent-orange); margin-bottom: 0.5rem; }
+  .rest-day p { font-family: 'Caveat', cursive; font-size: 1.4rem; color: var(--ink-light); }
+  .rest-day ul {
+    text-align: left; max-width: 320px; margin: 1rem auto 0;
+    font-size: 1.1rem; list-style: none; padding: 0;
+  }
+  .rest-day li { padding: 0.3rem 0; }
+
+  .schedule {
+    background: var(--paper); border: 2px solid var(--ink); border-radius: var(--radius);
+    padding: 1rem; box-shadow: 3px 3px 0 var(--ink); margin-bottom: 1rem;
+  }
+  .schedule summary {
+    cursor: pointer; font-family: 'Gochi Hand', cursive; font-size: 1.4rem;
+    color: var(--ink); list-style: none; user-select: none;
+  }
+  .schedule summary::before { content: "▸ "; transition: transform 0.2s; display: inline-block; }
+  .schedule[open] summary::before { content: "▾ "; }
+  .schedule-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 0.8rem; }
+  .sch-cell {
+    background: var(--bg); border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    padding: 0.4rem 0.2rem; text-align: center; font-size: 0.85rem; line-height: 1.2;
+  }
+  .sch-cell .day { font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); }
+  .sch-cell .name { font-family: 'Patrick Hand', sans-serif; color: var(--ink); }
+  .sch-cell.today { background: var(--accent-yellow); border-width: 3px; }
+  .schedule .note {
+    margin-top: 0.7rem; font-family: 'Caveat', cursive; font-size: 1.05rem;
+    color: var(--ink-light); line-height: 1.3;
+  }
+
+  .status {
+    text-align: center; font-family: 'Caveat', cursive; font-size: 1.4rem;
+    color: var(--jess-deep); margin-bottom: 0.5rem; min-height: 1.6rem;
+  }
+
+  .mantra {
+    text-align: center; font-family: 'Gochi Hand', cursive; font-size: 1.3rem;
+    color: var(--accent-orange); margin: 0.5rem 0 0.8rem; padding: 0.5rem;
+    background: var(--bg2); border-radius: var(--radius-sm);
+    border: 2px dashed var(--paper-line);
+  }
+
+  .swim-class-notice {
+    background: rgba(111, 177, 252, 0.15);
+    border: 2px solid var(--jess);
+    border-radius: var(--radius-sm);
+    padding: 0.7rem 1rem;
+    margin-bottom: 0.8rem;
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+  .swim-class-notice strong { color: var(--jess-deep); }
+
+  @media (max-width: 480px) {
+    body { font-size: 1.05rem; padding: 0.6rem; }
+    .timer { font-size: 5rem; }
+    .day-title { font-size: 1.6rem; }
+    .header h1 { font-size: 2rem; }
+    .day-tab { font-size: 0.8rem; padding: 0.35rem 0.1rem; }
+    .sch-cell { font-size: 0.7rem; }
+    .btn { font-size: 1rem; padding: 0.7rem 0.4rem; }
+    .modal { padding: 1.5rem; }
+    .modal h2 { font-size: 1.8rem; }
+  }
+
+  @media (min-width: 1024px) and (orientation: landscape) {
+    body { padding: 0.8rem; }
+    .page-content { max-width: 90vw; margin: 0 auto; }
+    .day-tabs { grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .day-tab { font-size: 1.05rem; padding: 0.6rem 0.3rem; }
+    .card { padding: 1.2rem; margin-bottom: 0.8rem; }
+    .exercise { min-height: 100px; padding: 0.9rem 1rem; }
+    .ex-name { font-size: 2.4rem; }
+    .upnext { font-size: 2.1rem; margin: 0.6rem 0; min-height: 2.2rem; }
+    .ex-cue { font-size: 1.2rem; }
+    .timer { font-size: 6rem; }
+    .btn-row { margin-top: 0.6rem; }
+    .btn { padding: 0.75rem 0.6rem; font-size: 1.2rem; }
+    .header { padding: 0.8rem 0; }
+    .header h1 { font-size: 2.2rem; }
+  }
+
+  @media (min-width: 1366px) and (orientation: landscape) {
+    .exercise { min-height: 120px; }
+    .ex-name { font-size: 2.6rem; }
+    .upnext { font-size: 2.3rem; }
+    .timer { font-size: 7rem; }
+    .btn { padding: 0.9rem 0.8rem; font-size: 1.3rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Day picker modal (shows on load) -->
+<div class="modal-overlay show" id="modal-overlay">
+  <div class="modal">
+    <h2>🏊 Which day are you training?</h2>
+    <p>Pick your workout below</p>
+    
+    <div class="modal-day-buttons" id="modal-days"></div>
+
+    <div class="modal-session-picker" id="modal-session-picker">
+      <div class="label">This day has both sessions:</div>
+      <div class="session-btns">
+        <button class="session-btn morning" id="btn-morning" onclick="pickSession('morning')">
+          ☀️ Morning<br><small>Land Training</small>
+        </button>
+        <button class="session-btn evening" id="btn-evening" onclick="pickSession('evening')">
+          🌙 Evening<br><small>Streamline Check</small>
+        </button>
+      </div>
+    </div>
+    
+    <div class="modal-confirm-msg" id="modal-msg"></div>
+    
+    <button class="modal-btn" id="modal-confirm-btn" disabled>
+      Let's Go! 💪
+    </button>
+  </div>
+</div>
+
+<!-- Main page (hidden until day is selected) -->
+<div class="page-content" id="page-content">
+  <div class="wrap">
+    <div class="header">
+      <h1>🏊 Land Training</h1>
+      <div class="sub">Jess · 7-day swimming plan · Week 2+</div>
+    </div>
+
+    <div class="day-tabs" id="day-tabs"></div>
+
+    <details class="schedule">
+      <summary>This week's plan</summary>
+      <div class="schedule-grid" id="schedule-grid"></div>
+      <div class="note">
+        Mon/Wed/Fri: power circuits · Tue: core anti-rotation · Thu: recovery (after school) ·
+        Sat: stretch + core C · Sun: full rest.
+        <br>Mon/Wed evening: swim class 6–7pm (this month).
+        <br>🌙 Evening streamline check: every day, 3 min.
+      </div>
+    </details>
+
+    <div class="card" id="main-card"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   PLAN DATA
+   ============================================================ */
+
+const MANTRA = "I am STRONG. I am FAST. I can SWIM THIS.";
+
+const WARMUP = {
+  name: "Movement Prep",
+  duration: 180,
+  steps: [
+    "Jumping Jacks · 30 seconds",
+    "Arm Circles forward + back · 20 each",
+    "Leg Swings front/back + side · 10 each",
+    "Shoulder Pendulum · 10 each arm"
+  ]
+};
+
+const HARD_EXERCISES = new Set([
+  "Box Jump", "Squat Jump", "Lateral Bound", "Bosu Squat",
+  "Wide-Grip Pull-Up", "Wide Pull-Up", "Box Jump-Down",
+  "Box Jump / Lateral Bound", "Jump Rope Simulation"
+]);
+
+const MIN_REST = 12;
+const SIDE_SWITCH_BUFFER = 5;
+
+const E = (name, work, rest, cue, redFlag, opts = {}) => ({
+  name, work, rest: Math.max(rest, MIN_REST), cue, redFlag, ...opts
+});
+const ER = (name, repsDetail, rest, cue, redFlag, opts = {}) => ({
+  name, byReps: true, repsDetail, rest: Math.max(rest, MIN_REST), cue, redFlag, ...opts
+});
+
+const PLAN = {
+  monday: {
+    title: "Power Day A",
+    subtitle: "Push-Off Power + Hip Activation",
+    badge: "POWER",
+    hasEveningSwimClass: true,
+    equipment: ["Plyo box", "Resistance band (above-knee loop)", "Step platform"],
+    warmup: WARMUP,
+    circuits: [
+      { name: "Circuit A — Push-Off Power", rounds: 4, roundRest: 35, exercises: [
+        E("Box Jump", 30, 10,
+          "Imagine pushing off the pool wall at every takeoff. Maximum leg drive.",
+          "Knee caves on landing — stop immediately, lower box height."),
+        E("Squat Jump", 30, 10,
+          "Land softly — absorb, then explode up immediately. Quiet feet = good absorption.",
+          "Heavy stomping on landing — reduce jump height, focus on soft landing first."),
+        E("Bosu Squat", 30, 10,
+          "Feet shoulder-width on dome. 3-second controlled descent. Knees must not collapse inward.",
+          "Cannot control 3s descent — switch to floor squat without Bosu."),
+        E("Lateral Bound", 30, 10,
+          "Each landing completely still before next jump. Stillness IS the training — builds deceleration for wall turns.",
+          "Continuous bouncing without pausing — must pause every single landing.")
+      ]},
+      { name: "Circuit B — Hip Activation", rounds: 2, roundRest: 35, exercises: [
+        ER("Band Clamshell", "15 reps each side · 2s open / 1s hold / 2s close", 15,
+           "Hip stays STILL — only top knee opens. Controls kick direction in freestyle.",
+           "Hip rotates with knee — place hand on hip to monitor — only knee moves."),
+        ER("Band Crab Walk", "20 steps each direction · band above knees", 15,
+           "Stay low throughout. Band stays taut — never slack between steps.",
+           "Standing upright or band slack — re-squat low before continuing."),
+        ER("Calf Raise", "15 reps · 2s up / 1s hold / 2s down", 15,
+           "Full range — heel fully below platform level between every rep.",
+           "Half-range only — stop, reset, full range from heel-below-step.")
+      ]}
+    ]
+  },
+  tuesday: {
+    title: "Core Day A",
+    subtitle: "Anti-Rotation + Lat Activation",
+    badge: "CORE",
+    equipment: ["Fitness ball", "Pull-up bar", "Resistance band (anchored at hip)"],
+    warmup: null,
+    circuits: [
+      { name: "Interval Core Circuit", rounds: 3, roundRest: 45, exercises: [
+        ER("Ball Prone Stroke Sim", "12 reps per side", 15,
+           "Press BOTH shoulders DOWN before each stroke — lat works, NOT bicep. If arms burn: stop, depress shoulders again.",
+           "Arms engage before shoulders depress — stop, reset shoulder position, then continue."),
+        ER("Dead Bug", "10 alternating reps · full extension", 15,
+           "Lower back MUST stay pressed to floor throughout. Exhale fully as limbs extend. Trains the core pattern used in underwater dolphin kick.",
+           "Lower back lifts off floor — reduce limb range until floor contact is maintained."),
+        E("Wide-Grip Pull-Up", 30, 15,
+          "Depress shoulder blades BEFORE pulling. Lower in 4 full seconds — count aloud every rep.",
+          "Swinging or shrugging — switch to dead hang hold for remaining time."),
+        ER("Band Single-Arm Pull", "10 reps each side · slow and controlled", 15,
+           "Torso stays COMPLETELY STILL throughout — core resists rotation on every pull.",
+           "Torso rotates on pull — reduce band tension, widen stance for better base."),
+        E("Prone Flutter + Brace", 30, 15,
+          "Belly tight while legs move — if the belly relaxes, the legs are doing all the work. This is the bridge from floor core to water core.",
+          "Belly lifts off floor during flutter — slow down kick tempo, re-engage core before continuing.")
+      ]}
+    ]
+  },
+  wednesday: {
+    title: "Power Day B",
+    subtitle: "Flip-Turn Simulation",
+    badge: "POWER",
+    hasEveningSwimClass: true,
+    equipment: ["Plyo box", "Resistance band (above-knee loop)", "Sandbag (light)"],
+    warmup: WARMUP,
+    circuits: [
+      { name: "Circuit A — Turn Simulation", rounds: 4, roundRest: 35, exercises: [
+        E("Lateral Bound", 30, 10,
+          "Stillness IS the training — builds deceleration for stopping at the wall.",
+          "Continuous bouncing — cue \"hold\" — must pause every single landing."),
+        E("Box Jump-Down", 30, 10,
+          "Land as quietly as possible. Quiet landing = good absorption = faster flip-turn push-off.",
+          "Heavy stomping every rep — reduce drop height until landing is quiet."),
+        E("Squat Jump", 30, 10,
+          "Touch and go — maximum leg drive. Think wall push-off every rep.",
+          "Collapsing at bottom before jumping — cue \"fast\" — reduce depth if needed."),
+        E("Jump Rope Simulation", 30, 10,
+          "Arms drive rhythm. Land on balls of feet — never flat-footed. Fast rhythm, consistent for full 30s.",
+          "Pace collapses in last 10s — note as endurance data, do not stop.")
+      ]},
+      { name: "Circuit B — Lateral + Core Finisher", rounds: 2, roundRest: 35, exercises: [
+        ER("Band Crab Walk", "20 steps each direction · band above knees", 12,
+           "Glutes warm now — feel the band resistance clearly. Stay low throughout.",
+           "Standing upright or band goes slack — re-squat, reset stance."),
+        ER("Single-Leg RDL", "8 reps each leg · sandbag in opposite hand", 12,
+           "Hip hinge — NOT rounding back. Feel hamstring load at bottom. Mirrors flip-turn posterior chain drive.",
+           "Lower back rounds — reduce to 5 reps, relearn hip hinge before adding reps."),
+        ER("Band Straight-Arm Pulldown", "12 reps · 2s pull / 1s hold / 2s return", 12,
+           "Arms STRAIGHT throughout — lat works, NOT bicep. Feel it under armpit.",
+           "Elbows bend during pull — reduce band tension immediately."),
+        ER("V-Up", "10 reps · controlled tempo", 12,
+           "Legs and arms meet at top simultaneously — no momentum. Core fatigued = no cheating.",
+           "Lower back arches off floor — reduce to 5 reps, activate abs first.")
+      ]}
+    ]
+  },
+  thursday: {
+    title: "Core Recovery",
+    subtitle: "After School · Low Intensity · Pool Done This Morning",
+    badge: "RECOVERY",
+    equipment: ["Yoga mat"],
+    warmup: null,
+    isThursday: true,
+    circuits: [
+      { name: "Recovery Circuit", rounds: 3, roundRest: 45, exercises: [
+        ER("Dead Bug", "10 alternating reps · full extension", 15,
+           "Lower back MUST stay pressed to floor. Exhale fully as limbs extend.",
+           "Lower back lifts — reduce limb range until floor contact is maintained."),
+        ER("Hollow Body Flutter", "3 × 20s holds with slow flutter · 10s rest between", 15,
+           "Lower back flat to floor. Arms overhead in streamline, legs flutter with SMALL kicks. This IS the streamline position — if your back lifts here, your hips sink there.",
+           "Lower back arches off floor during flutter — stop flutter, return to static hold."),
+        ER("Superman Hold", "10 reps · 5s hold each", 15,
+           "Arms and legs lift simultaneously. Squeeze glutes and upper back equally. Count 5s aloud.",
+           "Only arms OR only legs lift — cue \"together\" — both must move simultaneously."),
+        ER("Bird Dog", "10 reps each side · 5s hold", 15,
+           "Opposite arm and leg extend simultaneously. Hip stays level — do NOT rotate.",
+           "Hip rotates more than 5° — reduce extension range, prioritise hip stability first.")
+      ]},
+      { name: "Post-Circuit Stretches", rounds: 1, roundRest: 0, isPostCircuit: true, exercises: [
+        E("Ankle Dorsiflexion Stretch", 40, 5,
+          "Heel flat, drive knee to wall. Each 10s push 1cm further.",
+          "Pain in knee — back off immediately.",
+          { eachSide: true }),
+        E("Shoulder Posterior Stretch", 40, 5,
+          "Cross arm at shoulder height, pull elbow toward chest. Each 10s pull further.",
+          "Sharp pain — ease off.",
+          { eachSide: true })
+      ]}
+    ]
+  },
+  friday: {
+    title: "Combined Day",
+    subtitle: "Full Body: Power + Back + Core",
+    badge: "COMBINED",
+    equipment: ["Plyo box", "Pull-up bar", "Fitness ball", "Resistance band"],
+    warmup: WARMUP,
+    circuits: [
+      { name: "Full-Body Circuit", rounds: 4, roundRest: 35, exercises: [
+        E("Box Jump / Lateral Bound", 30, 12,
+          "Alternate each round. Maximum power intent — this is NOT a warm-up.",
+          "Fatigue causes completely uncontrolled landing — switch to squat jump for that round."),
+        E("Ball Stroke Sim", 30, 12,
+          "Lats already activated from jump — drill quality is highest now. Press shoulders DOWN before each stroke.",
+          "Arms engage before shoulders depress — cue \"shoulders first\" — stop and reset if needed."),
+        E("Wide Pull-Up", 30, 12,
+          "Legs tired, upper body fresh. 4s lower builds lat strength. Count aloud every rep.",
+          "Swinging or shrugging — switch to dead hang hold for remaining time."),
+        ER("Fast Step", "30 contacts — count each foot touch", 12,
+           "Arms drive rhythm. Light feet — do not stomp. Equal contacts each side.",
+           "Clearly favouring one side — cue \"even\" — equal weight both feet."),
+        ER("Band Straight-Arm Pulldown", "12 reps", 12,
+           "Arms straight throughout — feel back, NOT arms. Lat fatigue from pull-ups = highest drill transfer here.",
+           "Elbows bend — reduce band tension immediately.")
+      ]}
+    ]
+  },
+  saturday: {
+    title: "Stretch + Core C",
+    subtitle: "Full-Body Release + Swimmer Flexibility",
+    badge: "FLEX",
+    equipment: ["Yoga mat", "Resistance band", "Step platform", "Fitness ball"],
+    warmup: null,
+    isCalmDay: true,
+    circuits: [
+      { name: "Deep Stretch", rounds: 1, roundRest: 0, exercises: [
+        E("Ankle Dorsiflexion", 60, 5,
+          "Heel flat — never lift it. Drive knee toward wall. Every 10s: push 1cm further, hold 5s.",
+          "Pain in knee — back off immediately.",
+          { eachSide: true }),
+        E("Shoulder Posterior Stretch", 50, 5,
+          "Cross arm at shoulder height. Other hand pulls elbow toward chest. Every 10s: actively pull further.",
+          "Sharp pain — ease off.",
+          { eachSide: true }),
+        E("Band Shoulder Circles — Forward", 45, 3,
+          "Slowest possible pace. Pause 3s at most restricted point.",
+          "Shoulder pinches — widen grip immediately."),
+        E("Band Shoulder Circles — Back", 45, 3,
+          "Slowest possible pace. Pause 3s at most restricted point.",
+          "Shoulder pinches — widen grip immediately."),
+        E("Hip Flexor Lunge — Band", 50, 5,
+          "Tuck tailbone, push hip forward. Every 10s: tuck more, push further. Torso upright throughout.",
+          "Torso leans forward — find upright before going deeper.",
+          { eachSide: true }),
+        E("Ball Thoracic Extension", 50, 5,
+          "Mid-back on ball, arms wide overhead. Roll slowly to find tight spots — breathe out fully 3 times on each.",
+          "Sharp pain (not stretch) — roll past that spot.")
+      ]},
+      { name: "Core C — Posterior Chain + Streamline", rounds: 3, roundRest: 45, exercises: [
+        ER("Superman Hold", "10 reps · 5s hold each", 15,
+           "Arms and legs lift simultaneously. Squeeze glutes and upper back equally. Count 5s aloud.",
+           "Only arms OR only legs lift — cue \"together\" — both must move simultaneously."),
+        ER("Streamline Wall Hold", "10s hold × 8 reps · reset between each", 15,
+           "Press entire back of hands, arms and head against wall. Squeeze core and glutes. This IS your entry position in water.",
+           "Lower back arches away from wall — cue \"flatten back\" — tuck tailbone more."),
+        ER("Glute Bridge Slow", "12 reps · 2s up / 2s hold / 2s down", 15,
+           "Count each phase aloud. Squeeze glutes at top — hips fully extended. Do NOT arch lower back.",
+           "Lower back arches as compensation — reduce to 8 reps, focus on glute-only activation."),
+        ER("W-Raise", "12 reps · squeeze at top 2s", 15,
+           "Elbows at 90° — pull shoulder blades together and DOWN simultaneously. Feel rear shoulder and mid-back, NOT neck.",
+           "Neck straining or shrugging — reduce range of motion, focus on shoulder blade movement only."),
+        ER("Tuck-and-Streamline", "8 reps · hold 5s each", 15,
+           "Explode from tuck to full streamline — lock core and glutes the instant you extend. Hold 5s with zero wobble.",
+           "Cannot hold 5s without back arching — reduce hold to 3s, build stability before adding duration.")
+      ]}
+    ]
+  },
+  sunday: { restDay: true }
+};
+
+/* ============================================================
+   EVENING STREAMLINE CHECK — available every day
+   ============================================================ */
+
+const EVENING_CHECK = {
+  title: "Evening Streamline Check",
+  subtitle: "3 min · Body Position Awareness",
+  badge: "🌙 EVENING",
+  isCalmDay: true,
+  circuits: [
+    { name: "Streamline Check", rounds: 1, roundRest: 0, exercises: [
+      E("Streamline Hold on Floor", 30, 5,
+        "Lie on back, arms overhead in full streamline. Press lower back flat to floor. Hold. This is the feeling you need to find in the water.",
+        "Lower back arches — tuck tailbone, press harder into floor."),
+      E("Hollow Body Hold", 20, 5,
+        "Same position but lift arms and legs slightly off floor. Lower back stays flat. This is the ACTIVE version — what your core should feel like while swimming.",
+        "Lower back lifts — lower arms and legs closer to floor."),
+      E("Wall Streamline", 20, 5,
+        "Stand facing wall, arms overhead. Entire back of hands, arms, and head pressed flat against wall. This is the vertical version — reinforces the same shape.",
+        "Gap at lower back — tuck tailbone more, flatten against wall.")
+    ]}
+  ]
+};
+
+const DAY_KEYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/* ============================================================
+   STATE & AUDIO
+   ============================================================ */
+
+let selectedDay = null;
+let selectedSession = "morning"; // "morning" or "evening"
+let skipGreetingOnStart = false;
+let closeModalAborted = false;
+let session = {
+  running: false, paused: false, abort: false, skipExercise: false,
+  currentTimer: null, byRepsResolver: null,
+  calmMode: false, currentEx: null, weather: null
+};
+
+const speech = window.speechSynthesis;
+let audioCtx = null;
+
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function speak(msg) {
+  if (!speech) return;
+  speech.cancel();
+  const u = new SpeechSynthesisUtterance(msg);
+  u.rate = 0.9;
+  u.pitch = 1.05;
+  speech.speak(u);
+}
+
+// Helper: speak and WAIT for utterance to finish before proceeding
+// This is the key fix for voice lag — timer never starts until voice completes
+function speakAndWait(msg) {
+  return new Promise(resolve => {
+    if (!speech) { resolve(); return; }
+    speech.cancel();
+    const u = new SpeechSynthesisUtterance(msg);
+    u.rate = 0.9;
+    u.pitch = 1.05;
+    u.onend = () => {
+      // Small buffer after speech ends to prevent overlap with beeps
+      setTimeout(resolve, 200);
+    };
+    u.onerror = () => {
+      setTimeout(resolve, 200);
+    };
+    // Failsafe: if onend never fires (known browser bug), resolve after estimated duration
+    const estimatedMs = Math.max(msg.length * 80, 2000);
+    const failsafe = setTimeout(() => resolve(), estimatedMs);
+    const origOnend = u.onend;
+    u.onend = () => { clearTimeout(failsafe); setTimeout(resolve, 200); };
+    u.onerror = () => { clearTimeout(failsafe); setTimeout(resolve, 200); };
+    speech.speak(u);
+  });
+}
+
+function beep(freq = 440, duration = 0.12) {
+  if (!audioCtx || session.calmMode) return;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.connect(g); g.connect(audioCtx.destination);
+  osc.type = "sine";
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(0.15, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function endBeep() {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.connect(g); g.connect(audioCtx.destination);
+  osc.type = "sine";
+  osc.frequency.value = 700;
+  const vol = session.calmMode ? 0.07 : 0.18;
+  g.gain.setValueAtTime(vol, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.25);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.25);
+}
+
+/* ============================================================
+   WEATHER FETCH
+   ============================================================ */
+
+async function fetchWeather() {
+  try {
+    const response = await fetch(
+      'https://api.open-meteo.com/v1/forecast?latitude=52.1833&longitude=-113.8&current=temperature_2m,weather_code,wind_speed_10m&timezone=America/Edmonton'
+    );
+    const data = await response.json();
+    const curr = data.current;
+    const desc = weatherDesc(curr.weather_code);
+    return {
+      temp: Math.round(curr.temperature_2m),
+      desc: desc,
+      wind: Math.round(curr.wind_speed_10m)
+    };
+  } catch (e) {
+    console.error("Weather fetch failed:", e);
+    return { temp: 0, desc: "Unknown", wind: 0 };
+  }
+}
+
+function weatherDesc(code) {
+  if (code <= 1) return "clear or partly cloudy";
+  if (code <= 3) return "cloudy";
+  if (code <= 48) return "clear or misty";
+  if (code <= 67) return "light rain";
+  if (code <= 77) return "rain or snow";
+  if (code <= 82) return "heavy rain";
+  if (code <= 86) return "snow showers";
+  return "mixed conditions";
+}
+
+/* ============================================================
+   DATE
+   ============================================================ */
+
+function localDayKey() {
+  return new Date().toLocaleString("en-US", {
+    timeZone: "America/Edmonton", weekday: "long"
+  }).toLowerCase();
+}
+
+/* ============================================================
+   MODAL — DAY + SESSION PICKER (on load)
+   ============================================================ */
+
+function initModal() {
+  const today = localDayKey();
+  const modalDays = document.getElementById("modal-days");
+  const confirmBtn = document.getElementById("modal-confirm-btn");
+  const msgEl = document.getElementById("modal-msg");
+  const sessionPicker = document.getElementById("modal-session-picker");
+
+  const order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  
+  order.forEach(key => {
+    const idx = DAY_KEYS.indexOf(key);
+    const btn = document.createElement("button");
+    btn.className = "modal-day-btn";
+    btn.textContent = DAY_SHORT[idx];
+    
+    if (key === today) btn.classList.add("today");
+    if (PLAN[key].restDay) btn.classList.add("rest");
+    
+    btn.onclick = () => {
+      document.querySelectorAll(".modal-day-btn").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      selectedDay = key;
+      selectedSession = "morning";
+      
+      // Reset session picker
+      document.querySelectorAll(".session-btn").forEach(b => b.classList.remove("selected"));
+
+      const data = PLAN[key];
+
+      // Show session picker for all days (morning training + evening streamline)
+      if (data.restDay) {
+        // Rest day: only evening streamline available
+        sessionPicker.classList.add("show");
+        document.getElementById("btn-morning").style.display = "none";
+        document.getElementById("btn-evening").classList.add("selected");
+        selectedSession = "evening";
+        msgEl.textContent = "Rest day — evening streamline check only.";
+        confirmBtn.disabled = false;
+      } else {
+        sessionPicker.classList.add("show");
+        document.getElementById("btn-morning").style.display = "";
+        // Default to morning selected
+        document.getElementById("btn-morning").classList.add("selected");
+        selectedSession = "morning";
+
+        if (data.hasEveningSwimClass) {
+          msgEl.textContent = `${data.title} — ${data.subtitle} · 🏊 Swim class tonight 6–7pm`;
+        } else {
+          msgEl.textContent = `${data.title} — ${data.subtitle}`;
+        }
+        confirmBtn.disabled = false;
+      }
+    };
+    
+    modalDays.appendChild(btn);
+  });
+  
+  confirmBtn.onclick = async () => await closeModal();
+}
+
+function pickSession(which) {
+  selectedSession = which;
+  document.querySelectorAll(".session-btn").forEach(b => b.classList.remove("selected"));
+  if (which === "morning") {
+    document.getElementById("btn-morning").classList.add("selected");
+  } else {
+    document.getElementById("btn-evening").classList.add("selected");
+  }
+
+  const msgEl = document.getElementById("modal-msg");
+  const data = PLAN[selectedDay];
+
+  if (which === "evening") {
+    msgEl.textContent = "🌙 Evening Streamline Check — 3 min body position awareness";
+  } else if (data.restDay) {
+    msgEl.textContent = "Rest day — recovery is training.";
+  } else {
+    if (data.hasEveningSwimClass) {
+      msgEl.textContent = `${data.title} — ${data.subtitle} · 🏊 Swim class tonight 6–7pm`;
+    } else {
+      msgEl.textContent = `${data.title} — ${data.subtitle}`;
+    }
+  }
+}
+
+async function closeModal() {
+  ensureAudio();
+  closeModalAborted = false;
+  
+  document.getElementById("modal-overlay").classList.remove("show");
+  document.getElementById("page-content").classList.add("show");
+  
+  session.weather = await fetchWeather();
+  
+  renderTabs();
+  renderSchedule();
+  renderCard();
+  
+  if (selectedSession === "evening") {
+    // Evening streamline — minimal greeting
+    await speakAndWait("Evening streamline check. Let's find your swimming shape.");
+    return;
+  }
+
+  const data = PLAN[selectedDay];
+  
+  if (data.restDay) {
+    await speakAndWait(`Hi Jess! Today is ${DAY_LONG[DAY_KEYS.indexOf(selectedDay)]}, your rest day. Recovery is the training.`);
+    return;
+  }
+  
+  // Weather greeting
+  const w = session.weather;
+  const weatherMsg = `Red Deer is ${w.temp} degrees and ${w.desc}.`;
+  await speakAndWait(`Hi Jess! Another great day to work with you. ${weatherMsg}`);
+  if (closeModalAborted) return;
+  
+  // Equipment
+  const eqMsg = `Here's the equipment we'll need: ${data.equipment.join(", ")}.`;
+  await speakAndWait(eqMsg);
+  if (closeModalAborted) return;
+  
+  // Exercise list
+  let circuitMsg = "While you set up, here's today's exercise list. ";
+  for (let ci = 0; ci < data.circuits.length; ci++) {
+    const circuit = data.circuits[ci];
+    const exNames = circuit.exercises.map(e => e.name).join(", ");
+    const roundsText = circuit.rounds > 1 ? `${circuit.rounds} rounds of` : "1 round of";
+    
+    const hasReps = circuit.exercises.filter(e => e.byReps).length;
+    const hasTimed = circuit.exercises.filter(e => !e.byReps).length;
+    
+    let modeText = "";
+    if (hasReps > 0 && hasTimed > 0) {
+      modeText = " — mix of timed and by reps";
+    } else if (hasReps === circuit.exercises.length) {
+      modeText = " — by reps";
+    } else {
+      modeText = " — timed";
+    }
+    
+    circuitMsg += `${roundsText} ${exNames}${modeText}. `;
+  }
+  if (closeModalAborted) return;
+  await speakAndWait(circuitMsg);
+}
+
+// Live warm-up cueing after READY is tapped
+async function runWarmupCueing() {
+  const steps = [
+    { name: "Jumping Jacks", duration: 30, note: "30 seconds" },
+    { name: "Arm Circles forward and back", duration: 60, note: "20 each, about 1 minute" },
+    { name: "Leg Swings front back and side", duration: 60, note: "10 each, about 1 minute" },
+    { name: "Shoulder Pendulum", duration: 30, note: "10 each arm, 30 seconds" }
+  ];
+  
+  await speakAndWait("Movement prep starts now.");
+  
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    // Voice cue completes BEFORE timer starts — fixes lag
+    await speakAndWait(`${step.name}, ${step.note}. Go!`);
+    const r = await countdown(step.duration);
+    if (r === "abort") return "abort";
+  }
+  
+  await speakAndWait("Eight seconds until first circuit exercise.");
+  const r = await countdown(8);
+  if (r === "abort") return "abort";
+  return "done";
+}
+
+/* ============================================================
+   RENDER — tabs, schedule, day card
+   ============================================================ */
+
+function renderTabs() {
+  const today = localDayKey();
+  const tabs = document.getElementById("day-tabs");
+  tabs.innerHTML = "";
+  const order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  order.forEach(key => {
+    const idx = DAY_KEYS.indexOf(key);
+    const tab = document.createElement("div");
+    tab.className = "day-tab";
+    if (key === today) tab.classList.add("today");
+    if (key === selectedDay) tab.classList.add("active");
+    if (PLAN[key].restDay) tab.classList.add("rest");
+    tab.textContent = DAY_SHORT[idx];
+    tab.onclick = () => {
+      if (session.running) return;
+      selectedDay = key;
+      renderTabs();
+      renderCard();
+    };
+    tabs.appendChild(tab);
+  });
+}
+
+function renderSchedule() {
+  const today = localDayKey();
+  const grid = document.getElementById("schedule-grid");
+  grid.innerHTML = "";
+  const order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  order.forEach(key => {
+    const idx = DAY_KEYS.indexOf(key);
+    const cell = document.createElement("div");
+    cell.className = "sch-cell" + (key === today ? " today" : "");
+    const data = PLAN[key];
+    const name = data.restDay ? "Rest" : data.badge;
+    cell.innerHTML = `<div class="day">${DAY_SHORT[idx]}</div><div class="name">${name}</div>`;
+    grid.appendChild(cell);
+  });
+}
+
+function getActiveData() {
+  if (selectedSession === "evening") return EVENING_CHECK;
+  return PLAN[selectedDay];
+}
+
+function renderCard() {
+  const data = getActiveData();
+  document.getElementById("main-card").classList.remove("session-active");
+
+  if (selectedSession === "evening") {
+    renderEveningBrief(data);
+    return;
+  }
+
+  if (data.restDay) {
+    document.getElementById("main-card").innerHTML = `
+      <div class="rest-day">
+        <div class="emoji">☀️</div>
+        <h2>Sunday Rest</h2>
+        <p>Recovery IS the training.</p>
+        <ul>
+          <li>✓ Light recreational swimming — no laps, no drills</li>
+          <li>✓ Free play, walking, casual bike ride</li>
+          <li>✓ Light foam rolling</li>
+          <li>✓ Extra sleep — most powerful tool</li>
+          <li>✓ Eat well — especially protein</li>
+        </ul>
+      </div>`;
+    return;
+  }
+  renderBrief(data);
+}
+
+function renderEveningBrief(data) {
+  const exHtml = data.circuits[0].exercises.map(ex => {
+    const meta = ex.eachSide ? `${Math.floor(ex.work/2)}s × 2 sides` : `${ex.work}s`;
+    return `<li class="ex-line"><span>${ex.name}</span><span class="ex-meta">${meta}</span></li>`;
+  }).join("");
+
+  document.getElementById("main-card").innerHTML = `
+    <div class="day-header">
+      <span class="day-badge evening-badge">${data.badge}</span>
+      <h2 class="day-title">${data.title}</h2>
+      <div class="day-subtitle">${data.subtitle}</div>
+    </div>
+    <div class="mantra" style="font-size: 1.1rem; color: var(--evening-deep);">
+      Not a stretching routine — body position awareness training.<br>
+      Focus on FEELING the position, not performing.
+    </div>
+    <div class="brief">
+      <div class="brief-section">
+        <strong>🌙 Streamline Exercises</strong>
+        <ul>${exHtml}</ul>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-ready" style="background: var(--evening); color: white;">
+        START 🌙
+      </button>
+    </div>`;
+
+  document.getElementById("btn-ready").onclick = async () => {
+    closeModalAborted = true;
+    skipGreetingOnStart = true;
+    await startSession();
+  };
+}
+
+function renderBrief(data) {
+  const circuitsHtml = data.circuits.map(c => {
+    const exHtml = c.exercises.map(ex => {
+      const meta = ex.byReps
+        ? "by reps"
+        : (ex.eachSide ? `${Math.floor(ex.work/2)}s × 2 sides` : `${ex.work}s`);
+      return `<li class="ex-line"><span>${ex.name}</span><span class="ex-meta">${meta}</span></li>`;
+    }).join("");
+    return `
+      <div class="brief-section">
+        <strong>${c.name}</strong> · ${c.rounds} round${c.rounds > 1 ? "s" : ""}
+        <ul>${exHtml}</ul>
+      </div>`;
+  }).join("");
+
+  const eqHtml = data.equipment ? `
+    <div class="brief-section">
+      <strong>📦 Equipment to set up</strong>
+      <ul>${data.equipment.map(e => `<li>${e}</li>`).join("")}</ul>
+    </div>` : "";
+
+  const warmupHtml = data.warmup ? `
+    <div class="brief-section">
+      <strong>🔥 Movement Prep first</strong> · 3 min (mandatory on power days)
+    </div>` : "";
+
+  const swimClassHtml = data.hasEveningSwimClass ? `
+    <div class="swim-class-notice">
+      <strong>🏊 Evening Swim Class Tonight (6–7pm)</strong><br>
+      No extra activity this afternoon — protect 2 hours before class for light snack and rest.
+    </div>` : "";
+
+  const readinessHtml = data.isThursday ? `
+    <div class="readiness" id="readiness">
+      <strong>How are you feeling today?</strong>
+      <div style="font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); margin-top: 0.3rem;">
+        Morning pool session done. If waking resting HR was 5+ above baseline, rest IS the training.
+      </div>
+      <div class="readiness-buttons">
+        <button data-feel="fresh">Fresh ✨</button>
+        <button data-feel="okay">Okay</button>
+        <button data-feel="tired">Tired 😴</button>
+      </div>
+      <div id="readiness-msg" style="margin-top: 0.5rem; font-family: 'Gochi Hand', cursive; font-size: 1.2rem; min-height: 1.3rem;"></div>
+    </div>` : "";
+
+  document.getElementById("main-card").innerHTML = `
+    <div class="day-header">
+      <span class="day-badge">${data.badge}</span>
+      <h2 class="day-title">${data.title}</h2>
+      <div class="day-subtitle">${data.subtitle}</div>
+    </div>
+    <div class="mantra">"${MANTRA}"</div>
+    <div class="brief">
+      ${readinessHtml}
+      ${swimClassHtml}
+      ${eqHtml}
+      ${warmupHtml}
+      ${circuitsHtml}
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-ready">READY ✓</button>
+    </div>`;
+
+  if (data.isThursday) {
+    const readyBtn = document.getElementById("btn-ready");
+    const msgEl = document.getElementById("readiness-msg");
+    readyBtn.disabled = true;
+
+    document.querySelectorAll(".readiness-buttons button").forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll(".readiness-buttons button").forEach(b => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        const feel = btn.dataset.feel;
+        if (feel === "tired") {
+          msgEl.innerHTML = `<span style="color: var(--accent-orange);">Rest is the training today. Skip and sleep early.</span>`;
+          readyBtn.textContent = "TAKE THE REST ✓";
+          readyBtn.disabled = false;
+          readyBtn.onclick = () => {
+            document.getElementById("main-card").innerHTML = `
+              <div class="rest-day">
+                <div class="emoji">😴</div>
+                <h2>Rest tonight</h2>
+                <p>Recovery IS training. Tomorrow is Friday — show up rested.</p>
+              </div>`;
+          };
+        } else {
+          msgEl.innerHTML = `<span style="color: var(--accent-green);">Gentle work today. Stop early if quality drops.</span>`;
+          readyBtn.textContent = "READY ✓";
+          readyBtn.disabled = false;
+          readyBtn.onclick = startSession;
+        }
+      };
+    });
+  } else {
+    document.getElementById("btn-ready").onclick = async () => {
+      closeModalAborted = true;
+      skipGreetingOnStart = true;
+      await startSession();
+    };
+  }
+}
+
+/* ============================================================
+   SESSION UI
+   ============================================================ */
+
+function fmt(s) {
+  if (typeof s === "string") return s;
+  if (s < 60) return String(s).padStart(2, "0");
+  const m = Math.floor(s / 60), r = s % 60;
+  return `${m}:${String(r).padStart(2, "0")}`;
+}
+
+function renderSessionShell(data) {
+  const card = document.getElementById("main-card");
+  card.classList.add("session-active");
+  const isEvening = selectedSession === "evening";
+  card.innerHTML = `
+    <div class="day-header">
+      <span class="day-badge${isEvening ? ' evening-badge' : ''}">${data.badge}</span>
+      <h2 class="day-title">${data.title}</h2>
+      <div class="day-subtitle">${data.subtitle}</div>
+    </div>
+    <div class="status" id="status">Get ready…</div>
+    <div class="timer-zone" id="timer-zone">
+      <div class="timer" id="timer">--:--</div>
+      <div class="progress" id="progress"></div>
+    </div>
+    <div class="exercise" id="exercise"></div>
+    <div class="upnext" id="upnext"></div>
+    <div class="btn-row" id="controls"></div>`;
+}
+
+function setZone(mode) { document.getElementById("timer-zone").className = "timer-zone " + mode; }
+function setTimer(s, urgent = false) {
+  const t = document.getElementById("timer");
+  t.textContent = fmt(s);
+  t.classList.toggle("urgent", urgent);
+}
+function setStatus(msg) { document.getElementById("status").textContent = msg; }
+function setProgress(chips) {
+  document.getElementById("progress").innerHTML =
+    chips.map(c => `<span class="chip${c.phase ? " phase" : ""}">${c.text}</span>`).join("");
+}
+function setExercise({ name, detail, cue, redFlag, warmupSteps, hydrate }) {
+  const html = [];
+  if (name)   html.push(`<div class="ex-name">${name}</div>`);
+  if (detail) html.push(`<div class="ex-detail">${detail}</div>`);
+  if (warmupSteps) html.push(`<div class="ex-cue">${warmupSteps.map(s => "• " + s).join("<br>")}</div>`);
+  else if (cue) html.push(`<div class="ex-cue">${cue}</div>`);
+  if (redFlag) html.push(`<div class="ex-redflag">${redFlag}</div>`);
+  if (hydrate) html.push(`<div class="ex-hydrate">💧 Sip water · breathe deep · shake it out</div>`);
+  document.getElementById("exercise").innerHTML = html.join("");
+}
+function setUpNext(text) { document.getElementById("upnext").innerHTML = text || ""; }
+
+function setSessionControls() {
+  document.getElementById("controls").innerHTML = `
+    <button class="btn btn-pause" id="btn-pause">PAUSE</button>
+    <button class="btn btn-form"  id="btn-form">FORM</button>
+    <button class="btn btn-skip"  id="btn-skip">SKIP EX</button>
+    <button class="btn btn-stop"  id="btn-stop">STOP</button>`;
+  document.getElementById("btn-pause").onclick = togglePause;
+  document.getElementById("btn-form").onclick = formCheck;
+  document.getElementById("btn-skip").onclick = skipExercise;
+  document.getElementById("btn-stop").onclick = stopSession;
+}
+
+function setDoneControls() {
+  document.getElementById("controls").innerHTML = `
+    <button class="btn btn-done"  id="btn-done">DONE ✓</button>
+    <button class="btn btn-pause" id="btn-pause">PAUSE</button>
+    <button class="btn btn-form"  id="btn-form">FORM</button>
+    <button class="btn btn-skip"  id="btn-skip">SKIP EX</button>
+    <button class="btn btn-stop"  id="btn-stop">STOP</button>`;
+  document.getElementById("btn-done").onclick = () => {
+    if (session.byRepsResolver) {
+      const r = session.byRepsResolver;
+      session.byRepsResolver = null;
+      beep(880, 0.15);
+      r("done");
+    }
+  };
+  document.getElementById("btn-pause").onclick = togglePause;
+  document.getElementById("btn-form").onclick = formCheck;
+  document.getElementById("btn-skip").onclick = skipExercise;
+  document.getElementById("btn-stop").onclick = stopSession;
+}
+
+/* ============================================================
+   TIMER PRIMITIVES
+   ============================================================ */
+
+function countdown(seconds, opts = {}) {
+  return new Promise(resolve => {
+    let remaining = seconds;
+    setTimer(remaining);
+    session.currentTimer = setInterval(() => {
+      if (session.abort)        { clearInterval(session.currentTimer); resolve("abort"); return; }
+      if (session.skipExercise) { clearInterval(session.currentTimer); resolve("skip");  return; }
+      if (session.paused) return;
+
+      remaining--;
+      const urgent = remaining <= 3 && remaining > 0;
+      setTimer(Math.max(remaining, 0), urgent);
+      if (opts.onTick) opts.onTick(remaining);
+
+      if (remaining <= 3 && remaining > 0) beep(remaining === 1 ? 880 : 440, 0.1);
+      if (remaining === 0) endBeep();
+
+      if (remaining <= 0) { clearInterval(session.currentTimer); resolve("done"); }
+    }, 1000);
+  });
+}
+
+function waitForDone() {
+  return new Promise(resolve => {
+    session.byRepsResolver = resolve;
+    setTimer("✓");
+    setDoneControls();
+    const watchdog = setInterval(() => {
+      if (session.abort) {
+        clearInterval(watchdog);
+        if (session.byRepsResolver) { const r = session.byRepsResolver; session.byRepsResolver = null; r("abort"); }
+      }
+      if (session.skipExercise) {
+        clearInterval(watchdog);
+        if (session.byRepsResolver) { const r = session.byRepsResolver; session.byRepsResolver = null; r("skip"); }
+      }
+    }, 200);
+  });
+}
+
+function sleep(ms) {
+  return new Promise(resolve => {
+    const start = Date.now();
+    const id = setInterval(() => {
+      if (session.abort)        { clearInterval(id); resolve("abort"); return; }
+      if (session.skipExercise) { clearInterval(id); resolve("skip");  return; }
+      if (session.paused) return;
+      if (Date.now() - start >= ms) { clearInterval(id); resolve("done"); }
+    }, 100);
+  });
+}
+
+/* ============================================================
+   SESSION FLOW
+   ============================================================ */
+
+async function startSession() {
+  ensureAudio();
+  if (session.running) return;
+  const data = getActiveData();
+  const isEvening = selectedSession === "evening";
+  session = {
+    running: true, paused: false, abort: false, skipExercise: false,
+    currentTimer: null, byRepsResolver: null,
+    calmMode: !!data.isCalmDay, currentEx: null, weather: session.weather
+  };
+
+  if (skipGreetingOnStart) {
+    session.skipExercise = true;
+    skipGreetingOnStart = false;
+  }
+
+  renderSessionShell(data);
+  setSessionControls();
+
+  // Mantra / intro
+  if (isEvening) {
+    setStatus("Streamline Check");
+    setExercise({
+      name: "Find your shape",
+      cue: "Quiet space, no rush. Focus on feeling the position, not performing."
+    });
+    await speakAndWait("Evening streamline check. Focus on feeling the correct shape.");
+  } else {
+    setStatus("Let's go!");
+    const firstEx = data.warmup ? data.warmup.name : data.circuits[0].exercises[0].name;
+    setExercise({
+      name: "Ready?",
+      cue: `"${MANTRA}" — Starting with ${firstEx}.`
+    });
+    await speakAndWait(MANTRA + " Starting with " + firstEx + ".");
+  }
+
+  const r1 = await sleep(2000);
+  if (r1 === "abort") return finalize(false);
+  
+  session.skipExercise = false;
+
+  // Warm-up (morning sessions only, if warmup exists)
+  if (!isEvening && data.warmup) {
+    setZone("warmup");
+    setStatus("Warm-up");
+    setProgress([{ text: "Movement Prep", phase: true }, { text: "3 min" }]);
+    setExercise({ name: "Movement Prep", warmupSteps: data.warmup.steps });
+    setUpNext(`<span class="label">Up next:</span> <span class="name">${data.circuits[0].name}</span>`);
+    
+    const warmResult = await runWarmupCueing();
+    if (warmResult === "abort") return finalize(false);
+    await sleep(1000);
+  } else if (!isEvening && !data.warmup) {
+    setZone("warmup");
+    setStatus("Get ready…");
+    setExercise({ name: "Almost time", cue: "Get your gear ready. First exercise starts in 8 seconds." });
+    await speakAndWait("Eight seconds until first exercise.");
+    await countdown(8);
+  } else {
+    // Evening — short countdown
+    setZone("evening");
+    setStatus("Starting in 5…");
+    setExercise({ name: "Get into position", cue: "Find a quiet spot on the floor." });
+    await speakAndWait("Starting in five seconds.");
+    await countdown(5);
+  }
+
+  // Circuits
+  for (let ci = 0; ci < data.circuits.length; ci++) {
+    const circuit = data.circuits[ci];
+
+    for (let r = 1; r <= circuit.rounds; r++) {
+      for (let ei = 0; ei < circuit.exercises.length; ei++) {
+        const ex = circuit.exercises[ei];
+        session.skipExercise = false;
+        session.currentEx = ex;
+
+        // ---------- WORK ----------
+        setZone(isEvening ? "evening" : "work");
+        setStatus(circuit.name);
+        setProgress([
+          { text: `Round ${r}/${circuit.rounds}`, phase: true },
+          { text: `Exercise ${ei + 1}/${circuit.exercises.length}` }
+        ]);
+
+        const detail = ex.byReps
+          ? ex.repsDetail
+          : (ex.eachSide ? `${Math.floor(ex.work/2)}s each side` : `${ex.work}s`);
+
+        setExercise({ name: ex.name, detail, cue: ex.cue });
+
+        const next = nextLabel(data, ci, r, ei);
+        setUpNext(next ? `<span class="label">Up next:</span> <span class="name">${next}</span>` : "");
+
+        if (ex.byReps) {
+          // Voice cue completes FIRST, then show DONE button
+          await speakAndWait(ex.name + ". " + ex.repsDetail + ". Go.");
+          const result = await waitForDone();
+          if (result === "abort") return finalize(false);
+          setSessionControls();
+        } else {
+          setTimer(ex.work);
+          // Voice cue completes FIRST, then timer starts — fixes lag issue
+          await speakAndWait(ex.name + ". Three, two, one, go.");
+
+          if (ex.eachSide) {
+            const half = Math.floor(ex.work / 2);
+            const r3 = await countdown(half);
+            if (r3 === "abort") return finalize(false);
+
+            if (r3 !== "skip") {
+              setZone("sideswitch");
+              setStatus("Switch sides");
+              setExercise({
+                name: "Switch sides",
+                cue: `Reposition for the other side. ${ex.name} continues.`
+              });
+              await speakAndWait("Switch sides. Take five seconds to reposition.");
+              const r4 = await countdown(SIDE_SWITCH_BUFFER);
+              if (r4 === "abort") return finalize(false);
+
+              if (r4 !== "skip") {
+                setZone(isEvening ? "evening" : "work");
+                setStatus(circuit.name);
+                setExercise({ name: ex.name, detail: `${half}s second side`, cue: ex.cue });
+                await speakAndWait(ex.name + " second side. Three, two, one, go.");
+                const r5 = await countdown(half);
+                if (r5 === "abort") return finalize(false);
+              }
+            }
+          } else {
+            const r6 = await countdown(ex.work);
+            if (r6 === "abort") return finalize(false);
+          }
+        }
+
+        // ---------- REST ----------
+        const isFinalEx =
+          ci === data.circuits.length - 1 &&
+          r === circuit.rounds &&
+          ei === circuit.exercises.length - 1;
+
+        if (!isFinalEx) {
+          const upcoming = nextLabel(data, ci, r, ei);
+          const upcomingEx = nextExercise(data, ci, r, ei);
+          const isLastOfRound = ei === circuit.exercises.length - 1;
+          const isLastRound = r === circuit.rounds;
+          const isLastCircuit = ci === data.circuits.length - 1;
+
+          if (isLastOfRound && !(isLastRound && isLastCircuit)) {
+            // Round rest
+            setZone("roundrest");
+            setStatus("Round rest");
+            const nextLabelText = isLastRound ? data.circuits[ci + 1].name : `Round ${r + 1}`;
+
+            const roundProgress = r < circuit.rounds
+              ? `Round ${r} done! You got ${circuit.rounds - r} more to crush!`
+              : `${circuit.name} complete! Time to bring the fire to the next one!`;
+
+            setExercise({ name: "Round Rest", cue: roundProgress, hydrate: true });
+            setUpNext(`<span class="label">Up next:</span> <span class="name">${nextLabelText}</span>`);
+            // Voice completes before timer
+            await speakAndWait(roundProgress);
+
+            const leadTime = upcomingEx && HARD_EXERCISES.has(upcomingEx.name) ? 8 : 5;
+            const result = await countdown(circuit.roundRest, {
+              onTick: (rem) => {
+                if (rem === leadTime && upcomingEx) speak("Get ready for " + upcomingEx.name);
+              }
+            });
+            if (result === "abort") return finalize(false);
+          } else {
+            // Inter-exercise rest
+            const restDuration = Math.max(ex.rest, MIN_REST);
+            setZone("rest");
+            setStatus("Rest");
+            setExercise({
+              name: "Rest",
+              cue: "Breathe and reset.",
+              redFlag: upcomingEx ? upcomingEx.redFlag : null
+            });
+            setUpNext(`<span class="label">Up next:</span> <span class="name">${upcoming}</span>`);
+
+            await speakAndWait("Rest.");
+            const leadTime = upcomingEx && HARD_EXERCISES.has(upcomingEx.name) ? 8 : 5;
+            const result = await countdown(restDuration, {
+              onTick: (rem) => {
+                if (rem === leadTime) speak("Up next: " + upcoming);
+              }
+            });
+            if (result === "abort") return finalize(false);
+          }
+        }
+      }
+    }
+  }
+
+  finalize(true);
+}
+
+function nextLabel(data, ci, r, ei) {
+  const circuit = data.circuits[ci];
+  if (ei + 1 < circuit.exercises.length) return circuit.exercises[ei + 1].name;
+  if (r + 1 <= circuit.rounds) return circuit.exercises[0].name + ` (Round ${r + 1})`;
+  if (ci + 1 < data.circuits.length) return data.circuits[ci + 1].exercises[0].name;
+  return null;
+}
+
+function nextExercise(data, ci, r, ei) {
+  const circuit = data.circuits[ci];
+  if (ei + 1 < circuit.exercises.length) return circuit.exercises[ei + 1];
+  if (r + 1 <= circuit.rounds) return circuit.exercises[0];
+  if (ci + 1 < data.circuits.length) return data.circuits[ci + 1].exercises[0];
+  return null;
+}
+
+/* ============================================================
+   CONTROL ACTIONS
+   ============================================================ */
+
+function togglePause() {
+  session.paused = !session.paused;
+  const btn = document.getElementById("btn-pause");
+  if (btn) btn.textContent = session.paused ? "RESUME" : "PAUSE";
+  speak(session.paused ? "Paused." : "Resuming.");
+}
+
+function formCheck() {
+  if (!session.currentEx) return;
+  const ex = session.currentEx;
+  const wasPaused = session.paused;
+  if (!wasPaused) togglePause();
+  let msg = ex.name + ". " + ex.cue;
+  if (ex.redFlag) msg += " Watch out: " + ex.redFlag;
+  speak(msg);
+}
+
+function skipExercise() {
+  if (!confirm("Skip this exercise and move on?")) return;
+  session.skipExercise = true;
+  if (session.byRepsResolver) {
+    const r = session.byRepsResolver;
+    session.byRepsResolver = null;
+    r("skip");
+  }
+  speak("Skipping. Moving on.");
+}
+
+function stopSession() {
+  if (!confirm("Stop the whole session?")) return;
+  session.abort = true;
+  if (session.byRepsResolver) {
+    const r = session.byRepsResolver;
+    session.byRepsResolver = null;
+    r("abort");
+  }
+  speak("Session stopped.");
+}
+
+/* ============================================================
+   FINALIZATION
+   ============================================================ */
+
+function finalize(completed) {
+  if (session.currentTimer) clearInterval(session.currentTimer);
+  session.running = false;
+  session.paused = false;
+  session.abort = false;
+
+  const isEvening = selectedSession === "evening";
+
+  if (completed) {
+    setZone("");
+    if (isEvening) {
+      setStatus("Streamline check done 🌙");
+      setTimer("✓");
+      setExercise({
+        name: "Done, Jess!",
+        cue: "Great shape work. Your body knows the position a little better now. See you tomorrow."
+      });
+      setUpNext("");
+      speak("Streamline check complete. Great shape work.");
+    } else {
+      setStatus("Training complete 🎉");
+      setTimer("✓");
+      setExercise({
+        name: "Done, Jess!",
+        cue: "Great work out there. Sip water, breathe, walk it off for a minute."
+      });
+      setUpNext("");
+      speak("Training complete. Fantastic effort.");
+    }
+    showReflection();
+  } else {
+    setZone("");
+    setStatus("Stopped — tap START to try again");
+    setExercise({ name: "Stopped", cue: "Come back when you're ready." });
+    setUpNext("");
+    document.getElementById("controls").innerHTML =
+      `<button class="btn btn-primary" id="btn-start">START AGAIN</button>`;
+    document.getElementById("btn-start").onclick = () => renderCard();
+  }
+}
+
+function showReflection() {
+  const isEvening = selectedSession === "evening";
+
+  if (isEvening) {
+    // Simpler reflection for evening
+    document.getElementById("controls").innerHTML = `
+      <div style="flex: 1 1 100%;">
+        <div class="reflect">
+          <h3 style="color: var(--evening-deep);">Shape check ✓</h3>
+          <div style="margin-top: 1rem;">
+            <button class="btn btn-primary" id="btn-restart" style="background: var(--evening); color: white;">DONE</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById("btn-restart").onclick = () => renderCard();
+    return;
+  }
+
+  document.getElementById("controls").innerHTML = `
+    <div style="flex: 1 1 100%;">
+      <div class="reflect">
+        <h3>How did that feel?</h3>
+        <div style="font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light);">
+          Just for you to notice — nothing is saved.
+        </div>
+        <div class="reflect-buttons">
+          <button data-feel="easy">Easy</button>
+          <button data-feel="just">Just right</button>
+          <button data-feel="hard">Hard</button>
+        </div>
+        <div id="reflect-thanks" class="reflect-thanks" style="display:none;"></div>
+        <div style="margin-top: 1rem;">
+          <button class="btn btn-primary" id="btn-restart">DONE</button>
+        </div>
+      </div>
+    </div>`;
+  const messages = {
+    easy: "Noted — push a bit more next time. You got more in the tank!",
+    just: "Perfect zone. That's where the magic happens.",
+    hard: "Honest work right there. Tomorrow's body will thank today's effort."
+  };
+  document.querySelectorAll(".reflect-buttons button").forEach(btn => {
+    btn.onclick = () => {
+      const t = document.getElementById("reflect-thanks");
+      t.textContent = messages[btn.dataset.feel];
+      t.style.display = "block";
+    };
+  });
+  document.getElementById("btn-restart").onclick = () => renderCard();
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+
+function init() {
+  initModal();
+}
+
+init();
+</script>
+
+</body>
+</html>
