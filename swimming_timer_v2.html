@@ -1,0 +1,3495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏊 Jess · Land Training Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Gochi+Hand&family=Caveat:wght@400;700&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fef9ef;
+    --bg2: #fff4db;
+    --paper: #fffdf5;
+    --paper-line: #e8dfc3;
+    --ink: #2a2320;
+    --ink-light: #6b5d4f;
+    --jess: #6fb1fc;
+    --jess-deep: #4a8fd6;
+    --accent-orange: #ff7b54;
+    --accent-yellow: #ffd166;
+    --accent-green: #95d5b2;
+    --accent-pink: #ff9eb5;
+    --accent-purple: #c3aed6;
+    --red-flag: #d64545;
+    --rest-blue: #b8d8f0;
+    --evening: #7c6fbf;
+    --evening-deep: #5b50a0;
+    --radius: 18px;
+    --radius-sm: 10px;
+  }
+
+  .caveat-note {
+    font-family: 'Caveat', cursive;
+    font-size: 1rem;
+    color: var(--ink-light);
+    margin: 0.5rem 0;
+    text-align: left;
+  }
+  .btn-evening {
+    background: var(--evening) !important;
+    color: white !important;
+  }
+
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Patrick Hand', 'Nunito', sans-serif;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 10% 20%, rgba(111, 177, 252, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 90% 80%, rgba(255, 158, 181, 0.08) 0%, transparent 40%);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 1rem;
+    font-size: 1.15rem;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Gochi Hand', 'Caveat', cursive;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    margin: 0;
+  }
+
+  .wrap { max-width: 580px; margin: 0 auto; }
+
+  .header { text-align: center; padding: 0.5rem 0 1rem; }
+  .header h1 { font-size: 2.6rem; color: var(--jess-deep); margin-bottom: 0.2rem; }
+  .header .sub { font-family: 'Caveat', cursive; font-size: 1.4rem; color: var(--ink-light); }
+
+  /* Modal overlay */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+
+  .modal {
+    background: var(--paper);
+    border: 4px solid var(--ink);
+    border-radius: 24px;
+    padding: 2rem;
+    max-width: 520px;
+    box-shadow: 8px 8px 0 var(--ink);
+    text-align: center;
+  }
+
+  .modal h2 {
+    font-size: 2.2rem;
+    color: var(--ink);
+    margin-bottom: 0.5rem;
+  }
+
+  .modal p {
+    font-family: 'Caveat', cursive;
+    font-size: 1.3rem;
+    color: var(--ink-light);
+    margin-bottom: 1.5rem;
+  }
+
+  .modal-day-buttons {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    margin-bottom: 1.5rem;
+  }
+
+  .modal-day-btn {
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1.1rem;
+    font-weight: bold;
+    padding: 0.6rem 0.2rem;
+    border: 3px solid var(--ink);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    color: var(--ink);
+    cursor: pointer;
+    transition: all 0.15s;
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+
+  .modal-day-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+
+  .modal-day-btn.selected {
+    background: var(--jess);
+    color: white;
+    border-width: 4px;
+  }
+
+  .modal-day-btn.today {
+    background: var(--accent-yellow);
+    color: var(--ink);
+  }
+
+  .modal-day-btn.rest {
+    opacity: 0.5;
+  }
+
+  /* Session picker (morning / evening) */
+  .modal-session-picker {
+    display: none;
+    margin: 1rem 0 1.5rem;
+  }
+  .modal-session-picker.show { display: block; }
+
+  .modal-session-picker .label {
+    font-family: 'Caveat', cursive;
+    font-size: 1.2rem;
+    color: var(--ink-light);
+    margin-bottom: 0.6rem;
+  }
+
+  .session-btns {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .session-btn {
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1.15rem;
+    padding: 0.7rem 1.2rem;
+    border: 3px solid var(--ink);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    color: var(--ink);
+    cursor: pointer;
+    box-shadow: 3px 3px 0 var(--ink);
+    transition: all 0.15s;
+    flex: 1;
+    max-width: 200px;
+  }
+
+  .session-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+
+  .session-btn.selected {
+    border-width: 4px;
+  }
+
+  .session-btn.morning.selected {
+    background: var(--jess);
+    color: white;
+  }
+
+  .session-btn.evening.selected {
+    background: var(--evening);
+    color: white;
+  }
+
+  .modal-confirm-msg {
+    font-family: 'Caveat', cursive;
+    font-size: 1.2rem;
+    color: var(--jess-deep);
+    margin-bottom: 1rem;
+    min-height: 1.5rem;
+  }
+
+  .modal-btn {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 1.3rem;
+    padding: 1rem 1.5rem;
+    border: 3px solid var(--ink);
+    border-radius: var(--radius-sm);
+    background: var(--accent-green);
+    color: var(--ink);
+    cursor: pointer;
+    box-shadow: 5px 5px 0 var(--ink);
+    transition: all 0.1s;
+  }
+
+  .modal-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+
+  .modal-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+
+  .modal-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Main page (hidden until modal closes) */
+  .page-content {
+    display: none;
+  }
+
+  .page-content.show {
+    display: block;
+  }
+
+  .day-tabs {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+    margin-bottom: 1rem; background: var(--paper); border: 2px solid var(--ink);
+    border-radius: var(--radius); padding: 6px; box-shadow: 3px 3px 0 var(--ink);
+  }
+  .day-tab {
+    text-align: center; padding: 0.45rem 0.2rem; border-radius: var(--radius-sm);
+    cursor: pointer; font-family: 'Patrick Hand', sans-serif; font-size: 0.95rem;
+    color: var(--ink-light); border: 2px solid transparent;
+    transition: all 0.15s; user-select: none;
+  }
+  .day-tab:hover { background: var(--bg2); }
+  .day-tab.today { background: var(--accent-yellow); color: var(--ink); }
+  .day-tab.active { background: var(--jess); color: white; border-color: var(--ink); font-weight: bold; }
+  .day-tab.rest { opacity: 0.6; }
+
+  .card {
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 24px;
+    padding: 1.5rem; box-shadow: 5px 5px 0 var(--ink); margin-bottom: 1rem;
+  }
+
+  .day-header {
+    text-align: center; border-bottom: 3px dashed var(--paper-line);
+    padding-bottom: 1rem; margin-bottom: 1rem;
+  }
+  .session-active .day-header { display: none; }
+  .day-badge {
+    display: inline-block; background: var(--jess); color: white;
+    padding: 0.4rem 1.2rem; border-radius: 50px; border: 2px solid var(--ink);
+    box-shadow: 2px 2px 0 var(--ink); font-family: 'Nunito', sans-serif;
+    font-weight: 900; font-size: 0.9rem; letter-spacing: 1px; margin-bottom: 0.6rem;
+  }
+  .day-badge.evening-badge {
+    background: var(--evening);
+  }
+  .day-title { font-size: 2rem; color: var(--ink); margin: 0.2rem 0 0.1rem; }
+  .day-subtitle { font-family: 'Caveat', cursive; font-size: 1.3rem; color: var(--ink-light); }
+
+  .brief { padding: 0.5rem 0; }
+  .brief-section {
+    background: var(--bg); border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    padding: 0.8rem 1rem; margin-bottom: 0.8rem; box-shadow: 2px 2px 0 var(--ink);
+  }
+  .brief-section ul { list-style: none; padding: 0; margin: 0.3rem 0 0; font-size: 1.05rem; }
+  .brief-section li { padding: 0.15rem 0; line-height: 1.4; }
+  .brief-section li::before { content: "• "; color: var(--jess-deep); font-weight: bold; }
+  .brief-section .ex-line {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 0.5rem; flex-wrap: wrap;
+  }
+  .brief-section .ex-line span:first-child { flex: 1 1 60%; min-width: 0; }
+  .brief-section .ex-line .ex-meta {
+    color: var(--ink-light); font-family: 'Caveat', cursive; font-size: 1.1rem;
+    flex: 0 0 auto; white-space: nowrap;
+  }
+  .readiness {
+    background: var(--bg2); border: 2px dashed var(--paper-line);
+    border-radius: var(--radius-sm); padding: 0.8rem; margin-bottom: 0.8rem; text-align: center;
+  }
+  .readiness-buttons { display: flex; gap: 0.5rem; margin-top: 0.5rem; justify-content: center; }
+  .readiness-buttons button {
+    flex: 1; font-family: 'Nunito', sans-serif; font-weight: 700;
+    padding: 0.5rem; border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    background: var(--paper); box-shadow: 2px 2px 0 var(--ink);
+    cursor: pointer; font-size: 0.95rem;
+  }
+  .readiness-buttons button.selected { background: var(--jess); color: white; }
+  .readiness-buttons button:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink); }
+
+  /* v2 — warm-up 3-of-5 picker */
+  .warmup-options { display: flex; flex-direction: column; gap: 0.4rem; }
+  .warmup-opt {
+    position: relative; text-align: left; font-family: 'Nunito', sans-serif;
+    font-weight: 700; font-size: 0.95rem; padding: 0.55rem 0.7rem;
+    border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    background: var(--paper); box-shadow: 2px 2px 0 var(--ink); cursor: pointer;
+  }
+  .warmup-opt.picked { background: var(--accent-green); }
+  .warmup-opt.picked::after {
+    content: attr(data-order); position: absolute; right: 0.6rem; top: 50%;
+    transform: translateY(-50%); background: var(--ink); color: white;
+    width: 1.5rem; height: 1.5rem; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 0.9rem;
+  }
+  .warmup-opt:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink); }
+
+  /* v2 — HR zone block */
+  .hr-block { padding-left: 0.7rem; }
+
+  /* v2 — Sunday engagement pick */
+  .engage-options { display: flex; gap: 0.5rem; }
+  .engage-opt {
+    flex: 1; font-family: 'Nunito', sans-serif; font-weight: 900;
+    padding: 0.7rem 0.5rem; border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    background: var(--paper); box-shadow: 2px 2px 0 var(--ink); cursor: pointer;
+    font-size: 1.05rem; line-height: 1.3;
+  }
+  .engage-opt small { font-family: 'Caveat', cursive; font-weight: 400; font-size: 0.95rem; color: var(--ink-light); }
+  .engage-opt:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink); background: var(--bg2); }
+
+  .timer-zone { text-align: center; padding: 1rem 0; transition: background 0.3s ease; }
+  .timer-zone.work       { background: linear-gradient(180deg, transparent, rgba(255, 209, 102, 0.18)); }
+  .timer-zone.rest       { background: linear-gradient(180deg, transparent, rgba(184, 216, 240, 0.35)); }
+  .timer-zone.warmup     { background: linear-gradient(180deg, transparent, rgba(149, 213, 178, 0.25)); }
+  .timer-zone.roundrest  { background: linear-gradient(180deg, transparent, rgba(195, 174, 214, 0.3)); }
+  .timer-zone.sideswitch { background: linear-gradient(180deg, transparent, rgba(255, 158, 181, 0.25)); }
+  .timer-zone.evening    { background: linear-gradient(180deg, transparent, rgba(124, 111, 191, 0.18)); }
+
+  .timer {
+    font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 6.5rem;
+    line-height: 1; color: var(--ink); letter-spacing: -3px; transition: color 0.2s;
+  }
+  .timer.urgent { color: var(--accent-orange); }
+
+  .progress {
+    display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap;
+    margin-top: 0.5rem; font-family: 'Caveat', cursive; font-size: 1.3rem;
+    color: var(--ink-light);
+  }
+  .progress .chip {
+    background: var(--bg2); border: 2px solid var(--ink); border-radius: 50px;
+    padding: 0.1rem 0.7rem; box-shadow: 2px 2px 0 var(--ink);
+  }
+  .progress .chip.phase { background: var(--jess); color: white; }
+
+  .exercise {
+    background: var(--bg); border: 2px solid var(--ink); border-radius: var(--radius);
+    padding: 1rem 1.2rem; margin: 1rem 0; box-shadow: 3px 3px 0 var(--ink);
+    min-height: 130px;
+  }
+  .ex-name {
+    font-family: 'Gochi Hand', cursive; font-size: 2.21rem;
+    color: var(--ink); margin-bottom: 0.3rem; text-align: center;
+  }
+  .ex-detail {
+    font-family: 'Caveat', cursive; font-size: 1.3rem;
+    color: var(--jess-deep); margin-bottom: 0.5rem;
+  }
+  .ex-cue {
+    font-family: 'Patrick Hand', sans-serif; font-size: 1.1rem;
+    color: var(--ink); line-height: 1.4;
+  }
+  .ex-redflag {
+    margin-top: 0.7rem; padding-top: 0.5rem; border-top: 2px dotted var(--paper-line);
+    font-family: 'Patrick Hand', sans-serif; font-size: 1rem;
+    color: var(--red-flag); line-height: 1.4;
+  }
+  .ex-redflag::before { content: "🔴 "; }
+  .ex-hydrate {
+    margin-top: 0.6rem; padding-top: 0.5rem; border-top: 2px dotted var(--paper-line);
+    text-align: center; font-family: 'Caveat', cursive; font-size: 1.4rem;
+    color: var(--jess-deep);
+  }
+
+  .upnext {
+    text-align: center; font-family: 'Caveat', cursive; font-size: 1.95rem;
+    color: var(--ink-light); margin: 0.8rem 0; min-height: 2.5rem;
+  }
+  .upnext .label { color: var(--ink-light); }
+  .upnext .name { color: var(--jess-deep); font-weight: 700; }
+
+  .btn-row { display: flex; gap: 0.5rem; margin-top: 0.8rem; flex-wrap: wrap; }
+  .btn {
+    font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 1.1rem;
+    padding: 0.85rem 0.7rem; border: 3px solid var(--ink); border-radius: var(--radius-sm);
+    box-shadow: 4px 4px 0 var(--ink); cursor: pointer; color: var(--ink);
+    transition: transform 0.08s, box-shadow 0.08s; letter-spacing: 0.5px;
+  }
+  .btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--ink); }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary { background: var(--accent-green); flex: 1 1 100%; font-size: 1.4rem; padding: 1rem; }
+  .btn-pause   { background: var(--accent-yellow); flex: 1; min-width: 90px; }
+  .btn-skip    { background: var(--paper); flex: 1; font-size: 0.95rem; min-width: 90px; }
+  .btn-form    { background: var(--accent-purple); flex: 1; font-size: 0.95rem; min-width: 90px; }
+  .btn-done    { background: var(--accent-orange); color: white; flex: 1 1 100%; font-size: 1.4rem; padding: 1rem; }
+  .btn-stop    { background: var(--accent-pink); flex: 1; font-size: 0.9rem; min-width: 80px; }
+
+  .reflect { text-align: center; padding: 1rem 0; }
+  .reflect h3 { font-size: 1.6rem; color: var(--accent-orange); margin-bottom: 0.5rem; }
+  .reflect-buttons { display: flex; gap: 0.5rem; justify-content: center; margin-top: 0.8rem; }
+  .reflect-buttons button {
+    flex: 1; font-family: 'Patrick Hand', sans-serif; font-size: 1.1rem;
+    padding: 0.9rem 0.5rem; border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    background: var(--paper); box-shadow: 3px 3px 0 var(--ink); cursor: pointer;
+  }
+  .reflect-buttons button:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
+  .reflect-thanks {
+    margin-top: 1rem; font-family: 'Gochi Hand', cursive;
+    font-size: 1.4rem; color: var(--accent-green);
+  }
+
+  .rest-day { text-align: center; padding: 2rem 1rem; }
+  .rest-day .emoji { font-size: 4rem; margin-bottom: 0.5rem; }
+  .rest-day h2 { font-size: 2.4rem; color: var(--accent-orange); margin-bottom: 0.5rem; }
+  .rest-day p { font-family: 'Caveat', cursive; font-size: 1.4rem; color: var(--ink-light); }
+  .rest-day ul {
+    text-align: left; max-width: 320px; margin: 1rem auto 0;
+    font-size: 1.1rem; list-style: none; padding: 0;
+  }
+  .rest-day li { padding: 0.3rem 0; }
+
+  .schedule {
+    background: var(--paper); border: 2px solid var(--ink); border-radius: var(--radius);
+    padding: 1rem; box-shadow: 3px 3px 0 var(--ink); margin-bottom: 1rem;
+  }
+  .schedule summary {
+    cursor: pointer; font-family: 'Gochi Hand', cursive; font-size: 1.4rem;
+    color: var(--ink); list-style: none; user-select: none;
+  }
+  .schedule summary::before { content: "▸ "; transition: transform 0.2s; display: inline-block; }
+  .schedule[open] summary::before { content: "▾ "; }
+  .schedule-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 0.8rem; }
+  .sch-cell {
+    background: var(--bg); border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    padding: 0.4rem 0.2rem; text-align: center; font-size: 0.85rem; line-height: 1.2;
+  }
+  .sch-cell .day { font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light); }
+  .sch-cell .name { font-family: 'Patrick Hand', sans-serif; color: var(--ink); }
+  .sch-cell.today { background: var(--accent-yellow); border-width: 3px; }
+  .schedule .note {
+    margin-top: 0.7rem; font-family: 'Caveat', cursive; font-size: 1.05rem;
+    color: var(--ink-light); line-height: 1.3;
+  }
+
+  .status {
+    text-align: center; font-family: 'Caveat', cursive; font-size: 1.4rem;
+    color: var(--jess-deep); margin-bottom: 0.5rem; min-height: 1.6rem;
+  }
+
+  .mantra {
+    text-align: center; font-family: 'Gochi Hand', cursive; font-size: 1.3rem;
+    color: var(--accent-orange); margin: 0.5rem 0 0.8rem; padding: 0.5rem;
+    background: var(--bg2); border-radius: var(--radius-sm);
+    border: 2px dashed var(--paper-line);
+  }
+
+  @media (max-width: 480px) {
+    body { font-size: 1.05rem; padding: 0.6rem; }
+    .timer { font-size: 5rem; }
+    .day-title { font-size: 1.6rem; }
+    .header h1 { font-size: 2rem; }
+    .day-tab { font-size: 0.8rem; padding: 0.35rem 0.1rem; }
+    .sch-cell { font-size: 0.7rem; }
+    .btn { font-size: 1rem; padding: 0.7rem 0.4rem; }
+    .modal { padding: 1.5rem; }
+    .modal h2 { font-size: 1.8rem; }
+  }
+
+  /* Landscape iPad optimization (wide screens, shorter height) */
+  @media (min-width: 1024px) and (orientation: landscape) {
+    body { padding: 0.8rem; }
+    .page-content { max-width: 90vw; margin: 0 auto; }
+    .day-tabs { grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .day-tab { font-size: 1.05rem; padding: 0.6rem 0.3rem; }
+    .card { padding: 1.2rem; margin-bottom: 0.8rem; }
+    .exercise { min-height: 100px; padding: 0.9rem 1rem; }
+    .ex-name { font-size: 2.4rem; }
+    .upnext { font-size: 2.1rem; margin: 0.6rem 0; min-height: 2.2rem; }
+    .ex-cue { font-size: 1.2rem; }
+    .timer { font-size: 6rem; }
+    .btn-row { margin-top: 0.6rem; }
+    .btn { padding: 0.75rem 0.6rem; font-size: 1.2rem; }
+    .header { padding: 0.8rem 0; }
+    .header h1 { font-size: 2.2rem; }
+  }
+
+  /* Landscape iPad with taller viewport (iPad Pro landscape) */
+  @media (min-width: 1366px) and (orientation: landscape) {
+    .exercise { min-height: 120px; }
+    .ex-name { font-size: 2.6rem; }
+    .upnext { font-size: 2.3rem; }
+    .timer { font-size: 7rem; }
+    .btn { padding: 0.9rem 0.8rem; font-size: 1.3rem; }
+  }
+
+  /* ===== Settings panel (restored) ===== */
+  .modal-settings {
+    text-align: left;
+    background: var(--bg);
+    border: 2px solid var(--ink);
+    border-radius: var(--radius-sm);
+    padding: 0.8rem;
+    margin-bottom: 1rem;
+    box-shadow: 2px 2px 0 var(--ink);
+  }
+  .modal-settings h3 {
+    font-family: 'Gochi Hand', cursive;
+    font-size: 1.35rem;
+    margin-bottom: 0.4rem;
+  }
+  .settings-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.4rem 0.7rem;
+    align-items: center;
+    margin-bottom: 0.45rem;
+    font-size: 1rem;
+  }
+  .settings-row input,
+  .settings-row select {
+    font-family: 'Nunito', sans-serif;
+    border: 2px solid var(--ink);
+    border-radius: 8px;
+    padding: 0.25rem 0.4rem;
+    width: 96px;
+  }
+
+  /* ===== Equipment reminder line ===== */
+  .equipment-line {
+    font-family: 'Caveat', cursive;
+    font-size: 1.05rem;
+    color: var(--ink-light);
+    margin: 0.3rem 0 0.6rem;
+    min-height: 1.4em;
+  }
+
+  /* ===== Pass 2: session elapsed timer ===== */
+  .elapsed-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 0.5rem; padding: 0.4rem 0.8rem;
+    background: var(--bg2); border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    box-shadow: 2px 2px 0 var(--ink);
+  }
+  .elapsed-bar .label {
+    font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light);
+  }
+  .elapsed-bar .elapsed-time {
+    font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 1.3rem;
+    color: var(--jess-deep); letter-spacing: 1px;
+  }
+
+  /* ===== Pass 2: weekly summary in modal ===== */
+  .week-summary {
+    background: var(--bg2); border: 2px dashed var(--paper-line);
+    border-radius: var(--radius-sm); padding: 0.7rem;
+    margin: 0.8rem 0; text-align: left;
+  }
+  .week-summary .ws-title {
+    font-family: 'Caveat', cursive; font-size: 1.15rem;
+    color: var(--ink-light); margin-bottom: 0.4rem; text-align: center;
+  }
+  .week-summary .ws-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  }
+  .week-summary .ws-cell {
+    text-align: center; font-size: 0.75rem; line-height: 1.2;
+    padding: 0.3rem 0.1rem; background: var(--paper);
+    border: 1.5px solid var(--ink); border-radius: 6px;
+  }
+  .week-summary .ws-cell.done {
+    background: var(--accent-green); border-width: 2px;
+  }
+  .week-summary .ws-cell .ws-day {
+    font-family: 'Caveat', cursive; font-size: 0.85rem; color: var(--ink-light);
+  }
+  .week-summary .ws-cell .ws-time {
+    font-family: 'Nunito', sans-serif; font-weight: 700;
+    font-size: 0.85rem; color: var(--ink);
+  }
+  .week-summary .ws-total {
+    margin-top: 0.5rem; text-align: center;
+    font-family: 'Gochi Hand', cursive; font-size: 1.25rem;
+    color: var(--jess-deep);
+  }
+
+  /* ===== Pass 2: tracker reminder + tracker view ===== */
+  /* ===== Skip history + free-form tracker (restored) ===== */
+  .tracker {
+    background: var(--bg2);
+    border: 2px solid var(--ink);
+    border-radius: var(--radius-sm);
+    padding: 0.7rem;
+    margin-top: 0.8rem;
+    box-shadow: 2px 2px 0 var(--ink);
+  }
+  .tracker h4 {
+    font-size: 1.35rem;
+    margin-bottom: 0.4rem;
+  }
+  .tracker-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 1rem;
+  }
+  .tracker-list li {
+    padding: 0.2rem 0;
+  }
+
+  .tracker-reminder {
+    background: var(--accent-yellow); border: 2px solid var(--ink);
+    border-radius: var(--radius-sm); padding: 0.7rem 0.9rem;
+    margin: 0.8rem 0; text-align: left; box-shadow: 2px 2px 0 var(--ink);
+  }
+  .tracker-reminder .tr-title {
+    font-family: 'Gochi Hand', cursive; font-size: 1.2rem;
+    color: var(--ink); margin-bottom: 0.3rem;
+  }
+  .tracker-reminder .tr-body {
+    font-family: 'Patrick Hand', sans-serif; font-size: 0.95rem;
+    color: var(--ink); line-height: 1.4;
+  }
+
+  .modal-secondary-btns {
+    display: flex; gap: 0.5rem; margin-top: 0.6rem;
+  }
+  .modal-secondary-btns button {
+    flex: 1; font-family: 'Patrick Hand', sans-serif; font-size: 1rem;
+    padding: 0.5rem 0.4rem; border: 2px solid var(--ink);
+    border-radius: var(--radius-sm); background: var(--paper);
+    box-shadow: 2px 2px 0 var(--ink); cursor: pointer; color: var(--ink);
+  }
+  .modal-secondary-btns button:hover {
+    transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink);
+  }
+
+  .tracker-table {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    margin: 0.5rem 0; font-family: 'Patrick Hand', sans-serif;
+  }
+  .tracker-table th, .tracker-table td {
+    border: 1.5px solid var(--ink); padding: 0.4rem 0.3rem;
+    text-align: center; font-size: 0.95rem; background: var(--paper);
+  }
+  .tracker-table th {
+    background: var(--jess); color: white; font-weight: 700;
+  }
+  .tracker-table td.metric-name {
+    text-align: left; background: var(--bg2);
+    font-family: 'Caveat', cursive; font-size: 1.05rem;
+  }
+  .tracker-table input {
+    width: 100%; border: 1px dashed var(--paper-line);
+    background: transparent; font-family: 'Patrick Hand', sans-serif;
+    font-size: 1rem; text-align: center; color: var(--ink);
+    padding: 0.2rem; border-radius: 4px;
+  }
+  .tracker-table input:focus {
+    outline: none; border-color: var(--jess); background: var(--bg2);
+  }
+  .tracker-table th.this-week, .tracker-table td.this-week {
+    background: var(--accent-yellow); border-width: 2px;
+  }
+  .tracker-table th.this-week { background: var(--accent-orange); color: white; }
+
+  /* Sunday self-check highlight */
+  .self-check-banner {
+    background: var(--accent-pink); border: 2px solid var(--ink);
+    border-radius: var(--radius-sm); padding: 0.6rem 0.8rem;
+    margin: 0.5rem 0; text-align: center; box-shadow: 2px 2px 0 var(--ink);
+    font-family: 'Gochi Hand', cursive; font-size: 1.15rem; color: var(--ink);
+  }
+
+  /* Post-session input card */
+  .post-session-inputs {
+    background: var(--bg); border: 2px dashed var(--paper-line);
+    border-radius: var(--radius-sm); padding: 0.8rem;
+    margin: 0.5rem 0; text-align: left;
+  }
+  .post-session-inputs h4 {
+    font-family: 'Gochi Hand', cursive; font-size: 1.3rem;
+    color: var(--jess-deep); margin: 0 0 0.5rem; text-align: center;
+  }
+  .post-session-inputs label {
+    display: block; font-family: 'Caveat', cursive; font-size: 1.1rem;
+    color: var(--ink); margin: 0.4rem 0 0.2rem;
+  }
+  .post-session-inputs input {
+    width: 100%; padding: 0.5rem; border: 2px solid var(--ink);
+    border-radius: var(--radius-sm); font-family: 'Patrick Hand', sans-serif;
+    font-size: 1rem; background: var(--paper); box-sizing: border-box;
+  }
+  /* ---- 7-Day History ---- */
+  .history-list { display: flex; flex-direction: column; gap: 8px; margin: 0.8rem 0; }
+  .history-card {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg2); border: 2px solid var(--paper-line);
+    border-radius: var(--radius-sm); padding: 0.5rem 0.8rem;
+    font-family: 'Patrick Hand', sans-serif; font-size: 1rem;
+  }
+  .history-card .h-mood  { font-size: 1.5rem; flex-shrink: 0; }
+  .history-card .h-date  { color: var(--ink-light); font-size: 0.9rem; min-width: 70px; }
+  .history-card .h-day   { font-weight: bold; flex: 1; color: var(--ink); }
+  .history-card .h-dur   { color: var(--jess-deep); font-size: 0.95rem; font-family: 'Caveat', cursive; }
+  .history-card .h-type  { font-size: 0.8rem; color: var(--ink-light); }
+  .history-empty { font-family: 'Caveat', cursive; color: var(--ink-light); font-size: 1.1rem; text-align: center; padding: 1rem 0; }
+
+  /* ---- Achievement Board ---- */
+  #modal-achievements { max-width: 580px; }
+  .ach-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    margin: 1rem 0;
+  }
+  .ach-card {
+    background: var(--bg2); border: 2px solid var(--paper-line);
+    border-radius: var(--radius-sm); padding: 0.7rem 0.8rem;
+    text-align: center;
+  }
+  .ach-card .ach-icon  { font-size: 1.8rem; display: block; }
+  .ach-card .ach-val   { font-size: 1.5rem; font-family: 'Gochi Hand', cursive; color: var(--jess-deep); }
+  .ach-card .ach-label { font-size: 0.85rem; color: var(--ink-light); font-family: 'Caveat', cursive; }
+  .milestone-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0.5rem 0; }
+  .milestone-badge {
+    background: var(--accent-yellow); color: var(--ink);
+    border-radius: 20px; padding: 4px 12px;
+    font-family: 'Patrick Hand', sans-serif; font-size: 0.9rem;
+    border: 2px solid var(--ink);
+  }
+  .milestone-badge.locked { background: var(--paper-line); color: var(--ink-light); border-style: dashed; }
+  .ach-section-title {
+    font-family: 'Gochi Hand', cursive; font-size: 1.3rem;
+    color: var(--ink); margin: 0.8rem 0 0.3rem; text-align: left;
+  }
+</style>
+
+
+<!-- Day picker modal (shows on load) -->
+<div class="modal-overlay show" id="modal-overlay" role="presentation">
+  <div class="modal" id="modal-main" role="dialog" aria-modal="true" aria-labelledby="modal-main-title">
+    <h2 id="modal-main-title">Which day are you training?</h2>
+    <p>Pick your workout below</p>
+    
+    <div class="modal-day-buttons" id="modal-days"></div>
+
+    <div class="week-summary" id="week-summary"></div>
+
+    <div class="tracker-reminder" id="tracker-reminder"></div>
+
+    <div class="modal-session-picker" id="modal-session-picker">
+      <div class="label">This day has both sessions:</div>
+      <div class="session-btns">
+        <button class="session-btn morning" id="btn-morning" onclick="pickSession('morning')">
+          ☀️ Morning<br><small>Land Training</small>
+        </button>
+        <button class="session-btn evening" id="btn-evening" onclick="pickSession('evening')">
+          🌙 Evening<br><small>Streamline</small>
+        </button>
+      </div>
+    </div>
+    
+    <div class="modal-confirm-msg" id="modal-msg"></div>
+    
+    <button class="modal-btn" id="modal-confirm-btn" disabled>
+      Let's Go! 💪
+    </button>
+
+    <div class="modal-secondary-btns">
+      <button id="btn-open-tracker">📊 4-Week Progress</button>
+      <button id="btn-open-history">📅 Last 7 Sessions</button>
+      <button id="btn-open-achievements">🏅 Achievements</button>
+      <button id="btn-reset-week" title="Clear this week's session times">🔄 Reset Week</button>
+    </div>
+  </div>
+
+  <!-- Tracker view -->
+  <div class="modal" id="modal-tracker" role="dialog" aria-modal="true" aria-labelledby="modal-tracker-title" style="display:none; max-width: 560px;">
+    <h2 id="modal-tracker-title">📊 PR Board — 4 Weeks</h2>
+    <p>Beat last week. Same metric, same day — numbers only, no judgment.</p>
+
+    <div id="self-check-banner-slot"></div>
+
+    <table class="tracker-table" id="tracker-table"></table>
+
+    <div class="caveat-note">
+      💡 Tip: each day has one PR metric. Write your number, then beat it next week. Steady gains mean the work is landing.
+    </div>
+
+    <div class="modal-secondary-btns">
+      <button id="btn-tracker-back">← Back</button>
+      <button id="btn-tracker-save" class="btn-evening">Save</button>
+    </div>
+  </div>
+
+  <!-- History view: last 7 sessions from Firestore -->
+  <div class="modal" id="modal-history" role="dialog" aria-modal="true" aria-labelledby="modal-history-title" style="display:none; max-width: 540px;">
+    <h2 id="modal-history-title">📅 Last 7 Sessions</h2>
+    <p>Your recent training, pulled from the cloud.</p>
+    <div id="history-list-slot"><div class="history-empty">Loading…</div></div>
+    <div class="modal-secondary-btns" style="margin-top:1rem;">
+      <button id="btn-history-back">← Back</button>
+    </div>
+  </div>
+
+  <!-- Achievements view -->
+  <div class="modal" id="modal-achievements" role="dialog" aria-modal="true" aria-labelledby="modal-ach-title" style="display:none; max-width: 580px; overflow-y: auto; max-height: 90vh;">
+    <h2 id="modal-ach-title">🏅 Achievements</h2>
+    <p>Keep going — every session counts!</p>
+    <div id="ach-content"><div class="history-empty">Loading…</div></div>
+    <div class="modal-secondary-btns" style="margin-top:1rem;">
+      <button id="btn-ach-back">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main page (hidden until day is selected) -->
+<main class="page-content" id="page-content">
+  <div class="wrap">
+    <header class="header">
+      <h1>🏊 Land Training</h1>
+      <div class="sub">Jess · 7-day swimming plan · v2</div>
+    </header>
+
+    <nav class="day-tabs" id="day-tabs" aria-label="Day picker"></nav>
+
+    <details class="schedule">
+      <summary>This week's plan</summary>
+      <div class="schedule-grid" id="schedule-grid"></div>
+      <div class="note">
+        Mon/Tue: core anti-rotation (+ optional leg add-on) · Wed/Thu: power circuits ·
+        Fri: light core + mobility · Sat: combined (hardest) · Sun: rest + engagement pick.
+        <br>🌙 Evening streamline check: every day, ~7 min.
+      </div>
+    </details>
+
+    <section class="card" id="main-card" aria-label="Training session"></section>
+  </div>
+</main>
+
+<script type="module">
+import { initializeApp }                            from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs,
+         query, orderBy, limit, where, updateDoc,
+         doc, serverTimestamp }                     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* ============================================================
+   FIREBASE INIT
+   ============================================================ */
+
+const _fbApp = initializeApp({
+  apiKey:            "AIzaSyBvasH4OqU76196ZmZSXX_e8-L2PYnvyaY",
+  authDomain:        "chore-tracker-a461b.firebaseapp.com",
+  projectId:         "chore-tracker-a461b",
+  storageBucket:     "chore-tracker-a461b.firebasestorage.app",
+  messagingSenderId: "282740057913",
+  appId:             "1:282740057913:web:72defcf2e53ae13237eae8"
+});
+const db = getFirestore(_fbApp);
+const SESSIONS_COL = "jess_swimming_sessions"; // dedicated collection for this app
+
+/* ---- Fire-and-forget Firestore helpers ---- */
+// Returns the new doc ID (or null on failure) — caller decides whether to store it
+async function fsAddSession(entry) {
+  try {
+    const ref = await addDoc(collection(db, SESSIONS_COL), {
+      ...entry,
+      createdAt: serverTimestamp()
+    });
+    return ref.id;
+  } catch (e) {
+    console.warn("Firestore write failed:", e);
+    return null;
+  }
+}
+async function fsUpdateSession(fsId, patch) {
+  if (!fsId) return;
+  try {
+    await updateDoc(doc(db, SESSIONS_COL, fsId), patch);
+  } catch (e) {
+    console.warn("Firestore update failed:", e);
+  }
+}
+async function fsGetRecent(n = 7) {
+  try {
+    const q = query(collection(db, SESSIONS_COL), orderBy("createdAt", "desc"), limit(n));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.warn("Firestore read failed:", e);
+    return [];
+  }
+}
+async function fsGetAll() {
+  try {
+    const q = query(collection(db, SESSIONS_COL), orderBy("createdAt", "asc"));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.warn("Firestore read failed:", e);
+    return [];
+  }
+}
+
+// Pending Firestore doc ID for the session just saved (set in finalize, used in reflection save)
+let _pendingFsId = null;
+
+
+/* ============================================================
+   PROGRESSIVE OVERLOAD  (v2)
+   Anchored to the week of Mon May 25, 2026. Capped mid-July.
+   Timed work: +2s per week.  Rep-based: +1 rep every 2 weeks.
+   Pull-up eccentric: 4s -> 5s at week 3.  Round rest: flat 25s.
+   ============================================================ */
+const OVERLOAD_ANCHOR = new Date(2026, 4, 25);   // May 25 2026 (month is 0-indexed)
+const OVERLOAD_CAP_WEEKS = 7;                    // week 7 ~= mid-July, then frozen
+
+// Returns 1-based training week (1..OVERLOAD_CAP_WEEKS)
+function overloadWeek() {
+  const now = new Date();
+  if (now < OVERLOAD_ANCHOR) return 1;
+  const days = Math.floor((now - OVERLOAD_ANCHOR) / 86400000);
+  return Math.min(OVERLOAD_CAP_WEEKS, Math.floor(days / 7) + 1);
+}
+// Timed work seconds for a given base value, adjusted for the current week.
+function adjWork(baseSeconds) {
+  return baseSeconds + (overloadWeek() - 1) * 2;
+}
+// Extra reps for rep-based sets: +1 every 2 weeks.
+function repBonus() {
+  return Math.floor((overloadWeek() - 1) / 2);
+}
+
+const MANTRA = "I am STRONG. I am FAST. I can SWIM THIS.";
+
+// Per-day mantra (v10 Weekly Mantra Map)
+const DAY_MANTRA = {
+  monday:    "Practice makes perfect.",
+  tuesday:   "I am STRONG. I am FAST. I can SWIM THIS.",
+  wednesday: "Practice makes perfect.",
+  thursday:  "I am STRONG. I am FAST. I can SWIM THIS.",
+  friday:    "Sweat in training, no tears in competition.",
+  saturday:  "I am STRONG. I am FAST. I can SWIM THIS.",
+  sunday:    "Rest IS training."
+};
+
+// Warm-up: kid picks 3 of 5 and leads (v10 Athlete Choice warm-up)
+const WARMUP_OPTIONS = [
+  "Jumping Jacks · 30 seconds",
+  "Arm Circles forward + back · 20 each",
+  "Leg Swings front/back · 10 each",
+  "Shoulder Pendulum · 10 each arm",
+  "High Knees · 30 seconds"
+];
+// Default warm-up (first 3 options) — overridden by the kid's pick
+const WARMUP = {
+  name: "Movement Prep",
+  duration: 180,
+  steps: WARMUP_OPTIONS.slice(0, 3)
+};
+
+const HARD_EXERCISES = new Set([
+  "Box Jump", "Squat Jump", "Lateral Bound", "Bosu Squat",
+  "Wide-Grip Pull-Up", "Wide Pull-Up", "Box Jump-Down",
+  "Box Jump / Lateral Bound", "Jump Rope Simulation", "Squat Jump (light)"
+]);
+
+const SETTINGS_KEY       = "swimTrainingSettingsV2";
+const PROGRESS_KEY       = "swimTrainingProgressV2";
+const SKIP_HISTORY_KEY   = "swimTrainingSkipHistoryV2";
+const ENGAGE_KEY         = "swimEngagementPickV2";
+const SKIP_RETENTION_MS  = 7 * 24 * 60 * 60 * 1000;
+const DONE_HOLD_MS       = 1000;
+const ENCOURAGEMENTS = [
+  "Strong finish. Great focus.",
+  "That was awesome effort.",
+  "You are leveling up.",
+  "Clean round. Keep rolling.",
+  "Big energy. Nice work.",
+  "That control was excellent.",
+  "Power and calm. Great combo.",
+  "You stayed disciplined. Love it.",
+  "That round looked solid.",
+  "High quality effort right there."
+];
+const PRONUNCIATION_MAP = {
+  "Pallof Press (band)": "Pal-off Press, band",
+  "Pallof Press": "Pal-off Press",
+  "Bosu Squat": "Boh-soo Squat"
+};
+// v2: 5s between exercises, 25s round rest — kid can still raise these.
+const DEFAULT_SETTINGS = {
+  voiceStyle: "fun",
+  exerciseRestSeconds: 5,
+  roundRestSeconds: 25,
+  secondsPerRep: 3
+};
+
+const MIN_REST = 3;
+const SIDE_SWITCH_BUFFER = 5;
+const ROUND_REST = 25;   // v10 global rule — flat all weeks
+
+// E: timed exercise.  reset = short cue spoken before the exercise + during preceding rest.
+const E = (name, work, rest, reset, cue, redFlag, opts = {}) => ({
+  name, work, rest: Math.max(rest, MIN_REST), reset, cue, redFlag, ...opts
+});
+// ER: rep-based exercise.
+const ER = (name, repsDetail, rest, reset, cue, redFlag, opts = {}) => ({
+  name, byReps: true, repsDetail, rest: Math.max(rest, MIN_REST), reset, cue, redFlag, ...opts
+});
+
+/* ============================================================
+   HEART RATE ZONES  (v10 HR guide)
+   ============================================================ */
+const HR_ZONES = {
+  z2: { label: "Zone 2 · Aerobic Base", bpm: "118–138 bpm", color: "#95d5b2" },
+  z3: { label: "Zone 3 · Tempo",        bpm: "138–158 bpm", color: "#ffd166" },
+  z4: { label: "Zone 4 · High Intensity", bpm: "158–178 bpm", color: "#ff7b54" }
+};
+
+const PLAN = {
+  monday: {
+    title: "Core A",
+    subtitle: "Anti-Rotation + Lat Activation",
+    badge: "CORE",
+    hrZone: "z2", hrText: "Zone 2–3 · 118–158 bpm",
+    benchmark: "Core hold 30s clean — quality over heart rate.",
+    prTarget: "Hollow-Body Flutter — seconds held with flat back",
+    equipment: ["Fitness ball", "Resistance band (anchored at hip)", "Mat"],
+    warmup: null,
+    circuits: [
+      { name: "Anti-Rotation + Lat Activation", rounds: 3, roundRest: ROUND_REST, exercises: [
+        E("Hollow-Body Flutter", 30, 5, "Press lower back down.",
+          "Lower back FLAT throughout — the instant your back lifts, your hips sink in the pool. This is the deep V fault in land form.",
+          "Back lifts before 20s — slow kick tempo, re-engage core before continuing."),
+        ER("Dead Bug", "10 alternating reps · full extension", 5, "Exhale fully, lower back on floor.",
+          "Lower back MUST press to floor. Exhale fully as limbs extend. Trains core bracing for underwater dolphin kick.",
+          "Lower back lifts — reduce limb range until floor contact is maintained."),
+        ER("Ball Prone Stroke Sim", "12 reps per side", 5, "Depress both shoulders first.",
+          "Depress BOTH shoulders DOWN before each stroke — lat works, NOT bicep. Arms pulling before shoulders depress means a dropped elbow in the freestyle catch.",
+          "Arms engage before shoulders depress — stop, reset shoulder position, then continue."),
+        ER("Band Single-Arm Pull", "10 reps each side · slow controlled", 5, "Check torso — did it move?",
+          "Torso stays COMPLETELY STILL — core resists rotation on every pull. Torso rotation here is uncontrolled body roll in the pool.",
+          "Torso rotates on pull — reduce band tension, widen stance."),
+        E("Prone Flutter + Brace", 30, 5, "Belly still pressed? Re-brace.",
+          "Belly tight while legs move — if the belly relaxes the hips sink. This is the bridge from floor core to water core.",
+          "Belly lifts during flutter — slow kick, re-engage core. This moment IS the deep V.")
+      ]}
+    ]
+  },
+  tuesday: {
+    title: "Core B",
+    subtitle: "Anti-Rotation + Hip-Driven Kick",
+    badge: "CORE",
+    hrZone: "z2", hrText: "Zone 2–3 · 118–158 bpm",
+    benchmark: "Side-chain stability — torso square, hip-driven kick.",
+    prTarget: "Side-Lying Hip-Drive Kick — reps per side with clear hip drive",
+    equipment: ["Resistance band", "Mat"],
+    warmup: null,
+    circuits: [
+      { name: "Anti-Rotation + Hip Kick Pattern", rounds: 3, roundRest: ROUND_REST, exercises: [
+        ER("Pallof Press (band)", "10 reps each side · slow press and return", 5, "Did torso stay square?",
+          "Resist rotation — hips stay perfectly square throughout. Body rotation here is uncontrolled body roll on every freestyle stroke.",
+          "Torso rotates during press — reduce band tension, widen stance."),
+        E("Side Plank", 50, 5, "Hip high — check before starting.",
+          "Hip high, body in a straight line. Builds the lateral stiffness that stops hip drop in butterfly and freestyle.",
+          "Hip drops immediately — drop to a knee side plank, maintain the hip line.",
+          { eachSide: true }),
+        ER("Band Clamshell", "15 reps each side · 2s open / 1s hold / 2s close", 5, "Hip still? Hand on hip to monitor.",
+          "Hip stays STILL — only the top knee opens. Controls kick direction. An unstable hip means a kick crossing the midline.",
+          "Hip rotates with knee — hand on hip, only the knee should move."),
+        E("Hollow Body Hold", 30, 5, "Lower back flat — same as evening check.",
+          "Lower back FLAT — same engagement as the evening streamline check. If you feel it in your lower back, the core has released.",
+          "Lower back arches — reduce leg hover height, re-engage before continuing."),
+        ER("Side-Lying Hip-Drive Kick", "20 reps each side · controlled", 5, "Hand on glute — clear squeeze?",
+          "Top leg driven from the HIP — hand on glute feels a clear squeeze each rep. A knee-driven kick means the hip sinks in the pool.",
+          "Knee leads — slow to half speed, hand on glute to feel the hip drive.")
+      ]}
+    ]
+  },
+  wednesday: {
+    title: "Power A",
+    subtitle: "Push-Off Power + Hip Activation",
+    badge: "POWER",
+    hrZone: "z4", hrText: "Zone 4 · 158–178 bpm during Circuit A",
+    benchmark: "Push-off power — translate directly to wall drive.",
+    prTarget: "Box Jump — rounds completed at full height",
+    equipment: ["Plyo box", "Bosu ball", "Resistance band (above-knee loop)", "Step platform"],
+    warmup: WARMUP,
+    circuits: [
+      { name: "Circuit A — Push-Off Power", rounds: 4, roundRest: ROUND_REST, exercises: [
+        E("Box Jump", 30, 5, "Imagine pool wall — explode.",
+          "Imagine pushing off the pool wall at every takeoff. Hip drop at takeoff is wasted push-off in the flip turn.",
+          "Knee caves on landing — stop, lower box height."),
+        E("Squat Jump", 30, 5, "Quiet landing = good absorption.",
+          "Quiet landing means good absorption means a faster push-off. Stomping is energy lost at the wall.",
+          "Heavy stomping — reduce jump height, focus on soft landing first."),
+        E("Bosu Squat", 30, 5, "Knees out — control the descent.",
+          "Feet shoulder-width on the dome. A 3-second controlled descent. Knees must not collapse inward.",
+          "Cannot control the 3s descent — switch to a floor squat."),
+        E("Lateral Bound", 30, 5, "Hold — stick every landing.",
+          "Stillness IS the training — deceleration for wall turns. Continuous bouncing means no deceleration control.",
+          "Continuous bouncing — cue hold, must pause every landing.")
+      ]},
+      { name: "Circuit B — Hip Activation", rounds: 2, roundRest: ROUND_REST, exercises: [
+        ER("Band Clamshell", "15 reps each side · 2s open / 1s hold / 2s close", 5, "Hip still? Only knee moved.",
+          "Hip stays STILL — only the top knee opens. Controls kick direction. An unstable hip means a kick crossing the midline.",
+          "Hip rotates with knee — hand on hip to monitor."),
+        ER("Band Crab Walk", "20 steps each direction · band above knees", 5, "Stay low — band taut.",
+          "Stay low throughout. The band stays taut every step. Band slack means the hip abductors switch off and the kick goes unstable.",
+          "Standing or band slack — re-squat low before continuing."),
+        ER("Calf Raise", "15 reps · 2s up / 1s hold / 2s down", 5, "Heel fully below step.",
+          "Full range every rep. Half range means the ankle is not loaded and there is reduced push-off.",
+          "Half range — stop, reset, heel fully below the step.")
+      ]}
+    ]
+  },
+  thursday: {
+    title: "Power B",
+    subtitle: "Flip-Turn Simulation",
+    badge: "POWER",
+    hrZone: "z4", hrText: "Zone 4 · 158–178 bpm during Circuit A",
+    benchmark: "Flip-turn sequence — decelerate, absorb, drive.",
+    prTarget: "Pull-Up — clean reps Round 1",
+    equipment: ["Plyo box", "Pull-up bar", "Mat"],
+    warmup: WARMUP,
+    circuits: [
+      { name: "Circuit A — Turn Simulation", rounds: 4, roundRest: ROUND_REST, exercises: [
+        E("Lateral Bound", 30, 5, "Hold — stick every landing.",
+          "Stillness IS the training — deceleration for stopping at the wall. No pause means no deceleration means crashing the wall.",
+          "Continuous bouncing — cue hold, must pause every landing."),
+        E("Box Jump-Down", 30, 5, "Quiet landing — absorb the force.",
+          "Quiet landing means good absorption means a faster flip-turn push-off. Stomping is energy escaping.",
+          "Heavy stomping — reduce drop height until the landing is quiet."),
+        E("Squat Jump", 30, 5, "Touch and go — think wall, explode.",
+          "Touch and go — maximum leg drive. Think wall push-off every rep. A pause at the bottom is time lost at the wall.",
+          "Collapsing at the bottom — cue fast, reduce depth if needed."),
+        E("Jump Rope Simulation", 30, 5, "Arms drive rhythm — balls of feet.",
+          "Arms drive the rhythm. Land on the balls of your feet, never flat-footed. A pace collapse in the last 10 seconds is an endurance gap — note it.",
+          "Pace collapses in the last 10s — note as endurance data, do not stop.")
+      ]},
+      { name: "Circuit B — Pull + Core Finisher", rounds: 3, roundRest: ROUND_REST, exercises: [
+        E("Wide-Grip Pull-Up", 30, 5, "Depress shoulders — then pull.",
+          "Depress the shoulder blades BEFORE pulling. Lower in 4 full seconds — count aloud. Rushing means no eccentric lat strength and a weak catch.",
+          "Swinging or shrugging — switch to a dead hang hold for the remaining time."),
+        E("Hollow Body Hold", 30, 5, "Lower back flat — same as evening check.",
+          "Lower back FLAT — the same engagement needed in streamline off every wall. A burn here means it works in the pool.",
+          "Lower back arches — reduce leg hover height immediately."),
+        E("Prone Flutter + Brace", 30, 5, "Belly still pressed? That is the goal.",
+          "Belly tight while legs move. The belly relaxing is the exact moment the hips sink in the pool — the deep V land equivalent.",
+          "Belly lifts — slow kick, re-engage core before continuing.")
+      ]}
+    ]
+  },
+  friday: {
+    title: "Light Core",
+    subtitle: "Streamline + Mobility",
+    badge: "LIGHT",
+    hrZone: "z2", hrText: "Zone 2 · 118–138 bpm — stay light",
+    benchmark: "The read — Bench Vertical Kick diagnostic before Saturday.",
+    prTarget: "Bench Vertical Kick — seconds core held flat",
+    equipment: ["Bench", "Mat", "Wall"],
+    warmup: null,
+    isCalmDay: true,
+    circuits: [
+      { name: "Light Block — Core + Streamline + Mobility", rounds: 2, roundRest: ROUND_REST, exercises: [
+        E("Bench Vertical Kick Sim", 30, 5, "Core locked full 30s — belly down.",
+          "The core MUST stay locked the full 30 seconds. Belly releases means hips sink. This is the primary deep V diagnostic — Friday is the read, Saturday is the push.",
+          "Belly releases at 15 to 20s — reduce to 20s for one week, build back to 30s."),
+        E("Streamline Wall Hold", 30, 5, "Relax into shape — no gap at lower back.",
+          "Relax INTO the shape — do not muscle it. A lower-back gap means the hips sink at push-off.",
+          "Lower back arches — bend knees slightly until the back flattens."),
+        ER("Bird Dog", "8 reps each side · 5s hold", 5, "Hip level — did it rotate?",
+          "Opposite arm and leg extend together. The hip stays level — rotation here is body roll in the water.",
+          "Hip rotates more than 5 degrees — reduce extension range, prioritise the hip-level cue."),
+        E("Ankle Dorsiflexion Stretch", 90, 5, "Every 10s, push 1cm further.",
+          "Heel flat — never lift it. Every 10 seconds push 1cm further. Limited dorsiflexion means a reduced push-off angle.",
+          "Heel lifts — reset foot position before continuing.",
+          { eachSide: true }),
+        E("Shoulder Posterior Stretch", 90, 5, "Every 10s, pull further.",
+          "Cross the arm at shoulder height, pull the elbow toward the chest. Every 10 seconds pull further. Tightness means a restricted freestyle recovery.",
+          "Shoulder elevates during the stretch — lower the arm slightly.",
+          { eachSide: true })
+      ]}
+    ]
+  },
+  saturday: {
+    title: "Combined",
+    subtitle: "Full Body: Power + Back + Core",
+    badge: "COMBINED",
+    hrZone: "z3", hrText: "Zone 3–4 · 138–178 bpm — hardest session",
+    benchmark: "Highest load of the week — power maintained to Round 4.",
+    prTarget: "Pull-Up clean reps Round 1 + Bench Kick core seconds",
+    equipment: ["Plyo box", "Pull-up bar", "Fitness ball", "Bench"],
+    warmup: WARMUP,
+    circuits: [
+      { name: "Full-Body Circuit", rounds: 4, roundRest: ROUND_REST, exercises: [
+        E("Box Jump / Lateral Bound", 30, 5, "Maximum power — NOT warm-up.",
+          "Full intent every round. Fatigue is expected by round 4 — maintain form over height. Alternate box jump and lateral bound each round.",
+          "Fatigue causes an uncontrolled landing — switch to a squat jump that round."),
+        E("Ball Stroke Sim", 30, 5, "Shoulders first — then pull.",
+          "Lats are activated from the jump — the highest drill quality is now. Press the shoulders DOWN before each stroke.",
+          "Arms before shoulders depress — cue shoulders first, stop and reset.",
+          { rounds: 3 }),
+        E("Wide Pull-Up", 30, 5, "4 seconds down — count aloud.",
+          "Legs tired, upper body fresh — the highest quality lat pull of the week. A 4-second lower builds the eccentric lat for the catch.",
+          "Swinging or shrugging — switch to a dead hang hold."),
+        E("Bench Vertical Kick Sim", 30, 5, "Core locked full 30s — belly pressed.",
+          "The core MUST hold the full 30 seconds. Hardest day, biggest core load. Holds here are holds in the water.",
+          "Belly releases at 15 to 20s — reduce work to 20s for one week."),
+        E("Squat Jump", 30, 5, "Still absorbing correctly under fatigue?",
+          "Finisher — legs are fatigued. A quiet landing means you are still absorbing correctly. A stomp means technique is breaking down.",
+          "Stomping every rep — reduce height, maintain the quiet landing.")
+      ]}
+    ]
+  },
+  sunday: { restDay: true, isEngagementPick: true }
+};
+
+/* ============================================================
+   EVENING STREAMLINE CHECK  (v10 — every night, 7 days/week)
+   Same three holds each day; holds follow +2s/week overload.
+   ============================================================ */
+const EVENING_STREAMLINE = {
+  title: "Evening Streamline Check",
+  subtitle: "Body-position automation · ~7 min",
+  badge: "🌙 EVENING",
+  isCalmDay: true,
+  equipment: ["Mat"],
+  warmup: null,
+  circuits: [
+    { name: "Streamline Check", rounds: 3, roundRest: 20, exercises: [
+      E("Hollow Body Hold", 30, 5, "Lower back flat — find the shape.",
+        "Supine, arms and legs slightly off the floor. Lower back STAYS FLAT. The active version — what the core should feel like while swimming.",
+        "If you feel it in the lower back, the core has released — lower the limbs slightly."),
+      E("Supine Flutter Check", 30, 5, "Back flat — add slow flutter.",
+        "Same as Hollow Body but with a SLOW flutter kick. The lower back must stay flat throughout. The land equivalent of the deep V moment.",
+        "Lower back lifts — slow the flutter, return to a static hold if needed."),
+      E("Prone Streamline + Brace", 30, 5, "Belly pressed — squeeze glutes.",
+        "Face-down, arms overhead in streamline, belly pressed to the floor. Squeeze glutes AND brace the core together. Trains the post-push-off body line.",
+        "Belly lifts off the floor — re-press, brace before continuing.")
+    ]}
+  ]
+};
+// Streamline check is the same every day of the week.
+const EVENING_FLEX = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"]
+  .reduce((m, k) => { m[k] = EVENING_STREAMLINE; return m; }, {});
+
+/* ============================================================
+   MONDAY / TUESDAY LEG ADD-ON  (conditional — PM pool skipped)
+   The 500-Kick rotation is a pool block, done by-reps (3 segments).
+   ============================================================ */
+const KICK_500 = {
+  name: "500-Kick Rotation",
+  segments: [
+    { label: "250 Flutter — freestyle position",
+      detail: "Face-down, arms extended on kickboard. Small fast kick from the hip, not the knee. Lower back flat against the board." },
+    { label: "150 Back Flutter — backstroke position",
+      detail: "Face-up, kickboard on thighs, hips pushed up toward the surface. Contrast position — forces the anti-deep-V body line." },
+    { label: "100 Dolphin — streamline",
+      detail: "Arms streamlined overhead, face-down. Full core lock — no hip sag possible here. Highest demand segment." }
+  ]
+};
+
+const ADDON = {
+  monday: {
+    title: "Monday Leg Add-On",
+    subtitle: "Kick Endurance — run only if PM pool skipped",
+    circuits: [
+      { name: "Dryland Kick Endurance", rounds: 3, roundRest: ROUND_REST, exercises: [
+        ER("Side-Lying Hip-Drive Kick", "20 reps each side · controlled", 5, "Hand on glute — feel the squeeze.",
+          "Top leg driven from the HIP, not the knee. Hand on glute should feel a clear squeeze each rep.",
+          "Knee leads — slow to half speed, hand on glute to feel the hip drive."),
+        E("Prone Streamline Flutter Hold", 30, 5, "Belly still down? Quality over speed.",
+          "The belly must NOT lift — quality over speed. This is the push-off breakout position with active legs.",
+          "Belly lifts off floor — reduce kick tempo immediately."),
+        E("Squat Jump (light)", 20, 5, "Quiet landing — imagine the wall.",
+          "70% effort preserves the nervous system for tomorrow. Quiet landing. Imagine the pool wall every rep.",
+          "Heavy landing — reduce jump height, soft landing is the goal.")
+      ]}
+    ]
+  },
+  tuesday: {
+    title: "Tuesday Leg Add-On",
+    subtitle: "Hip + Posterior Chain — run only if PM pool skipped",
+    circuits: [
+      { name: "Dryland Hip + Posterior Chain", rounds: 3, roundRest: ROUND_REST, exercises: [
+        ER("Single-Leg Glute Bridge", "12 reps each side · 2s hold at top", 5, "Hips level — both sides same height.",
+          "Drive one heel into the floor, lift the hips, squeeze the glute at the top for 2 full seconds. Hip asymmetry here is kick asymmetry in the pool.",
+          "Pelvis tilts to the lifted-leg side — reduce reps, focus on a level pelvis."),
+        ER("Band Crab Walk", "20 steps each direction · band above knees", 5, "Stay low — band taut the whole time.",
+          "Stay low throughout — band taut every step. Band slack means the hip abductors switch off and the kick goes unstable.",
+          "Standing upright or band slack — re-squat low before continuing."),
+        ER("Calf Raise", "15 reps · 2s up / 1s hold / 2s down · full range", 5, "Heel fully below step — full range.",
+          "Full range — heel fully below the platform every rep. Half range means the ankle is not loaded and there is reduced push-off.",
+          "Half range only — stop, reset, heel fully below the step.")
+      ]}
+    ]
+  }
+};
+
+/* ============================================================
+   ENGAGEMENT SYSTEMS  (chosen Sunday, run all week)
+   ============================================================ */
+const ENGAGEMENT_SYSTEMS = {
+  peer: {
+    label: "Peer Challenge vs Parent",
+    desc: "Same timer, different metric. Reveal after both are done."
+  },
+  roleflip: {
+    label: "Role Flip",
+    desc: "Jess demos one exercise and gives the parent ONE coaching cue before the set."
+  }
+};
+
+const DAY_KEYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// Days with an AM+PM pool day -> conditional leg add-on offered
+const ADDON_DAYS = new Set(["monday", "tuesday"]);
+// Days where the kid picks/leads the warm-up (v10: Wed/Thu/Sat)
+const WARMUP_CHOICE_DAYS = new Set(["wednesday", "thursday", "saturday"]);
+
+// Equipment needed per day (morning session)
+const DAY_EQUIPMENT = {
+  monday:    "Fitness ball, Resistance band, Mat",
+  tuesday:   "Resistance band, Mat",
+  wednesday: "Plyo box, Bosu, Resistance band",
+  thursday:  "Plyo box, Pull-up bar, Mat",
+  friday:    "Bench, Mat, Wall",
+  saturday:  "Plyo box, Pull-up bar, Fitness ball, Bench",
+  sunday:    null  // rest day
+};
+
+/* ============================================================
+   STATE & AUDIO
+   ============================================================ */
+
+let selectedDay = null;
+let selectedSession = "morning"; // "morning" or "evening"
+let skipGreetingOnStart = false;
+let closeModalAborted = false;
+let session = {
+  running: false, paused: false, abort: false, skipExercise: false,
+  currentTimer: null, byRepsResolver: null,
+  calmMode: false, currentEx: null, weather: null,
+  skipped: [], doneHoldTimeout: null, doneHoldTriggered: false
+};
+let appSettings     = loadSettings();
+let progressEntries = loadProgressEntries();
+let skipHistory     = loadSkipHistory();
+let lastEncouragement = "";
+let sessionWarmupPick = null;   // array of WARMUP_OPTIONS indices, in chosen order
+let sessionAddonOn = false;     // Mon/Tue leg add-on toggle for this session
+
+const speech = window.speechSynthesis;
+let audioCtx = null;
+
+/* Male voice selection — keeps the swimming timer distinct from the skating
+   timer. Browser voice availability varies; we pick the best male match and
+   fall back gracefully. Lower pitch reinforces the distinction. */
+let _maleVoice = null;
+function pickMaleVoice() {
+  if (!speech) return null;
+  const voices = speech.getVoices() || [];
+  if (!voices.length) return null;
+  const maleHints = ["male", "daniel", "alex", "fred", "aaron", "arthur",
+                     "oliver", "thomas", "rishi", "google uk english male",
+                     "microsoft david", "microsoft mark", "microsoft guy"];
+  const femaleHints = ["female", "samantha", "victoria", "karen", "moira",
+                       "tessa", "fiona", "zira", "susan"];
+  const en = voices.filter(v => /^en/i.test(v.lang || ""));
+  const pool = en.length ? en : voices;
+  // explicit male-named voice
+  let v = pool.find(x => maleHints.some(h => (x.name || "").toLowerCase().includes(h)));
+  if (v) return v;
+  // any en voice not obviously female
+  v = pool.find(x => !femaleHints.some(h => (x.name || "").toLowerCase().includes(h)));
+  return v || pool[0] || null;
+}
+function refreshVoice() { _maleVoice = pickMaleVoice(); }
+if (speech) {
+  refreshVoice();
+  speech.onvoiceschanged = refreshVoice;
+}
+const VOICE_PITCH = 0.85;   // lower than skating (1.05) — separate, more "male"
+const VOICE_RATE  = 0.9;
+
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function speak(msg) {
+  if (!speech) return;
+  speech.cancel();
+  const u = new SpeechSynthesisUtterance(msg);
+  u.rate = VOICE_RATE;
+  u.pitch = VOICE_PITCH;
+  if (_maleVoice) u.voice = _maleVoice;
+  speech.speak(u);
+}
+
+function beep(freq = 440, duration = 0.12) {
+  if (!audioCtx || session.calmMode) return;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.connect(g); g.connect(audioCtx.destination);
+  osc.type = "sine";
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(0.15, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function endBeep() {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.connect(g); g.connect(audioCtx.destination);
+  osc.type = "sine";
+  osc.frequency.value = 700;
+  const vol = session.calmMode ? 0.07 : 0.18;
+  g.gain.setValueAtTime(vol, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.25);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.25);
+}
+
+/* ============================================================
+   WEATHER FETCH
+   ============================================================ */
+
+async function fetchRedDeerWeather() {
+  try {
+    const response = await fetch(
+      'https://api.open-meteo.com/v1/forecast?latitude=52.1833&longitude=-113.8&current=temperature_2m,weather_code,wind_speed_10m&timezone=America/Edmonton'
+    );
+    const data = await response.json();
+    const curr = data.current;
+    const desc = weatherDesc(curr.weather_code);
+    return {
+      temp: Math.round(curr.temperature_2m),
+      desc: desc,
+      wind: Math.round(curr.wind_speed_10m)
+    };
+  } catch (e) {
+    console.error("Weather fetch failed:", e);
+    return { temp: 0, desc: "Unknown", wind: 0 };
+  }
+}
+
+function weatherDesc(code) {
+  if (code <= 1) return "clear or partly cloudy";
+  if (code <= 3) return "cloudy";
+  if (code <= 48) return "clear or misty";
+  if (code <= 67) return "light rain";
+  if (code <= 77) return "rain or snow";
+  if (code <= 82) return "heavy rain";
+  if (code <= 86) return "snow showers";
+  return "mixed conditions";
+}
+
+/* ============================================================
+   DATE
+   ============================================================ */
+
+function edmontonDayKey() {
+  return new Date().toLocaleString("en-US", {
+    timeZone: "America/Edmonton", weekday: "long"
+  }).toLowerCase();
+}
+
+/* ============================================================
+   MODAL — DAY PICKER (on load)
+   ============================================================ */
+
+function initModal() {
+  const today = edmontonDayKey();
+  const modalDays = document.getElementById("modal-days");
+  const confirmBtn = document.getElementById("modal-confirm-btn");
+  const msgEl = document.getElementById("modal-msg");
+  const sessionPicker = document.getElementById("modal-session-picker");
+
+  const order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  
+  order.forEach(key => {
+    const idx = DAY_KEYS.indexOf(key);
+    const btn = document.createElement("button");
+    btn.className = "modal-day-btn";
+    btn.textContent = DAY_SHORT[idx];
+    
+    if (key === today) btn.classList.add("today");
+    if (PLAN[key].restDay) btn.classList.add("rest");
+    
+    btn.onclick = () => {
+      document.querySelectorAll(".modal-day-btn").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      selectedDay = key;
+      selectedSession = "morning";
+      
+      // Reset session picker
+      document.querySelectorAll(".session-btn").forEach(b => b.classList.remove("selected"));
+
+      const data = PLAN[key];
+      const hasEvening = !!EVENING_FLEX[key];
+
+      if (data.restDay) {
+        // Sunday: "morning" = engagement pick screen, evening = streamline check
+        sessionPicker.classList.add("show");
+        document.getElementById("btn-morning").style.display = "";
+        document.getElementById("btn-morning").classList.add("selected");
+        selectedSession = "morning";
+        const mb = document.getElementById("btn-morning");
+        mb.innerHTML = "📅 Engagement<br><small>Pick &amp; rest</small>";
+        msgEl.textContent = "Rest day — make the weekly pick, or do the evening streamline.";
+        { const el = document.getElementById("modal-equipment"); if (el) el.textContent = ""; }
+        confirmBtn.disabled = false;
+      } else if (key === "saturday") {
+        // Saturday: no pool, but the evening streamline still runs 7 days/week
+        sessionPicker.classList.add("show");
+        document.getElementById("btn-morning").style.display = "";
+        document.getElementById("btn-morning").innerHTML = "☀️ Morning<br><small>Land Training</small>";
+        document.getElementById("btn-morning").classList.add("selected");
+        selectedSession = "morning";
+        msgEl.textContent = `${data.title} — ${data.subtitle}`;
+        { const eq = DAY_EQUIPMENT[key]; const el = document.getElementById("modal-equipment"); if (el) el.textContent = eq ? "📦 You'll need: " + eq : ""; }
+        confirmBtn.disabled = false;
+      } else {
+        // Normal day: show session picker
+        sessionPicker.classList.add("show");
+        document.getElementById("btn-morning").style.display = "";
+        document.getElementById("btn-morning").innerHTML = "☀️ Morning<br><small>Land Training</small>";
+        document.getElementById("btn-morning").classList.add("selected");
+        selectedSession = "morning";
+        msgEl.textContent = `${data.title} — ${data.subtitle}`;
+        { const eq = DAY_EQUIPMENT[key]; const el = document.getElementById("modal-equipment"); if (el) el.textContent = eq ? "📦 You'll need: " + eq : ""; }
+        confirmBtn.disabled = false;
+      }
+    };
+    
+    modalDays.appendChild(btn);
+  });
+
+  // Settings panel
+  const settingsBox = document.createElement("div");
+  settingsBox.className = "modal-settings";
+  settingsBox.innerHTML = `
+    <h3>Session options</h3>
+    <div class="settings-row">
+      <label for="voice-style">Voice style</label>
+      <select id="voice-style">
+        <option value="classic">Classic</option>
+        <option value="fun">Fun</option>
+        <option value="quiet">Quiet</option>
+      </select>
+    </div>
+    <div class="settings-row">
+      <label for="exercise-rest">Rest between exercises (s)</label>
+      <input id="exercise-rest" type="number" min="3" max="120" />
+    </div>
+    <div class="settings-row">
+      <label for="round-rest">Rest between rounds (s)</label>
+      <input id="round-rest" type="number" min="10" max="180" />
+    </div>
+  `;
+  document.getElementById("modal-msg").before(settingsBox);
+  document.getElementById("voice-style").value = appSettings.voiceStyle;
+  document.getElementById("exercise-rest").value = appSettings.exerciseRestSeconds;
+  document.getElementById("round-rest").value = appSettings.roundRestSeconds;
+  document.getElementById("voice-style").onchange = (e) => {
+    appSettings.voiceStyle = e.target.value; saveSettings();
+  };
+  document.getElementById("exercise-rest").onchange = (e) => {
+    const parsed = Number(e.target.value);
+    if (!Number.isFinite(parsed)) return;
+    appSettings.exerciseRestSeconds = Math.max(3, Math.round(parsed));
+    e.target.value = appSettings.exerciseRestSeconds; saveSettings();
+  };
+  document.getElementById("round-rest").onchange = (e) => {
+    const parsed = Number(e.target.value);
+    if (!Number.isFinite(parsed)) return;
+    appSettings.roundRestSeconds = Math.max(10, Math.round(parsed));
+    e.target.value = appSettings.roundRestSeconds; saveSettings();
+  };
+
+  // Equipment reminder line (injected after modal-msg)
+  const equipEl = document.createElement("div");
+  equipEl.className = "equipment-line";
+  equipEl.id = "modal-equipment";
+  document.getElementById("modal-msg").after(equipEl);
+
+  confirmBtn.onclick = async () => await closeModal();
+
+  // Pass 2: render weekly summary + tracker reminder
+  renderModalWeekSummary();
+  renderModalTrackerReminder();
+
+  // Wire secondary buttons
+  document.getElementById("btn-open-tracker").onclick     = openTrackerView;
+  document.getElementById("btn-open-history").onclick     = openHistoryView;
+  document.getElementById("btn-open-achievements").onclick = openAchievementsView;
+  document.getElementById("btn-reset-week").onclick = () => {
+    if (!confirm("Reset this week's session times? (Tracker data is kept.)")) return;
+    clearThisWeekSessions();
+    renderModalWeekSummary();
+  };
+  document.getElementById("btn-tracker-back").onclick = closeAllSubViews;
+  document.getElementById("btn-tracker-save").onclick = saveTrackerFromUI;
+  document.getElementById("btn-history-back").onclick = closeAllSubViews;
+  document.getElementById("btn-ach-back").onclick     = closeAllSubViews;
+}
+
+/* ===== Pass 2: weekly summary in modal ===== */
+function renderModalWeekSummary() {
+  const sessions = thisWeekSessions().filter(s => s.session === "morning");
+  const byDay = {};
+  sessions.forEach(s => {
+    byDay[s.dayKey] = (byDay[s.dayKey] || 0) + s.durationSecs;
+  });
+  const order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  const cellsHtml = order.map(key => {
+    const idx = DAY_KEYS.indexOf(key);
+    const secs = byDay[key];
+    const done = secs > 0;
+    return `
+      <div class="ws-cell ${done ? 'done' : ''}">
+        <div class="ws-day">${DAY_SHORT[idx]}</div>
+        <div class="ws-time">${done ? fmtMMSS(secs) : '—'}</div>
+      </div>`;
+  }).join("");
+  const total = sessions.reduce((sum, s) => sum + s.durationSecs, 0);
+  const totalText = total > 0 ? fmtHHMM(total) : "Let's start the week!";
+  document.getElementById("week-summary").innerHTML = `
+    <div class="ws-title">⏱ This week's training time</div>
+    <div class="ws-grid">${cellsHtml}</div>
+    <div class="ws-total">Week total: ${totalText}</div>`;
+}
+
+/* ===== Pass 2: tracker reminder in modal ===== */
+function renderModalTrackerReminder() {
+  const week = getCurrentTrackerWeek();
+  const t = loadTracker();
+  const wkData = t[`week${week}`] || {};
+  const today = edmontonDayKey();
+  const isSunday = today === "sunday";
+
+  // Build reminders based on missing PR-day data
+  const dayMetrics = [
+    { key: "mon", label: "Mon PR" }, { key: "tue", label: "Tue PR" },
+    { key: "wed", label: "Wed PR" }, { key: "thu", label: "Thu PR" },
+    { key: "fri", label: "Fri PR" }, { key: "sat", label: "Sat PR" }
+  ];
+  const missing = dayMetrics.filter(m => !wkData[m.key]).map(m => m.label);
+
+  let reminderBody = "";
+  if (isSunday) {
+    reminderBody = `
+      <div class="self-check-banner">📅 Sunday — log this week's PR numbers, then make the engagement pick.</div>`;
+  }
+  reminderBody += `
+    <div class="tr-title">📋 Don't forget your gear</div>
+    <div class="tr-body">
+      Fitness ball · Resistance band · Plyo box · Pull-up bar · Bosu · Bench · Mat. Wear your Apple Watch.
+    </div>`;
+  if (missing.length > 0 && week > 0) {
+    reminderBody += `
+      <div class="tr-body" style="margin-top: 0.4rem;">
+        💡 Week ${week} still needs: <strong>${missing.join(", ")}</strong>. Tap "📊 Progress" to log.
+      </div>`;
+  }
+  document.getElementById("tracker-reminder").innerHTML = reminderBody;
+}
+
+/* ===== Sub-view navigation ===== */
+const SUB_VIEWS = ["modal-tracker", "modal-history", "modal-achievements"];
+function showSubView(id) {
+  document.getElementById("modal-main").style.display = "none";
+  SUB_VIEWS.forEach(v => {
+    document.getElementById(v).style.display = v === id ? "block" : "none";
+  });
+}
+function closeAllSubViews() {
+  SUB_VIEWS.forEach(v => { document.getElementById(v).style.display = "none"; });
+  document.getElementById("modal-main").style.display = "block";
+  renderModalTrackerReminder();
+}
+function openTrackerView() {
+  showSubView("modal-tracker");
+  renderTrackerTable();
+}
+
+/* ===== History view ===== */
+const MOOD_EMOJI = { easy: "😎", just: "✅", hard: "💪", null: "—", undefined: "—" };
+function openHistoryView() {
+  showSubView("modal-history");
+  const slot = document.getElementById("history-list-slot");
+  slot.innerHTML = `<div class="history-empty">Loading…</div>`;
+  fsGetRecent(7).then(docs => {
+    if (!docs.length) {
+      slot.innerHTML = `<div class="history-empty">No cloud sessions yet — complete a session to see history here!</div>`;
+      return;
+    }
+    const cards = docs.map(d => {
+      const date = d.isoDate ? d.isoDate.slice(0, 10) : "—";
+      const day  = d.dayKey  ? d.dayKey[0].toUpperCase() + d.dayKey.slice(1) : "—";
+      const dur  = d.durationSecs ? fmtMMSS(d.durationSecs) : "—";
+      const type = d.session === "evening" ? "🌙 Streamline" : "☀️ Morning";
+      const mood = MOOD_EMOJI[d.mood] ?? "—";
+      return `
+        <div class="history-card">
+          <span class="h-mood" title="Mood: ${d.mood || 'not logged'}">${mood}</span>
+          <span class="h-date">${date}</span>
+          <span class="h-day">${day}</span>
+          <span class="h-type">${type}</span>
+          <span class="h-dur">${dur}</span>
+        </div>`;
+    }).join("");
+    slot.innerHTML = `<div class="history-list">${cards}</div>`;
+  });
+}
+
+/* ===== Achievements view ===== */
+function openAchievementsView() {
+  showSubView("modal-achievements");
+  const slot = document.getElementById("ach-content");
+  slot.innerHTML = `<div class="history-empty">Calculating…</div>`;
+  fsGetAll().then(docs => renderAchievements(docs, slot));
+}
+
+function renderAchievements(docs, slot) {
+  if (!docs.length) {
+    slot.innerHTML = `<div class="history-empty">Complete your first session to unlock achievements!</div>`;
+    return;
+  }
+
+  const mornings = docs.filter(d => d.session !== "evening" && d.completedFully);
+  const evenings  = docs.filter(d => d.session === "evening" && d.completedFully);
+  const all       = docs.filter(d => d.completedFully);
+
+  // ---- Streak (consecutive calendar days with ≥1 session) ----
+  const uniqueDays = [...new Set(all.map(d => (d.isoDate || "").slice(0, 10)))].sort();
+  let streak = 0;
+  if (uniqueDays.length) {
+    let cur = new Date(uniqueDays[uniqueDays.length - 1]);
+    const today = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Edmonton" }));
+    // Allow today or yesterday as the anchor
+    const anchor = new Date(today); anchor.setDate(anchor.getDate() - 1);
+    if (cur >= anchor) {
+      streak = 1;
+      for (let i = uniqueDays.length - 2; i >= 0; i--) {
+        const prev = new Date(uniqueDays[i]);
+        const diff = Math.round((cur - prev) / 86400000);
+        if (diff === 1) { streak++; cur = prev; } else break;
+      }
+    }
+  }
+
+  // ---- This week ----
+  const monday = mondayOfThisWeek();
+  const weekSessions = all.filter(d => d.isoDate && new Date(d.isoDate) >= monday);
+
+  // ---- This month ----
+  const now = new Date();
+  const monthSessions = all.filter(d => {
+    if (!d.isoDate) return false;
+    const dt = new Date(d.isoDate);
+    return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth();
+  });
+
+  // ---- Totals ----
+  const totalSecs  = all.reduce((s, d) => s + (d.durationSecs || 0), 0);
+  const longestSec = Math.max(0, ...all.map(d => d.durationSecs || 0));
+
+  // ---- Personal best week (max sessions in any Mon–Sun window) ----
+  const sessionsByWeek = {};
+  all.forEach(d => {
+    if (!d.isoDate) return;
+    const dt = new Date(d.isoDate);
+    const dow = dt.getDay();
+    const mon = new Date(dt); mon.setDate(dt.getDate() - (dow === 0 ? 6 : dow - 1));
+    const key = mon.toISOString().slice(0, 10);
+    sessionsByWeek[key] = (sessionsByWeek[key] || 0) + 1;
+  });
+  const bestWeek = Math.max(0, ...Object.values(sessionsByWeek));
+
+  // ---- Mood breakdown ----
+  const moods = { easy: 0, just: 0, hard: 0 };
+  all.forEach(d => { if (d.mood && moods[d.mood] !== undefined) moods[d.mood]++; });
+
+  // ---- Stats grid ----
+  const statsHtml = `
+    <div class="ach-grid">
+      <div class="ach-card">
+        <span class="ach-icon">🔥</span>
+        <div class="ach-val">${streak}</div>
+        <div class="ach-label">Day streak</div>
+      </div>
+      <div class="ach-card">
+        <span class="ach-icon">📅</span>
+        <div class="ach-val">${weekSessions.length}</div>
+        <div class="ach-label">Sessions this week</div>
+      </div>
+      <div class="ach-card">
+        <span class="ach-icon">🗓️</span>
+        <div class="ach-val">${monthSessions.length}</div>
+        <div class="ach-label">Sessions this month</div>
+      </div>
+      <div class="ach-card">
+        <span class="ach-icon">⏱</span>
+        <div class="ach-val">${fmtHHMM(totalSecs)}</div>
+        <div class="ach-label">Total training time</div>
+      </div>
+      <div class="ach-card">
+        <span class="ach-icon">🏆</span>
+        <div class="ach-val">${longestSec ? fmtMMSS(longestSec) : "—"}</div>
+        <div class="ach-label">Longest session</div>
+      </div>
+      <div class="ach-card">
+        <span class="ach-icon">📈</span>
+        <div class="ach-val">${bestWeek}</div>
+        <div class="ach-label">Best week ever</div>
+      </div>
+      <div class="ach-card">
+        <span class="ach-icon">🌙</span>
+        <div class="ach-val">${evenings.length}</div>
+        <div class="ach-label">Streamline sessions</div>
+      </div>
+      <div class="ach-card">
+        <span class="ach-icon">☀️</span>
+        <div class="ach-val">${mornings.length}</div>
+        <div class="ach-label">Morning sessions</div>
+      </div>
+    </div>`;
+
+  // ---- Mood breakdown ----
+  const moodHtml = `
+    <div class="ach-section-title">How sessions felt</div>
+    <div class="ach-grid" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="ach-card"><span class="ach-icon">😎</span><div class="ach-val">${moods.easy}</div><div class="ach-label">Easy</div></div>
+      <div class="ach-card"><span class="ach-icon">✅</span><div class="ach-val">${moods.just}</div><div class="ach-label">Just right</div></div>
+      <div class="ach-card"><span class="ach-icon">💪</span><div class="ach-val">${moods.hard}</div><div class="ach-label">Hard</div></div>
+    </div>`;
+
+  // ---- Milestones ----
+  const totalCount = all.length;
+  const MILESTONES = [
+    { n: 1,   label: "First session! 🎉" },
+    { n: 5,   label: "5 sessions 🌟" },
+    { n: 10,  label: "10 sessions 💫" },
+    { n: 20,  label: "20 sessions 🚀" },
+    { n: 30,  label: "30 sessions 🏅" },
+    { n: 50,  label: "50 sessions 👑" },
+    { n: 3,   label: "3-day streak 🔥",   check: () => streak >= 3 },
+    { n: 7,   label: "7-day streak 🌊",   check: () => streak >= 7 },
+    { n: 5,   label: "5 in one week 💥",  check: () => bestWeek >= 5 },
+  ];
+  const badgesHtml = MILESTONES.map(m => {
+    const unlocked = m.check ? m.check() : totalCount >= m.n;
+    return `<span class="milestone-badge ${unlocked ? "" : "locked"}">${unlocked ? "" : "🔒 "}${m.label}</span>`;
+  }).join("");
+
+  slot.innerHTML = statsHtml + moodHtml + `
+    <div class="ach-section-title">Milestones</div>
+    <div class="milestone-list">${badgesHtml}</div>`;
+}
+
+
+function renderTrackerTable() {
+  const t = loadTracker();
+  const currentWk = getCurrentTrackerWeek();
+  const today = edmontonDayKey();
+
+  document.getElementById("self-check-banner-slot").innerHTML =
+    today === "sunday"
+      ? `<div class="self-check-banner">📅 Sunday — log this week before bed!</div>`
+      : "";
+
+  // v10 PR Board — one tracked metric per training day. Beat last week.
+  const metrics = [
+    { key: "mon", label: "Mon · Hollow-Body Flutter (secs, flat back)", type: "number", placeholder: "0" },
+    { key: "tue", label: "Tue · Hip-Drive Kick (reps/side, clean)",     type: "number", placeholder: "0" },
+    { key: "wed", label: "Wed · Box Jump (rounds at full height)",      type: "number", placeholder: "0" },
+    { key: "thu", label: "Thu · Pull-Up (clean reps, Round 1)",         type: "number", placeholder: "0" },
+    { key: "fri", label: "Fri · Bench Vertical Kick (secs core flat)",  type: "number", placeholder: "0" },
+    { key: "sat", label: "Sat · Pull-Up R1 + Bench Kick (secs)",        type: "text",   placeholder: "e.g. 6 / 28" },
+    { key: "feel", label: "Overall feel this week",                     type: "text",   placeholder: "easy / just / hard" }
+  ];
+
+  const headers = `<tr>
+    <th>Metric</th>
+    ${[1,2,3,4].map(w => `<th class="${w === currentWk ? 'this-week' : ''}">Wk ${w}</th>`).join("")}
+  </tr>`;
+
+  const rows = metrics.map(m => `
+    <tr>
+      <td class="metric-name">${m.label}</td>
+      ${[1,2,3,4].map(w => {
+        const val = (t[`week${w}`] || {})[m.key] || "";
+        const cls = w === currentWk ? "this-week" : "";
+        return `<td class="${cls}"><input type="${m.type}" data-week="${w}" data-key="${m.key}" placeholder="${m.placeholder}" value="${val}"></td>`;
+      }).join("")}
+    </tr>
+  `).join("");
+
+  document.getElementById("tracker-table").innerHTML = headers + rows;
+}
+function saveTrackerFromUI() {
+  const t = loadTracker();
+  document.querySelectorAll("#tracker-table input").forEach(inp => {
+    const w = inp.dataset.week;
+    const k = inp.dataset.key;
+    const v = inp.value.trim();
+    t[`week${w}`] = t[`week${w}`] || {};
+    if (v) t[`week${w}`][k] = v;
+    else delete t[`week${w}`][k];
+  });
+  saveTracker(t);
+  // Brief visual feedback
+  const btn = document.getElementById("btn-tracker-save");
+  const orig = btn.textContent;
+  btn.textContent = "✓ Saved!";
+  setTimeout(() => { btn.textContent = orig; }, 1200);
+}
+
+function pickSession(which) {
+  selectedSession = which;
+  document.querySelectorAll(".session-btn").forEach(b => b.classList.remove("selected"));
+  if (which === "morning") {
+    document.getElementById("btn-morning").classList.add("selected");
+  } else {
+    document.getElementById("btn-evening").classList.add("selected");
+  }
+
+  const msgEl = document.getElementById("modal-msg");
+  const data = PLAN[selectedDay];
+
+  if (which === "evening") {
+    const evData = EVENING_FLEX[selectedDay];
+    msgEl.textContent = evData ? `🌙 ${evData.title}` : "🌙 Evening Streamline";
+  } else if (data.restDay) {
+    msgEl.textContent = "Sunday — weekly engagement pick & rest.";
+  } else {
+    msgEl.textContent = `${data.title} — ${data.subtitle}`;
+  }
+}
+
+async function closeModal() {
+  ensureAudio();
+  closeModalAborted = false;
+  
+  // Hide modal, show page
+  document.getElementById("modal-overlay").classList.remove("show");
+  document.getElementById("page-content").classList.add("show");
+  
+  // Fetch weather
+  session.weather = await fetchRedDeerWeather();
+  
+  // Render the day's brief
+  renderTabs();
+  renderSchedule();
+  renderCard();
+  
+  if (selectedSession === "evening") {
+    // Evening flexibility — minimal greeting
+    await speakAndWait("Evening streamline check. Quiet space, no rush. Find your shape.");
+    return;
+  }
+
+  const data = PLAN[selectedDay];
+  
+  if (data.restDay) {
+    await speakAndWait("Hi Jess! It's Sunday — your rest day. Recovery is the training. Pick your engagement system for next week, then rest up.");
+    return;
+  }
+  
+  // Weather greeting
+  const w = session.weather;
+  const weatherMsg = `Red Deer is ${w.temp} degrees and ${w.desc}.`;
+  await speakAndWait(`Hi Jess! Another great day to work with you. ${weatherMsg}.`);
+  if (closeModalAborted) return;
+  
+  // Equipment
+  const eqMsg = `Here's the equipment we'll need: ${data.equipment.join(", ")}.`;
+  await speakAndWait(eqMsg);
+  if (closeModalAborted) return;
+  
+  // Exercise list with circuit structure (NO warm-up mentioned here)
+  let circuitMsg = "While you move the gear in place, here's today's exercise list. ";
+  for (let ci = 0; ci < data.circuits.length; ci++) {
+    const circuit = data.circuits[ci];
+    const exNames = circuit.exercises.map(e => e.name).join(", ");
+    const roundsText = circuit.rounds > 1 ? `${circuit.rounds} rounds of` : "1 round of";
+    
+    // Determine if by-reps or timed
+    const hasReps = circuit.exercises.filter(e => e.byReps).length;
+    const hasTimed = circuit.exercises.filter(e => !e.byReps).length;
+    
+    let modeText = "";
+    if (hasReps > 0 && hasTimed > 0) {
+      modeText = " — mix of timed and by reps";
+    } else if (hasReps === circuit.exercises.length) {
+      modeText = " — by reps";
+    } else {
+      modeText = " — timed";
+    }
+    
+    circuitMsg += `${roundsText} ${exNames}${modeText}. `;
+  }
+  if (closeModalAborted) return;
+  await speakAndWait(circuitMsg);
+}
+
+// Helper: speak and WAIT for utterance to finish before proceeding
+// This is the key fix for voice lag — timer never starts until voice completes
+function speakAndWait(msg) {
+  return new Promise(resolve => {
+    if (!speech) { resolve(); return; }
+    speech.cancel();
+    const u = new SpeechSynthesisUtterance(msg);
+    u.rate = VOICE_RATE;
+    u.pitch = VOICE_PITCH;
+    if (_maleVoice) u.voice = _maleVoice;
+    u.onend = () => {
+      // Small buffer after speech ends to prevent overlap with beeps
+      setTimeout(resolve, 200);
+    };
+    u.onerror = () => {
+      setTimeout(resolve, 200);
+    };
+    // Failsafe: if onend never fires (known browser bug), resolve after estimated duration
+    const estimatedMs = Math.max(msg.length * 80, 2000);
+    const failsafe = setTimeout(() => resolve(), estimatedMs);
+    u.onend = () => { clearTimeout(failsafe); setTimeout(resolve, 200); };
+    u.onerror = () => { clearTimeout(failsafe); setTimeout(resolve, 200); };
+    speech.speak(u);
+  });
+}
+
+// Live warm-up cueing after READY is tapped
+async function runWarmupCueing(warmup) {
+  const steps = [
+    { name: "Jumping Jacks", duration: 30, note: "30 seconds" },
+    { name: "Arm Circles forward and back", duration: 60, note: "20 each, that's about 1 minute" },
+    { name: "Leg Swings front back and side", duration: 60, note: "10 each, that's about 1 minute" },
+    { name: "Hip Circles", duration: 30, note: "10 each direction, 30 seconds" }
+  ];
+  
+  await speakAndWait("Movement prep starts now.");
+  
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    await speakAndWait(`${step.name}, ${step.note}. Go!`);
+    await countdown(step.duration);  // Run timer for this step
+    // No rest break — immediately move to next
+  }
+  
+  // After warm-up completes, countdown to first circuit
+  await speakAndWait("Eight seconds until first circuit exercise.");
+  await countdown(8);
+}
+
+/* ============================================================
+   RENDER — tabs, schedule, day card
+   ============================================================ */
+
+function renderTabs() {
+  const today = edmontonDayKey();
+  const tabs = document.getElementById("day-tabs");
+  tabs.innerHTML = "";
+  const order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  order.forEach(key => {
+    const idx = DAY_KEYS.indexOf(key);
+    const tab = document.createElement("div");
+    tab.className = "day-tab";
+    if (key === today) tab.classList.add("today");
+    if (key === selectedDay) tab.classList.add("active");
+    if (PLAN[key].restDay) tab.classList.add("rest");
+    tab.textContent = DAY_SHORT[idx];
+    tab.onclick = () => {
+      if (session.running) return;
+      selectedDay = key;
+      renderTabs();
+      renderCard();
+    };
+    tabs.appendChild(tab);
+  });
+}
+
+function renderSchedule() {
+  const today = edmontonDayKey();
+  const grid = document.getElementById("schedule-grid");
+  grid.innerHTML = "";
+  const order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  order.forEach(key => {
+    const idx = DAY_KEYS.indexOf(key);
+    const cell = document.createElement("div");
+    cell.className = "sch-cell" + (key === today ? " today" : "");
+    const data = PLAN[key];
+    const name = data.restDay ? "Rest" : data.badge;
+    cell.innerHTML = `<div class="day">${DAY_SHORT[idx]}</div><div class="name">${name}</div>`;
+    grid.appendChild(cell);
+  });
+}
+
+function getActiveData() {
+  if (selectedSession === "evening") return EVENING_FLEX[selectedDay];
+  return PLAN[selectedDay];
+}
+
+function renderCard() {
+  const data = getActiveData();
+  document.getElementById("main-card").classList.remove("session-active");
+
+  if (selectedSession === "evening") {
+    if (!data) {
+      // Saturday — no evening session
+      document.getElementById("main-card").innerHTML = `
+        <div class="rest-day">
+          <div class="emoji">🧘</div>
+          <h2>No Evening Session</h2>
+          <p>Saturday's Deep Stretch already covers flexibility. Enjoy your evening!</p>
+        </div>`;
+      return;
+    }
+    renderEveningBrief(data);
+    return;
+  }
+
+  if (data.restDay) {
+    if (data.isEngagementPick) { renderEngagementPick(); return; }
+    document.getElementById("main-card").innerHTML = `
+      <div class="rest-day">
+        <div class="emoji">☀️</div>
+        <h2>Sunday Rest</h2>
+        <p>Recovery IS the training.</p>
+      </div>`;
+    return;
+  }
+  renderBrief(data);
+}
+
+/* Sunday — pick ONE engagement system for the coming week, or run today's
+   challenge if a system is already active. Once picked, the picker is done
+   for the rest of this Sunday. */
+function renderEngagementPick() {
+  const card = document.getElementById("main-card");
+  card.classList.remove("session-active");
+
+  const comingWeekKey = (() => {
+    const mon = new Date(); mon.setDate(mon.getDate() + 1);
+    return weekKeyFor(mon);
+  })();
+  const all = loadEngagement();
+  const alreadyPicked = all[comingWeekKey];
+  const thisWeekSystem = activeEngagement();   // system chosen LAST Sunday, in effect now
+
+  const sys = thisWeekSystem ? ENGAGEMENT_SYSTEMS[thisWeekSystem] : null;
+  const activeHtml = sys ? `
+    <div class="brief-section" style="background: var(--bg2); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem;">
+      <strong>🗓️ Active this week: ${sys.label}</strong>
+      <div class="caveat-note" style="margin:0.2rem 0 0;">${sys.desc}</div>
+    </div>` : "";
+
+  const pickedHtml = alreadyPicked ? `
+    <div class="brief-section">
+      <strong>✓ Picked for next week: ${ENGAGEMENT_SYSTEMS[alreadyPicked].label}</strong>
+      <div class="caveat-note" style="margin:0.2rem 0 0;">All set — see you Monday.</div>
+    </div>` : `
+    <div class="brief-section">
+      <strong>📅 Pick ONE system for next week</strong>
+      <div class="caveat-note" style="margin:0.2rem 0 0.5rem;">Choose the one you'll run all week. You can change it next Sunday.</div>
+      <div class="engage-options" id="engage-options">
+        <button class="engage-opt" data-sys="peer">
+          🏆 Peer Challenge<br><small>Same timer vs parent, different metric</small>
+        </button>
+        <button class="engage-opt" data-sys="roleflip">
+          🔄 Role Flip<br><small>You demo + coach the parent</small>
+        </button>
+      </div>
+    </div>`;
+
+  card.innerHTML = `
+    <div class="day-header">
+      <span class="day-badge">REST</span>
+      <h2 class="day-title">Sunday</h2>
+      <div class="day-subtitle">Full Rest + Weekly Engagement Pick</div>
+    </div>
+    <div class="mantra">"${DAY_MANTRA.sunday}"</div>
+    <div class="brief">
+      ${activeHtml}
+      ${pickedHtml}
+      <div class="brief-section">
+        <strong>✓ Today: rest well</strong>
+        <ul>
+          <li>Light recreational swimming — no laps, no drills</li>
+          <li>Free play, walking, casual bike ride</li>
+          <li>Extra sleep — the most powerful recovery tool</li>
+          <li>Eat well — protein and carbs</li>
+        </ul>
+      </div>
+    </div>
+    <div class="caveat-note" style="text-align:center;">
+      🌙 Still do the evening streamline check tonight — it runs 7 days a week.
+    </div>`;
+
+  if (!alreadyPicked) {
+    card.querySelectorAll(".engage-opt").forEach(btn => {
+      btn.onclick = () => {
+        setEngagementPick(btn.dataset.sys);
+        renderEngagementPick();   // re-render into the "picked" state
+      };
+    });
+  }
+}
+
+function renderEveningBrief(data) {
+  const exHtml = data.circuits[0].exercises.map(ex => {
+    const w = exWork(ex);
+    const meta = ex.eachSide ? `${Math.floor(w/2)}s × 2 sides` : `${w}s`;
+    return `<li class="ex-line"><span>${ex.name}</span><span class="ex-meta">${meta}</span></li>`;
+  }).join("");
+
+  const est = fmtEstimate(estimateSessionSecs(data, false));
+
+  document.getElementById("main-card").innerHTML = `
+    <div class="day-header">
+      <span class="day-badge evening-badge">${data.badge}</span>
+      <h2 class="day-title">${data.title}</h2>
+      <div class="day-subtitle">${data.subtitle} · ${est}</div>
+    </div>
+    <div class="mantra" style="font-size: 1.1rem; color: var(--evening-deep);">
+      Body-position automation — not strength training.<br>
+      Quiet space, no rush. Focus on FEELING the position.
+    </div>
+    <div class="brief">
+      <div class="brief-section">
+        <strong>🌙 Streamline Holds — 3 rounds each</strong>
+        <ul>${exHtml}</ul>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-ready" style="background: var(--evening); color: white;">
+        START 🌙
+      </button>
+    </div>`;
+
+  document.getElementById("btn-ready").onclick = async () => {
+    closeModalAborted = true;
+    skipGreetingOnStart = true;
+    await startSession();
+  };
+}
+
+function briefRepsMeta(ex) {
+  // For cadence exercises, just show "by reps" — strip the timing detail from screen
+  if (ex.byReps) return "by reps";
+  const w = exWork(ex);
+  return ex.eachSide ? `${Math.floor(w/2)}s × 2 sides` : `${w}s`;
+}
+
+function renderBrief(data) {
+  const dayKey = selectedDay;
+  const isWarmupChoice = WARMUP_CHOICE_DAYS.has(dayKey) && !!data.warmup;
+  const isAddonDay = ADDON_DAYS.has(dayKey);
+
+  const circuitsHtml = data.circuits.map(c => {
+    const exHtml = c.exercises.map(ex => {
+      const meta = briefRepsMeta(ex);
+      const rd = ex.rounds && ex.rounds < c.rounds ? ` <span class="ex-meta">(${ex.rounds} rds)</span>` : "";
+      return `<li class="ex-line"><span>${ex.name}${rd}</span><span class="ex-meta">${meta}</span></li>`;
+    }).join("");
+    return `
+      <div class="brief-section">
+        <strong>${c.name}</strong> · ${c.rounds} round${c.rounds > 1 ? "s" : ""}
+        <ul>${exHtml}</ul>
+      </div>`;
+  }).join("");
+
+  const eqHtml = `
+    <div class="brief-section">
+      <strong>📦 Equipment to set up</strong>
+      <ul>${data.equipment.map(e => `<li>${e}</li>`).join("")}</ul>
+    </div>`;
+
+  const wk = overloadWeek();
+  const est = fmtEstimate(estimateSessionSecs(data, !!data.warmup));
+  const hz = HR_ZONES[data.hrZone] || HR_ZONES.z2;
+
+  // HR zone chip + Apple Watch reminder
+  const hrHtml = `
+    <div class="brief-section hr-block" style="border-left: 5px solid ${hz.color};">
+      <strong>⌚ Heart Rate — ${data.hrText}</strong>
+      <div class="caveat-note" style="margin:0.2rem 0 0;">
+        Wear your Apple Watch — check your heart rate on the watch face.
+        Target zone: ${hz.label} (${hz.bpm}).
+      </div>
+    </div>`;
+
+  // Emerge benchmark banner
+  const benchHtml = data.benchmark ? `
+    <div class="brief-section" style="background: var(--bg2); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem;">
+      <strong>🎯 Today's Benchmark</strong>
+      <div class="caveat-note" style="margin:0.2rem 0 0;">${data.benchmark}</div>
+    </div>` : "";
+
+  // PR Board target
+  const prHtml = data.prTarget ? `
+    <div class="brief-section">
+      <strong>📊 PR Board — beat last week</strong>
+      <div class="caveat-note" style="margin:0.2rem 0 0;">${data.prTarget}</div>
+    </div>` : "";
+
+  // Active weekly engagement system (chosen last Sunday)
+  const engSys = activeEngagement();
+  const engHtml = engSys ? `
+    <div class="brief-section" style="background: var(--bg2); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem;">
+      <strong>${engSys === "peer" ? "🏆" : "🔄"} This week: ${ENGAGEMENT_SYSTEMS[engSys].label}</strong>
+      <div class="caveat-note" style="margin:0.2rem 0 0;">${ENGAGEMENT_SYSTEMS[engSys].desc}</div>
+    </div>` : "";
+
+  // Warm-up: picker on Wed/Thu/Sat, plain note otherwise
+  let warmupHtml = "";
+  if (isWarmupChoice) {
+    warmupHtml = `
+      <div class="brief-section" id="warmup-picker">
+        <strong>🔥 Warm-Up — pick 3 of 5 &amp; lead it</strong>
+        <div class="caveat-note" style="margin:0.2rem 0 0.4rem;">Tap 3. You set the order — first tapped goes first.</div>
+        <div class="warmup-options" id="warmup-options"></div>
+      </div>`;
+  } else if (data.warmup) {
+    warmupHtml = `
+      <div class="brief-section">
+        <strong>🔥 Movement Prep first</strong> · 3 min · ${data.warmup.steps.join(" · ")}
+      </div>`;
+  }
+
+  // Mon/Tue conditional Leg Add-On gate
+  const addonHtml = isAddonDay ? `
+    <div class="readiness" id="addon-gate">
+      <strong>🦵 Leg Add-On?</strong>
+      <div class="caveat-note" style="margin-top:0.3rem;">
+        Run the Add-On (500-Kick + dryland) only if the PM pool is confirmed skipped by 4 PM.
+        If unsure — skip it.
+      </div>
+      <div class="readiness-buttons">
+        <button data-addon="no">No add-on</button>
+        <button data-addon="yes">Add it on</button>
+      </div>
+    </div>` : "";
+
+  document.getElementById("main-card").innerHTML = `
+    <div class="day-header">
+      <span class="day-badge">${data.badge}</span>
+      <h2 class="day-title">${data.title}</h2>
+      <div class="day-subtitle">${data.subtitle} · ${est} · Week ${wk}</div>
+    </div>
+    <div class="mantra">"${DAY_MANTRA[dayKey] || MANTRA}"</div>
+    <div class="brief">
+      ${hrHtml}
+      ${benchHtml}
+      ${prHtml}
+      ${engHtml}
+      ${eqHtml}
+      ${warmupHtml}
+      ${addonHtml}
+      ${circuitsHtml}
+    </div>
+    <div class="caveat-note" style="text-align:center;">
+      📱 Put your phone on the floor where you can see it — then leave it there.
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-ready">READY ✓</button>
+    </div>`;
+
+  // --- Warm-up picker logic ---
+  if (isWarmupChoice) {
+    sessionWarmupPick = [];
+    const optWrap = document.getElementById("warmup-options");
+    WARMUP_OPTIONS.forEach((opt, i) => {
+      const b = document.createElement("button");
+      b.className = "warmup-opt";
+      b.textContent = opt;
+      b.onclick = () => {
+        const idx = sessionWarmupPick.indexOf(i);
+        if (idx >= 0) {
+          sessionWarmupPick.splice(idx, 1);
+        } else {
+          if (sessionWarmupPick.length >= 3) return;
+          sessionWarmupPick.push(i);
+        }
+        optWrap.querySelectorAll(".warmup-opt").forEach((el, j) => {
+          const pos = sessionWarmupPick.indexOf(j);
+          el.classList.toggle("picked", pos >= 0);
+          el.dataset.order = pos >= 0 ? (pos + 1) : "";
+        });
+      };
+      optWrap.appendChild(b);
+    });
+  } else {
+    sessionWarmupPick = null;
+  }
+
+  // --- Add-on gate logic ---
+  sessionAddonOn = false;
+  if (isAddonDay) {
+    document.querySelectorAll("#addon-gate .readiness-buttons button").forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll("#addon-gate .readiness-buttons button")
+          .forEach(b => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        sessionAddonOn = btn.dataset.addon === "yes";
+      };
+    });
+  }
+
+  document.getElementById("btn-ready").onclick = async () => {
+    if (isWarmupChoice && sessionWarmupPick && sessionWarmupPick.length !== 3) {
+      alert("Pick exactly 3 warm-up exercises first.");
+      return;
+    }
+    closeModalAborted = true;
+    skipGreetingOnStart = true;
+    await startSession();
+  };
+}
+
+/* ============================================================
+   SESSION UI
+   ============================================================ */
+
+function fmt(s) {
+  if (typeof s === "string") return s;
+  if (s < 60) return String(s).padStart(2, "0");
+  const m = Math.floor(s / 60), r = s % 60;
+  return `${m}:${String(r).padStart(2, "0")}`;
+}
+
+/* Overload-adjusted work seconds for a timed exercise (v2 progressive overload).
+   eachSide exercises store full duration; +2s/week applies to the whole. */
+function exWork(ex) {
+  return adjWork(ex.work);
+}
+/* Rep count shown for a rep-based exercise, with +1-rep-every-2-weeks bonus
+   applied to the leading "N reps" figure in repsDetail. */
+function exRepsDetail(ex) {
+  const bonus = repBonus();
+  if (!bonus || !ex.repsDetail) return ex.repsDetail;
+  // bump the leading number (covers "10 reps", "10 alternating reps", "20 steps")
+  return ex.repsDetail.replace(/^(\d+)/, n => parseInt(n, 10) + bonus);
+}
+
+/* Estimated session length in seconds, for the current overload week.
+   Rep-based exercises are estimated at secondsPerRep × reps. */
+function estimateSessionSecs(data, withWarmup) {
+  let total = 0;
+  if (withWarmup && data.warmup) total += data.warmup.duration || 180;
+  const exRest = Math.max(appSettings.exerciseRestSeconds, MIN_REST);
+  data.circuits.forEach(c => {
+    const roundRest = Math.max(c.roundRest || ROUND_REST, appSettings.roundRestSeconds, MIN_REST);
+    for (let r = 1; r <= c.rounds; r++) {
+      let exInRound = 0;
+      c.exercises.forEach(ex => {
+        if (ex.rounds && r > ex.rounds) return;
+        exInRound++;
+        if (ex.byReps) {
+          const m = (ex.repsDetail || "").match(/(\d+)\s*(?:reps?|steps?|alternating)/i)
+                 || (ex.repsDetail || "").match(/(\d+)/);
+          const reps = m ? parseInt(m[1], 10) + repBonus() : 10;
+          total += reps * (appSettings.secondsPerRep || 3) * (ex.eachSide ? 2 : 1);
+        } else {
+          total += exWork(ex) + (ex.eachSide ? SIDE_SWITCH_BUFFER : 0);
+        }
+      });
+      total += exRest * Math.max(0, exInRound - 1);   // between exercises
+      if (r < c.rounds) total += roundRest;            // between rounds
+    }
+  });
+  return Math.round(total);
+}
+function fmtEstimate(secs) {
+  const m = Math.round(secs / 60);
+  return `~${m} min`;
+}
+
+function renderSessionShell(data) {
+  const card = document.getElementById("main-card");
+  card.classList.add("session-active");
+  const isEvening = selectedSession === "evening";
+  card.innerHTML = `
+    <div class="day-header">
+      <span class="day-badge${isEvening ? ' evening-badge' : ''}">${data.badge}</span>
+      <h2 class="day-title">${data.title}</h2>
+      <div class="day-subtitle">${data.subtitle}</div>
+    </div>
+    <div class="elapsed-bar">
+      <span class="label">⏱ Session time</span>
+      <span class="elapsed-time" id="elapsed-time">00:00</span>
+    </div>
+    <div class="status" id="status" role="status" aria-live="polite">Get ready…</div>
+    <div class="timer-zone" id="timer-zone">
+      <div class="timer" id="timer" aria-live="off">--:--</div>
+      <div class="progress" id="progress"></div>
+    </div>
+    <div class="exercise" id="exercise"></div>
+    <div class="upnext" id="upnext"></div>
+    <div class="btn-row" id="controls"></div>`;
+}
+
+function setZone(mode) { document.getElementById("timer-zone").className = "timer-zone " + mode; }
+function setTimer(s, urgent = false) {
+  const t = document.getElementById("timer");
+  t.textContent = fmt(s);
+  t.classList.toggle("urgent", urgent);
+}
+function setStatus(msg) { document.getElementById("status").textContent = msg; }
+function setProgress(chips) {
+  document.getElementById("progress").innerHTML =
+    chips.map(c => `<span class="chip${c.phase ? " phase" : ""}">${c.text}</span>`).join("");
+}
+function setExercise({ name, detail, cue, redFlag, warmupSteps, hydrate }) {
+  const html = [];
+  if (name)   html.push(`<div class="ex-name">${name}</div>`);
+  if (detail) html.push(`<div class="ex-detail">${detail}</div>`);
+  if (warmupSteps) html.push(`<div class="ex-cue">${warmupSteps.map(s => "• " + s).join("<br>")}</div>`);
+  else if (cue) html.push(`<div class="ex-cue">${cue}</div>`);
+  if (redFlag) html.push(`<div class="ex-redflag">${redFlag}</div>`);
+  if (hydrate) html.push(`<div class="ex-hydrate">💧 Sip water · breathe deep · shake it out</div>`);
+  document.getElementById("exercise").innerHTML = html.join("");
+}
+function setUpNext(text) { document.getElementById("upnext").innerHTML = text || ""; }
+
+function setSessionControls() {
+  document.getElementById("controls").innerHTML = `
+    <button class="btn btn-pause" id="btn-pause">PAUSE</button>
+    <button class="btn btn-form"  id="btn-form">FORM</button>
+    <button class="btn btn-skip"  id="btn-skip">SKIP EX</button>
+    <button class="btn btn-stop"  id="btn-stop">STOP</button>`;
+  document.getElementById("btn-pause").onclick = togglePause;
+  document.getElementById("btn-form").onclick = formCheck;
+  document.getElementById("btn-skip").onclick = skipExercise;
+  document.getElementById("btn-stop").onclick = stopSession;
+}
+
+function setDoneControls() {
+  document.getElementById("controls").innerHTML = `
+    <button class="btn btn-done"  id="btn-done">DONE ✓</button>
+    <button class="btn btn-pause" id="btn-pause">PAUSE</button>
+    <button class="btn btn-form"  id="btn-form">FORM</button>
+    <button class="btn btn-skip"  id="btn-skip">SKIP EX</button>
+    <button class="btn btn-stop"  id="btn-stop">STOP</button>`;
+  document.getElementById("btn-done").onclick = () => {
+    if (session.byRepsResolver) {
+      beep(880, 0.15);
+      session.byRepsResolver("done"); // wrapper handles null + clearInterval
+    }
+  };
+  document.getElementById("btn-pause").onclick = togglePause;
+  document.getElementById("btn-form").onclick = formCheck;
+  document.getElementById("btn-skip").onclick = skipExercise;
+  document.getElementById("btn-stop").onclick = stopSession;
+}
+
+/* ============================================================
+   TIMER PRIMITIVES
+   ============================================================ */
+
+function countdown(seconds, opts = {}) {
+  return new Promise(resolve => {
+    let remaining = seconds;
+    setTimer(remaining);
+    session.currentTimer = setInterval(() => {
+      if (session.abort)        { clearInterval(session.currentTimer); resolve("abort"); return; }
+      if (session.skipExercise) { clearInterval(session.currentTimer); resolve("skip");  return; }
+      if (session.paused) return;
+
+      remaining--;
+      const urgent = remaining <= 3 && remaining > 0;
+      setTimer(Math.max(remaining, 0), urgent);
+      if (opts.onTick) opts.onTick(remaining);
+
+      if (remaining <= 3 && remaining > 0) beep(remaining === 1 ? 880 : 440, 0.1);
+      if (remaining === 0) endBeep();
+
+      if (remaining <= 0) { clearInterval(session.currentTimer); resolve("done"); }
+    }, 1000);
+  });
+}
+
+function waitForDone() {
+  return new Promise(resolve => {
+    session.byRepsResolver = resolve;
+    setTimer("✓");
+    setDoneControls();
+    const watchdog = setInterval(() => {
+      if (session.abort || session.skipExercise) {
+        clearInterval(watchdog);
+        const r = session.byRepsResolver;
+        session.byRepsResolver = null;
+        r(session.abort ? "abort" : "skip");
+      }
+    }, 200);
+    // Wrap resolve so watchdog is always cleared
+    const origResolver = resolve;
+    session.byRepsResolver = (result) => {
+      clearInterval(watchdog);
+      session.byRepsResolver = null;
+      origResolver(result);
+    };
+  });
+}
+
+function sleep(ms) {
+  return new Promise(resolve => {
+    const start = Date.now();
+    const id = setInterval(() => {
+      if (session.abort)        { clearInterval(id); resolve("abort"); return; }
+      if (session.skipExercise) { clearInterval(id); resolve("skip");  return; }
+      if (session.paused) return;
+      if (Date.now() - start >= ms) { clearInterval(id); resolve("done"); }
+    }, 100);
+  });
+}
+
+/* ============================================================
+   REPS VOICE INTELLIGENCE
+   ============================================================ */
+
+// Patterns that get cadence voice-only (not shown on screen)
+const CADENCE_PATTERN = /\d+s\s+(?:up|open|raise)/i;
+
+function hasCadence(ex) {
+  return ex.byReps && CADENCE_PATTERN.test(ex.repsDetail || "");
+}
+
+// Return screen-safe rep count: "10 reps" stripping cadence timing text.
+// Reps reflect the current week's +1-every-2-weeks overload bonus.
+function screenRepsDetail(ex) {
+  const detail = exRepsDetail(ex);
+  if (!hasCadence(ex)) return detail;
+  // Extract just the leading "N reps" part
+  const m = detail.match(/^(\d+\s+reps?)/i);
+  return m ? m[1] : detail.replace(/·.*$/, "").trim();
+}
+
+// Build the ordered voice cue sequence for a reps exercise
+// Returns array of strings to speak one by one, looping until DONE
+function buildVoiceCues(ex) {
+  const name = ex.name;
+
+  if (/glute bridge slow/i.test(name)) {
+    const cues = [];
+    for (let i = 1; i <= 10; i++) {
+      cues.push(`${i}. Up 2 3`, "Hold 2 3", "Down 2 3");
+    }
+    return cues;
+  }
+  if (/glute bridge/i.test(name)) {
+    const cues = [];
+    for (let i = 1; i <= 12; i++) {
+      cues.push(`${i}. Up 2`, "Hold", "Down 2");
+    }
+    return cues;
+  }
+  if (/calf raise/i.test(name)) {
+    const cues = [];
+    for (let i = 1; i <= 15; i++) {
+      cues.push(`${i}. Up 2`, "Hold", "Down 2");
+    }
+    return cues;
+  }
+  if (/clamshell/i.test(name)) {
+    const cues = [];
+    for (let i = 1; i <= 15; i++) {
+      cues.push(`${i}. Open 2`, "Hold", "Close 2");
+    }
+    return cues;
+  }
+  if (/dead bug/i.test(name)) {
+    const cues = [];
+    for (let i = 1; i <= 10; i++) {
+      cues.push(`${i}. Extend`, "And return");
+    }
+    return cues;
+  }
+  if (/bird dog/i.test(name)) {
+    const cues = [];
+    for (let i = 1; i <= 10; i++) {
+      cues.push(`${i}. Extend`, "Hold 2 3 4 5", "Return");
+    }
+    return cues;
+  }
+  // Default: count reps
+  const repMatch = (ex.repsDetail || "").match(/(\d+)\s*reps?/i);
+  const count = repMatch ? parseInt(repMatch[1]) : 10;
+  return Array.from({ length: count }, (_, i) => String(i + 1));
+}
+
+// Run a reps exercise with voice driving the pace.
+// Shows DONE button — Jen presses when finished.
+// Voice loops through cues; pressing DONE interrupts cleanly and instantly.
+async function runRepsWithVoice(ex) {
+  const cues = buildVoiceCues(ex);
+  let cueDone = false;
+
+  setTimer("✓");
+  setDoneControls();
+
+  // Promise that resolves when DONE/skip/abort is pressed
+  const donePromise = new Promise(resolve => {
+    const watchdog = setInterval(() => {
+      if (session.abort || session.skipExercise) {
+        clearInterval(watchdog);
+        const r = session.byRepsResolver;
+        if (r) { session.byRepsResolver = null; r(session.abort ? "abort" : "skip"); }
+      }
+    }, 200);
+    session.byRepsResolver = (result) => {
+      clearInterval(watchdog);
+      cueDone = true;
+      session.byRepsResolver = null;
+      // Cancel any in-flight speech so awaiting speakAndWait resolves fast
+      if (speech) speech.cancel();
+      resolve(result);
+    };
+  });
+
+  // Voice cue loop — runs until cueDone is set
+  // Respects session.paused (waits until unpaused before next cue)
+  const voiceLoop = (async () => {
+    for (const cue of cues) {
+      if (cueDone) break;
+      // If paused, wait — checked between cues so we don't speak over silence
+      while (session.paused && !cueDone) {
+        await new Promise(r => setTimeout(r, 200));
+      }
+      if (cueDone) break;
+      await speakAndWait(cue);
+      if (cueDone) break;
+    }
+  })();
+
+  const result = await donePromise;
+  cueDone = true;
+  await voiceLoop;
+  return result;
+}
+
+/* ============================================================
+   PASS 2: PERSISTENCE — sessions log + 4-week tracker
+   ============================================================ */
+
+const LS_SESSIONS = "swim_sessions_v2";
+const LS_TRACKER  = "swim_tracker_v2";
+
+/* ============================================================
+   SETTINGS + SKIP HISTORY + PROGRESS (restored)
+   ============================================================ */
+
+function readStorage(key, fallback) {
+  try { const v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : fallback; }
+  catch { return fallback; }
+}
+function writeStorage(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+function loadSettings() {
+  return { ...DEFAULT_SETTINGS, ...readStorage(SETTINGS_KEY, {}) };
+}
+function saveSettings() {
+  writeStorage(SETTINGS_KEY, appSettings);
+}
+function loadProgressEntries() {
+  return readStorage(PROGRESS_KEY, []);
+}
+function saveProgressEntries() {
+  writeStorage(PROGRESS_KEY, progressEntries);
+}
+function pruneSkipHistory(items) {
+  const cutoff = Date.now() - SKIP_RETENTION_MS;
+  return (items || []).filter(item => item.createdAt >= cutoff);
+}
+function loadSkipHistory() {
+  const cleaned = pruneSkipHistory(readStorage(SKIP_HISTORY_KEY, []));
+  writeStorage(SKIP_HISTORY_KEY, cleaned);
+  return cleaned;
+}
+function saveSkipHistory() {
+  skipHistory = pruneSkipHistory(skipHistory);
+  writeStorage(SKIP_HISTORY_KEY, skipHistory);
+}
+function nextEncouragement() {
+  const options = ENCOURAGEMENTS.filter(msg => msg !== lastEncouragement);
+  const chosen = options[Math.floor(Math.random() * options.length)] || ENCOURAGEMENTS[0];
+  lastEncouragement = chosen;
+  return chosen;
+}
+function escapeRegex(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function applyPronunciationMap(msg) {
+  let out = msg;
+  for (const [word, pron] of Object.entries(PRONUNCIATION_MAP)) {
+    out = out.replace(new RegExp(escapeRegex(word), "gi"), pron);
+  }
+  return out;
+}
+
+// Sessions log: array of { dayKey, isoDate, durationSecs, session: 'morning'|'evening' }
+function loadSessions() {
+  try { return JSON.parse(localStorage.getItem(LS_SESSIONS) || "[]"); }
+  catch { return []; }
+}
+function saveSession(entry) {
+  const all = loadSessions();
+  all.push(entry);
+  localStorage.setItem(LS_SESSIONS, JSON.stringify(all));
+}
+function clearThisWeekSessions() {
+  const monday = mondayOfThisWeek();
+  const all = loadSessions().filter(s => new Date(s.isoDate) < monday);
+  localStorage.setItem(LS_SESSIONS, JSON.stringify(all));
+}
+function mondayOfThisWeek() {
+  const now = new Date();
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  const dow = d.getDay(); // 0=Sun..6=Sat
+  const diff = dow === 0 ? -6 : 1 - dow; // Monday-based week
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+function thisWeekSessions() {
+  const monday = mondayOfThisWeek();
+  return loadSessions().filter(s => new Date(s.isoDate) >= monday);
+}
+function fmtMMSS(secs) {
+  if (!secs || secs < 0) return "—";
+  const m = Math.floor(secs / 60), r = secs % 60;
+  return `${m}:${String(r).padStart(2, "0")}`;
+}
+function fmtHHMM(secs) {
+  if (!secs || secs < 0) return "0m";
+  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+/* ===== Weekly engagement pick (Peer Challenge / Role Flip) =====
+   Stored per ISO week-start (Monday). Picked on Sunday for the coming week. */
+function weekKeyFor(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const dow = d.getDay();
+  const diff = dow === 0 ? 1 : 1 - dow;  // upcoming/this Monday
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+function loadEngagement() {
+  try { return JSON.parse(localStorage.getItem(ENGAGE_KEY) || "{}"); }
+  catch { return {}; }
+}
+function saveEngagement(obj) {
+  localStorage.setItem(ENGAGE_KEY, JSON.stringify(obj));
+}
+// The engagement system active for the week containing `date` (default today).
+function activeEngagement(date) {
+  const all = loadEngagement();
+  return all[weekKeyFor(date || new Date())] || null;
+}
+// Record the pick for the coming week (called from the Sunday screen).
+function setEngagementPick(systemKey) {
+  const all = loadEngagement();
+  // Picking on Sunday applies to the week starting tomorrow (Monday).
+  const monday = new Date();
+  monday.setDate(monday.getDate() + 1);
+  all[weekKeyFor(monday)] = systemKey;
+  saveEngagement(all);
+}
+
+// 4-week tracker storage
+// Structure: { week1: {pullup, boxjump, splits, feel}, week2: {...}, ... }
+function loadTracker() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_TRACKER) || "{}");
+    return {
+      week1: raw.week1 || {},
+      week2: raw.week2 || {},
+      week3: raw.week3 || {},
+      week4: raw.week4 || {}
+    };
+  } catch {
+    return { week1: {}, week2: {}, week3: {}, week4: {} };
+  }
+}
+function saveTracker(t) {
+  localStorage.setItem(LS_TRACKER, JSON.stringify(t));
+}
+
+// Determine "this week" for the tracker (1..4) — based on first-tracker-use date
+function getCurrentTrackerWeek() {
+  const t = loadTracker();
+  if (!t._startISO) {
+    t._startISO = new Date().toISOString();
+    saveTracker(t);
+  }
+  const start = new Date(t._startISO);
+  const days = Math.floor((new Date() - start) / 86400000);
+  return Math.min(4, Math.max(1, Math.floor(days / 7) + 1));
+}
+
+/* ============================================================
+   PASS 2: ELAPSED TIMER
+   ============================================================ */
+
+let elapsedStart = null;
+let elapsedInterval = null;
+
+function startElapsed() {
+  elapsedStart = Date.now();
+  if (elapsedInterval) clearInterval(elapsedInterval);
+  elapsedInterval = setInterval(() => {
+    if (session.paused) return;
+    const el = document.getElementById("elapsed-time");
+    if (!el) return;
+    const secs = Math.floor((Date.now() - elapsedStart) / 1000);
+    el.textContent = fmtMMSS(secs);
+  }, 1000);
+}
+function getElapsedSecs() {
+  if (!elapsedStart) return 0;
+  return Math.floor((Date.now() - elapsedStart) / 1000);
+}
+function stopElapsed() {
+  if (elapsedInterval) { clearInterval(elapsedInterval); elapsedInterval = null; }
+}
+
+/* ============================================================
+   SESSION FLOW
+   ============================================================ */
+
+async function startSession() {
+  ensureAudio();
+  if (session.running) return;
+  let data = getActiveData();
+  const isEvening = selectedSession === "evening";
+  session = {
+    running: true, paused: false, abort: false, skipExercise: false,
+    currentTimer: null, byRepsResolver: null,
+    calmMode: !!data.isCalmDay, currentEx: null, weather: session.weather,
+    skipped: [], doneHoldTimeout: null, doneHoldTriggered: false
+  };
+
+  // Apply skipGreetingOnStart if set
+  if (skipGreetingOnStart) {
+    session.skipExercise = true;
+    skipGreetingOnStart = false;
+  }
+
+  // Build the day's run data — apply warm-up pick + conditional leg add-on
+  let runData = data;
+  if (!isEvening && (sessionWarmupPick || sessionAddonOn)) {
+    runData = Object.assign({}, data);
+    if (sessionWarmupPick && sessionWarmupPick.length === 3 && data.warmup) {
+      runData.warmup = Object.assign({}, data.warmup, {
+        steps: sessionWarmupPick.map(i => WARMUP_OPTIONS[i])
+      });
+    }
+    if (sessionAddonOn && ADDON[selectedDay]) {
+      runData.circuits = data.circuits.concat(ADDON[selectedDay].circuits);
+    }
+  }
+
+  renderSessionShell(runData);
+  setSessionControls();
+  startElapsed();
+
+  const dayMantra = DAY_MANTRA[selectedDay] || MANTRA;
+
+  // Mantra / intro
+  if (isEvening) {
+    setStatus("Evening Streamline");
+    setExercise({
+      name: "Find your shape",
+      cue: "Quiet space, no rush. Focus on FEELING the position."
+    });
+    await speakAndWait("Evening streamline check. Focus on finding and holding the correct body shape.");
+  } else {
+    setStatus("Let's go!");
+    const firstEx = runData.warmup ? runData.warmup.name : runData.circuits[0].exercises[0].name;
+    const hz = HR_ZONES[data.hrZone] || HR_ZONES.z2;
+    setExercise({
+      name: "Ready?",
+      cue: `"${dayMantra}" — Wear your Apple Watch. Target ${hz.label}. Starting with ${firstEx}.`
+    });
+    await speakAndWait(
+      dayMantra + " Wear your Apple Watch and watch your heart rate. " +
+      "Today's target is " + hz.label + ", " + hz.bpm + ". " +
+      "Put your phone on the floor where you can see it. Starting with " + firstEx + "."
+    );
+  }
+
+  const r1 = await sleep(2000);
+  if (r1 === "abort") return finalize(false);
+  
+  // Reset skip flag after greeting — warm-up should run normally
+  session.skipExercise = false;
+
+  // Warm-up (morning sessions only, if warmup exists)
+  if (!isEvening && runData.warmup) {
+    setZone("warmup");
+    setStatus("Warm-up");
+    setProgress([{ text: "Movement Prep", phase: true }, { text: "3 min" }]);
+    setExercise({ name: "Movement Prep", warmupSteps: runData.warmup.steps });
+    setUpNext(`<span class="label">Up next:</span> <span class="name">${runData.circuits[0].name}</span>`);
+    
+    await runWarmupCueing(runData.warmup);
+    
+    // Brief pause after warm-up before circuits
+    await sleep(1000);
+  } else if (!isEvening && !runData.warmup) {
+    // No warm-up: just an 8s pause before first circuit
+    setZone("warmup");
+    setStatus("Get ready…");
+    setExercise({ name: "Almost time", cue: "Get your gear ready. First exercise starts in 8 seconds." });
+    await speakAndWait("Eight seconds until first circuit exercise.");
+    await countdown(8);
+  } else {
+    // Evening — short countdown
+    setZone("evening");
+    setStatus("Starting in 5…");
+    setExercise({ name: "Get into position", cue: "Find a quiet spot on the floor." });
+    await speakAndWait("Starting in five seconds.");
+    await countdown(5);
+  }
+
+  // Use the assembled run data (warm-up pick + add-on) for the circuit loop
+  data = runData;
+
+  // Circuits
+  for (let ci = 0; ci < data.circuits.length; ci++) {
+    const circuit = data.circuits[ci];
+
+    for (let r = 1; r <= circuit.rounds; r++) {
+      for (let ei = 0; ei < circuit.exercises.length; ei++) {
+        const ex = circuit.exercises[ei];
+        // Per-exercise round cap (e.g. Ball Stroke Sim runs 3 of 4 rounds)
+        if (ex.rounds && r > ex.rounds) continue;
+        session.skipExercise = false;
+        session.currentEx = ex;
+
+        // ---------- WORK ----------
+        setZone(isEvening ? "evening" : "work");
+        setStatus(circuit.name);
+        setProgress([
+          { text: `Round ${r}/${circuit.rounds}`, phase: true },
+          { text: `Exercise ${ei + 1}/${circuit.exercises.length}` }
+        ]);
+
+        const work = ex.byReps ? 0 : exWork(ex);
+        const detail = ex.byReps
+          ? screenRepsDetail(ex)
+          : (ex.eachSide ? `${Math.floor(work/2)}s each side` : `${work}s`);
+
+        setExercise({ name: ex.name, detail, cue: ex.cue });
+
+        const next = nextLabel(data, ci, r, ei);
+        setUpNext(next ? `<span class="label">Up next:</span> <span class="name">${next}</span>` : "");
+
+        // v2: reset cue announced before the exercise starts
+        const resetPhrase = ex.reset ? ` ${ex.reset}` : "";
+
+        if (ex.byReps) {
+          // Announce exercise name + reset cue first, then voice-cue the reps
+          await speakAndWait(ex.name + "." + resetPhrase + " Go.");
+          const result = await runRepsWithVoice(ex);
+          if (result === "abort") return finalize(false);
+          setSessionControls();
+        } else {
+          setTimer(work);
+          // Voice cue completes FIRST, then timer starts — fixes lag issue
+          await speakAndWait(ex.name + "." + resetPhrase + " Three, two, one, go.");
+
+          if (ex.eachSide) {
+            const half = Math.floor(work / 2);
+            const r3 = await countdown(half);
+            if (r3 === "abort") return finalize(false);
+
+            if (r3 !== "skip") {
+              setZone("sideswitch");
+              setStatus("Switch sides");
+              setExercise({
+                name: "Switch sides",
+                cue: `Reposition for the other side. ${ex.name} continues.`
+              });
+              await speakAndWait("Switch sides. Take five seconds to reposition.");
+              const r4 = await countdown(SIDE_SWITCH_BUFFER);
+              if (r4 === "abort") return finalize(false);
+
+              if (r4 !== "skip") {
+                setZone(isEvening ? "evening" : "work");
+                setStatus(circuit.name);
+                setExercise({ name: ex.name, detail: `${half}s second side`, cue: ex.cue });
+                await speakAndWait(ex.name + " second side. Three, two, one, go.");
+                const r5 = await countdown(half);
+                if (r5 === "abort") return finalize(false);
+              }
+            }
+          } else {
+            const r6 = await countdown(work);
+            if (r6 === "abort") return finalize(false);
+          }
+        }
+
+        // ---------- REST ----------
+        const isFinalEx =
+          ci === data.circuits.length - 1 &&
+          r === circuit.rounds &&
+          ei === circuit.exercises.length - 1;
+
+        if (!isFinalEx) {
+          const upcoming = nextLabel(data, ci, r, ei);
+          const upcomingEx = nextExercise(data, ci, r, ei);
+          const isLastOfRound = ei === circuit.exercises.length - 1;
+          const isLastRound = r === circuit.rounds;
+          const isLastCircuit = ci === data.circuits.length - 1;
+
+          if (isLastOfRound && !(isLastRound && isLastCircuit)) {
+            // Round rest
+            setZone("roundrest");
+            setStatus("Round rest");
+            const nextLabelText = isLastRound ? data.circuits[ci + 1].name : `Round ${r + 1}`;
+
+            const roundProgress = r < circuit.rounds
+              ? `Round ${r} done! You got ${circuit.rounds - r} more to crush!`
+              : `${circuit.name} complete! Time to bring the fire to the next one!`;
+
+            // Extra: mid-session self-check during round rest
+            const selfCheck = "Did that feel different from Round one? No answer needed — just ask yourself.";
+
+            setExercise({ name: "Round Rest", cue: roundProgress + " — " + selfCheck, hydrate: true });
+            setUpNext(`<span class="label">Up next:</span> <span class="name">${nextLabelText}</span>`);
+            // Voice completes before timer
+            await speakAndWait(roundProgress);
+            if (appSettings.voiceStyle !== "quiet") speak(selfCheck);
+
+            const leadTime = upcomingEx && HARD_EXERCISES.has(upcomingEx.name) ? 8 : 5;
+            const result = await countdown(Math.max(circuit.roundRest, appSettings.roundRestSeconds, MIN_REST), {
+              onTick: (rem) => {
+                if (rem === leadTime && upcomingEx) {
+                  speak("Get ready for " + upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : ""));
+                }
+              }
+            });
+            if (result === "abort") return finalize(false);
+            if (result !== "skip" && appSettings.voiceStyle !== "quiet") {
+              speak(nextEncouragement());
+            }
+          } else {
+            // Inter-exercise rest — speak the NEXT exercise's reset cue (v2)
+            const restDuration = Math.max(ex.rest, appSettings.exerciseRestSeconds, MIN_REST);
+            setZone("rest");
+            setStatus("Rest");
+            const nextReset = upcomingEx && upcomingEx.reset ? upcomingEx.reset : "";
+            setExercise({
+              name: "Rest",
+              cue: nextReset ? `Next: ${nextReset}` : "Breathe and reset.",
+              redFlag: upcomingEx ? upcomingEx.redFlag : null
+            });
+            setUpNext(`<span class="label">Up next:</span> <span class="name">${upcoming}</span>`);
+
+            await speakAndWait(nextReset ? "Rest. Next up: " + nextReset : "Rest.");
+            const leadTime = upcomingEx && HARD_EXERCISES.has(upcomingEx.name) ? 8 : 5;
+            const result = await countdown(restDuration, {
+              onTick: (rem) => {
+                if (rem === leadTime) speak("Up next: " + upcoming);
+              }
+            });
+            if (result === "abort") return finalize(false);
+          }
+        }
+      }
+    }
+  }
+
+  finalize(true);
+}
+
+function nextLabel(data, ci, r, ei) {
+  const nx = nextExercise(data, ci, r, ei);
+  if (!nx) return null;
+  // figure round-suffix only when wrapping to a new round of same circuit
+  const circuit = data.circuits[ci];
+  let j = ei + 1;
+  while (j < circuit.exercises.length && circuit.exercises[j].rounds && r > circuit.exercises[j].rounds) j++;
+  if (j < circuit.exercises.length) return circuit.exercises[j].name;
+  if (r + 1 <= circuit.rounds) return circuit.exercises[0].name + ` (Round ${r + 1})`;
+  return nx.name;
+}
+
+function nextExercise(data, ci, r, ei) {
+  const circuit = data.circuits[ci];
+  // remaining exercises this round (skip round-capped ones)
+  for (let j = ei + 1; j < circuit.exercises.length; j++) {
+    if (!(circuit.exercises[j].rounds && r > circuit.exercises[j].rounds)) return circuit.exercises[j];
+  }
+  // first non-capped exercise of next round, same circuit
+  if (r + 1 <= circuit.rounds) {
+    for (let j = 0; j < circuit.exercises.length; j++) {
+      if (!(circuit.exercises[j].rounds && (r + 1) > circuit.exercises[j].rounds)) return circuit.exercises[j];
+    }
+  }
+  // first exercise of next circuit
+  if (ci + 1 < data.circuits.length) return data.circuits[ci + 1].exercises[0];
+  return null;
+}
+
+/* ============================================================
+   CONTROL ACTIONS
+   ============================================================ */
+
+function togglePause() {
+  session.paused = !session.paused;
+  const btn = document.getElementById("btn-pause");
+  if (btn) btn.textContent = session.paused ? "RESUME" : "PAUSE";
+  // speak() calls speech.cancel() — this also kills any active rep cue,
+  // which is exactly what we want when pausing
+  speak(session.paused ? "Paused." : "Resuming.");
+}
+
+function formCheck() {
+  if (!session.currentEx) return;
+  const ex = session.currentEx;
+  const wasPaused = session.paused;
+  if (!wasPaused) togglePause();
+  let msg = ex.name + ". " + ex.cue;
+  if (ex.redFlag) msg += " Watch out: " + ex.redFlag;
+  speak(msg);
+}
+
+function skipExercise() {
+  if (!confirm("Skip this exercise and move on?")) return;
+  if (session.currentEx) {
+    session.skipped.push({
+      name: session.currentEx.name,
+      round: document.getElementById("progress")?.innerText || "",
+      at: Date.now()
+    });
+  }
+  session.skipExercise = true;
+  if (session.byRepsResolver) {
+    session.byRepsResolver("skip"); // wrapper handles null + clearInterval
+  }
+  speak("Skipping. Moving on.");
+}
+
+function stopSession() {
+  if (!confirm("Stop the whole session?")) return;
+  session.abort = true;
+  if (session.byRepsResolver) {
+    session.byRepsResolver("abort"); // wrapper handles null + clearInterval
+  }
+  speak("Session stopped.");
+}
+
+/* ============================================================
+   FINALIZATION
+   ============================================================ */
+
+function finalize(completed) {
+  if (session.currentTimer) clearInterval(session.currentTimer);
+  session.running = false;
+  session.paused = false;
+  session.abort = false;
+
+  const elapsedSecs = getElapsedSecs();
+  stopElapsed();
+
+  const isEvening = selectedSession === "evening";
+
+  if (completed) {
+    // Save session record — localStorage (source of truth) + Firestore (cloud record)
+    const sessionEntry = {
+      app: "swimming",
+      dayKey: selectedDay,
+      dayTitle: (PLAN[selectedDay] && PLAN[selectedDay].title) || selectedDay,
+      isoDate: new Date().toISOString(),
+      durationSecs: elapsedSecs,
+      session: isEvening ? "evening" : "morning",
+      overloadWeek: overloadWeek(),
+      addOn: sessionAddonOn || false,
+      skippedCount: session.skipped.length,
+      completedFully: true
+    };
+    saveSession(sessionEntry);
+    // Cloud write — store returned doc ID so reflection can patch mood later
+    _pendingFsId = null;
+    fsAddSession(sessionEntry).then(id => { _pendingFsId = id; });
+
+    setZone("");
+    if (isEvening) {
+      setStatus("Streamline done 🌙");
+      setTimer("✓");
+      setExercise({
+        name: "Done, Jess!",
+        cue: `Great stretch work — ${fmtMMSS(elapsedSecs)} on the clock. Your body is a little more open now.`
+      });
+      setUpNext("");
+      speak("Streamline check complete. Great work.");
+    } else {
+      setStatus("Training complete 🎉");
+      setTimer("✓");
+      setExercise({
+        name: "Done, Jess!",
+        cue: `Great work — ${fmtMMSS(elapsedSecs)} on the clock. Sip water, breathe, walk it off.`
+      });
+      setUpNext("");
+      speak("Training complete. Fantastic effort.");
+    }
+    if (session.skipped.length) {
+      skipHistory.unshift({
+        createdAt: Date.now(),
+        sessionDate: new Date().toISOString(),
+        sessionType: selectedSession,
+        skippedItems: session.skipped
+      });
+      saveSkipHistory();
+    }
+    showReflection();
+  } else {
+    setZone("");
+    setStatus("Stopped — tap START to try again");
+    setExercise({ name: "Stopped", cue: "Come back when you're ready." });
+    setUpNext("");
+    document.getElementById("controls").innerHTML =
+      `<button class="btn btn-primary" id="btn-start">START AGAIN</button>`;
+    document.getElementById("btn-start").onclick = () => renderCard();
+  }
+}
+
+function showReflection() {
+  const isEvening = selectedSession === "evening";
+
+  if (isEvening) {
+    // Simpler reflection for evening
+    document.getElementById("controls").innerHTML = `
+      <div style="flex: 1 1 100%;">
+        <div class="reflect">
+          <h3 style="color: var(--evening-deep);">Stretch check ✓</h3>
+          <div style="margin-top: 1rem;">
+            <button class="btn btn-primary" id="btn-restart" style="background: var(--evening); color: white;">DONE</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById("btn-restart").onclick = () => renderCard();
+    return;
+  }
+
+  // Morning reflection: feel rating + the day's PR Board metric
+  const week = getCurrentTrackerWeek();
+  const tracker = loadTracker();
+  const wkData = tracker[`week${week}`] || {};
+
+  // The PR metric tracked for this day (matches the PR Board rows)
+  const PR_BY_DAY = {
+    monday:    { key: "mon", label: "Hollow-Body Flutter — seconds held with flat back", type: "number", ph: "e.g. 30" },
+    tuesday:   { key: "tue", label: "Side-Lying Hip-Drive Kick — clean reps per side",   type: "number", ph: "e.g. 20" },
+    wednesday: { key: "wed", label: "Box Jump — rounds completed at full height",        type: "number", ph: "e.g. 4" },
+    thursday:  { key: "thu", label: "Pull-Up — clean reps in Round 1",                   type: "number", ph: "e.g. 6" },
+    friday:    { key: "fri", label: "Bench Vertical Kick — seconds core held flat",      type: "number", ph: "e.g. 30" },
+    saturday:  { key: "sat", label: "Pull-Up R1 reps + Bench Kick seconds",              type: "text",   ph: "e.g. 6 / 28" }
+  };
+  const prMetric = PR_BY_DAY[selectedDay] || null;
+
+  const inputsHtml = prMetric ? `
+    <div class="post-session-inputs">
+      <h4>📊 PR Board — Week ${week}</h4>
+      <label>${prMetric.label}</label>
+      <input type="${prMetric.type}" id="post-pr" ${prMetric.type === "number" ? 'min="0" max="200"' : ''}
+             placeholder="${prMetric.ph}" value="${wkData[prMetric.key] || ''}">
+      <div class="caveat-note" style="margin:0.3rem 0 0;">Write your number — beat it next week.</div>
+    </div>
+  ` : '';
+
+  document.getElementById("controls").innerHTML = `
+    <div style="flex: 1 1 100%;">
+      <div class="reflect">
+        <h3>How did that feel?</h3>
+        <div class="reflect-buttons">
+          <button data-feel="easy">Easy</button>
+          <button data-feel="just">Just right</button>
+          <button data-feel="hard">Hard</button>
+        </div>
+        <div id="reflect-thanks" class="reflect-thanks" style="display:none;"></div>
+        <div id="skip-summary" style="margin-top:0.6rem; font-family:'Caveat',cursive; color:var(--ink-light);"></div>
+        ${inputsHtml}
+        <div class="tracker" style="margin-top:0.5rem;">
+          <h4>Skipped in last 7 days</h4>
+          <ul class="tracker-list" id="skip-history-list"></ul>
+        </div>
+        <div style="margin-top: 1rem;">
+          <button class="btn btn-primary" id="btn-restart">SAVE & DONE</button>
+        </div>
+      </div>
+    </div>`;
+  const messages = {
+    easy: "Noted — push a bit more next time. You got more in the tank!",
+    just: "Perfect zone. That's where the magic happens.",
+    hard: "Honest work right there. Tomorrow's body will thank today's effort."
+  };
+  let chosenFeel = null;
+  document.querySelectorAll(".reflect-buttons button").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll(".reflect-buttons button").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      chosenFeel = btn.dataset.feel;
+      const t = document.getElementById("reflect-thanks");
+      t.textContent = messages[chosenFeel];
+      t.style.display = "block";
+    };
+  });
+  const skipSummary = document.getElementById("skip-summary");
+  if (session.skipped.length) {
+    skipSummary.textContent = `Skipped this session: ${session.skipped.map(s => s.name).join(", ")}`;
+  } else {
+    skipSummary.textContent = "No skipped exercises this session.";
+  }
+  const skipHistoryList = document.getElementById("skip-history-list");
+  const recentSkips = skipHistory.slice(0, 8);
+  skipHistoryList.innerHTML = recentSkips.length
+    ? recentSkips.map(entry => `<li>${entry.sessionDate.slice(0, 10)} · ${entry.skippedItems.map(item => item.name).join(", ")}</li>`).join("")
+    : "<li>No skipped content in the last 7 days.</li>";
+  document.getElementById("btn-restart").onclick = () => {
+    // Save the day's PR metric + feel to the localStorage tracker
+    const t = loadTracker();
+    const w = `week${week}`;
+    t[w] = t[w] || {};
+    if (chosenFeel) t[w].feel = chosenFeel;
+    const prInput = document.getElementById("post-pr");
+    if (prMetric && prInput && prInput.value) t[w][prMetric.key] = prInput.value;
+    saveTracker(t);
+    // Patch mood + PR metric back to the Firestore doc (fire-and-forget)
+    if (_pendingFsId) {
+      const patch = {};
+      if (chosenFeel) patch.mood = chosenFeel;
+      if (prMetric && prInput && prInput.value) patch.pr = prInput.value;
+      if (Object.keys(patch).length) fsUpdateSession(_pendingFsId, patch);
+      _pendingFsId = null;
+    }
+    renderCard();
+  };
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+
+function init() {
+  initModal();
+}
+
+// type=module scripts are scoped — expose functions referenced by inline HTML attributes
+window.pickSession = pickSession;
+
+init();
+</script>
+
+</body>
+</html>
