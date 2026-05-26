@@ -1132,7 +1132,7 @@ const PRONUNCIATION_MAP = {
   "Pallof Press": "Pal-off Press",
   "Bosu Squat": "Boh-soo Squat"
 };
-// v2: 5s between exercises, 25s round rest — kid can still raise these.
+// Initial settings; a saved custom rest value overrides each live rest timer.
 const DEFAULT_SETTINGS = {
   voiceStyle: "fun",
   exerciseRestSeconds: 5,
@@ -1870,13 +1870,13 @@ function initModal() {
   document.getElementById("exercise-rest").onchange = (e) => {
     const parsed = Number(e.target.value);
     if (!Number.isFinite(parsed)) return;
-    appSettings.exerciseRestSeconds = Math.max(3, Math.round(parsed));
+    appSettings.exerciseRestSeconds = Math.min(120, Math.max(MIN_REST, Math.round(parsed)));
     e.target.value = appSettings.exerciseRestSeconds; saveSettings();
   };
   document.getElementById("round-rest").onchange = (e) => {
     const parsed = Number(e.target.value);
     if (!Number.isFinite(parsed)) return;
-    appSettings.roundRestSeconds = Math.max(10, Math.round(parsed));
+    appSettings.roundRestSeconds = Math.min(180, Math.max(10, Math.round(parsed)));
     e.target.value = appSettings.roundRestSeconds; saveSettings();
   };
 
@@ -2792,14 +2792,24 @@ function exRepsDetail(ex) {
   return ex.repsDetail.replace(/^(\d+)/, n => parseInt(n, 10) + bonus);
 }
 
+function configuredExerciseRest() {
+  const value = Number(appSettings.exerciseRestSeconds);
+  return Math.min(120, Math.max(MIN_REST, Number.isFinite(value) ? Math.round(value) : DEFAULT_SETTINGS.exerciseRestSeconds));
+}
+
+function configuredRoundRest() {
+  const value = Number(appSettings.roundRestSeconds);
+  return Math.min(180, Math.max(10, Number.isFinite(value) ? Math.round(value) : DEFAULT_SETTINGS.roundRestSeconds));
+}
+
 /* Estimated session length in seconds, for the current overload week.
    Rep-based exercises are estimated at secondsPerRep × reps. */
 function estimateSessionSecs(data, withWarmup) {
   let total = 0;
   if (withWarmup && data.warmup) total += data.warmup.duration || 180;
-  const exRest = Math.max(appSettings.exerciseRestSeconds, MIN_REST);
+  const exRest = configuredExerciseRest();
   data.circuits.forEach(c => {
-    const roundRest = Math.max(c.roundRest || ROUND_REST, appSettings.roundRestSeconds, MIN_REST);
+    const roundRest = configuredRoundRest();
     for (let r = 1; r <= c.rounds; r++) {
       let exInRound = 0;
       c.exercises.forEach(ex => {
@@ -3519,7 +3529,7 @@ async function startSession() {
             if (appSettings.voiceStyle !== "quiet") speakIfIdle(selfCheck);
 
             const leadTime = upcomingEx && HARD_EXERCISES.has(upcomingEx.name) ? 8 : 5;
-            const result = await countdown(Math.max(circuit.roundRest, appSettings.roundRestSeconds, MIN_REST), {
+            const result = await countdown(configuredRoundRest(), {
               onTick: (rem) => {
                 if (rem === leadTime && upcomingEx) {
                   speakIfIdle("Get ready for " + upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : ""));
@@ -3532,7 +3542,7 @@ async function startSession() {
             }
           } else {
             // Inter-exercise rest — speak the NEXT exercise's reset cue (v2)
-            const restDuration = Math.max(ex.rest, appSettings.exerciseRestSeconds, MIN_REST);
+            const restDuration = configuredExerciseRest();
             setZone("rest");
             setStatus("Rest");
             const nextReset = upcomingEx && upcomingEx.reset ? upcomingEx.reset : "";
