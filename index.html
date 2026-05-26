@@ -1630,6 +1630,7 @@ let selectedMainVariant = "twoaday"; // safe default when PM pool status is unkn
 let selectedEveningCut = false;
 let skipGreetingOnStart = false;
 let closeModalAborted = false;
+let introPlaying = false;
 let session = {
   running: false, paused: false, abort: false, skipExercise: false,
   currentTimer: null, byRepsResolver: null,
@@ -2248,6 +2249,7 @@ function pickSession(which) {
 async function closeModal() {
   ensureAudio();
   closeModalAborted = false;
+  introPlaying = true;
   
   // Hide modal, show page
   document.getElementById("modal-overlay").classList.remove("show");
@@ -2263,6 +2265,8 @@ async function closeModal() {
   
   if (selectedSession === "evening") {
     await speakAndWait("Evening rehearsal. Keep it easy and focus on clean shapes.");
+    introPlaying = false;
+    refreshReadyButton();
     return;
   }
 
@@ -2270,6 +2274,7 @@ async function closeModal() {
   
   if (selectedSession === "rest") {
     await speakAndWait("It is recovery day. Make next week's pick, then rest well.");
+    introPlaying = false;
     return;
   }
   
@@ -2285,6 +2290,8 @@ async function closeModal() {
   if (closeModalAborted) return;
   
   await speakAndWait("Review the session card, then tap ready when your space is clear.");
+  introPlaying = false;
+  refreshReadyButton();
 }
 
 // Helper: speak and WAIT for utterance to finish before proceeding
@@ -2534,8 +2541,8 @@ function renderEveningBrief(data) {
       </div>
     </div>
     <div class="btn-row">
-      <button class="btn btn-primary" id="btn-ready" style="background: var(--evening); color: white;">
-        START REHEARSAL
+      <button class="btn btn-primary" id="btn-ready" style="background: var(--evening); color: white;" ${introPlaying ? "disabled" : ""}>
+        ${introPlaying ? "INTRO PLAYING..." : "START REHEARSAL"}
       </button>
     </div>`;
 
@@ -2546,6 +2553,7 @@ function renderEveningBrief(data) {
     };
   });
   document.getElementById("btn-ready").onclick = async () => {
+    if (introPlaying) return;
     closeModalAborted = true;
     skipGreetingOnStart = true;
     await startSession();
@@ -2674,7 +2682,7 @@ function renderBrief(data) {
       📱 Put your phone on the floor where you can see it — then leave it there.
     </div>
     <div class="btn-row">
-      <button class="btn btn-primary" id="btn-ready">READY ✓</button>
+      <button class="btn btn-primary" id="btn-ready" ${introPlaying ? "disabled" : ""}>${introPlaying ? "INTRO PLAYING..." : "READY ✓"}</button>
     </div>`;
 
   // --- Warm-up picker logic ---
@@ -2718,6 +2726,7 @@ function renderBrief(data) {
   }
 
   document.getElementById("btn-ready").onclick = async () => {
+    if (introPlaying) return;
     if (isWarmupChoice && sessionWarmupPick && sessionWarmupPick.length !== data.warmup.choiceOptions.length) {
       alert("Choose the order for all 4 warm-up primer drills first.");
       return;
@@ -2726,6 +2735,17 @@ function renderBrief(data) {
     skipGreetingOnStart = true;
     await startSession();
   };
+}
+
+function refreshReadyButton() {
+  const btn = document.getElementById("btn-ready");
+  if (!btn) return;
+  btn.disabled = introPlaying;
+  if (selectedSession === "evening") {
+    btn.textContent = introPlaying ? "INTRO PLAYING..." : "START REHEARSAL";
+  } else {
+    btn.textContent = introPlaying ? "INTRO PLAYING..." : "READY ✓";
+  }
 }
 
 /* ============================================================
