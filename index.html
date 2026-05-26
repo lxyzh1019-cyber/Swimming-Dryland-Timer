@@ -1003,6 +1003,48 @@ const WARMUP = {
   duration: 180,
   steps: WARMUP_OPTIONS.slice(0, 3)
 };
+const V15_MAIN_PRIMERS = {
+  monday: {
+    name: "Warm-Up / Primer",
+    duration: 310,
+    steps: [
+      "Light jog - 1 minute pulse raise",
+      "Jump Rope - 2 minutes",
+      "A-skip / Athletic Skip - 40 seconds",
+      "Band Shoulder Pass-Through - 8-10 reps",
+      "Scapular Wall Slides - 10 reps",
+      "Shake out + breathe - 30 seconds"
+    ],
+    sequence: [
+      { name: "Light Jog", duration: 60, note: "easy pulse raise" },
+      { name: "Jump Rope", duration: 120, note: "stay tall and light on the feet" },
+      { name: "A-skip / Athletic Skip", duration: 40, note: "drive knee, snap foot" },
+      { name: "Band Shoulder Pass-Through", duration: 30, note: "8 to 10 slow reps" },
+      { name: "Scapular Wall Slides", duration: 30, note: "10 controlled reps" },
+      { name: "Shake Out + Breathe", duration: 30, note: "finish loose and ready" }
+    ]
+  },
+  tuesday: {
+    name: "Warm-Up / Primer",
+    duration: 240,
+    steps: [
+      "Jumping Jacks - 1 minute pulse raise",
+      "Partner Ball Toss - 40 seconds",
+      "A-skip / Athletic Skip - 40 seconds",
+      "90/90 Hip Switches - 8 switches",
+      "World's Greatest Stretch - 4 each side",
+      "Shake out + breathe - 30 seconds"
+    ],
+    sequence: [
+      { name: "Jumping Jacks", duration: 60, note: "easy pulse raise" },
+      { name: "Partner Ball Toss", duration: 40, note: "soft hands, controlled passes" },
+      { name: "A-skip / Athletic Skip", duration: 40, note: "drive knee, snap foot" },
+      { name: "90/90 Hip Switches", duration: 30, note: "8 slow switches" },
+      { name: "World's Greatest Stretch", duration: 40, note: "4 slow reps each side" },
+      { name: "Shake Out + Breathe", duration: 30, note: "finish loose and ready" }
+    ]
+  }
+};
 
 const HARD_EXERCISES = new Set([
   "Box Jump", "Squat Jump", "Lateral Bound", "Bosu Squat",
@@ -1293,7 +1335,7 @@ const V15_MAIN_VARIANTS = {
       benchmark: "Full circuit plus ankle and jump add-on.", prTargets: [
         { key: "v15_mon_hollow", label: "Hollow-Body Flutter - seconds held with flat back", type: "number", ph: "e.g. 30" }
       ],
-      equipment: ["Resistance band", "Mat"], warmup: null,
+      equipment: ["Jump rope", "Resistance band", "Mat"], warmup: V15_MAIN_PRIMERS.monday,
       circuits: [{ name: "Anti-Rotation + Lat Activation", rounds: 3, roundRest: 25, exercises: [
         E("Hollow-Body Flutter", 30, 5, "Press lower back down.", "Keep the lower back flat throughout.", "Back lifts - slow tempo and re-brace."),
         ER("Dead Bug", "10 alternating reps", 5, "Exhale and flatten back.", "Extend with control.", "Reduce range if back lifts."),
@@ -1306,7 +1348,7 @@ const V15_MAIN_VARIANTS = {
       title: "Core A · Version B", subtitle: "Two-a-day activation (PM pool attending)", badge: "MAIN B",
       hrZone: "z2", hrText: "Activation only · stay fresh for 7 PM pool",
       benchmark: "No PR. This should feel like a primer, not a workout.", prTargets: [],
-      equipment: ["Resistance band", "Mat"], warmup: null,
+      equipment: ["Jump rope", "Resistance band", "Mat"], warmup: V15_MAIN_PRIMERS.monday,
       circuits: [{ name: "Lat + Scapular Activation", rounds: 2, roundRest: 25, exercises: [
         ER("Band Row", "12 reps · 2-1-2 tempo", 5, "Blades back and down.", "Prime the evening swim.", "No shrugging."),
         ER("Single-Arm Band Row", "10 reps each side · 2-1-2 tempo", 5, "Torso still.", "Prime anti-rotation feel.", "Reduce tension if twisting."),
@@ -1321,7 +1363,7 @@ const V15_MAIN_VARIANTS = {
       benchmark: "Full anti-rotation and hip-driven kick circuit.", prTargets: [
         { key: "v15_tue_leglift", label: "Side-Lying Leg Lift - clean reps per side", type: "number", ph: "e.g. 20" }
       ],
-      equipment: ["Resistance band", "Mat"], warmup: null,
+      equipment: ["Light ball", "Resistance band", "Mat"], warmup: V15_MAIN_PRIMERS.tuesday,
       circuits: [{ name: "Anti-Rotation + Hip Kick Pattern", rounds: 3, roundRest: 25, exercises: [
         ER("Pallof Press", "10 reps each side · 2-1-2 tempo", 5, "Torso square.", "Resist rotation.", "Reduce band tension if twisting."),
         E("Side Plank", 40, 5, "Hip high.", "Keep a long side line.", "Drop to knee if line breaks.", { eachSide: true }),
@@ -1334,7 +1376,7 @@ const V15_MAIN_VARIANTS = {
       title: "Core B · Version B", subtitle: "Two-a-day activation (PM pool attending)", badge: "MAIN B",
       hrZone: "z2", hrText: "Activation only · stay fresh for 7 PM pool",
       benchmark: "No PR. Stop while fresh.", prTargets: [],
-      equipment: ["Resistance band", "Mat"], warmup: null,
+      equipment: ["Light ball", "Resistance band", "Mat"], warmup: V15_MAIN_PRIMERS.tuesday,
       circuits: [{ name: "Anti-Rotation + Hip Activation", rounds: 2, roundRest: 25, exercises: [
         ER("Pallof Press", "10 reps each side · 2-1-2 tempo", 5, "Torso square.", "Prime anti-rotation.", "Reduce band tension if twisting."),
         ER("Band Clamshell", "15 reps each side · 2-1-2 tempo", 5, "Hip still.", "Prime hip control.", "Stop hip rolling.")
@@ -2212,24 +2254,26 @@ function speakAndWait(msg) {
 
 // Live warm-up cueing after READY is tapped
 async function runWarmupCueing(warmup) {
-  const steps = [
+  const defaultSteps = [
     { name: "Jumping Jacks", duration: 30, note: "30 seconds" },
     { name: "Arm Circles forward and back", duration: 60, note: "20 each, that's about 1 minute" },
     { name: "Leg Swings front back and side", duration: 60, note: "10 each, that's about 1 minute" },
     { name: "Hip Circles", duration: 30, note: "10 each direction, 30 seconds" }
   ];
+  const steps = warmup.sequence || defaultSteps;
   
-  await speakAndWait("Movement prep starts now.");
+  await speakAndWait(`${warmup.name || "Movement prep"} starts now.`);
   
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
+    setExercise({ name: step.name, detail: `${step.duration}s`, cue: step.note });
+    setProgress([{ text: warmup.name || "Movement Prep", phase: true }, { text: `${i + 1}/${steps.length}` }]);
     await speakAndWait(`${step.name}, ${step.note}. Go!`);
-    await countdown(step.duration);  // Run timer for this step
-    // No rest break — immediately move to next
+    const result = await countdown(step.duration);
+    if (result === "abort") return result;
   }
   
-  // After warm-up completes, countdown to first circuit
-  await speakAndWait("Eight seconds until first circuit exercise.");
+  await speakAndWait("Primer complete. Eight seconds until the main circuit.");
   await countdown(8);
 }
 
@@ -2527,7 +2571,8 @@ function renderBrief(data) {
   } else if (data.warmup) {
     warmupHtml = `
       <div class="brief-section">
-        <strong>🔥 Movement Prep first</strong> · 3 min · ${data.warmup.steps.join(" · ")}
+        <strong>Warm-Up / Primer first</strong> · ${fmtEstimate(data.warmup.duration)}<br>
+        <div class="caveat-note" style="margin:0.3rem 0 0;">${data.warmup.steps.join(" · ")}</div>
       </div>`;
   }
 
@@ -3184,7 +3229,7 @@ async function startSession() {
   }
 
   plannedSessionSecs = estimateSessionSecs(runData, !!runData.warmup)
-    + (isEvening ? 5 : (runData.warmup ? 0 : 8));
+    + (isEvening ? 5 : 8);
   elapsedActiveSecs = 0;
   renderSessionShell(runData);
   setSessionControls();
@@ -3229,11 +3274,12 @@ async function startSession() {
   if (!isEvening && runData.warmup) {
     setZone("warmup");
     setStatus("Warm-up");
-    setProgress([{ text: "Movement Prep", phase: true }, { text: "3 min" }]);
-    setExercise({ name: "Movement Prep", warmupSteps: runData.warmup.steps });
+    setProgress([{ text: runData.warmup.name || "Movement Prep", phase: true }, { text: fmtEstimate(runData.warmup.duration) }]);
+    setExercise({ name: runData.warmup.name || "Movement Prep", warmupSteps: runData.warmup.steps });
     setUpNext(`<span class="label">Up next:</span> <span class="name">${runData.circuits[0].name}</span>`);
     
-    await runWarmupCueing(runData.warmup);
+    const warmupResult = await runWarmupCueing(runData.warmup);
+    if (warmupResult === "abort") return finalize(false);
     
     // Brief pause after warm-up before circuits
     await sleep(1000);
