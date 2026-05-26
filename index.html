@@ -864,7 +864,7 @@
   <div class="wrap">
     <header class="header">
       <h1>🏊 Land Training</h1>
-      <div class="sub">Jess · 7-day swimming plan · v15</div>
+      <div class="sub">Jess · 7-day swimming plan · v17</div>
     </header>
 
     <nav class="day-tabs" id="day-tabs" aria-label="Day picker"></nav>
@@ -986,7 +986,7 @@ const DAY_MANTRA = {
   thursday:  "I am STRONG. I am FAST. I can SWIM THIS.",
   friday:    "Sweat in training, no tears in competition.",
   saturday:  "I am STRONG. I am FAST. I can SWIM THIS.",
-  sunday:    "Rest IS training."
+  sunday:    "Sweat in training, no tears in competition."
 };
 
 // Warm-up: kid picks 3 of 5 and leads (v10 Athlete Choice warm-up)
@@ -1052,19 +1052,19 @@ const V15_MAIN_PRIMERS = {
       { name: "A-skip / Athletic Skip", duration: 40, note: "drive knee, snap foot" },
       { name: "Crab Walk", duration: 40, note: "hips lifted, travel both ways" },
       { name: "Thoracic Rotation (Open-Book)", duration: 40, note: "6 slow reps each side" },
-      { name: "Knee-to-Wall Ankle Mobilization", duration: 40, note: "8 controlled reps each side" }
+      { name: "Band Shoulder Pass-Through", duration: 40, note: "8 to 10 slow reps" }
     ],
     fixedClose: { name: "Shake Out + Breathe", duration: 30, note: "finish loose and ready" }
   },
   thursday: {
     name: "Warm-Up / Primer",
-    duration: 310,
-    fixedStart: { name: "High-Knee March", duration: 60, note: "easy pulse raise" },
+    duration: 280,
+    fixedStart: { name: "Light Jog", duration: 60, note: "easy pulse raise" },
     choiceOptions: [
-      { name: "Jump Rope", duration: 120, note: "stay tall and light on the feet" },
-      { name: "Bear Crawl", duration: 40, note: "hips low, back flat" },
-      { name: "Knee-to-Wall Ankle Mobilization", duration: 40, note: "8 controlled reps each side" },
-      { name: "Thoracic Rotation (Open-Book)", duration: 40, note: "6 slow reps each side" }
+      { name: "A-skip / Athletic Skip", duration: 40, note: "drive knee, snap foot" },
+      { name: "Crab Walk", duration: 40, note: "hips lifted, travel both ways" },
+      { name: "Thoracic Rotation (Open-Book)", duration: 40, note: "6 slow reps each side" },
+      { name: "Band Shoulder Pass-Through", duration: 40, note: "8 to 10 slow reps" }
     ],
     fixedClose: { name: "Shake Out + Breathe", duration: 30, note: "finish loose and ready" }
   },
@@ -1223,39 +1223,28 @@ const PLAN = {
     ]
   },
   wednesday: {
-    title: "Power A",
-    subtitle: "Push-Off Power + Hip Activation",
+    title: "Power / Coordination",
+    subtitle: "Split Day · Power Half + Coordination Half",
     badge: "POWER",
-    hrZone: "z4", hrText: "Zone 4 · 158–178 bpm during Circuit A",
+    hrZone: "z4", hrText: "Zone 4 in Power half · Zone 2–3 in Coordination half",
     benchmark: "Push-off power — translate directly to wall drive.",
-    prTarget: "Box Jump — rounds completed at full height",
-    equipment: ["Plyo box", "Bosu ball", "Resistance band (above-knee loop)", "Step platform"],
+    prTarget: "Box Jump / Lateral Bound — clean rep count",
+    equipment: ["Plyo box", "Mat"],
     warmup: WARMUP,
     circuits: [
-      { name: "Circuit A — Push-Off Power", rounds: 4, roundRest: ROUND_REST, exercises: [
-        E("Box Jump", 30, 5, "Imagine pool wall — explode.",
-          "Imagine pushing off the pool wall at every takeoff. Hip drop at takeoff is wasted push-off in the flip turn.",
-          "Knee caves on landing — stop, lower box height."),
-        E("Squat Jump", 30, 5, "Quiet landing = good absorption.",
-          "Quiet landing means good absorption means a faster push-off. Stomping is energy lost at the wall.",
-          "Heavy stomping — reduce jump height, focus on soft landing first."),
-        E("Bosu Squat", 30, 5, "Knees out — control the descent.",
-          "Feet shoulder-width on the dome. A 3-second controlled descent. Knees must not collapse inward.",
-          "Cannot control the 3s descent — switch to a floor squat."),
-        E("Lateral Bound", 30, 5, "Hold — stick every landing.",
-          "Stillness IS the training — deceleration for wall turns. Continuous bouncing means no deceleration control.",
-          "Continuous bouncing — cue hold, must pause every landing.")
-      ]},
-      { name: "Circuit B — Hip Activation", rounds: 2, roundRest: ROUND_REST, exercises: [
-        ER("Band Clamshell", "15 reps each side · 2s open / 1s hold / 2s close", 5, "Hip still? Only knee moved.",
-          "Hip stays STILL — only the top knee opens. Controls kick direction. An unstable hip means a kick crossing the midline.",
-          "Hip rotates with knee — hand on hip to monitor."),
-        ER("Band Crab Walk", "20 steps each direction · band above knees", 5, "Stay low — band taut.",
-          "Stay low throughout. The band stays taut every step. Band slack means the hip abductors switch off and the kick goes unstable.",
-          "Standing or band slack — re-squat low before continuing."),
-        ER("Calf Raise", "15 reps · 2s up / 1s hold / 2s down", 5, "Heel fully below step.",
-          "Full range every rep. Half range means the ankle is not loaded and there is reduced push-off.",
-          "Half range — stop, reset, heel fully below the step.")
+      { name: "Power Half + Coordination Half", rounds: 4, roundRest: ROUND_REST, exercises: [
+        ER("Box Jump", "up to 5 reps · full reset between", 5, "Land soft, full reset.",
+          "Power half — maximum leg drive every rep, full reset between. Land soft and quiet; absorption is the skill.",
+          "Heavy or loud landing — reduce box height."),
+        ER("Lateral Bound", "up to 5 reps · single-leg 2s stick", 5, "Quiet landing — absorb.",
+          "Coordination half — quiet landing means good absorption means a faster flip-turn push-off. Knees track over toes every landing.",
+          "Heavy stomp — reduce drop height until quiet."),
+        ER("Squat Jump", "up to 6 reps · fast ground contact", 5, "Touch and go.",
+          "Touch and go — maximum leg drive, think wall push-off every rep. A pause at the bottom is time lost at the wall.",
+          "Collapsing at the bottom — cue fast, reduce depth."),
+        ER("Pike Push-Up", "max clean reps · stop when form breaks", 5, "Flat back, no hip sag.",
+          "Hips high, press the head toward the floor. Scale to whatever depth keeps a flat back. Shoulder-health insurance.",
+          "Hip sag or form breaks — incline higher, fewer reps.")
       ]}
     ]
   },
@@ -1269,7 +1258,7 @@ const PLAN = {
     equipment: ["Plyo box", "Pull-up bar", "Mat"],
     warmup: WARMUP,
     circuits: [
-      { name: "Circuit A — Turn Simulation", rounds: 4, roundRest: ROUND_REST, exercises: [
+      { name: "Circuit A — Flip-Turn Simulation", rounds: 3, roundRest: 0, exercises: [
         E("Lateral Bound", 30, 5, "Hold — stick every landing.",
           "Stillness IS the training — deceleration for stopping at the wall. No pause means no deceleration means crashing the wall.",
           "Continuous bouncing — cue hold, must pause every landing."),
@@ -1279,20 +1268,23 @@ const PLAN = {
         E("Squat Jump", 30, 5, "Touch and go — think wall, explode.",
           "Touch and go — maximum leg drive. Think wall push-off every rep. A pause at the bottom is time lost at the wall.",
           "Collapsing at the bottom — cue fast, reduce depth if needed."),
-        E("Jump Rope Simulation", 30, 5, "Arms drive rhythm — balls of feet.",
-          "Arms drive the rhythm. Land on the balls of your feet, never flat-footed. A pace collapse in the last 10 seconds is an endurance gap — note it.",
+        E("Jump Rope Simulation", 120, 5, "Arms drive rhythm — balls of feet.",
+          "Fixed 2 minutes every round — rope is the active recovery, no round rest. Arms drive the rhythm. Land on the balls of your feet, never flat-footed. A pace collapse in the last 10 seconds is an endurance gap — note it.",
           "Pace collapses in the last 10s — note as endurance data, do not stop.")
       ]},
       { name: "Circuit B — Pull + Core Finisher", rounds: 3, roundRest: ROUND_REST, exercises: [
         E("Wide-Grip Pull-Up", 30, 5, "Depress shoulders — then pull.",
-          "Depress the shoulder blades BEFORE pulling. Lower in 4 full seconds — count aloud. Rushing means no eccentric lat strength and a weak catch.",
+          "Pull-up day 1 of 2 — STRENGTH focus. Low clean reps, 4 to 5 second eccentric lower — count aloud. Lower-only is fine if she cannot press up.",
           "Swinging or shrugging — switch to a dead hang hold for the remaining time."),
         E("Hollow Body Hold", 30, 5, "Lower back flat — same as evening check.",
           "Lower back FLAT — the same engagement needed in streamline off every wall. A burn here means it works in the pool.",
           "Lower back arches — reduce leg hover height immediately."),
-        E("Prone Flutter + Brace", 30, 5, "Belly still pressed? That is the goal.",
-          "Belly tight while legs move. The belly relaxing is the exact moment the hips sink in the pool — the deep V land equivalent.",
-          "Belly lifts — slow kick, re-engage core before continuing.")
+        ER("Dead Bug", "10 alternating reps · exhale as limbs extend", 5, "Exhale fully, back on floor.",
+          "Lower back MUST press to the floor. Exhale as the limbs extend. Anti-rotation plus anti-extension — a different plane from the Hollow Body Hold.",
+          "Back lifts — reduce limb range until floor contact is kept."),
+        E("Dead Hang", 30, 5, "Hang tall — decompress.",
+          "Finish with a 30-second dead hang from the bar — grip plus shoulder decompression after the pull work.",
+          "Grip fails early — drop down, shake out, that is fine.")
       ]}
     ]
   },
@@ -1301,60 +1293,59 @@ const PLAN = {
     subtitle: "Streamline + Mobility",
     badge: "LIGHT",
     hrZone: "z2", hrText: "Zone 2 · 118–138 bpm — stay light",
-    benchmark: "The read — Bench Vertical Kick diagnostic before Saturday.",
-    prTarget: "Bench Vertical Kick — seconds core held flat",
-    equipment: ["Bench", "Mat", "Wall"],
+    benchmark: "Fresh day — log a clean PR number, no grinding.",
+    prTarget: "Bench Flutter Kick seconds + Side-Lying Leg Lift reps",
+    equipment: ["Bench", "Mat", "Wall", "Resistance band"],
     warmup: null,
     isCalmDay: true,
     circuits: [
       { name: "Light Block — Core + Streamline + Mobility", rounds: 2, roundRest: ROUND_REST, exercises: [
-        E("Bench Vertical Kick Sim", 30, 5, "Core locked full 30s — belly down.",
-          "The core MUST stay locked the full 30 seconds. Belly releases means hips sink. This is the primary deep V diagnostic — Friday is the read, Saturday is the push.",
+        E("Bench Flutter Kick", 30, 5, "Core locked full 30s — belly down.",
+          "Face-down on the bench, core braced. The core MUST stay locked the full 30 seconds — the belly releasing means the hips sink. Primary deep V diagnostic.",
           "Belly releases at 15 to 20s — reduce to 20s for one week, build back to 30s."),
+        ER("Bird Dog", "10 reps each side · slow · opposite arm + leg", 5, "Lower back flat — no rotation.",
+          "Lower back stays completely flat — the opposite arm and leg extend without rotating the hips. Anti-rotation plus anti-extension.",
+          "Hips rotate on extension — reduce range, focus on keeping the back flat."),
+        ER("Side-Lying Leg Lift", "20 reps each side · 2-0-2 tempo", 5, "Hand on glute — squeeze?",
+          "Top leg driven from the HIP, not the knee. Fresh athlete — this is the PR target day.",
+          "Knee leads — half speed, hand on glute to feel the hip drive."),
         E("Streamline Wall Hold", 30, 5, "Relax into shape — no gap at lower back.",
           "Relax INTO the shape — do not muscle it. A lower-back gap means the hips sink at push-off.",
           "Lower back arches — bend knees slightly until the back flattens."),
-        ER("Bird Dog", "8 reps each side · 5s hold", 5, "Hip level — did it rotate?",
-          "Opposite arm and leg extend together. The hip stays level — rotation here is body roll in the water.",
-          "Hip rotates more than 5 degrees — reduce extension range, prioritise the hip-level cue."),
-        E("Ankle Dorsiflexion Stretch", 90, 5, "Every 10s, push 1cm further.",
-          "Heel flat — never lift it. Every 10 seconds push 1cm further. Limited dorsiflexion means a reduced push-off angle.",
-          "Heel lifts — reset foot position before continuing.",
-          { eachSide: true }),
-        E("Shoulder Posterior Stretch", 90, 5, "Every 10s, pull further.",
-          "Cross the arm at shoulder height, pull the elbow toward the chest. Every 10 seconds pull further. Tightness means a restricted freestyle recovery.",
-          "Shoulder elevates during the stretch — lower the arm slightly.",
-          { eachSide: true })
+        ER("Prone Y-T-W", "6 reps each letter · 2-1-2 tempo", 5, "Lead from shoulder blades.",
+          "Scapular work for streamline and catch. Face-down, lift the arms into Y, then T, then W. Slow and controlled.",
+          "Neck strains — lower the lift, lead from the blades."),
+        E("Cross-Body Shoulder Stretch", 90, 5, "Pull further each 10s.",
+          "Cross the arm at shoulder height, pull the elbow toward the chest. Tightness means a restricted freestyle recovery.",
+          "Shoulder elevates — lower the arm slightly.",
+          { eachSide: true, rounds: 1 })
       ]}
     ]
   },
   saturday: {
     title: "Combined",
-    subtitle: "Full Body: Power + Back + Core",
+    subtitle: "Full Body: Power + Back + Core + Push",
     badge: "COMBINED",
     hrZone: "z3", hrText: "Zone 3–4 · 138–178 bpm — hardest session",
     benchmark: "Highest load of the week — power maintained to Round 4.",
-    prTarget: "Pull-Up clean reps Round 1 + Bench Kick core seconds",
+    prTarget: "Pull-Up clean reps Round 1 + Bench Kick core seconds + Push-Up reps",
     equipment: ["Plyo box", "Pull-up bar", "Fitness ball", "Bench"],
     warmup: WARMUP,
     circuits: [
       { name: "Full-Body Circuit", rounds: 4, roundRest: ROUND_REST, exercises: [
-        E("Box Jump / Lateral Bound", 30, 5, "Maximum power — NOT warm-up.",
-          "Full intent every round. Fatigue is expected by round 4 — maintain form over height. Alternate box jump and lateral bound each round.",
-          "Fatigue causes an uncontrolled landing — switch to a squat jump that round."),
-        E("Ball Stroke Sim", 30, 5, "Shoulders first — then pull.",
-          "Lats are activated from the jump — the highest drill quality is now. Press the shoulders DOWN before each stroke.",
+        ER("Box Jump / Lateral Bound", "up to 5 reps · alternate each round", 5, "Knees over toes.",
+          "Full intent every round. Fatigue is expected by round 4 — maintain form over height. Finish through the toes. Alternate box jump and lateral bound each round.",
+          "Uncontrolled landing — switch to a squat jump that round."),
+        ER("Stability Ball Freestyle Pull", "12 reps · 2-1-2 tempo", 5, "Shoulders first — then pull.",
+          "Belly on the ball. Lats are activated from the jumping — the highest drill quality is now. Press the shoulders DOWN before each stroke.",
           "Arms before shoulders depress — cue shoulders first, stop and reset.",
           { rounds: 3 }),
-        E("Wide Pull-Up", 30, 5, "4 seconds down — count aloud.",
-          "Legs tired, upper body fresh — the highest quality lat pull of the week. A 4-second lower builds the eccentric lat for the catch.",
+        ER("Wide-Grip Pull-Up", "small sets of 2-3 clean reps · 4s lower", 5, "Clean reps only.",
+          "Pull-up day 2 of 2 — QUALITY-VOLUME focus. More total clean reps in small sets of 2 to 3, with a 4-second lower.",
           "Swinging or shrugging — switch to a dead hang hold."),
-        E("Bench Vertical Kick Sim", 30, 5, "Core locked full 30s — belly pressed.",
-          "The core MUST hold the full 30 seconds. Hardest day, biggest core load. Holds here are holds in the water.",
-          "Belly releases at 15 to 20s — reduce work to 20s for one week."),
-        E("Squat Jump", 30, 5, "Still absorbing correctly under fatigue?",
-          "Finisher — legs are fatigued. A quiet landing means you are still absorbing correctly. A stomp means technique is breaking down.",
-          "Stomping every rep — reduce height, maintain the quiet landing.")
+        E("Bench Flutter Kick", 30, 5, "Core locked full 30s — belly pressed.",
+          "Face-down, core braced. The core MUST hold the full 30 seconds. Hardest day, biggest core load. Holds here are holds in the water.",
+          "Belly releases at 15 to 20s — reduce work to 20s for one week.")
       ]}
     ]
   },
@@ -1444,24 +1435,13 @@ const V15_MAIN_VARIANTS = {
 
 PLAN.friday.prTargets = [
   { key: "v15_fri_bench", label: "Bench Flutter Kick - seconds core held flat", type: "number", ph: "e.g. 30" },
-  { key: "v15_fri_hollow", label: "Hollow-Body Flutter - seconds held with flat back", type: "number", ph: "e.g. 30" },
   { key: "v15_fri_leglift", label: "Side-Lying Leg Lift - clean reps per side", type: "number", ph: "e.g. 20" }
 ];
-PLAN.friday.circuits[0].exercises.splice(1, 0,
-  E("Hollow-Body Flutter", 30, 5, "Press lower back down.", "Log a clean number, do not grind.", "Back lifts - stop the PR attempt."),
-  ER("Side-Lying Leg Lift", "20 reps each side", 5, "Drive from hip.", "This PR moved from Tuesday to the fresh light day.", "Slow down if knee leads.")
-);
 PLAN.wednesday.prTargets = [
-  { key: "v15_wed_box", label: "Box Jump - rounds completed at full height", type: "number", ph: "e.g. 4" },
-  { key: "v15_wed_rope", label: "Jump Rope - longest unbroken streak", type: "number", ph: "e.g. 55" }
+  { key: "v15_wed_box", label: "Box Jump - clean reps at full height", type: "number", ph: "e.g. 5" },
+  { key: "v15_wed_rope", label: "Lateral Bound - clean reps per side", type: "number", ph: "e.g. 5" }
 ];
-PLAN.wednesday.title = "Power / Coordination";
-PLAN.wednesday.subtitle = "Split Day · Power plus rope coordination";
 PLAN.wednesday.warmup = V15_MAIN_PRIMERS.wednesday;
-PLAN.wednesday.circuits[1].name = "Half 2 - Coordination";
-PLAN.wednesday.circuits[1].exercises.push(
-  E("Jump Rope", 60, 5, "Stay tall and light.", "Find a steady unbroken rhythm.", "Slow the rope if feet land flat.")
-);
 PLAN.thursday.prTargets = [
   { key: "v15_thu_pullup", label: "Pull-Up - clean reps Round 1", type: "number", ph: "e.g. 6" }
 ];
@@ -1475,7 +1455,7 @@ PLAN.saturday.prTargets = [
 PLAN.saturday.subtitle = "Full Body: Power + Back + Core + Push";
 PLAN.saturday.warmup = V15_MAIN_PRIMERS.saturday;
 PLAN.saturday.circuits[0].exercises.push(
-  ER("Incline Push-Up", "10 clean reps", 5, "Hold a straight body line.", "Push cleanly under fatigue.", "Raise the hands if hips sag.")
+  ER("Incline Push-Up", "max clean reps · hands on box", 5, "Flat back, full range.", "Push-up day 2 of 2. Hands elevated on the box, lower with control, flat body line, no hip sag.", "Hips sag or form breaks - raise the hands higher.")
 );
 
 const EVENING_A = {
@@ -1613,9 +1593,9 @@ const WARMUP_CHOICE_DAYS = new Set(["wednesday", "thursday", "friday", "saturday
 const DAY_EQUIPMENT = {
   monday:    "Fitness ball, Resistance band, Mat",
   tuesday:   "Resistance band, Mat",
-  wednesday: "Plyo box, Bosu, Resistance band",
+  wednesday: "Plyo box, Mat",
   thursday:  "Plyo box, Pull-up bar, Mat",
-  friday:    "Bench, Mat, Wall",
+  friday:    "Bench, Mat, Wall, Resistance band",
   saturday:  "Plyo box, Pull-up bar, Fitness ball, Bench",
   sunday:    null  // rest day
 };
@@ -1947,10 +1927,9 @@ function renderModalTrackerReminder() {
   // Build reminders based on missing PR-day data
   const dayMetrics = [
     { key: "v15_wed_box", label: "Wed Box Jump" },
-    { key: "v15_wed_rope", label: "Wed Rope" },
+    { key: "v15_wed_rope", label: "Wed Lateral Bound" },
     { key: "v15_thu_pullup", label: "Thu Pull-Up" },
     { key: "v15_fri_bench", label: "Fri Bench" },
-    { key: "v15_fri_hollow", label: "Fri Hollow" },
     { key: "v15_fri_leglift", label: "Fri Leg Lift" },
     { key: "v15_sat_pullup", label: "Sat Pull-Up" },
     { key: "v15_sat_bench", label: "Sat Bench" },
@@ -2184,11 +2163,10 @@ function renderTrackerTable() {
   const metrics = [
     { key: "v15_mon_hollow", label: "Mon A · Hollow Flutter (seconds)", type: "number", placeholder: "0" },
     { key: "v15_tue_leglift", label: "Tue A · Side-Lying Leg Lift (reps/side)", type: "number", placeholder: "0" },
-    { key: "v15_wed_box", label: "Wed · Box Jump (full-height rounds)", type: "number", placeholder: "0" },
-    { key: "v15_wed_rope", label: "Wed · Jump Rope (longest streak)", type: "number", placeholder: "0" },
+    { key: "v15_wed_box", label: "Wed · Box Jump (clean reps)", type: "number", placeholder: "0" },
+    { key: "v15_wed_rope", label: "Wed · Lateral Bound (reps/side)", type: "number", placeholder: "0" },
     { key: "v15_thu_pullup", label: "Thu · Pull-Up (clean reps R1)", type: "number", placeholder: "0" },
     { key: "v15_fri_bench", label: "Fri · Bench Flutter (seconds)", type: "number", placeholder: "0" },
-    { key: "v15_fri_hollow", label: "Fri · Hollow Flutter (seconds)", type: "number", placeholder: "0" },
     { key: "v15_fri_leglift", label: "Fri · Side-Lying Leg Lift (reps/side)", type: "number", placeholder: "0" },
     { key: "v15_sat_pullup", label: "Sat · Pull-Up (clean reps R1)", type: "number", placeholder: "0" },
     { key: "v15_sat_bench", label: "Sat · Bench Kick (seconds)", type: "number", placeholder: "0" },
