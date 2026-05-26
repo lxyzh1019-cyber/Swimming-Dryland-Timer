@@ -1675,14 +1675,29 @@ function ensureAudio() {
   if (audioCtx.state === "suspended") audioCtx.resume();
 }
 
-function speak(msg) {
-  if (!speech) return;
-  speech.cancel();
+function createCoachUtterance(msg) {
   const u = new SpeechSynthesisUtterance(applyPronunciationMap(msg));
   u.rate = VOICE_RATE;
   u.pitch = VOICE_PITCH;
   if (_coachVoice) u.voice = _coachVoice;
+  return u;
+}
+
+function speak(msg) {
+  if (!speech) return;
+  const u = createCoachUtterance(msg);
   speech.speak(u);
+}
+
+function speakIfIdle(msg) {
+  if (!speech || speech.speaking || speech.pending) return;
+  speak(msg);
+}
+
+function interruptSpeech(msg) {
+  if (!speech) return;
+  speech.cancel();
+  speak(msg);
 }
 
 function beep(freq = 440, duration = 0.12) {
@@ -2299,23 +2314,23 @@ async function closeModal() {
 function speakAndWait(msg) {
   return new Promise(resolve => {
     if (!speech) { resolve(); return; }
-    speech.cancel();
-    const u = new SpeechSynthesisUtterance(applyPronunciationMap(msg));
-    u.rate = VOICE_RATE;
-    u.pitch = VOICE_PITCH;
-    if (_coachVoice) u.voice = _coachVoice;
-    u.onend = () => {
-      // Small buffer after speech ends to prevent overlap with beeps
+    const u = createCoachUtterance(msg);
+    let settled = false;
+    let failsafe = null;
+    const startFailsafe = setTimeout(done, Math.max(msg.length * 100 + 10000, 15000));
+    function done() {
+      if (settled) return;
+      settled = true;
+      clearTimeout(startFailsafe);
+      if (failsafe) clearTimeout(failsafe);
       setTimeout(resolve, 200);
+    }
+    u.onstart = () => {
+      clearTimeout(startFailsafe);
+      failsafe = setTimeout(done, Math.max(msg.length * 100, 3000));
     };
-    u.onerror = () => {
-      setTimeout(resolve, 200);
-    };
-    // Failsafe: if onend never fires (known browser bug), resolve after estimated duration
-    const estimatedMs = Math.max(msg.length * 80, 2000);
-    const failsafe = setTimeout(() => resolve(), estimatedMs);
-    u.onend = () => { clearTimeout(failsafe); setTimeout(resolve, 200); };
-    u.onerror = () => { clearTimeout(failsafe); setTimeout(resolve, 200); };
+    u.onend = done;
+    u.onerror = done;
     speech.speak(u);
   });
 }
@@ -3498,19 +3513,19 @@ async function startSession() {
             setUpNext(`<span class="label">Up next:</span> <span class="name">${nextLabelText}</span>`);
             // Voice completes before timer
             await speakAndWait(roundProgress);
-            if (appSettings.voiceStyle !== "quiet") speak(selfCheck);
+            if (appSettings.voiceStyle !== "quiet") speakIfIdle(selfCheck);
 
             const leadTime = upcomingEx && HARD_EXERCISES.has(upcomingEx.name) ? 8 : 5;
             const result = await countdown(Math.max(circuit.roundRest, appSettings.roundRestSeconds, MIN_REST), {
               onTick: (rem) => {
                 if (rem === leadTime && upcomingEx) {
-                  speak("Get ready for " + upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : ""));
+                  speakIfIdle("Get ready for " + upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : ""));
                 }
               }
             });
             if (result === "abort") return finalize(false);
             if (result !== "skip" && appSettings.voiceStyle !== "quiet") {
-              speak(nextEncouragement());
+              await speakAndWait(nextEncouragement());
             }
           } else {
             // Inter-exercise rest — speak the NEXT exercise's reset cue (v2)
@@ -3529,7 +3544,7 @@ async function startSession() {
             const leadTime = upcomingEx && HARD_EXERCISES.has(upcomingEx.name) ? 8 : 5;
             const result = await countdown(restDuration, {
               onTick: (rem) => {
-                if (rem === leadTime) speak("Up next: " + upcoming);
+                if (rem === leadTime) speakIfIdle("Up next: " + upcoming);
               }
             });
             if (result === "abort") return finalize(false);
@@ -3579,9 +3594,8 @@ function togglePause() {
   session.paused = !session.paused;
   const btn = document.getElementById("btn-pause");
   if (btn) btn.textContent = session.paused ? "RESUME" : "PAUSE";
-  // speak() calls speech.cancel() — this also kills any active rep cue,
-  // which is exactly what we want when pausing
-  speak(session.paused ? "Paused." : "Resuming.");
+  // Pause and resume deliberately replace any active coaching cue.
+  interruptSpeech(session.paused ? "Paused." : "Resuming.");
 }
 
 function formCheck() {
@@ -3591,7 +3605,7 @@ function formCheck() {
   if (!wasPaused) togglePause();
   let msg = ex.name + ". " + ex.cue;
   if (ex.redFlag) msg += " Watch out: " + ex.redFlag;
-  speak(msg);
+  interruptSpeech(msg);
 }
 
 function skipExercise() {
@@ -3607,7 +3621,7 @@ function skipExercise() {
   if (session.byRepsResolver) {
     session.byRepsResolver("skip"); // wrapper handles null + clearInterval
   }
-  speak("Skipping. Moving on.");
+  interruptSpeech("Skipping. Moving on.");
 }
 
 function stopSession() {
@@ -3616,7 +3630,7 @@ function stopSession() {
   if (session.byRepsResolver) {
     session.byRepsResolver("abort"); // wrapper handles null + clearInterval
   }
-  speak("Session stopped.");
+  interruptSpeech("Session stopped.");
 }
 
 /* ============================================================
