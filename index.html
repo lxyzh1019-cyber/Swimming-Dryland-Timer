@@ -2349,6 +2349,9 @@ async function runWarmupCueing(warmup) {
   
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
+    // Skipping one primer drill must not skip every remaining primer drill.
+    session.skipExercise = false;
+    session.currentEx = { name: step.name, cue: step.note };
     setExercise({ name: step.name, detail: `${step.duration}s`, cue: step.note });
     setProgress([{ text: warmup.name || "Movement Prep", phase: true }, { text: `${i + 1}/${steps.length}` }]);
     await speakAndWait(`${step.name}, ${step.note}. Go!`);
