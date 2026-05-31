@@ -3032,11 +3032,55 @@ function buildVoiceCues(ex) {
   return Array.from({ length: count }, (_, i) => String(i + 1));
 }
 
+// Tempo notation like "2-1-2" / "2-0-2" → seconds for up / hold / down phases.
+const TEMPO_PATTERN = /(\d)-(\d)-(\d)/;
+
+function parseTempo(ex) {
+  const m = (ex.repsDetail || "").match(TEMPO_PATTERN);
+  if (!m) return null;
+  const repMatch = (ex.repsDetail || "").match(/(\d+)\s*reps?/i);
+  return {
+    up: parseInt(m[1]),
+    hold: parseInt(m[2]),
+    down: parseInt(m[3]),
+    count: repMatch ? parseInt(repMatch[1]) : 10
+  };
+}
+
+// Paced metronome for tempo reps: phase word (non-blocking) + one beep per second,
+// so the audible cadence is precise. Skips zero-second phases (e.g. 2-0-2 hold).
+async function runTempoLoop(ex, tempo, isDone) {
+  const phaseDefs = [
+    { word: "Up",   secs: tempo.up,   freq: 660 },
+    { word: "Hold", secs: tempo.hold, freq: 880 },
+    { word: "Down", secs: tempo.down, freq: 440 },
+  ];
+  for (let i = 1; i <= tempo.count; i++) {
+    for (let p = 0; p < phaseDefs.length; p++) {
+      const ph = phaseDefs[p];
+      if (ph.secs <= 0) continue;
+      if (isDone()) return;
+      while (session.paused && !isDone()) { await new Promise(r => setTimeout(r, 200)); }
+      if (isDone()) return;
+      speak(p === 0 ? `${i}. ${ph.word}` : ph.word);
+      beep(ph.freq, 0.1);
+      for (let s = 1; s < ph.secs; s++) {
+        const r = await sleep(1000);
+        if (r === "abort" || r === "skip" || isDone()) return;
+        beep(ph.freq, 0.08);
+      }
+      const rLast = await sleep(1000);
+      if (rLast === "abort" || rLast === "skip" || isDone()) return;
+    }
+  }
+}
+
 // Run a reps exercise with voice driving the pace.
 // Shows DONE button — Jen presses when finished.
 // Voice loops through cues; pressing DONE interrupts cleanly and instantly.
 async function runRepsWithVoice(ex) {
-  const cues = buildVoiceCues(ex);
+  const tempo = parseTempo(ex);
+  const cues = tempo ? null : buildVoiceCues(ex);
   let cueDone = false;
 
   setTimer("✓");
@@ -3063,18 +3107,20 @@ async function runRepsWithVoice(ex) {
 
   // Voice cue loop — runs until cueDone is set
   // Respects session.paused (waits until unpaused before next cue)
-  const voiceLoop = (async () => {
-    for (const cue of cues) {
-      if (cueDone) break;
-      // If paused, wait — checked between cues so we don't speak over silence
-      while (session.paused && !cueDone) {
-        await new Promise(r => setTimeout(r, 200));
-      }
-      if (cueDone) break;
-      await speakAndWait(cue);
-      if (cueDone) break;
-    }
-  })();
+  const voiceLoop = tempo
+    ? runTempoLoop(ex, tempo, () => cueDone)
+    : (async () => {
+        for (const cue of cues) {
+          if (cueDone) break;
+          // If paused, wait — checked between cues so we don't speak over silence
+          while (session.paused && !cueDone) {
+            await new Promise(r => setTimeout(r, 200));
+          }
+          if (cueDone) break;
+          await speakAndWait(cue);
+          if (cueDone) break;
+        }
+      })();
 
   const result = await donePromise;
   cueDone = true;
@@ -3399,6 +3445,10 @@ async function startSession() {
   // Use the assembled run data (warm-up pick + add-on) for the circuit loop
   data = runData;
 
+  // Set true when the prior rest already announced this exercise (name + cue + 3-2-1-Go),
+  // so the exercise's own intro announcement is skipped and it starts right on "Go".
+  let preAnnounced = false;
+
   // Circuits
   for (let ci = 0; ci < data.circuits.length; ci++) {
     const circuit = data.circuits[ci];
@@ -3434,14 +3484,17 @@ async function startSession() {
 
         if (ex.byReps) {
           // Announce exercise name + reset cue first, then voice-cue the reps
-          await speakAndWait(ex.name + "." + resetPhrase + " Go.");
+          // (skipped when the prior rest already announced this exercise)
+          if (!preAnnounced) await speakAndWait(ex.name + "." + resetPhrase + " Go.");
+          preAnnounced = false;
           const result = await runRepsWithVoice(ex);
           if (result === "abort") return finalize(false);
           setSessionControls();
         } else {
           setTimer(work);
           // Voice cue completes FIRST, then timer starts — fixes lag issue
-          await speakAndWait(ex.name + "." + resetPhrase + " Three, two, one, go.");
+          if (!preAnnounced) await speakAndWait(ex.name + "." + resetPhrase + " Three, two, one, go.");
+          preAnnounced = false;
 
           if (ex.eachSide) {
             const half = Math.floor(work / 2);
@@ -3531,14 +3584,32 @@ async function startSession() {
             });
             setUpNext(`<span class="label">Up next:</span> <span class="name">${upcoming}</span>`);
 
-            await speakAndWait(nextReset ? "Rest. Next up: " + nextReset : "Rest.");
-            const leadTime = upcomingEx && HARD_EXERCISES.has(upcomingEx.name) ? 8 : 5;
+            // Timer runs immediately; brief non-blocking "Rest." for context
+            if (appSettings.voiceStyle !== "quiet") speakIfIdle("Rest.");
+
+            // Announce the next exercise (name first, then short cue), sized to finish
+            // before the final 3s, then "3, 2, 1, Go" synced to the closing ticks.
+            const announceMsg = upcomingEx
+              ? upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : "")
+              : "";
+            const estSec = Math.max(0, Math.min(restDuration - 3, Math.max(4, Math.ceil(announceMsg.length / 10))));
+            let announced = false, said3 = false, said2 = false, said1 = false;
+
             const result = await countdown(restDuration, {
               onTick: (rem) => {
-                if (rem === leadTime) speakIfIdle("Up next: " + upcoming);
+                if (!announced && announceMsg && rem <= estSec + 3) { announced = true; speak(announceMsg); }
+                if (!said3 && rem === 3) { said3 = true; speak("3"); }
+                if (!said2 && rem === 2) { said2 = true; speak("2"); }
+                if (!said1 && rem === 1) { said1 = true; speak("1"); }
               }
             });
             if (result === "abort") return finalize(false);
+            if (result === "skip") {
+              if (speech) speech.cancel();
+            } else {
+              speak("Go");
+              preAnnounced = true;
+            }
           }
         }
       }
