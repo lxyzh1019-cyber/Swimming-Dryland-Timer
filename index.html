@@ -75,8 +75,10 @@
     top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0, 0, 0, 0.6);
     z-index: 1000;
-    align-items: center;
-    justify-content: center;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 1rem;
+    box-sizing: border-box;
   }
   .modal-overlay.show { display: flex; }
 
@@ -86,6 +88,9 @@
     border-radius: 24px;
     padding: 2rem;
     max-width: 520px;
+    width: 100%;
+    margin: auto;
+    box-sizing: border-box;
     box-shadow: 8px 8px 0 var(--ink);
     text-align: center;
   }
@@ -1606,7 +1611,7 @@ const DAY_EQUIPMENT = {
 
 let selectedDay = null;
 let selectedSession = "main"; // "activation", "main", "evening", or "rest"
-let selectedMainVariant = "twoaday"; // safe default when PM pool status is unknown
+let selectedMainVariant = null; // Mon/Tue: user must explicitly choose A or B
 let selectedEveningCut = false;
 let skipGreetingOnStart = false;
 let closeModalAborted = false;
@@ -1648,7 +1653,7 @@ if (speech) {
   speech.onvoiceschanged = refreshVoice;
 }
 const VOICE_PITCH = 1.0;
-const VOICE_RATE  = 0.96;
+const VOICE_RATE  = 1.05;
 
 function ensureAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1808,7 +1813,7 @@ function initModal() {
       document.querySelectorAll(".modal-day-btn").forEach(b => b.classList.remove("selected"));
       btn.classList.add("selected");
       selectedDay = key;
-      selectedMainVariant = "twoaday";
+      selectedMainVariant = null;
       selectedEveningCut = false;
       sessionPicker.classList.add("show");
       renderModalSessionOptions(key);
@@ -2364,7 +2369,7 @@ function renderTabs() {
       if (!sessionOptionsForDay(key).some(opt => opt.key === selectedSession)) {
         selectedSession = key === "sunday" ? "rest" : "main";
       }
-      if (ADDON_DAYS.has(key)) selectedMainVariant = "twoaday";
+      if (ADDON_DAYS.has(key)) selectedMainVariant = null;
       selectedEveningCut = false;
       renderTabs();
       renderCard();
@@ -2393,7 +2398,10 @@ function getActiveData() {
   if (selectedSession === "activation") return AM_MICRO_ACTIVATION;
   if (selectedSession === "evening") return selectedEveningCut ? EVENING_CUT : EVENING_FLEX[selectedDay];
   if (selectedSession === "main" && V15_MAIN_VARIANTS[selectedDay]) {
-    return V15_MAIN_VARIANTS[selectedDay][selectedMainVariant];
+    // Mon/Tue: until the user picks a variant, fall back to "twoaday" for the
+    // brief outline only — the READY button stays gated until they choose.
+    const variant = selectedMainVariant || "twoaday";
+    return V15_MAIN_VARIANTS[selectedDay][variant];
   }
   return PLAN[selectedDay];
 }
@@ -2644,12 +2652,14 @@ function renderBrief(data) {
       </div>`;
   }
 
-  // Mon/Tue select the safe two-a-day version unless PM pool is explicitly skipped.
+  // Mon/Tue: user MUST pick a version — no default is pre-selected.
+  const variantNotChosen = isVariantDay && !selectedMainVariant;
   const addonHtml = isVariantDay ? `
     <div class="readiness" id="addon-gate">
-      <strong>PM pool status selects today's Main</strong>
+      <strong>Pick today's Main version${variantNotChosen ? " — required" : ""}</strong>
       <div class="caveat-note" style="margin-top:0.3rem;">
-        Attending or unsure: Version B, activation only. Skipped: Version A plus Add-On.
+        Attending or unsure (PM pool on): Version B, activation only.
+        Skipped (no PM pool): Version A plus Add-On.
       </div>
       <div class="readiness-buttons">
         <button data-variant="twoaday" class="${selectedMainVariant === "twoaday" ? "selected" : ""}">Attending / unsure</button>
@@ -2678,7 +2688,7 @@ function renderBrief(data) {
       📱 Put your phone on the floor where you can see it — then leave it there.
     </div>
     <div class="btn-row">
-      <button class="btn btn-primary" id="btn-ready" ${introPlaying ? "disabled" : ""}>${introPlaying ? "INTRO PLAYING..." : "READY ✓"}</button>
+      <button class="btn btn-primary" id="btn-ready" ${introPlaying || variantNotChosen ? "disabled" : ""}>${introPlaying ? "INTRO PLAYING..." : (variantNotChosen ? "PICK A VERSION FIRST" : "READY ✓")}</button>
     </div>`;
 
   // --- Warm-up picker logic ---
@@ -2736,9 +2746,12 @@ function renderBrief(data) {
 function refreshReadyButton() {
   const btn = document.getElementById("btn-ready");
   if (!btn) return;
-  btn.disabled = introPlaying;
+  const variantNotChosen = selectedSession === "main" && ADDON_DAYS.has(selectedDay) && !selectedMainVariant;
+  btn.disabled = introPlaying || variantNotChosen;
   if (selectedSession === "evening") {
     btn.textContent = introPlaying ? "INTRO PLAYING..." : "START REHEARSAL";
+  } else if (variantNotChosen) {
+    btn.textContent = "PICK A VERSION FIRST";
   } else {
     btn.textContent = introPlaying ? "INTRO PLAYING..." : "READY ✓";
   }
@@ -3400,7 +3413,9 @@ async function startSession() {
       cue: `"${dayMantra}" — Wear your Apple Watch. Target ${hz.label}. Starting with ${firstEx}.`
     });
     await speakAndWait(
-      dayMantra + " Wear your Apple Watch and watch your heart rate. " +
+      "Say it out loud with me, LOUD and PROUD: " + dayMantra + " " +
+      "One more time, even LOUDER — you've got this! " + dayMantra + " " +
+      "Wear your Apple Watch and watch your heart rate. " +
       "Today's target is " + hz.label + ", " + hz.bpm + ". " +
       "Put your phone on the floor where you can see it. Starting with " + firstEx + "."
     );
@@ -3584,29 +3599,30 @@ async function startSession() {
             });
             setUpNext(`<span class="label">Up next:</span> <span class="name">${upcoming}</span>`);
 
-            // Timer runs immediately; brief non-blocking "Rest." for context
-            if (appSettings.voiceStyle !== "quiet") speakIfIdle("Rest.");
+            // Speak "Rest, next move: NAME. CUE" upfront — timer starts immediately.
+            // 3,2,1 only fire if the announcement has finished by then; otherwise just "Go".
+            const nextName = upcomingEx ? upcomingEx.name : "";
+            const nextCue = upcomingEx && upcomingEx.reset ? upcomingEx.reset : "";
+            const announceMsg = nextName
+              ? `Rest, next move: ${nextName}.${nextCue ? " " + nextCue : ""}`
+              : "Rest.";
+            if (appSettings.voiceStyle !== "quiet") speak(announceMsg);
 
-            // Announce the next exercise (name first, then short cue), sized to finish
-            // before the final 3s, then "3, 2, 1, Go" synced to the closing ticks.
-            const announceMsg = upcomingEx
-              ? upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : "")
-              : "";
-            const estSec = Math.max(0, Math.min(restDuration - 3, Math.max(4, Math.ceil(announceMsg.length / 10))));
-            let announced = false, said3 = false, said2 = false, said1 = false;
-
+            let said3 = false, said2 = false, said1 = false;
             const result = await countdown(restDuration, {
               onTick: (rem) => {
-                if (!announced && announceMsg && rem <= estSec + 3) { announced = true; speak(announceMsg); }
-                if (!said3 && rem === 3) { said3 = true; speak("3"); }
-                if (!said2 && rem === 2) { said2 = true; speak("2"); }
-                if (!said1 && rem === 1) { said1 = true; speak("1"); }
+                const announceDone = !speech || (!speech.speaking && !speech.pending);
+                if (!said3 && rem === 3) { said3 = true; if (announceDone) speak("3"); }
+                if (!said2 && rem === 2) { said2 = true; if (announceDone) speak("2"); }
+                if (!said1 && rem === 1) { said1 = true; if (announceDone) speak("1"); }
               }
             });
             if (result === "abort") return finalize(false);
             if (result === "skip") {
               if (speech) speech.cancel();
             } else {
+              // If the announcement is still going, cancel it so "Go" lands on time.
+              if (speech && (speech.speaking || speech.pending)) speech.cancel();
               speak("Go");
               preAnnounced = true;
             }
