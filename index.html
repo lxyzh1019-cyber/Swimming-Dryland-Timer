@@ -82,6 +82,77 @@
   }
   .modal-overlay.show { display: flex; }
 
+  /* "?" how-to button shown next to exercise names */
+  .howto-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4em;
+    height: 1.4em;
+    margin-left: 0.25em;
+    border-radius: 50%;
+    border: 2px solid var(--ink);
+    background: var(--accent-yellow);
+    color: var(--ink);
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 0.75em;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+    vertical-align: middle;
+    box-shadow: 1px 1px 0 var(--ink);
+  }
+  .howto-btn:hover { background: var(--accent-orange); color: white; }
+
+  /* How-to modal */
+  .howto-modal {
+    background: var(--paper);
+    border: 4px solid var(--ink);
+    border-radius: 20px;
+    padding: 1.5rem;
+    max-width: 480px;
+    width: 100%;
+    margin: auto;
+    box-sizing: border-box;
+    box-shadow: 8px 8px 0 var(--ink);
+    text-align: left;
+  }
+  .howto-modal h3 {
+    font-size: 1.8rem;
+    color: var(--jess-deep);
+    margin-bottom: 0.6rem;
+  }
+  .howto-modal p {
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1.05rem;
+    line-height: 1.45;
+    color: var(--ink);
+    margin: 0 0 1rem;
+  }
+  .howto-modal a {
+    display: inline-block;
+    margin-bottom: 1rem;
+    color: var(--jess-deep);
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1rem;
+    word-break: break-word;
+  }
+  .howto-modal .close-row {
+    text-align: right;
+  }
+  .howto-modal .btn-close {
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1rem;
+    padding: 0.5rem 1.2rem;
+    border: 3px solid var(--ink);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    color: var(--ink);
+    cursor: pointer;
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+
   .modal {
     background: var(--paper);
     border: 4px solid var(--ink);
@@ -793,6 +864,18 @@
 </style>
 
 
+<!-- How-to overlay (shown when "?" next to an exercise is tapped) -->
+<div class="modal-overlay" id="howto-overlay" role="presentation">
+  <div class="howto-modal" role="dialog" aria-modal="true" aria-labelledby="howto-title">
+    <h3 id="howto-title"></h3>
+    <p id="howto-text"></p>
+    <a id="howto-link" target="_blank" rel="noopener"></a>
+    <div class="close-row">
+      <button class="btn-close" type="button" id="howto-close-btn">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Day picker modal (shows on load) -->
 <div class="modal-overlay show" id="modal-overlay" role="presentation">
   <div class="modal" id="modal-main" role="dialog" aria-modal="true" aria-labelledby="modal-main-title">
@@ -1157,6 +1240,119 @@ const E = (name, work, rest, reset, cue, redFlag, opts = {}) => ({
 const ER = (name, repsDetail, rest, reset, cue, redFlag, opts = {}) => ({
   name, byReps: true, repsDetail, rest: Math.max(rest, MIN_REST), reset, cue, redFlag, ...opts
 });
+
+/* ------------------------------------------------------------
+   HOW-TO LOOKUP — for exercises whose names are not common
+   search terms. Each entry: 1-line plain description + a
+   YouTube SEARCH URL so the link never goes dead. Tap the "?"
+   next to the exercise name to see it.
+   ------------------------------------------------------------ */
+const yt = q => "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
+const EXERCISE_HOWTO = {
+  // — Opus-coined / descriptive labels —
+  "Hollow-Body Flutter": {
+    text: "Lie on your back in a hollow-body hold (lower back PRESSED into the floor, head + shoulders + legs lifted), then flutter-kick your legs quickly. Core stays braced the whole time.",
+    search: "hollow body hold flutter kick swimmer"
+  },
+  "Prone Flutter + Brace": {
+    text: "Lie face-down, arms by your sides. Lift legs and chest slightly off the floor (mini-superman) and flutter-kick from the hips while bracing your core.",
+    search: "prone flutter kick superman swimmer"
+  },
+  "Prone Streamline Flutter Hold": {
+    text: "Lie face-down with arms in swimming streamline overhead (hands stacked). Lift arms + chest + legs and hold a flutter kick.",
+    search: "prone streamline flutter kick hold dryland"
+  },
+  "Floor Body-Line Hold": {
+    text: "Face-down 'swimmer's superman' — arms streamline overhead, legs straight, lift everything off the floor and hold a long, straight body line.",
+    search: "swimmer superman body line hold"
+  },
+  "Standing Hollow Brace": {
+    text: "Stand tall. Pull ribs down, tuck pelvis slightly, squeeze glutes and tense your core as if bracing for a punch. Breathe normally while holding the brace.",
+    search: "standing core brace ribs down 360 breathing"
+  },
+  "Slow Flutter-Kick Rehearsal": {
+    text: "Lie on your back, legs straight. Flutter-kick SLOWLY from the hips (not knees). It is a rehearsal — focus on quiet, small, controlled kicks, not speed.",
+    search: "flutter kick from hips slow rehearsal dryland"
+  },
+  "Backstroke Arm Shape": {
+    text: "Lie on your back and rehearse the backstroke pull shape — one arm enters straight overhead, pinky-first, then sweeps down past the hip while the other recovers. No resistance, just the shape.",
+    search: "backstroke arm pull pattern dryland dry land"
+  },
+  "Breaststroke Kick Shape": {
+    text: "Lie face-down or sit on the floor. Practice the breaststroke 'whip kick': heels to bum with feet flexed out, then snap the feet back together in a circular kick.",
+    search: "breaststroke whip kick dryland rehearsal"
+  },
+  "Dolphin Body-Wave Rehearsal": {
+    text: "Stand or lie face-down. Initiate an undulation from the chest, through the hips, finishing at the feet — the same body wave used in butterfly kick. Smooth and rhythmic.",
+    search: "dolphin kick body undulation dryland"
+  },
+  "Ball Prone Stroke Sim": {
+    text: "Lie face-down on a stability ball with the ball under your hips/belly. Hold a long body line and simulate freestyle pulls with both arms (or one at a time).",
+    search: "stability ball prone freestyle pull swim"
+  },
+  "Calm Breathing": {
+    text: "Box breathing: inhale through the nose for 4 seconds, hold 4, exhale through the nose 4, hold 4. Repeat. Long, quiet, calm breaths.",
+    search: "box breathing 4 4 4 4 technique"
+  },
+
+  // — Uncommon name aliases (real exercises, easier to search) —
+  "Box Jump-Down": {
+    text: "Step off a low box, land softly on the balls of your feet with bent knees and 'stick' the landing. Same as a 'Depth Drop'.",
+    search: "depth drop landing drill"
+  },
+  "Streamline Wall Hold": {
+    text: "Stand with your back to a wall, arms reaching overhead in swimming streamline (hands stacked, biceps by ears). Squeeze the streamline shape; lower back stays flat against the wall.",
+    search: "swimmer streamline wall hold dryland"
+  },
+  "Streamline Hold": {
+    text: "Same as the swimming streamline shape — hands stacked above your head, biceps by the ears, long body. Can be done standing, lying, or on a wall.",
+    search: "swimming streamline position dryland"
+  },
+  "Catch-Position Hold": {
+    text: "Set the freestyle 'catch': one arm forward and slightly down, fingertips down, forearm vertical, elbow high (Early Vertical Forearm / EVF). Hold the shape.",
+    search: "early vertical forearm EVF catch hold dryland"
+  },
+  "Stability Ball Freestyle Pull": {
+    text: "Lie face-down on a stability ball with the ball under your hips. Hold streamline, then perform slow freestyle pulls keeping a high elbow catch.",
+    search: "stability ball freestyle pull simulation swim"
+  },
+  "Band Single-Arm Pull": {
+    text: "Anchor a resistance band in front of you at chest height. Hinge forward into a freestyle posture and pull through the full stroke — entry, catch, push past the hip.",
+    search: "resistance band single arm freestyle pull"
+  },
+  "Side-Lying Hip-Drive Kick": {
+    text: "Lie on your side, body in a long line. Drive the top leg up and slightly forward with the hip (not the knee) — like the strong kick used to balance freestyle/back.",
+    search: "side lying hip abduction kick swimmer"
+  }
+};
+function howToHtml(name) {
+  const h = EXERCISE_HOWTO[name];
+  if (!h) return "";
+  return ` <button class="howto-btn" type="button" data-howto="${name.replace(/"/g, "&quot;")}" aria-label="How to do ${name.replace(/"/g, "&quot;")}" title="How to">?</button>`;
+}
+function showHowTo(name) {
+  const h = EXERCISE_HOWTO[name];
+  if (!h) return;
+  document.getElementById("howto-title").textContent = name;
+  document.getElementById("howto-text").textContent = h.text;
+  const link = document.getElementById("howto-link");
+  link.href = yt(h.search);
+  link.textContent = "Search YouTube for \"" + h.search + "\"";
+  document.getElementById("howto-overlay").classList.add("show");
+}
+function closeHowTo() {
+  document.getElementById("howto-overlay").classList.remove("show");
+}
+document.addEventListener("click", e => {
+  const btn = e.target.closest && e.target.closest(".howto-btn");
+  if (btn) { e.preventDefault(); e.stopPropagation(); showHowTo(btn.dataset.howto); }
+});
+{
+  const closeBtn = document.getElementById("howto-close-btn");
+  if (closeBtn) closeBtn.addEventListener("click", closeHowTo);
+  const overlay = document.getElementById("howto-overlay");
+  if (overlay) overlay.addEventListener("click", e => { if (e.target === overlay) closeHowTo(); });
+}
 
 /* ============================================================
    HEART RATE ZONES  (v10 HR guide)
@@ -2580,7 +2776,7 @@ function renderBrief(data) {
     const exHtml = c.exercises.map(ex => {
       const meta = briefRepsMeta(ex);
       const rd = ex.rounds && ex.rounds < c.rounds ? ` <span class="ex-meta">(${ex.rounds} rds)</span>` : "";
-      return `<li class="ex-line"><span>${ex.name}${rd}</span><span class="ex-meta">${meta}</span></li>`;
+      return `<li class="ex-line"><span>${ex.name}${howToHtml(ex.name)}${rd}</span><span class="ex-meta">${meta}</span></li>`;
     }).join("");
     return `
       <div class="brief-section">
@@ -2869,7 +3065,7 @@ function setProgress(chips) {
 }
 function setExercise({ name, detail, cue, redFlag, warmupSteps, hydrate }) {
   const html = [];
-  if (name)   html.push(`<div class="ex-name">${name}</div>`);
+  if (name)   html.push(`<div class="ex-name">${name}${howToHtml(name)}</div>`);
   if (detail) html.push(`<div class="ex-detail">${detail}</div>`);
   if (warmupSteps) html.push(`<div class="ex-cue">${warmupSteps.map(s => "• " + s).join("<br>")}</div>`);
   else if (cue) html.push(`<div class="ex-cue">${cue}</div>`);
