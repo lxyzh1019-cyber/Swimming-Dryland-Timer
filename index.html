@@ -3600,7 +3600,8 @@ async function startSession() {
             setUpNext(`<span class="label">Up next:</span> <span class="name">${upcoming}</span>`);
 
             // Speak "Rest, next move: NAME. CUE" upfront — timer starts immediately.
-            // 3,2,1 only fire if the announcement has finished by then; otherwise just "Go".
+            // 3,2,1 only fire if the announcement has finished by then; otherwise
+            // we just queue "Go" after the announcement finishes naturally.
             const nextName = upcomingEx ? upcomingEx.name : "";
             const nextCue = upcomingEx && upcomingEx.reset ? upcomingEx.reset : "";
             const announceMsg = nextName
@@ -3621,8 +3622,9 @@ async function startSession() {
             if (result === "skip") {
               if (speech) speech.cancel();
             } else {
-              // If the announcement is still going, cancel it so "Go" lands on time.
-              if (speech && (speech.speaking || speech.pending)) speech.cancel();
+              // Queue "Go" — if the announcement is still mid-sentence, it will
+              // finish naturally and "Go" follows. Do NOT cancel speech, or the
+              // announcement gets cut off in the middle.
               speak("Go");
               preAnnounced = true;
             }
