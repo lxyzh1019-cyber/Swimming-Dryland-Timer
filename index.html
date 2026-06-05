@@ -3055,6 +3055,18 @@ async function runTempoLoop(ex, tempo, isDone) {
     { word: "Hold", secs: tempo.hold, freq: 880 },
     { word: "Down", secs: tempo.down, freq: 440 },
   ];
+  // Sleep that also breaks when DONE is pressed (cueDone via isDone()),
+  // so runRepsWithVoice doesn't hang awaiting the voiceLoop after DONE-while-paused.
+  async function tempoSleep(ms) {
+    const start = Date.now();
+    let pausedMs = 0;
+    while (true) {
+      if (isDone() || session.abort || session.skipExercise) return "interrupt";
+      if (session.paused) { pausedMs += 100; }
+      else if (Date.now() - start - pausedMs >= ms) return "done";
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }
   for (let i = 1; i <= tempo.count; i++) {
     for (let p = 0; p < phaseDefs.length; p++) {
       const ph = phaseDefs[p];
@@ -3065,12 +3077,10 @@ async function runTempoLoop(ex, tempo, isDone) {
       speak(p === 0 ? `${i}. ${ph.word}` : ph.word);
       beep(ph.freq, 0.1);
       for (let s = 1; s < ph.secs; s++) {
-        const r = await sleep(1000);
-        if (r === "abort" || r === "skip" || isDone()) return;
+        if (await tempoSleep(1000) === "interrupt") return;
         beep(ph.freq, 0.08);
       }
-      const rLast = await sleep(1000);
-      if (rLast === "abort" || rLast === "skip" || isDone()) return;
+      if (await tempoSleep(1000) === "interrupt") return;
     }
   }
 }
@@ -3598,16 +3608,16 @@ async function startSession() {
             const result = await countdown(restDuration, {
               onTick: (rem) => {
                 if (!announced && announceMsg && rem <= estSec + 3) { announced = true; speak(announceMsg); }
-                if (!said3 && rem === 3) { said3 = true; speak("3"); }
-                if (!said2 && rem === 2) { said2 = true; speak("2"); }
-                if (!said1 && rem === 1) { said1 = true; speak("1"); }
+                if (!said3 && rem === 3) { said3 = true; interruptSpeech("3"); }
+                if (!said2 && rem === 2) { said2 = true; interruptSpeech("2"); }
+                if (!said1 && rem === 1) { said1 = true; interruptSpeech("1"); }
               }
             });
             if (result === "abort") return finalize(false);
             if (result === "skip") {
               if (speech) speech.cancel();
             } else {
-              speak("Go");
+              interruptSpeech("Go");
               preAnnounced = true;
             }
           }
