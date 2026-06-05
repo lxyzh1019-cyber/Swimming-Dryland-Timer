@@ -861,6 +861,34 @@
     font-family: 'Gochi Hand', cursive; font-size: 1.3rem;
     color: var(--ink); margin: 0.8rem 0 0.3rem; text-align: left;
   }
+
+  /* ===== Test / Practice mode ===== */
+  .test-toggle-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    margin-top: 0.6rem; padding-top: 0.55rem;
+    border-top: 2px dashed var(--paper-line);
+    font-size: 1rem;
+  }
+  .test-toggle-row input[type="checkbox"] {
+    width: 1.3rem; height: 1.3rem; flex: 0 0 auto;
+    accent-color: var(--accent-purple); cursor: pointer;
+  }
+  .test-toggle-row label { cursor: pointer; line-height: 1.3; }
+  .test-toggle-row .test-hint {
+    display: block; font-family: 'Caveat', cursive;
+    font-size: 0.95rem; color: var(--ink-light);
+  }
+  .test-mode-banner {
+    background: var(--accent-purple); color: var(--ink);
+    border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    padding: 0.5rem 0.8rem; margin-bottom: 0.6rem; text-align: center;
+    box-shadow: 2px 2px 0 var(--ink);
+    font-family: 'Gochi Hand', cursive; font-size: 1.15rem;
+  }
+  .test-mode-banner small {
+    display: block; font-family: 'Caveat', cursive;
+    font-size: 0.95rem; color: var(--ink);
+  }
 </style>
 
 
@@ -1810,6 +1838,7 @@ let selectedSession = "main"; // "activation", "main", "evening", or "rest"
 let selectedMainVariant = null; // Mon/Tue: user must explicitly choose A or B
 let selectedEveningCut = false;
 let skipGreetingOnStart = false;
+let testMode = false; // Practice run — when true, nothing is recorded (localStorage, Firestore, tracker, skip history)
 let closeModalAborted = false;
 let introPlaying = false;
 let session = {
@@ -2040,6 +2069,12 @@ function initModal() {
       <label for="round-rest">Rest between rounds (s)</label>
       <input id="round-rest" type="number" min="10" max="180" />
     </div>
+    <div class="test-toggle-row">
+      <input id="test-mode" type="checkbox" />
+      <label for="test-mode">🧪 Test mode (practice run)
+        <span class="test-hint">Walk through the movements first — nothing is saved or recorded.</span>
+      </label>
+    </div>
   `;
   document.getElementById("modal-msg").before(settingsBox);
   document.getElementById("voice-style").value = appSettings.voiceStyle;
@@ -2059,6 +2094,10 @@ function initModal() {
     if (!Number.isFinite(parsed)) return;
     appSettings.roundRestSeconds = Math.min(180, Math.max(10, Math.round(parsed)));
     e.target.value = appSettings.roundRestSeconds; saveSettings();
+  };
+  document.getElementById("test-mode").checked = testMode;
+  document.getElementById("test-mode").onchange = (e) => {
+    testMode = e.target.checked;
   };
 
   // Equipment reminder line (injected after modal-msg)
@@ -3029,6 +3068,8 @@ function renderSessionShell(data) {
   card.classList.add("session-active");
   const isEvening = selectedSession === "evening";
   card.innerHTML = `
+    ${testMode ? `<div class="test-mode-banner">🧪 Test Mode — practice run
+      <small>Learn the movements. Nothing is saved or recorded.</small></div>` : ''}
     <div class="day-header">
       <span class="day-badge${isEvening ? ' evening-badge' : ''}">${data.badge}</span>
       <h2 class="day-title">${data.title}</h2>
@@ -3926,57 +3967,72 @@ function finalize(completed) {
   const sessionType = selectedSession === "activation" ? "activation" : isEvening ? "evening" : "main";
 
   if (completed) {
-    // Save session record — localStorage (source of truth) + Firestore (cloud record)
-    const sessionEntry = {
-      app: "swimming",
-      dayKey: selectedDay,
-      dayTitle: (PLAN[selectedDay] && PLAN[selectedDay].title) || selectedDay,
-      isoDate: new Date().toISOString(),
-      durationSecs: elapsedSecs,
-      session: isEvening ? "evening" : "morning",
-      planVersion: "v15",
-      sessionType,
-      mainVariant: sessionType === "main" && ADDON_DAYS.has(selectedDay) ? selectedMainVariant : null,
-      eveningBlock: isEvening ? (selectedEveningCut ? "cut" : (selectedDay === "tuesday" || selectedDay === "thursday" ? "B" : "A")) : null,
-      overloadWeek: overloadWeek(),
-      addOn: sessionType === "main" && sessionAddonOn || false,
-      skippedCount: session.skipped.length,
-      completedFully: true
-    };
-    saveSession(sessionEntry);
-    renderModalWeekSummary();
-    // Cloud write — store returned doc ID so reflection can patch mood later
     _pendingFsId = null;
-    fsAddSession(sessionEntry).then(id => { _pendingFsId = id; });
-
-    setZone("");
-    if (isEvening) {
-      setStatus("Rehearsal done");
+    if (testMode) {
+      // Practice run — record nothing (no localStorage, no Firestore, no skip history).
+      setZone("");
+      setStatus("Practice run done 🧪");
       setTimer("✓");
       setExercise({
-        name: "Done, Jess!",
-        cue: `Good shape work - ${fmtMMSS(elapsedSecs)} active time. Stay fresh for the pool.`
+        name: "Nice practice, Jess!",
+        cue: "You know the moves now. Nothing was recorded — turn off Test Mode when you're ready for the real thing."
       });
       setUpNext("");
-      speak("Evening rehearsal complete. Nice and easy.");
+      speak(isEvening
+        ? "Practice rehearsal complete. Nothing recorded — you've got the shapes down."
+        : "Practice run complete. Nothing recorded. You know the movements now.");
     } else {
-      setStatus("Training complete 🎉");
-      setTimer("✓");
-      setExercise({
-        name: "Done, Jess!",
-        cue: `Great work — ${fmtMMSS(elapsedSecs)} on the clock. Sip water, breathe, walk it off.`
-      });
-      setUpNext("");
-      speak("Training complete. Fantastic effort.");
-    }
-    if (session.skipped.length) {
-      skipHistory.unshift({
-        createdAt: Date.now(),
-        sessionDate: new Date().toISOString(),
-        sessionType: selectedSession,
-        skippedItems: session.skipped
-      });
-      saveSkipHistory();
+      // Save session record — localStorage (source of truth) + Firestore (cloud record)
+      const sessionEntry = {
+        app: "swimming",
+        dayKey: selectedDay,
+        dayTitle: (PLAN[selectedDay] && PLAN[selectedDay].title) || selectedDay,
+        isoDate: new Date().toISOString(),
+        durationSecs: elapsedSecs,
+        session: isEvening ? "evening" : "morning",
+        planVersion: "v15",
+        sessionType,
+        mainVariant: sessionType === "main" && ADDON_DAYS.has(selectedDay) ? selectedMainVariant : null,
+        eveningBlock: isEvening ? (selectedEveningCut ? "cut" : (selectedDay === "tuesday" || selectedDay === "thursday" ? "B" : "A")) : null,
+        overloadWeek: overloadWeek(),
+        addOn: sessionType === "main" && sessionAddonOn || false,
+        skippedCount: session.skipped.length,
+        completedFully: true
+      };
+      saveSession(sessionEntry);
+      renderModalWeekSummary();
+      // Cloud write — store returned doc ID so reflection can patch mood later
+      fsAddSession(sessionEntry).then(id => { _pendingFsId = id; });
+
+      setZone("");
+      if (isEvening) {
+        setStatus("Rehearsal done");
+        setTimer("✓");
+        setExercise({
+          name: "Done, Jess!",
+          cue: `Good shape work - ${fmtMMSS(elapsedSecs)} active time. Stay fresh for the pool.`
+        });
+        setUpNext("");
+        speak("Evening rehearsal complete. Nice and easy.");
+      } else {
+        setStatus("Training complete 🎉");
+        setTimer("✓");
+        setExercise({
+          name: "Done, Jess!",
+          cue: `Great work — ${fmtMMSS(elapsedSecs)} on the clock. Sip water, breathe, walk it off.`
+        });
+        setUpNext("");
+        speak("Training complete. Fantastic effort.");
+      }
+      if (session.skipped.length) {
+        skipHistory.unshift({
+          createdAt: Date.now(),
+          sessionDate: new Date().toISOString(),
+          sessionType: selectedSession,
+          skippedItems: session.skipped
+        });
+        saveSkipHistory();
+      }
     }
     showReflection();
   } else {
@@ -3993,6 +4049,24 @@ function finalize(completed) {
 function showReflection() {
   const isEvening = selectedSession === "evening";
   const isActivation = selectedSession === "activation";
+
+  // Test mode: nothing is recorded, so skip the feel rating + PR board entirely.
+  if (testMode) {
+    document.getElementById("controls").innerHTML = `
+      <div style="flex: 1 1 100%;">
+        <div class="reflect">
+          <h3 style="color: var(--accent-purple);">🧪 Practice complete</h3>
+          <div class="reflect-thanks" style="display:block;">
+            Movements rehearsed — nothing saved. Uncheck Test Mode for a recorded session.
+          </div>
+          <div style="margin-top: 1rem;">
+            <button class="btn btn-primary" id="btn-restart" style="background: var(--accent-purple);">DONE</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById("btn-restart").onclick = () => renderCard();
+    return;
+  }
 
   if (isEvening || isActivation) {
     document.getElementById("controls").innerHTML = `
