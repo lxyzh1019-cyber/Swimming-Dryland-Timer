@@ -889,6 +889,84 @@
     display: block; font-family: 'Caveat', cursive;
     font-size: 0.95rem; color: var(--ink);
   }
+
+  /* ===== 2026.2 — badges, readiness, learning, quiz ===== */
+  .ex-line.gated { opacity: 0.6; }
+  .ex-badge {
+    display: inline-block; font-size: 0.7rem; font-family: 'Nunito', sans-serif;
+    border-radius: 10px; padding: 1px 6px; margin-left: 4px; vertical-align: middle;
+    border: 1.5px solid var(--ink);
+  }
+  .ex-badge.gate   { background: #ffe0e0; }
+  .ex-badge.echo   { background: #e0f0ff; }
+  .ex-badge.anchor { background: #fff0d0; }
+  .brief-section.safety { background: #fff3f3; border-left: 5px solid #ff7b54; border-radius: var(--radius-sm); padding: 0.6rem 0.8rem; }
+  .brief-section.resume { background: var(--bg2); border-left: 5px solid var(--accent-purple); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem; }
+
+  /* Readiness checklist */
+  .readiness-quiz { margin: 0.6rem 0; }
+  .rq {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+    padding: 0.5rem 0; border-bottom: 1.5px dashed var(--paper-line);
+  }
+  .rq-text { flex: 1; font-size: 1rem; }
+  .rq-flag { color: #ff7b54; }
+  .rq-btns { display: flex; gap: 0.4rem; flex: 0 0 auto; }
+  .rq-btns button {
+    min-width: 52px; padding: 0.4rem 0.6rem; border: 2px solid var(--ink);
+    border-radius: var(--radius-sm); background: var(--bg2); cursor: pointer;
+    font-family: 'Patrick Hand', sans-serif; font-size: 1rem;
+  }
+  .rq-btns button.selected { background: var(--accent-yellow); box-shadow: 2px 2px 0 var(--ink); }
+  .rq-light {
+    text-align: center; font-family: 'Gochi Hand', cursive; font-size: 1.25rem;
+    padding: 0.6rem; border-radius: var(--radius-sm); border: 2px solid var(--ink); margin: 0.6rem 0;
+  }
+  .rq-light.green    { background: #c9f5d2; }
+  .rq-light.yellow   { background: #fff0b3; }
+  .rq-light.red      { background: #ffd1c7; }
+  .rq-light.recovery { background: #d7ecff; }
+
+  /* Quiz */
+  .quiz-entry { margin-top: 0.6rem; display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+  .btn-quiz, .btn-learn {
+    background: var(--accent-purple); color: var(--ink); border: 2px solid var(--ink);
+    border-radius: var(--radius-sm); padding: 0.6rem 1rem; cursor: pointer;
+    font-family: 'Patrick Hand', sans-serif; font-size: 1.05rem; box-shadow: 2px 2px 0 var(--ink);
+  }
+  .btn-learn { background: var(--accent-yellow); }
+  .quiz-q { font-size: 1.2rem; font-family: 'Gochi Hand', cursive; margin: 0.8rem 0; text-align: center; }
+  .quiz-opts { display: flex; flex-direction: column; gap: 0.5rem; }
+  .quiz-opt {
+    padding: 0.7rem 0.9rem; border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    background: var(--bg2); cursor: pointer; font-family: 'Nunito', sans-serif; font-size: 1rem; text-align: left;
+  }
+  .quiz-opt.correct { background: #c9f5d2; }
+  .quiz-opt.wrong   { background: #ffd1c7; }
+  .quiz-fb { text-align: center; min-height: 1.6rem; margin-top: 0.5rem; }
+  .fb-ok { color: #2e9e57; font-family: 'Gochi Hand', cursive; font-size: 1.2rem; }
+  .fb-no { color: #d4612f; font-family: 'Caveat', cursive; font-size: 1.05rem; }
+
+  /* Micro-loop + learn card + ladder */
+  .microloop { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-top: 0.6rem; }
+  .ml-opt, .lc-chip {
+    padding: 0.5rem 0.9rem; border: 2px solid var(--ink); border-radius: 20px;
+    background: var(--bg2); cursor: pointer; font-family: 'Patrick Hand', sans-serif; font-size: 1rem;
+  }
+  .ml-opt.correct, .lc-chip.selected { background: #c9f5d2; }
+  .ml-opt.wrong { background: #ffd1c7; }
+  .learn-card { background: var(--bg2); border: 2px solid var(--paper-line); border-radius: var(--radius-sm); padding: 0.7rem 0.8rem; margin-top: 0.5rem; text-align: left; }
+  .lc-row { margin: 0.2rem 0; font-size: 0.95rem; }
+  .lc-q { margin: 0.5rem 0 0.3rem; font-family: 'Gochi Hand', cursive; }
+  .lc-chips { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .lc-toggle { display: block; margin: 0.4rem 0; font-size: 0.95rem; cursor: pointer; }
+  .lc-btns { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+  .ladder-row { display: flex; align-items: center; gap: 0.6rem; margin: 0.5rem 0; }
+  .lad-btn {
+    width: 2rem; height: 2rem; border: 2px solid var(--ink); border-radius: 50%;
+    background: var(--accent-yellow); cursor: pointer; font-size: 1.2rem; line-height: 1;
+  }
+  .lad-val { font-family: 'Caveat', cursive; font-size: 1.05rem; }
 </style>
 
 
@@ -980,7 +1058,7 @@
   <div class="wrap">
     <header class="header">
       <h1>🏊 Land Training</h1>
-      <div class="sub">Jess · 7-day swimming plan · v17</div>
+      <div class="sub">Jess · Dryland 2026.2 · readiness · learning · quiz</div>
     </header>
 
     <nav class="day-tabs" id="day-tabs" aria-label="Day picker"></nav>
@@ -989,9 +1067,10 @@
       <summary>This week's plan</summary>
       <div class="schedule-grid" id="schedule-grid"></div>
       <div class="note">
-        Mon/Tue: AM activation + versioned main · Wed/Thu: power circuits ·
-        Fri: activation + light core · Sat: combined (hardest) · Sun: rest + engagement pick.
-        <br>Evening rehearsal: pool days only, alternating A/B through Friday.
+        Each day: Warm-up → Coordination → Main (Traffic-Light rounds) → Finisher → Swim-Skill.
+        Mon: Pull + Hip Drive · Tue: Anti-Rotation (double pool, no rope) · Wed: Rhythm + Dynamic ·
+        Thu: Pull-Up Rest + Control · Fri: Light Stability + Shoulder · Sat: Athletic (hardest) · Sun: Spa recovery.
+        <br>Answer the 8-question readiness check before you start — it sets your light.
       </div>
     </details>
 
@@ -1391,423 +1470,505 @@ const HR_ZONES = {
   z4: { label: "Zone 4 · High Intensity", bpm: "158–178 bpm", color: "#ff7b54" }
 };
 
-const PLAN = {
+/* ============================================================
+   2026.2 CONTENT MODEL
+   Each training day = Warm-up → Coordination → Main (Traffic-Light
+   rounds) → Finisher → Swim-Skill. Exercises carry a driver
+   (time|reps), block tag, and standing-rule flags (gate, parentEcho,
+   faultAnchor). X() returns an object compatible with the existing
+   timer/voice runner (work / byReps+repsDetail / reset / cue / redFlag).
+   ============================================================ */
+
+function X(o) {
+  const driver = o.driver ||
+    (o.work != null ? "time" : (o.repsDetail != null ? "reps" : null));
+  const ex = {
+    name: o.name,
+    block: o.block || "main",
+    driver,
+    dose: o.dose || "",
+    reset: o.reset || "",                 // short setup phrase spoken first
+    cue: o.cue || "",
+    redFlag: o.fix || null,               // correction (shown as red-flag)
+    parentWatch: o.parentWatch || null,   // "what to watch" (feeds quiz/cards)
+    swimTransfer: o.swimTransfer || null, // skill it builds (feeds quiz/cards)
+    faultAnchor: !!o.faultAnchor,
+    gate: o.gate || null,                 // null | "valgus"
+    parentEcho: !!o.parentEcho,           // anti-extension breath gate
+    searchableName: o.searchableName || o.name,
+    demoUrl: o.demoUrl || null,
+    rest: o.rest != null ? o.rest : 5
+  };
+  if (driver === "reps") { ex.byReps = true; ex.repsDetail = o.repsDetail || o.dose; }
+  else if (driver === "time") { ex.work = o.work; }
+  if (o.eachSide) ex.eachSide = true;
+  return ex;
+}
+
+/* Light → number of rounds for the Main block. */
+const LIGHT_ROUNDS = { green: 3, yellow: 2, red: 1, recovery: 0 };
+
+/* 8-question readiness checklist (kid tone). The pain question forces
+   RECOVERY-ONLY regardless of the rest. */
+const READINESS_QUESTIONS = [
+  { id: "q1", text: "Are you ready to become a better swimmer today?" },
+  { id: "q2", text: "Is your body pain-free — shoulders, back, knees, ankles, wrists?", painGate: true },
+  { id: "q3", text: "Did you sleep okay and is your energy full?" },
+  { id: "q4", text: "Does your body feel light, not heavy from swimming?" },
+  { id: "q5", text: "Can you breathe — hum out loud — in a hollow or side plank?" },
+  { id: "q6", text: "Do your shoulders stay DOWN when you hang or pull?" },
+  { id: "q7", text: "Is your landing quiet, knees over toes?" },
+  { id: "q8", text: "Do you WANT to give this 100% today?" }
+];
+
+/* Top-7 exercises tracked on the Independence Ladder. */
+const TOP7 = [
+  "Hollow Tuck Flutter", "Clean Pull-Ups", "Glute Bridge March",
+  "Superman", "Single-Leg Balance Reach", "Pallof Press", "Drop-and-Stick"
+];
+
+const MICRO_LOOP = { q: "Where did the power start?", a: "the hips" };
+const BREATH_REHEARSAL =
+  "Side-lying head-turn: exhale face-down (hum), rotate, quick sip, rotate back.";
+
+/* Shared finisher + swim-skill prompt block builders */
+const FINISHER = () => [
+  X({ name: "Scap Pull-Up + Dead Hang", block: "finisher", driver: "time", work: 30,
+      dose: "30s", reset: "Hang tall, shoulders ready.",
+      cue: "Shoulders slide DOWN, hang and decompress.",
+      swimTransfer: "Shoulder control / decompression" })
+];
+
+const DAYS = {
   monday: {
-    title: "Core A",
-    subtitle: "Anti-Rotation + Lat Activation",
-    badge: "CORE",
-    hrZone: "z2", hrText: "Zone 2–3 · 118–158 bpm",
-    benchmark: "Core hold 30s clean — quality over heart rate.",
-    prTarget: "Hollow-Body Flutter — seconds held with flat back",
-    equipment: ["Fitness ball", "Resistance band (anchored at hip)", "Mat"],
-    warmup: null,
-    circuits: [
-      { name: "Anti-Rotation + Lat Activation", rounds: 3, roundRest: ROUND_REST, exercises: [
-        E("Hollow-Body Flutter", 30, 5, "Press lower back down.",
-          "Lower back FLAT throughout — the instant your back lifts, your hips sink in the pool. This is the deep V fault in land form.",
-          "Back lifts before 20s — slow kick tempo, re-engage core before continuing."),
-        ER("Dead Bug", "10 alternating reps · full extension", 5, "Exhale fully, lower back on floor.",
-          "Lower back MUST press to floor. Exhale fully as limbs extend. Trains core bracing for underwater dolphin kick.",
-          "Lower back lifts — reduce limb range until floor contact is maintained."),
-        ER("Ball Prone Stroke Sim", "12 reps per side", 5, "Depress both shoulders first.",
-          "Depress BOTH shoulders DOWN before each stroke — lat works, NOT bicep. Arms pulling before shoulders depress means a dropped elbow in the freestyle catch.",
-          "Arms engage before shoulders depress — stop, reset shoulder position, then continue."),
-        ER("Band Single-Arm Pull", "10 reps each side · slow controlled", 5, "Check torso — did it move?",
-          "Torso stays COMPLETELY STILL — core resists rotation on every pull. Torso rotation here is uncontrolled body roll in the pool.",
-          "Torso rotates on pull — reduce band tension, widen stance."),
-        E("Prone Flutter + Brace", 30, 5, "Belly still pressed? Re-brace.",
-          "Belly tight while legs move — if the belly relaxes the hips sink. This is the bridge from floor core to water core.",
-          "Belly lifts during flutter — slow kick, re-engage core. This moment IS the deep V.")
-      ]}
-    ]
+    title: "Pull + Hip Drive",
+    subtitle: "PM · single pool day",
+    badge: "MON",
+    theme: "Pull + Hip Drive",
+    mantra: "I am STRONG. I am SMOOTH. I can SWIM THIS.",
+    poolLoad: "pm",
+    defaultLight: "green",
+    timeLo: 18, timeHi: 22,
+    equipment: ["Jump rope", "Resistance band", "Pull-up bar", "Mat"],
+    blocks: {
+      warmup: [
+        X({ name: "Jump Rope", block: "warmup", driver: "time", work: 75, dose: "60–90s", cue: "Off the toes, quiet, tall." }),
+        X({ name: "Band Pass-Through", block: "warmup", driver: "reps", repsDetail: "8–10", dose: "8–10", cue: "Wide, slow, no shrug." }),
+        X({ name: "Cat-Camel", block: "warmup", driver: "reps", repsDetail: "8 cycles", dose: "8 cycles", cue: "Move segment by segment." }),
+        X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Knees lead, sit tall." }),
+        X({ name: "Leg Swings", block: "warmup", driver: "reps", repsDetail: "8/dir/leg", dose: "8/dir/leg", cue: "Relaxed, build range." })
+      ],
+      coordination: [
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "A-Skip", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Same pattern with rhythm." })
+      ],
+      main: [
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+            parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
+            cue: "Ribs down, low back glued to floor.",
+            parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
+            swimTransfer: "Body line + kick" }),
+        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", dose: "2–3 clean",
+            reset: "Shoulders sink first.", cue: "Shoulders sink first, THEN bend.",
+            parentWatch: "Kipping / swinging", fix: "One swing = set over.",
+            swimTransfer: "Catch with the lats" }),
+        X({ name: "Dead Bug", block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side", faultAnchor: true,
+            reset: "Back flat, exhale on extend.", cue: "Exhale as limbs extend, back flat.",
+            parentWatch: "Low back lifts off floor", fix: "Smaller range.",
+            swimTransfer: "Brace under breathing" }),
+        X({ name: "Glute Bridge March", block: "main", driver: "reps", repsDetail: "8–10/side", dose: "8–10/side", faultAnchor: true,
+            reset: "Drive from the hip.", cue: "Drive from the HIP, not the heel.",
+            parentWatch: "Pelvis tilts / drops", fix: "Slow down, level the pelvis.",
+            swimTransfer: "Hip = the motor" }),
+        X({ name: "Single-Leg Balance Reach", block: "main", driver: "time", work: 40, eachSide: true, dose: "20s/side",
+            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe.",
+            parentWatch: "Knee caves inward", fix: "Reach shorter, slow down.",
+            swimTransfer: "Start / turn line" })
+      ],
+      finisher: FINISHER(),
+      swimskill: [
+        X({ name: "Streamline Shape Rehearsal", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+            cue: "Ribs down, long body, hands stacked.", swimTransfer: "Tighter streamline" }),
+        X({ name: "Prone Dolphin Kick", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+            cue: "Wave from the chest, not the knees.", swimTransfer: "Stroke patterning" })
+      ]
+    },
+    prepMenu: []
   },
+
   tuesday: {
-    title: "Core B",
-    subtitle: "Anti-Rotation + Hip-Driven Kick",
-    badge: "CORE",
-    hrZone: "z2", hrText: "Zone 2–3 · 118–158 bpm",
-    benchmark: "Side-chain stability — torso square, hip-driven kick.",
-    prTarget: "Side-Lying Hip-Drive Kick — reps per side with clear hip drive",
-    equipment: ["Resistance band", "Mat"],
-    warmup: null,
-    circuits: [
-      { name: "Anti-Rotation + Hip Kick Pattern", rounds: 3, roundRest: ROUND_REST, exercises: [
-        ER("Pallof Press (band)", "10 reps each side · slow press and return", 5, "Did torso stay square?",
-          "Resist rotation — hips stay perfectly square throughout. Body rotation here is uncontrolled body roll on every freestyle stroke.",
-          "Torso rotates during press — reduce band tension, widen stance."),
-        E("Side Plank", 50, 5, "Hip high — check before starting.",
-          "Hip high, body in a straight line. Builds the lateral stiffness that stops hip drop in butterfly and freestyle.",
-          "Hip drops immediately — drop to a knee side plank, maintain the hip line.",
-          { eachSide: true }),
-        ER("Band Clamshell", "15 reps each side · 2s open / 1s hold / 2s close", 5, "Hip still? Hand on hip to monitor.",
-          "Hip stays STILL — only the top knee opens. Controls kick direction. An unstable hip means a kick crossing the midline.",
-          "Hip rotates with knee — hand on hip, only the knee should move."),
-        E("Hollow Body Hold", 30, 5, "Lower back flat — same as evening check.",
-          "Lower back FLAT — same engagement as the evening streamline check. If you feel it in your lower back, the core has released.",
-          "Lower back arches — reduce leg hover height, re-engage before continuing."),
-        ER("Side-Lying Hip-Drive Kick", "20 reps each side · controlled", 5, "Hand on glute — clear squeeze?",
-          "Top leg driven from the HIP — hand on glute feels a clear squeeze each rep. A knee-driven kick means the hip sinks in the pool.",
-          "Knee leads — slow to half speed, hand on glute to feel the hip drive.")
-      ]}
+    title: "Anti-Rotation + Posterior",
+    subtitle: "AM+PM pool · double day · priming, not a workout",
+    badge: "TUE",
+    theme: "Anti-Rotation + Posterior",
+    mantra: "I am SHARP. I am STRONG. I can SWIM THIS.",
+    poolLoad: "double",
+    defaultLight: "yellow",
+    timeLo: 18, timeHi: 18,
+    equipment: ["Resistance band", "Dowel", "Mat"],
+    blocks: {
+      warmup: [
+        X({ name: "Wall Slides", block: "warmup", driver: "reps", repsDetail: "8", dose: "8", cue: "Back on wall, ribs down — no arching." }),
+        X({ name: "Open-Book / T-Rotation", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Hips stacked, rotate from the spine." }),
+        X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Knees lead, sit tall." }),
+        X({ name: "Knee-to-Wall Ankle", block: "warmup", driver: "reps", repsDetail: "8/side", dose: "8/side", cue: "Heel flat, knee past toes." }),
+        X({ name: "Short-Foot", block: "warmup", driver: "time", work: 20, dose: "20s", cue: "Spread toes, dome the arch." })
+      ],
+      coordination: [
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "Carioca", block: "coordination", driver: "time", work: 60, dose: "10m/side", cue: "Hip over hip — trunk-hip separation." })
+      ],
+      main: [
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+            parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
+            cue: "Ribs down, low back glued to floor.",
+            parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
+            swimTransfer: "Body line + kick" }),
+        X({ name: "Band Row", block: "main", driver: "reps", repsDetail: "12 · 2-1-2 tempo", dose: "12 · 2-1-2",
+            reset: "Blades first.", cue: "Drive elbows back, squeeze the blades.",
+            parentWatch: "Shrugging / arms-only", fix: "Reset, blades first.",
+            swimTransfer: "Freestyle pull" }),
+        X({ name: "Bird Dog", block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side",
+            reset: "Flat back.", cue: "Flat back, no hip rotation.",
+            parentWatch: "Hips rotate", fix: "Slow down, reduce reach.",
+            swimTransfer: "Posterior body line" }),
+        X({ name: "Hip Hinge", block: "main", driver: "reps", repsDetail: "8 · 2-1-2", dose: "8 · 2-1-2 (dowel)",
+            reset: "Hips load back.", cue: "Hips load back, dowel touches 3 points.",
+            parentWatch: "Rounding the back", fix: "Hinge from the hip, flat back.",
+            swimTransfer: "Hip drive for the start" }),
+        X({ name: "Single-Leg Balance Reach", block: "main", driver: "time", work: 40, eachSide: true, dose: "20s/side",
+            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe.",
+            parentWatch: "Knee caves inward", fix: "Reach shorter, slow down.",
+            swimTransfer: "Start / turn line" })
+      ],
+      finisher: FINISHER(),
+      swimskill: [
+        X({ name: "Floor Body-Line Hold", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+            cue: "Flat back, one straight line.", swimTransfer: "Streamline shape" }),
+        X({ name: "Catch-Position Hold", block: "swimskill", driver: "time", work: 30, dose: "2×15s",
+            cue: "High elbow, fingertips down.", swimTransfer: "Stronger catch" })
+      ]
+    },
+    prepMenu: [
+      X({ name: "Pallof Press", block: "main", driver: "reps", repsDetail: "10/side · 2s hold", dose: "10/side · 2s hold",
+          cue: "Press out, hold, hips square — resist the twist.",
+          parentWatch: "Body rotates on the press", fix: "Lower tension, hips square.",
+          swimTransfer: "Anti-rotation / less roll" }),
+      X({ name: "Side Plank Reach", block: "main", driver: "time", work: 40, eachSide: true, dose: "20s/side",
+          cue: "Hips stacked and lifted, reach under and back.",
+          parentWatch: "Hip drops", fix: "Lift the hip, shorten the reach.",
+          swimTransfer: "Anti-side-bend" })
     ]
   },
+
   wednesday: {
-    title: "Power / Coordination",
-    subtitle: "Split Day · Power Half + Coordination Half",
-    badge: "POWER",
-    hrZone: "z4", hrText: "Zone 4 in Power half · Zone 2–3 in Coordination half",
-    benchmark: "Push-off power — translate directly to wall drive.",
-    prTarget: "Box Jump / Lateral Bound — clean rep count",
-    equipment: ["Plyo box", "Mat"],
-    warmup: WARMUP,
-    circuits: [
-      { name: "Power Half + Coordination Half", rounds: 4, roundRest: ROUND_REST, exercises: [
-        ER("Box Jump", "up to 5 reps · full reset between", 5, "Land soft, full reset.",
-          "Power half — maximum leg drive every rep, full reset between. Land soft and quiet; absorption is the skill.",
-          "Heavy or loud landing — reduce box height."),
-        ER("Lateral Bound", "up to 5 reps · single-leg 2s stick", 5, "Quiet landing — absorb.",
-          "Coordination half — quiet landing means good absorption means a faster flip-turn push-off. Knees track over toes every landing.",
-          "Heavy stomp — reduce drop height until quiet."),
-        ER("Squat Jump", "up to 6 reps · fast ground contact", 5, "Touch and go.",
-          "Touch and go — maximum leg drive, think wall push-off every rep. A pause at the bottom is time lost at the wall.",
-          "Collapsing at the bottom — cue fast, reduce depth."),
-        ER("Pike Push-Up", "max clean reps · stop when form breaks", 5, "Flat back, no hip sag.",
-          "Hips high, press the head toward the floor. Scale to whatever depth keeps a flat back. Shoulder-health insurance.",
-          "Hip sag or form breaks — incline higher, fewer reps.")
-      ]}
-    ]
+    title: "Rhythm + Dynamic",
+    subtitle: "PM pool day",
+    badge: "WED",
+    theme: "Rhythm + Dynamic",
+    mantra: "Practice makes perfect.",
+    poolLoad: "pm",
+    defaultLight: "yellow",
+    timeLo: 20, timeHi: 20,
+    equipment: ["Jump rope", "Pull-up bar", "Mat"],
+    blocks: {
+      warmup: [
+        X({ name: "Jump Rope", block: "warmup", driver: "time", work: 75, dose: "60–90s", cue: "Off the toes, quiet, tall." }),
+        X({ name: "Wall Slides", block: "warmup", driver: "reps", repsDetail: "8", dose: "8", cue: "Back on wall, ribs down — no arching." }),
+        X({ name: "Open-Book / T-Rotation", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Hips stacked, rotate from the spine." }),
+        X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Knees lead, sit tall." }),
+        X({ name: "Knee-to-Wall Ankle", block: "warmup", driver: "reps", repsDetail: "8/side", dose: "8/side", cue: "Heel flat, knee past toes." })
+      ],
+      coordination: [
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "A-Skip", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Same pattern with rhythm." }),
+        X({ name: "Carioca", block: "coordination", driver: "time", work: 60, dose: "10m/side", cue: "Hip over hip — trunk-hip separation." })
+      ],
+      main: [
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+            parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
+            cue: "Ribs down, low back glued to floor.",
+            parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
+            swimTransfer: "Body line + kick" }),
+        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", dose: "2–3 clean",
+            reset: "Shoulders sink first.", cue: "Shoulders sink first, THEN bend.",
+            parentWatch: "Kipping / swinging", fix: "One swing = set over.",
+            swimTransfer: "Catch with the lats" }),
+        X({ name: "Superman", block: "main", driver: "time", work: 30, dose: "3 × 8–10s hold",
+            reset: "Lift into streamline.", cue: "Lift arms+legs into streamline, hold.",
+            parentWatch: "Neck strains / fast pumping", fix: "Lower the lift, hold the shape.",
+            swimTransfer: "Dry-land streamline" }),
+        X({ name: "Glute Bridge March", block: "main", driver: "reps", repsDetail: "8–10/side", dose: "8–10/side", faultAnchor: true,
+            reset: "Drive from the hip.", cue: "Drive from the HIP, not the heel.",
+            parentWatch: "Pelvis tilts / drops", fix: "Slow down, level the pelvis.",
+            swimTransfer: "Hip = the motor" }),
+        X({ name: "Single-Leg Balance Reach", block: "main", driver: "time", work: 40, eachSide: true, dose: "20s/side",
+            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe.",
+            parentWatch: "Knee caves inward", fix: "Reach shorter, slow down.",
+            swimTransfer: "Start / turn line" }),
+        X({ name: "Drop-and-Stick", block: "main", driver: "reps", repsDetail: "5 · hold 3s", dose: "5 · hold 3s",
+            gate: "valgus", reset: "Land soft, knees over toes.",
+            cue: "Land soft, knees apart over toes, freeze.",
+            parentWatch: "Knees cave inward (valgus)", fix: "Stop, reset stance, slower.",
+            swimTransfer: "Turn / landing absorption" })
+      ],
+      finisher: FINISHER(),
+      swimskill: [
+        X({ name: "Prone Dolphin Kick", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+            cue: "Wave from the chest, not the knees.", swimTransfer: "Stroke patterning" }),
+        X({ name: "Streamline Shape Rehearsal", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+            cue: "Ribs down, long body, hands stacked.", swimTransfer: "Tighter streamline" })
+      ]
+    },
+    prepMenu: []
   },
+
   thursday: {
-    title: "Power B",
-    subtitle: "Flip-Turn Simulation",
-    badge: "POWER",
-    hrZone: "z4", hrText: "Zone 4 · 158–178 bpm during Circuit A",
-    benchmark: "Flip-turn sequence — decelerate, absorb, drive.",
-    prTarget: "Pull-Up — clean reps Round 1",
-    equipment: ["Plyo box", "Pull-up bar", "Mat"],
-    warmup: WARMUP,
-    circuits: [
-      { name: "Circuit A — Flip-Turn Simulation", rounds: 3, roundRest: 0, exercises: [
-        E("Lateral Bound", 30, 5, "Hold — stick every landing.",
-          "Stillness IS the training — deceleration for stopping at the wall. No pause means no deceleration means crashing the wall.",
-          "Continuous bouncing — cue hold, must pause every landing."),
-        E("Box Jump-Down", 30, 5, "Quiet landing — absorb the force.",
-          "Quiet landing means good absorption means a faster flip-turn push-off. Stomping is energy escaping.",
-          "Heavy stomping — reduce drop height until the landing is quiet."),
-        E("Squat Jump", 30, 5, "Touch and go — think wall, explode.",
-          "Touch and go — maximum leg drive. Think wall push-off every rep. A pause at the bottom is time lost at the wall.",
-          "Collapsing at the bottom — cue fast, reduce depth if needed."),
-        E("Jump Rope Simulation", 120, 5, "Arms drive rhythm — balls of feet.",
-          "Fixed 2 minutes every round — rope is the active recovery, no round rest. Arms drive the rhythm. Land on the balls of your feet, never flat-footed. A pace collapse in the last 10 seconds is an endurance gap — note it.",
-          "Pace collapses in the last 10s — note as endurance data, do not stop.")
-      ]},
-      { name: "Circuit B — Pull + Core Finisher", rounds: 3, roundRest: ROUND_REST, exercises: [
-        E("Wide-Grip Pull-Up", 30, 5, "Depress shoulders — then pull.",
-          "Pull-up day 1 of 2 — STRENGTH focus. Low clean reps, 4 to 5 second eccentric lower — count aloud. Lower-only is fine if she cannot press up.",
-          "Swinging or shrugging — switch to a dead hang hold for the remaining time."),
-        E("Hollow Body Hold", 30, 5, "Lower back flat — same as evening check.",
-          "Lower back FLAT — the same engagement needed in streamline off every wall. A burn here means it works in the pool.",
-          "Lower back arches — reduce leg hover height immediately."),
-        ER("Dead Bug", "10 alternating reps · exhale as limbs extend", 5, "Exhale fully, back on floor.",
-          "Lower back MUST press to the floor. Exhale as the limbs extend. Anti-rotation plus anti-extension — a different plane from the Hollow Body Hold.",
-          "Back lifts — reduce limb range until floor contact is kept."),
-        E("Dead Hang", 30, 5, "Hang tall — decompress.",
-          "Finish with a 30-second dead hang from the bar — grip plus shoulder decompression after the pull work.",
-          "Grip fails early — drop down, shake out, that is fine.")
-      ]}
+    title: "Pull-Up Rest + Control",
+    subtitle: "PM pool day · band work only",
+    badge: "THU",
+    theme: "Pull-Up Rest + Control",
+    mantra: "I am SHARP. I am FAST. I can SWIM THIS.",
+    poolLoad: "pm",
+    defaultLight: "yellow",
+    timeLo: 19, timeHi: 19,
+    equipment: ["Resistance band", "Mat"],
+    blocks: {
+      warmup: [
+        X({ name: "Band Pass-Through", block: "warmup", driver: "reps", repsDetail: "8–10", dose: "8–10", cue: "Wide, slow, no shrug." }),
+        X({ name: "Shoulder CARs", block: "warmup", driver: "reps", repsDetail: "3/dir each", dose: "3/dir each", cue: "Slow full circle, control the range." }),
+        X({ name: "Hip Circles", block: "warmup", driver: "reps", repsDetail: "8/dir", dose: "8/dir", cue: "Big slow circles." }),
+        X({ name: "Band Ankle 4-Way", block: "warmup", driver: "reps", repsDetail: "8/dir", dose: "8/dir", cue: "Slow, full range each direction." }),
+        X({ name: "Leg Swings", block: "warmup", driver: "reps", repsDetail: "8/dir/leg", dose: "8/dir/leg", cue: "Relaxed, build range." })
+      ],
+      coordination: [
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "Butt Kicks", block: "coordination", driver: "time", work: 60, dose: "15s", cue: "Heels recover fast under the butt." }),
+        X({ name: "Ankle Dribbles", block: "coordination", driver: "time", work: 60, dose: "15s", cue: "Low, fast, stiff ankle." })
+      ],
+      main: [
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+            parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
+            cue: "Ribs down, low back glued to floor.",
+            parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
+            swimTransfer: "Body line + kick" }),
+        X({ name: "Single-Arm Band Row", block: "main", driver: "reps", repsDetail: "10/side", dose: "10/side",
+            reset: "Torso completely still.", cue: "Torso completely still.",
+            parentWatch: "Torso rotates", fix: "Lower tension, widen base.",
+            swimTransfer: "Anti-roll in the pull" }),
+        X({ name: "Dead Bug", block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side", faultAnchor: true,
+            reset: "Back flat, exhale on extend.", cue: "Exhale as limbs extend, back flat.",
+            parentWatch: "Low back lifts off floor", fix: "Smaller range.",
+            swimTransfer: "Brace under breathing" }),
+        X({ name: "Glute Bridge March", block: "main", driver: "reps", repsDetail: "8–10/side", dose: "8–10/side", faultAnchor: true,
+            reset: "Drive from the hip.", cue: "Drive from the HIP, not the heel.",
+            parentWatch: "Pelvis tilts / drops", fix: "Slow down, level the pelvis.",
+            swimTransfer: "Hip = the motor" }),
+        X({ name: "Single-Leg Balance Reach", block: "main", driver: "time", work: 40, eachSide: true, dose: "20s/side",
+            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe.",
+            parentWatch: "Knee caves inward", fix: "Reach shorter, slow down.",
+            swimTransfer: "Start / turn line" })
+      ],
+      finisher: FINISHER(),
+      swimskill: [
+        X({ name: "Catch-Position Hold", block: "swimskill", driver: "time", work: 30, dose: "2×15s",
+            cue: "High elbow, fingertips down.", swimTransfer: "Stronger catch" }),
+        X({ name: "Floor Body-Line Hold", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+            cue: "Flat back, one straight line.", swimTransfer: "Streamline shape" })
+      ]
+    },
+    prepMenu: [
+      X({ name: "Band External Rotation", block: "main", driver: "reps", repsDetail: "12/side", dose: "12/side",
+          cue: "Elbow pinned to the side, rotate slow.",
+          parentWatch: "Elbow drifts off the ribs", fix: "Pin the elbow, slow down.",
+          swimTransfer: "Shoulder durability" }),
+      X({ name: "Side-Lying ER", block: "main", driver: "reps", repsDetail: "10/side", dose: "10/side",
+          cue: "Second cuff angle — light, slow.",
+          parentWatch: "Rushing / too heavy", fix: "Lighter, slower.",
+          swimTransfer: "Shoulder durability" })
     ]
   },
+
   friday: {
-    title: "Light Core",
-    subtitle: "Streamline + Mobility",
-    badge: "LIGHT",
-    hrZone: "z2", hrText: "Zone 2 · 118–138 bpm — stay light",
-    benchmark: "Fresh day — log a clean PR number, no grinding.",
-    prTarget: "Bench Flutter Kick seconds + Side-Lying Leg Lift reps",
-    equipment: ["Bench", "Mat", "Wall", "Resistance band"],
-    warmup: null,
-    isCalmDay: true,
-    circuits: [
-      { name: "Light Block — Core + Streamline + Mobility", rounds: 2, roundRest: ROUND_REST, exercises: [
-        E("Bench Flutter Kick", 30, 5, "Core locked full 30s — belly down.",
-          "Face-down on the bench, core braced. The core MUST stay locked the full 30 seconds — the belly releasing means the hips sink. Primary deep V diagnostic.",
-          "Belly releases at 15 to 20s — reduce to 20s for one week, build back to 30s."),
-        ER("Bird Dog", "10 reps each side · slow · opposite arm + leg", 5, "Lower back flat — no rotation.",
-          "Lower back stays completely flat — the opposite arm and leg extend without rotating the hips. Anti-rotation plus anti-extension.",
-          "Hips rotate on extension — reduce range, focus on keeping the back flat."),
-        ER("Side-Lying Leg Lift", "20 reps each side · 2-0-2 tempo", 5, "Hand on glute — squeeze?",
-          "Top leg driven from the HIP, not the knee. Fresh athlete — this is the PR target day.",
-          "Knee leads — half speed, hand on glute to feel the hip drive."),
-        E("Streamline Wall Hold", 30, 5, "Relax into shape — no gap at lower back.",
-          "Relax INTO the shape — do not muscle it. A lower-back gap means the hips sink at push-off.",
-          "Lower back arches — bend knees slightly until the back flattens."),
-        ER("Prone Y-T-W", "6 reps each letter · 2-1-2 tempo", 5, "Lead from shoulder blades.",
-          "Scapular work for streamline and catch. Face-down, lift the arms into Y, then T, then W. Slow and controlled.",
-          "Neck strains — lower the lift, lead from the blades."),
-        E("Cross-Body Shoulder Stretch", 90, 5, "Pull further each 10s.",
-          "Cross the arm at shoulder height, pull the elbow toward the chest. Tightness means a restricted freestyle recovery.",
-          "Shoulder elevates — lower the arm slightly.",
-          { eachSide: true, rounds: 1 })
-      ]}
+    title: "Light Stability + Shoulder",
+    subtitle: "AM pool only · fresh day",
+    badge: "FRI",
+    theme: "Light Stability + Shoulder",
+    mantra: "Sweat in training, no tears in competition.",
+    poolLoad: "am",
+    defaultLight: "green",
+    timeLo: 19, timeHi: 23,
+    equipment: ["Jump rope", "Resistance band", "Dowel", "Mat"],
+    blocks: {
+      warmup: [
+        X({ name: "Jump Rope", block: "warmup", driver: "time", work: 75, dose: "60–90s", cue: "Off the toes, quiet, tall." }),
+        X({ name: "Wall Slides", block: "warmup", driver: "reps", repsDetail: "8", dose: "8", cue: "Back on wall, ribs down — no arching." }),
+        X({ name: "Shoulder CARs", block: "warmup", driver: "reps", repsDetail: "3/dir each", dose: "3/dir each", cue: "Slow full circle, control the range." }),
+        X({ name: "World's Greatest Stretch", block: "warmup", driver: "reps", repsDetail: "4/side", dose: "4/side", cue: "Lunge, reach, rotate — whole body opens." }),
+        X({ name: "Short-Foot", block: "warmup", driver: "time", work: 20, dose: "20s", cue: "Spread toes, dome the arch." })
+      ],
+      coordination: [
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "C-Skip", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Paw the ground back under the hip." }),
+        X({ name: "Fast Leg", block: "coordination", driver: "time", work: 60, dose: "4/side", cue: "One sharp snap leg in a march." })
+      ],
+      main: [
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+            parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
+            cue: "Ribs down, low back glued to floor.",
+            parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
+            swimTransfer: "Body line + kick" }),
+        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", dose: "2–3 clean",
+            reset: "Shoulders sink first.", cue: "Shoulders sink first, THEN bend.",
+            parentWatch: "Kipping / swinging", fix: "One swing = set over.",
+            swimTransfer: "Catch with the lats" }),
+        X({ name: "Bird Dog", block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side",
+            reset: "Flat back.", cue: "Flat back, no hip rotation.",
+            parentWatch: "Hips rotate", fix: "Slow down, reduce reach.",
+            swimTransfer: "Posterior body line" }),
+        X({ name: "Hip Hinge", block: "main", driver: "reps", repsDetail: "8 · 2-1-2", dose: "8 · 2-1-2 (dowel)",
+            reset: "Hips load back.", cue: "Hips load back, dowel touches 3 points.",
+            parentWatch: "Rounding the back", fix: "Hinge from the hip, flat back.",
+            swimTransfer: "Hip drive for the start" }),
+        X({ name: "Single-Leg Balance Reach", block: "main", driver: "time", work: 40, eachSide: true, dose: "20s/side",
+            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe.",
+            parentWatch: "Knee caves inward", fix: "Reach shorter, slow down.",
+            swimTransfer: "Start / turn line" })
+      ],
+      finisher: FINISHER(),
+      swimskill: [
+        X({ name: "Streamline Shape Rehearsal", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+            cue: "Ribs down, long body, hands stacked.", swimTransfer: "Tighter streamline" }),
+        X({ name: "Catch-Position Hold", block: "swimskill", driver: "time", work: 30, dose: "2×15s",
+            cue: "High elbow, fingertips down.", swimTransfer: "Stronger catch" })
+      ]
+    },
+    prepMenu: [
+      X({ name: "Pallof Press", block: "main", driver: "reps", repsDetail: "10/side · 2s hold", dose: "10/side · 2s hold",
+          cue: "Resist the twist, hips square.",
+          parentWatch: "Body rotates on the press", fix: "Lower tension, hips square.",
+          swimTransfer: "Anti-rotation / less roll" }),
+      X({ name: "Side Plank Reach", block: "main", driver: "time", work: 40, eachSide: true, dose: "20s/side",
+          cue: "Hips lifted, reach under and back.",
+          parentWatch: "Hip drops", fix: "Lift the hip, shorten the reach.",
+          swimTransfer: "Anti-side-bend" })
     ]
   },
+
   saturday: {
-    title: "Combined",
-    subtitle: "Full Body: Power + Back + Core + Push",
-    badge: "COMBINED",
-    hrZone: "z3", hrText: "Zone 3–4 · 138–178 bpm — hardest session",
-    benchmark: "Highest load of the week — power maintained to Round 4.",
-    prTarget: "Pull-Up clean reps Round 1 + Bench Kick core seconds + Push-Up reps",
-    equipment: ["Plyo box", "Pull-up bar", "Fitness ball", "Bench"],
-    warmup: WARMUP,
-    circuits: [
-      { name: "Full-Body Circuit", rounds: 4, roundRest: ROUND_REST, exercises: [
-        ER("Box Jump / Lateral Bound", "up to 5 reps · alternate each round", 5, "Knees over toes.",
-          "Full intent every round. Fatigue is expected by round 4 — maintain form over height. Finish through the toes. Alternate box jump and lateral bound each round.",
-          "Uncontrolled landing — switch to a squat jump that round."),
-        ER("Stability Ball Freestyle Pull", "12 reps · 2-1-2 tempo", 5, "Shoulders first — then pull.",
-          "Belly on the ball. Lats are activated from the jumping — the highest drill quality is now. Press the shoulders DOWN before each stroke.",
-          "Arms before shoulders depress — cue shoulders first, stop and reset.",
-          { rounds: 3 }),
-        ER("Wide-Grip Pull-Up", "small sets of 2-3 clean reps · 4s lower", 5, "Clean reps only.",
-          "Pull-up day 2 of 2 — QUALITY-VOLUME focus. More total clean reps in small sets of 2 to 3, with a 4-second lower.",
-          "Swinging or shrugging — switch to a dead hang hold."),
-        E("Bench Flutter Kick", 30, 5, "Core locked full 30s — belly pressed.",
-          "Face-down, core braced. The core MUST hold the full 30 seconds. Hardest day, biggest core load. Holds here are holds in the water.",
-          "Belly releases at 15 to 20s — reduce work to 20s for one week.")
-      ]}
-    ]
-  },
-  sunday: { restDay: true, isEngagementPick: true }
-};
-
-/* ============================================================
-   V15 SESSION EXTENSIONS
-   ============================================================ */
-const AM_MICRO_ACTIVATION = {
-  title: "AM Micro-Activation",
-  subtitle: "Wake the body up, do not train it · fixed 4-5 min",
-  badge: "AM PRIME",
-  hrZone: "z2", hrText: "Gentle activation only",
-  benchmark: "No PR and no overload. Leave fresh for the pool.",
-  equipment: ["Mat", "Resistance band (optional)"],
-  warmup: null, noOverload: true, prTargets: [],
-  circuits: [
-    { name: "Before Departure Primer", rounds: 1, roundRest: 0, exercises: [
-      ER("Cat-Camel", "8 reps · slow cycles", 3, "Move slowly.", "Wake the spine after sleep.", "Keep the motion comfortable."),
-      ER("Standing Scap Squeeze", "10 reps · 2s hold", 3, "Shoulders down.", "Switch on the streamline stabilizers.", "No shrugging."),
-      ER("Glute Bridge", "10 reps · 1s squeeze", 3, "Squeeze at the top.", "Wake the posterior chain.", "Keep hips level."),
-      E("Standing Hollow Brace", 30, 3, "Stand tall and brace.", "Three calm 10-second holds.", "Do not hold your breath."),
-      ER("Leg Swings", "8 reps each direction", 3, "Controlled range.", "Open the hips before swimming.", "No forcing range."),
-      E("Easy March / Light Jog", 20, 3, "Easy pace.", "Finish gently warm.", "This is not conditioning.")
-    ]}
-  ]
-};
-
-const V15_MAIN_VARIANTS = {
-  monday: {
-    regular: {
-      title: "Core A · Version A", subtitle: "Regular (PM pool skipped)", badge: "MAIN A",
-      hrZone: "z2", hrText: "Zone 2-3 · quality over heart rate",
-      benchmark: "Full circuit plus ankle and jump add-on.", prTargets: [
-        { key: "v15_mon_hollow", label: "Hollow-Body Flutter - seconds held with flat back", type: "number", ph: "e.g. 30" }
+    title: "Athletic Day — Coordination + Power",
+    subtitle: "No pool · the week's main dryland day",
+    badge: "SAT",
+    theme: "Coordination + Power",
+    mantra: "I am STRONG. I am FAST. I can SWIM THIS.",
+    poolLoad: "none",
+    defaultLight: "green",
+    timeLo: 23, timeHi: 28,
+    equipment: ["Jump rope", "Pull-up bar", "Med ball / partner", "Mat"],
+    blocks: {
+      warmup: [
+        X({ name: "Jump Rope", block: "warmup", driver: "time", work: 75, dose: "60–90s", cue: "Off the toes, quiet, tall." }),
+        X({ name: "World's Greatest Stretch", block: "warmup", driver: "reps", repsDetail: "4/side", dose: "4/side", cue: "Lunge, reach, rotate — whole body opens." }),
+        X({ name: "Open-Book / T-Rotation", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Hips stacked, rotate from the spine." }),
+        X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Knees lead, sit tall." }),
+        X({ name: "Band Ankle 4-Way", block: "warmup", driver: "reps", repsDetail: "8/dir", dose: "8/dir", cue: "Slow, full range each direction." })
       ],
-      equipment: ["Jump rope", "Resistance band", "Mat"], warmup: V15_MAIN_PRIMERS.monday,
-      circuits: [{ name: "Anti-Rotation + Lat Activation", rounds: 3, roundRest: 25, exercises: [
-        E("Hollow-Body Flutter", 30, 5, "Press lower back down.", "Keep the lower back flat throughout.", "Back lifts - slow tempo and re-brace."),
-        ER("Dead Bug", "10 alternating reps", 5, "Exhale and flatten back.", "Extend with control.", "Reduce range if back lifts."),
-        ER("Band Row", "12 reps · 2-1-2 tempo", 5, "Blades back and down.", "Drive elbows back using lats.", "Shrugging - reset shoulder blades."),
-        ER("Single-Arm Band Row", "10 reps each side · 2-1-2 tempo", 5, "Torso still.", "Resist rotation on each pull.", "Reduce band tension if twisting."),
-        ER("Prone Y-T-W", "6 reps each letter · 2-1-2 tempo", 5, "Lift from blades.", "Build streamline stability.", "Reduce lift if neck strains.")
-      ]}]
-    },
-    twoaday: {
-      title: "Core A · Version B", subtitle: "Two-a-day activation (PM pool attending)", badge: "MAIN B",
-      hrZone: "z2", hrText: "Activation only · stay fresh for 7 PM pool",
-      benchmark: "No PR. This should feel like a primer, not a workout.", prTargets: [],
-      equipment: ["Jump rope", "Resistance band", "Mat"], warmup: V15_MAIN_PRIMERS.monday,
-      circuits: [{ name: "Lat + Scapular Activation", rounds: 2, roundRest: 25, exercises: [
-        ER("Band Row", "12 reps · 2-1-2 tempo", 5, "Blades back and down.", "Prime the evening swim.", "No shrugging."),
-        ER("Single-Arm Band Row", "10 reps each side · 2-1-2 tempo", 5, "Torso still.", "Prime anti-rotation feel.", "Reduce tension if twisting."),
-        ER("Prone Y-T-W", "6 reps each letter · 2-1-2 tempo", 5, "Lift from blades.", "Hold a flat body line.", "Reduce lift if neck strains.")
-      ]}]
-    }
-  },
-  tuesday: {
-    regular: {
-      title: "Core B · Version A", subtitle: "Regular (PM pool skipped)", badge: "MAIN A",
-      hrZone: "z2", hrText: "Zone 2-3 · quality over heart rate",
-      benchmark: "Full anti-rotation and hip-driven kick circuit.", prTargets: [
-        { key: "v15_tue_leglift", label: "Side-Lying Leg Lift - clean reps per side", type: "number", ph: "e.g. 20" }
+      coordination: [
+        X({ name: "C-Skip", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Paw the ground back under the hip." }),
+        X({ name: "Fast Leg", block: "coordination", driver: "time", work: 60, dose: "4/side", cue: "One sharp snap leg in a march." }),
+        X({ name: "Straight-Leg Bound", block: "coordination", driver: "time", work: 60, dose: "6 reps", cue: "Stiff-leg drive, active foot strike." }),
+        X({ name: "Wall Drive", block: "coordination", driver: "time", work: 60, dose: "6/side", cue: "Lean on wall, drive knee, hold line." }),
+        X({ name: "Falling Start → 3m", block: "coordination", driver: "time", work: 60, dose: "3 reps", cue: "Lean, fall, catch with 3 strides." }),
+        X({ name: "Lateral Shuffle", block: "coordination", driver: "time", work: 60, dose: "10m/side", cue: "Stay low, don't cross your feet." })
       ],
-      equipment: ["Light ball", "Resistance band", "Mat"], warmup: V15_MAIN_PRIMERS.tuesday,
-      circuits: [{ name: "Anti-Rotation + Hip Kick Pattern", rounds: 3, roundRest: 25, exercises: [
-        ER("Pallof Press", "10 reps each side · 2-1-2 tempo", 5, "Torso square.", "Resist rotation.", "Reduce band tension if twisting."),
-        E("Side Plank", 40, 5, "Hip high.", "Keep a long side line.", "Drop to knee if line breaks.", { eachSide: true }),
-        ER("Band Clamshell", "15 reps each side · 2-1-2 tempo", 5, "Hip still.", "Open only the knee.", "Hand on hip if it rotates."),
-        ER("Glute Bridge to March", "10 reps each side", 5, "Hips level.", "Keep the pelvis steady.", "Reduce range if hips tip."),
-        ER("Side-Lying Leg Lift", "20 reps each side", 5, "Drive from hip.", "Feel the glute on each rep.", "Slow down if knee leads.")
-      ]}]
+      main: [
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+            parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
+            cue: "Ribs down, low back glued to floor.",
+            parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
+            swimTransfer: "Body line + kick" }),
+        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", dose: "2–3 clean",
+            reset: "Shoulders sink first.", cue: "Shoulders sink first, THEN bend.",
+            parentWatch: "Kipping / swinging", fix: "One swing = set over.",
+            swimTransfer: "Catch with the lats" }),
+        X({ name: "Superman", block: "main", driver: "time", work: 30, dose: "3 × 8–10s hold",
+            reset: "Lift into streamline.", cue: "Lift arms+legs into streamline, hold.",
+            parentWatch: "Neck strains / fast pumping", fix: "Lower the lift, hold the shape.",
+            swimTransfer: "Dry-land streamline" }),
+        X({ name: "Glute Bridge March", block: "main", driver: "reps", repsDetail: "8–10/side", dose: "8–10/side", faultAnchor: true,
+            reset: "Drive from the hip.", cue: "Drive from the HIP, not the heel.",
+            parentWatch: "Pelvis tilts / drops", fix: "Slow down, level the pelvis.",
+            swimTransfer: "Hip = the motor" }),
+        X({ name: "Single-Leg Balance Reach", block: "main", driver: "time", work: 40, eachSide: true, dose: "20s/side",
+            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe.",
+            parentWatch: "Knee caves inward", fix: "Reach shorter, slow down.",
+            swimTransfer: "Start / turn line" }),
+        X({ name: "Drop-and-Stick", block: "main", driver: "reps", repsDetail: "5 · hold 3s", dose: "5 · hold 3s",
+            gate: "valgus", reset: "Land soft, knees over toes.",
+            cue: "Land soft, knees apart over toes, freeze.",
+            parentWatch: "Knees cave inward (valgus)", fix: "Stop, reset stance, slower.",
+            swimTransfer: "Turn / landing absorption" })
+      ],
+      finisher: FINISHER(),
+      swimskill: [
+        X({ name: "Streamline Shape Rehearsal", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+            cue: "Ribs down, long body, hands stacked.", swimTransfer: "Tighter streamline" }),
+        X({ name: "Prone Dolphin Kick", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+            cue: "Wave from the chest, not the knees.", swimTransfer: "Stroke patterning" }),
+        X({ name: "Catch-Position Hold", block: "swimskill", driver: "time", work: 30, dose: "2×15s",
+            cue: "High elbow, fingertips down.", swimTransfer: "Stronger catch" })
+      ]
     },
-    twoaday: {
-      title: "Core B · Version B", subtitle: "Two-a-day activation (PM pool attending)", badge: "MAIN B",
-      hrZone: "z2", hrText: "Activation only · stay fresh for 7 PM pool",
-      benchmark: "No PR. Stop while fresh.", prTargets: [],
-      equipment: ["Light ball", "Resistance band", "Mat"], warmup: V15_MAIN_PRIMERS.tuesday,
-      circuits: [{ name: "Anti-Rotation + Hip Activation", rounds: 2, roundRest: 25, exercises: [
-        ER("Pallof Press", "10 reps each side · 2-1-2 tempo", 5, "Torso square.", "Prime anti-rotation.", "Reduce band tension if twisting."),
-        ER("Band Clamshell", "15 reps each side · 2-1-2 tempo", 5, "Hip still.", "Prime hip control.", "Stop hip rolling.")
-      ]}]
-    }
-  }
-};
-
-PLAN.friday.prTargets = [
-  { key: "v15_fri_bench", label: "Bench Flutter Kick - seconds core held flat", type: "number", ph: "e.g. 30" },
-  { key: "v15_fri_leglift", label: "Side-Lying Leg Lift - clean reps per side", type: "number", ph: "e.g. 20" }
-];
-PLAN.wednesday.prTargets = [
-  { key: "v15_wed_box", label: "Box Jump - clean reps at full height", type: "number", ph: "e.g. 5" },
-  { key: "v15_wed_rope", label: "Lateral Bound - clean reps per side", type: "number", ph: "e.g. 5" }
-];
-PLAN.wednesday.warmup = V15_MAIN_PRIMERS.wednesday;
-PLAN.thursday.prTargets = [
-  { key: "v15_thu_pullup", label: "Pull-Up - clean reps Round 1", type: "number", ph: "e.g. 6" }
-];
-PLAN.thursday.warmup = V15_MAIN_PRIMERS.thursday;
-PLAN.friday.warmup = V15_MAIN_PRIMERS.friday;
-PLAN.saturday.prTargets = [
-  { key: "v15_sat_pullup", label: "Pull-Up - clean reps Round 1", type: "number", ph: "e.g. 6" },
-  { key: "v15_sat_bench", label: "Bench Kick - seconds core flat", type: "number", ph: "e.g. 30" },
-  { key: "v15_sat_pushup", label: "Push-Up - clean reps", type: "number", ph: "e.g. 10" }
-];
-PLAN.saturday.subtitle = "Full Body: Power + Back + Core + Push";
-PLAN.saturday.warmup = V15_MAIN_PRIMERS.saturday;
-PLAN.saturday.circuits[0].exercises.push(
-  ER("Incline Push-Up", "max clean reps · hands on box", 5, "Flat back, full range.", "Push-up day 2 of 2. Hands elevated on the box, lower with control, flat body line, no hip sag.", "Hips sag or form breaks - raise the hands higher.")
-);
-
-const EVENING_A = {
-  title: "Evening A", subtitle: "Freestyle + Backstroke rehearsal · pre-pool", badge: "EVENING A",
-  isCalmDay: true, noOverload: true, prTargets: [], equipment: ["Mat", "Bench", "Wall"], warmup: null,
-  circuits: [{ name: "Shape Rehearsal A", rounds: 2, roundRest: 20, exercises: [
-    E("Streamline Wall Hold", 20, 5, "Find the long line.", "Relax into a clean body line.", "Stop if shoulder position hurts."),
-    E("Floor Body-Line Hold", 20, 5, "Back flat.", "Feel the freestyle line.", "Reduce reach if arching."),
-    E("Slow Flutter-Kick Rehearsal", 20, 5, "Slow and clean.", "Keep the core quiet.", "Do not race."),
-    ER("Backstroke Arm Shape", "8 reps each side", 5, "Slow arm path.", "Rehearse the shape only.", "No force."),
-    E("Calm Breathing", 25, 5, "Five slow breaths.", "Finish calm.", "No rushing.")
-  ]}]
-};
-const EVENING_B = {
-  title: "Evening B", subtitle: "Butterfly + Breaststroke rehearsal · pre-pool", badge: "EVENING B",
-  isCalmDay: true, noOverload: true, prTargets: [], equipment: ["Mat", "Wall"], warmup: null,
-  circuits: [{ name: "Shape Rehearsal B", rounds: 2, roundRest: 20, exercises: [
-    E("Streamline Wall Hold", 20, 5, "Find the long line.", "Relax into a clean body line.", "Stop if shoulder position hurts."),
-    ER("Dolphin Body-Wave Rehearsal", "8 reps", 5, "Slow wave.", "Rehearse shape, not force.", "Do not rush."),
-    ER("Breaststroke Kick Shape", "8 reps", 5, "Slow and controlled.", "Practice shape only.", "Do not snap hard."),
-    E("Catch-Position Hold", 15, 5, "Both arms set.", "Hold the catch shape.", "Keep shoulders comfortable."),
-    E("Calm Breathing", 25, 5, "Five slow breaths.", "Finish calm.", "No rushing.")
-  ]}]
-};
-const EVENING_CUT = {
-  title: "Evening Cut", subtitle: "Fatigue version · streamline and breathing only", badge: "EVENING CUT",
-  isCalmDay: true, noOverload: true, prTargets: [], equipment: ["Mat"], warmup: null,
-  circuits: [{ name: "Recovery Rehearsal", rounds: 2, roundRest: 20, exercises: [
-    E("Streamline Hold", 20, 5, "Easy shape.", "Keep this restorative.", "Stop if uncomfortable."),
-    E("Calm Breathing", 25, 5, "Five slow breaths.", "Finish rested.", "No rushing.")
-  ]}]
-};
-const EVENING_FLEX = { monday: EVENING_A, tuesday: EVENING_B, wednesday: EVENING_A, thursday: EVENING_B, friday: EVENING_A };
-
-/* ============================================================
-   MONDAY / TUESDAY LEG ADD-ON  (conditional — PM pool skipped)
-   The 500-Kick rotation is a pool block, done by-reps (3 segments).
-   ============================================================ */
-const KICK_500 = {
-  name: "500-Kick Rotation",
-  segments: [
-    { label: "250 Flutter — freestyle position",
-      detail: "Face-down, arms extended on kickboard. Small fast kick from the hip, not the knee. Lower back flat against the board." },
-    { label: "150 Back Flutter — backstroke position",
-      detail: "Face-up, kickboard on thighs, hips pushed up toward the surface. Contrast position — forces the anti-deep-V body line." },
-    { label: "100 Dolphin — streamline",
-      detail: "Arms streamlined overhead, face-down. Full core lock — no hip sag possible here. Highest demand segment." }
-  ]
-};
-
-const ADDON = {
-  monday: {
-    title: "Monday Leg Add-On",
-    subtitle: "Kick Endurance — run only if PM pool skipped",
-    circuits: [
-      { name: "Dryland Kick Endurance", rounds: 3, roundRest: ROUND_REST, exercises: [
-        ER("Side-Lying Hip-Drive Kick", "20 reps each side · controlled", 5, "Hand on glute — feel the squeeze.",
-          "Top leg driven from the HIP, not the knee. Hand on glute should feel a clear squeeze each rep.",
-          "Knee leads — slow to half speed, hand on glute to feel the hip drive."),
-        E("Prone Streamline Flutter Hold", 30, 5, "Belly still down? Quality over speed.",
-          "The belly must NOT lift — quality over speed. This is the push-off breakout position with active legs.",
-          "Belly lifts off floor — reduce kick tempo immediately."),
-        E("Squat Jump (light)", 20, 5, "Quiet landing — imagine the wall.",
-          "70% effort preserves the nervous system for tomorrow. Quiet landing. Imagine the pool wall every rep.",
-          "Heavy landing — reduce jump height, soft landing is the goal.")
-      ]}
+    prepMenu: [
+      X({ name: "Partner Ball Toss", block: "main", driver: "reps", repsDetail: "2×8", dose: "2×8",
+          cue: "Throw from the hips and core, not just arms.",
+          parentWatch: "All arms, no hip", fix: "Load the hip, then throw.",
+          swimTransfer: "Rotation production" }),
+      X({ name: "Half-Kneeling Chop/Lift", block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side",
+          cue: "Rotate through the hip, controlled.",
+          parentWatch: "Twisting from the low back", fix: "Rotate through the hip, slow.",
+          swimTransfer: "Cleaner stroke roll" })
     ]
   },
-  tuesday: {
-    title: "Tuesday Leg Add-On",
-    subtitle: "Hip + Posterior Chain — run only if PM pool skipped",
-    circuits: [
-      { name: "Dryland Hip + Posterior Chain", rounds: 3, roundRest: ROUND_REST, exercises: [
-        ER("Single-Leg Glute Bridge", "12 reps each side · 2s hold at top", 5, "Hips level — both sides same height.",
-          "Drive one heel into the floor, lift the hips, squeeze the glute at the top for 2 full seconds. Hip asymmetry here is kick asymmetry in the pool.",
-          "Pelvis tilts to the lifted-leg side — reduce reps, focus on a level pelvis."),
-        ER("Band Crab Walk", "20 steps each direction · band above knees", 5, "Stay low — band taut the whole time.",
-          "Stay low throughout — band taut every step. Band slack means the hip abductors switch off and the kick goes unstable.",
-          "Standing upright or band slack — re-squat low before continuing."),
-        ER("Calf Raise", "15 reps · 2s up / 1s hold / 2s down · full range", 5, "Heel fully below step — full range.",
-          "Full range — heel fully below the platform every rep. Half range means the ankle is not loaded and there is reduced push-off.",
-          "Half range only — stop, reset, heel fully below the step.")
-      ]}
-    ]
-  }
-};
-const ANKLE_JUMP_ADDON = {
-  monday: [
-    E("Pogo Jumps", 20, 5, "Stay tall, stiff spring.", "Bounce quickly from the ankle.", "If knees bend deeply, make it smaller."),
-    E("Line Hops - Forward/Back", 20, 5, "Pop off toes.", "Land quietly on the balls of the feet.", "Slow down if landing flat."),
-    ER("Drop-and-Stick Landing", "6 reps · hold 2-3s", 5, "Knees over toes.", "Land soft and freeze.", "Reset if knees cave inward."),
-    E("Single-Leg Balance", 40, 5, "Quiet foot.", "Grip gently through the toes.", "Use light support if wobbling.", { eachSide: true, rounds: 2 }),
-    ER("Band Ankle 4-Way", "8 reps each direction", 5, "Slow full range.", "Control every direction.", "Do not rush.", { rounds: 2 }),
-    E("Short-Foot Exercise", 20, 5, "Wake up the arch.", "Spread toes and dome the arch.", "Ease off if cramping.", { rounds: 2 })
-  ],
-  tuesday: [
-    E("Lateral Line Hops", 20, 5, "Pop off toes.", "Lateral and quiet contacts.", "Slow down if landing flat."),
-    E("Single-Leg Balance", 40, 5, "Quiet foot.", "Build ankle control.", "Use light support if wobbling.", { eachSide: true, rounds: 2 }),
-    E("Pogo Jumps", 20, 5, "Stay tall.", "Bounce quickly from the ankle.", "Keep it small."),
-    ER("Drop-and-Stick Landing", "6 reps · hold 2-3s", 5, "Knees over toes.", "Land soft and freeze.", "Reset if knees cave inward."),
-    ER("Band Ankle 4-Way", "8 reps each direction", 5, "Slow full range.", "Control every direction.", "Do not rush.", { rounds: 2 }),
-    E("Short-Foot Exercise", 20, 5, "Wake up the arch.", "Spread toes and dome the arch.", "Ease off if cramping.", { rounds: 2 })
-  ]
-};
-Object.keys(ANKLE_JUMP_ADDON).forEach(day => {
-  ADDON[day].title = `${day[0].toUpperCase() + day.slice(1)} Add-On`;
-  ADDON[day].subtitle = "Ankle + Jump Mechanics - Version A only";
-  ADDON[day].circuits = [{ name: "Ankle + Jump Mechanics", rounds: 3, roundRest: 25, exercises: ANKLE_JUMP_ADDON[day] }];
-});
 
-/* ============================================================
-   ENGAGEMENT SYSTEMS  (chosen Sunday, run all week)
-   ============================================================ */
-const ENGAGEMENT_SYSTEMS = {
-  peer: {
-    label: "Peer Challenge vs Parent",
-    desc: "Same timer, different metric. Reveal after both are done."
-  },
-  roleflip: {
-    label: "Role Flip",
-    desc: "Jess demos one exercise and gives the parent ONE coaching cue before the set."
+  sunday: {
+    title: "Spa Sunday — Recovery Only",
+    subtitle: "No main, no finisher · recovery is scheduled, not optional",
+    badge: "SUN",
+    theme: "Recovery",
+    mantra: "Rest IS training.",
+    poolLoad: "none",
+    defaultLight: "recovery",
+    timeLo: 10, timeHi: 12,
+    spa: true,
+    equipment: ["Foam roller", "Massage gun (parent-operated)", "Mat"],
+    safety: "Roller slow (2–3 cm/sec), pause 20s on tender spots. NEVER roll the lower-back spine or neck. Massage gun is PARENT-OPERATED only, lowest speed, big muscles only — never on bones, joints, spine, neck, or growth plates.",
+    recovery: [
+      { name: "Calves — foam roller", dose: "60s/side", why: "Kick + rope volume lands here." },
+      { name: "Quads — roller or gun", dose: "60s/side", why: "Jump days (Wed/Sat)." },
+      { name: "Lats / upper back — roller, arms overhead", dose: "60s", why: "Pull work + overhead range." },
+      { name: "Glutes — foam roller", dose: "45s/side", why: "Bridge + landing absorption." },
+      { name: "Touch-up — massage gun (parent)", dose: "30–45s/muscle", why: "Lowest speed, comfort not pain." },
+      { name: "Wind-down — Crocodile / 90-90 breathing", dose: "2 min", why: "Closes the week down-regulated." }
+    ],
+    recoveryHolds: [
+      X({ name: "Light Streamline Hold", block: "swimskill", driver: "time", work: 20, dose: "2×20s", cue: "Easy, long, relaxed." }),
+      X({ name: "Easy Single-Leg Balance", block: "swimskill", driver: "time", work: 40, eachSide: true, dose: "20s/side", cue: "Gentle, quiet foot." })
+    ],
+    blocks: { warmup: [], coordination: [], main: [], finisher: [], swimskill: [] },
+    prepMenu: []
   }
 };
+
+const STANDING_RULES = [
+  "No-Debt / Stop: a missed day is never doubled. Quality over quantity.",
+  "Jump rope: single / no-pool days only — never double-pool days.",
+  "Valgus gate: all jumps stay at Drop-and-Stick until 5/5 clean landings ×2 weeks.",
+  "Parent Echo: hum/count out loud on anti-extension holds. Can't hear it = the rep doesn't count.",
+  "Coordination / sprint always FRESH — first after warm-up, never to fatigue."
+];
+
+const ENGAGEMENT_SYSTEMS = {};
 
 const DAY_KEYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -1982,22 +2143,16 @@ function edmontonDayKey() {
 }
 
 function sessionOptionsForDay(day) {
-  if (day === "sunday") return [{ key: "rest", icon: "REST", label: "Engagement" }];
-  if (day === "saturday") return [{ key: "main", icon: "MAIN", label: "Land Training" }];
-  const options = [];
-  if (day === "monday" || day === "tuesday" || day === "friday") {
-    options.push({ key: "activation", icon: "AM", label: "Activation" });
-  }
-  options.push({ key: "main", icon: "MAIN", label: "Land Training" });
-  if (EVENING_FLEX[day]) options.push({ key: "evening", icon: "PM", label: "Rehearsal" });
-  return options;
+  if (day === "sunday") return [{ key: "rest", icon: "SPA", label: "Recovery" }];
+  return [{ key: "main", icon: "MAIN", label: "Land Training" }];
 }
 
 function sessionLabel(entry) {
-  if (entry.sessionType === "activation") return "Activation";
-  if (entry.sessionType === "main") return entry.mainVariant === "regular" ? "Main A" : entry.mainVariant === "two-a-day" ? "Main B" : "Main";
-  if (entry.sessionType === "evening") return entry.eveningBlock ? `Evening ${entry.eveningBlock === "cut" ? "Cut" : entry.eveningBlock}` : "Evening";
-  return entry.session === "evening" ? "Legacy PM" : "Legacy Main";
+  if (entry.sessionType === "spa" || entry.session === "spa") return "Spa";
+  if (entry.sessionType === "main" && entry.lightResult) {
+    return "Land Training · " + entry.lightResult.toUpperCase();
+  }
+  return entry.session === "evening" ? "Legacy PM" : "Land Training";
 }
 
 function renderModalSessionOptions(day) {
@@ -2032,14 +2187,13 @@ function initModal() {
     btn.textContent = DAY_SHORT[idx];
     
     if (key === today) btn.classList.add("today");
-    if (PLAN[key].restDay) btn.classList.add("rest");
-    
+    if (DAYS[key].spa) btn.classList.add("rest");
+
     btn.onclick = () => {
       document.querySelectorAll(".modal-day-btn").forEach(b => b.classList.remove("selected"));
       btn.classList.add("selected");
       selectedDay = key;
-      selectedMainVariant = null;
-      selectedEveningCut = false;
+      selectedSession = key === "sunday" ? "rest" : "main";
       sessionPicker.classList.add("show");
       renderModalSessionOptions(key);
       confirmBtn.disabled = false;
@@ -2465,12 +2619,8 @@ function pickSession(which) {
   if (chosen) chosen.classList.add("selected");
   const msgEl = document.getElementById("modal-msg");
   const data = getActiveData();
-  if (which === "evening") {
-    msgEl.textContent = `${data.title} - choose the fatigue cut on the next screen if needed.`;
-  } else if (which === "activation") {
-    msgEl.textContent = "AM Micro-Activation - fixed primer before leaving for the pool.";
-  } else if (which === "rest") {
-    msgEl.textContent = "Sunday — weekly engagement pick & rest.";
+  if (which === "rest") {
+    msgEl.textContent = "Spa Sunday — recovery only.";
   } else {
     msgEl.textContent = `${data.title} — ${data.subtitle}`;
   }
@@ -2495,34 +2645,28 @@ async function closeModal() {
   renderTabs();
   renderSchedule();
   renderCard();
-  
-  if (selectedSession === "evening") {
-    await speakAndWait("Evening rehearsal. Keep it easy and focus on clean shapes.");
+
+  const data = getActiveData();
+
+  if (data.spa) {
+    await speakAndWait("It is Spa Sunday. Recovery only — slow and gentle.");
     introPlaying = false;
     refreshReadyButton();
     return;
   }
 
-  const data = getActiveData();
-  
-  if (selectedSession === "rest") {
-    await speakAndWait("It is recovery day. Make next week's pick, then rest well.");
-    introPlaying = false;
-    return;
-  }
-  
   // Weather greeting
   const w = session.weather;
-  const weatherMsg = `Red Deer is ${w.temp} degrees and ${w.desc}.`;
-  await speakAndWait(`Hi Jess. ${weatherMsg} Ready for ${data.title}.`);
+  const weatherMsg = w ? `Red Deer is ${w.temp} degrees and ${w.desc}. ` : "";
+  await speakAndWait(`Hi Jess. ${weatherMsg}Ready for ${data.title}.`);
   if (closeModalAborted) return;
-  
+
   // Equipment
   const eqMsg = `Set up: ${data.equipment.join(", ")}.`;
   await speakAndWait(eqMsg);
   if (closeModalAborted) return;
-  
-  await speakAndWait("Review the session card, then tap ready when your space is clear.");
+
+  await speakAndWait("Review the session card, then tap ready and answer your readiness check.");
   introPlaying = false;
   refreshReadyButton();
 }
@@ -2596,16 +2740,14 @@ function renderTabs() {
     tab.className = "day-tab";
     if (key === today) tab.classList.add("today");
     if (key === selectedDay) tab.classList.add("active");
-    if (PLAN[key].restDay) tab.classList.add("rest");
+    if (DAYS[key].spa) tab.classList.add("rest");
     tab.textContent = DAY_SHORT[idx];
     tab.onclick = () => {
       if (session.running) return;
       selectedDay = key;
-      if (!sessionOptionsForDay(key).some(opt => opt.key === selectedSession)) {
-        selectedSession = key === "sunday" ? "rest" : "main";
-      }
-      if (ADDON_DAYS.has(key)) selectedMainVariant = null;
-      selectedEveningCut = false;
+      selectedSession = key === "sunday" ? "rest" : "main";
+      selectedLight = null;
+      resumeSkipBlocks = [];
       renderTabs();
       renderCard();
     };
@@ -2622,374 +2764,378 @@ function renderSchedule() {
     const idx = DAY_KEYS.indexOf(key);
     const cell = document.createElement("div");
     cell.className = "sch-cell" + (key === today ? " today" : "");
-    const data = PLAN[key];
-    const name = data.restDay ? "Rest" : data.badge;
+    const data = DAYS[key];
+    const name = data.spa ? "Spa" : data.badge;
     cell.innerHTML = `<div class="day">${DAY_SHORT[idx]}</div><div class="name">${name}</div>`;
     grid.appendChild(cell);
   });
 }
 
-function getActiveData() {
-  if (selectedSession === "activation") return AM_MICRO_ACTIVATION;
-  if (selectedSession === "evening") return selectedEveningCut ? EVENING_CUT : EVENING_FLEX[selectedDay];
-  if (selectedSession === "main" && V15_MAIN_VARIANTS[selectedDay]) {
-    // Mon/Tue: until the user picks a variant, fall back to "twoaday" for the
-    // brief outline only — the READY button stays gated until they choose.
-    const variant = selectedMainVariant || "twoaday";
-    return V15_MAIN_VARIANTS[selectedDay][variant];
+/* ============================================================
+   2026.2 — block assembly, readiness, day card
+   ============================================================ */
+
+const BLOCK_ORDER = ["warmup", "coordination", "main", "finisher", "swimskill"];
+const BLOCK_LABEL = {
+  warmup: "Warm-up", coordination: "Coordination", main: "Main Circuit",
+  prep: "Prep Pair", finisher: "Finisher", swimskill: "Swim-Skill"
+};
+
+// Persistence keys + tiny JSON helpers (2026.2 records)
+const LS_READINESS   = "swim_readiness";
+const LS_DAYPROG     = "swim_day_progress";
+const LS_LEARNING    = "swim_learning_records";
+const LS_LADDER      = "swim_ladder_rungs";
+const LS_QUIZ        = "swim_quiz_v1";
+const LS_GATE        = "swim_gate_state";
+const LS_ROLLOUT     = "swim_rollout";
+function loadJSON(key, fallback) {
+  try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? fallback : v; }
+  catch { return fallback; }
+}
+function saveJSON(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+
+let selectedLight = null;     // chosen by the readiness checklist
+let resumeSkipBlocks = [];    // block keys already completed earlier today
+let lastReadiness = null;     // {answers:[8], light, date}
+
+function effectiveLight() {
+  const day = DAYS[selectedDay];
+  return selectedLight || (day ? day.defaultLight : "green");
+}
+function mainRounds() {
+  const r = LIGHT_ROUNDS[effectiveLight()];
+  return r && r > 0 ? r : 1;
+}
+
+/* Standing rule: jump rope hidden on double-pool days. */
+function visibleBlockExercises(day, blockKey) {
+  let list = (day.blocks[blockKey] || []).slice();
+  if (blockKey === "warmup" && day.poolLoad === "double") {
+    list = list.filter(ex => !/jump rope/i.test(ex.name));
   }
-  return PLAN[selectedDay];
+  return list;
+}
+
+/* Build circuits the runner consumes from the block model. Main gets the
+   light-driven round count; everything else is a single pass. prepMenu
+   becomes its own no-rounds circuit right after main. */
+function assembleDay(day, opts = {}) {
+  const rounds = opts.rounds || mainRounds();
+  const skip = opts.skip || [];
+  const circuits = [];
+  BLOCK_ORDER.forEach(bk => {
+    if (skip.includes(bk)) return;
+    const exs = visibleBlockExercises(day, bk);
+    if (!exs.length) return;
+    circuits.push({ name: BLOCK_LABEL[bk], block: bk,
+      rounds: bk === "main" ? rounds : 1, roundRest: ROUND_REST, exercises: exs });
+    if (bk === "main" && day.prepMenu && day.prepMenu.length && !skip.includes("prep")) {
+      circuits.push({ name: BLOCK_LABEL.prep, block: "prep", rounds: 1,
+        roundRest: ROUND_REST, exercises: day.prepMenu });
+    }
+  });
+  return circuits;
+}
+
+function getActiveData() {
+  const day = DAYS[selectedDay];
+  if (!day) return { badge: "", title: "", subtitle: "", equipment: [], circuits: [], warmup: null, noOverload: true };
+  let circuits;
+  if (day.spa) {
+    circuits = [{ name: "Recovery Holds", block: "swimskill", rounds: 1,
+      roundRest: ROUND_REST, exercises: day.recoveryHolds || [] }];
+  } else {
+    circuits = assembleDay(day, { skip: resumeSkipBlocks });
+  }
+  return {
+    badge: day.badge, title: day.title, subtitle: day.subtitle,
+    equipment: day.equipment || [], warmup: null, noOverload: true,
+    spa: !!day.spa, poolLoad: day.poolLoad, mantra: day.mantra,
+    circuits
+  };
+}
+
+/* ---- day-progress (same-day resume) ---- */
+function todayISODate() { return new Date().toISOString().slice(0, 10); }
+function dayProgressKey() { return `${selectedDay}|${todayISODate()}`; }
+function loadDayProgress() {
+  const all = loadJSON(LS_DAYPROG, {});
+  return all[dayProgressKey()] || null;
+}
+function saveDayProgress(p) {
+  const all = loadJSON(LS_DAYPROG, {});
+  // prune stale dates (No-Debt: partials never carry to another day)
+  const today = todayISODate();
+  Object.keys(all).forEach(k => { if (!k.endsWith("|" + today)) delete all[k]; });
+  all[dayProgressKey()] = p;
+  saveJSON(LS_DAYPROG, all);
+}
+function clearDayProgress() {
+  const all = loadJSON(LS_DAYPROG, {});
+  delete all[dayProgressKey()];
+  saveJSON(LS_DAYPROG, all);
+}
+
+/* ---- exercise display helpers ---- */
+function exMeta(ex) {
+  if (ex.driver === "reps" || ex.byReps) return `🔢 ${ex.dose || ex.repsDetail || "reps"}`;
+  const w = ex.work || 0;
+  return `⏱ ${ex.dose || (ex.eachSide ? Math.floor(w / 2) + "s/side" : w + "s")}`;
+}
+function exBadges(ex, locked) {
+  const b = [];
+  if (ex.gate === "valgus") b.push(`<span class="ex-badge gate">${locked ? "🔒" : "🔓"} valgus</span>`);
+  if (ex.parentEcho) b.push(`<span class="ex-badge echo">🗣 echo</span>`);
+  if (ex.faultAnchor) b.push(`<span class="ex-badge anchor">⚓ anchor</span>`);
+  return b.length ? ` ${b.join(" ")}` : "";
 }
 
 function renderCard() {
-  const data = getActiveData();
   document.getElementById("main-card").classList.remove("session-active");
-
-  if (selectedSession === "evening") {
-    if (!data) {
-      // Saturday — no evening session
-      document.getElementById("main-card").innerHTML = `
-        <div class="rest-day">
-          <div class="emoji">🧘</div>
-          <h2>No Evening Session</h2>
-          <p>Saturday's Deep Stretch already covers flexibility. Enjoy your evening!</p>
-        </div>`;
-      return;
-    }
-    renderEveningBrief(data);
-    return;
-  }
-
-  if (selectedSession === "rest" || data.restDay) {
-    if (data.isEngagementPick) { renderEngagementPick(); return; }
-    document.getElementById("main-card").innerHTML = `
-      <div class="rest-day">
-        <div class="emoji">☀️</div>
-        <h2>Sunday Rest</h2>
-        <p>Recovery IS the training.</p>
-      </div>`;
-    return;
-  }
-  renderBrief(data);
+  const day = DAYS[selectedDay];
+  if (!day) return;
+  if (day.spa) { renderSpaBrief(day); return; }
+  renderBrief(getActiveData());
 }
 
-/* Sunday — pick ONE engagement system for the coming week, or run today's
-   challenge if a system is already active. Once picked, the picker is done
-   for the rest of this Sunday. */
-function renderEngagementPick() {
-  const card = document.getElementById("main-card");
-  card.classList.remove("session-active");
-
-  const comingWeekKey = (() => {
-    const mon = new Date(); mon.setDate(mon.getDate() + 1);
-    return weekKeyFor(mon);
-  })();
-  const all = loadEngagement();
-  const alreadyPicked = all[comingWeekKey];
-  const thisWeekSystem = activeEngagement();   // system chosen LAST Sunday, in effect now
-
-  const sys = thisWeekSystem ? ENGAGEMENT_SYSTEMS[thisWeekSystem] : null;
-  const activeHtml = sys ? `
-    <div class="brief-section" style="background: var(--bg2); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem;">
-      <strong>🗓️ Active this week: ${sys.label}</strong>
-      <div class="caveat-note" style="margin:0.2rem 0 0;">${sys.desc}</div>
-    </div>` : "";
-
-  const pickedHtml = alreadyPicked ? `
-    <div class="brief-section">
-      <strong>✓ Picked for next week: ${ENGAGEMENT_SYSTEMS[alreadyPicked].label}</strong>
-      <div class="caveat-note" style="margin:0.2rem 0 0;">All set — see you Monday.</div>
-    </div>` : `
-    <div class="brief-section">
-      <strong>📅 Pick ONE system for next week</strong>
-      <div class="caveat-note" style="margin:0.2rem 0 0.5rem;">Choose the one you'll run all week. You can change it next Sunday.</div>
-      <div class="engage-options" id="engage-options">
-        <button class="engage-opt" data-sys="peer">
-          🏆 Peer Challenge<br><small>Same timer vs parent, different metric</small>
-        </button>
-        <button class="engage-opt" data-sys="roleflip">
-          🔄 Role Flip<br><small>You demo + coach the parent</small>
-        </button>
-      </div>
-    </div>`;
-
-  card.innerHTML = `
-    <div class="day-header">
-      <span class="day-badge">REST</span>
-      <h2 class="day-title">Sunday</h2>
-      <div class="day-subtitle">Full Rest + Weekly Engagement Pick</div>
-    </div>
-    <div class="mantra">"${DAY_MANTRA.sunday}"</div>
-    <div class="brief">
-      ${activeHtml}
-      ${pickedHtml}
-      <div class="brief-section">
-        <strong>✓ Today: rest well</strong>
-        <ul>
-          <li>Light recreational swimming — no laps, no drills</li>
-          <li>Free play, walking, casual bike ride</li>
-          <li>Extra sleep — the most powerful recovery tool</li>
-          <li>Eat well — protein and carbs</li>
-        </ul>
-      </div>
-    </div>
-    <div class="caveat-note" style="text-align:center;">
-      Recovery is today's work. No required evening rehearsal.
-    </div>`;
-
-  if (!alreadyPicked) {
-    card.querySelectorAll(".engage-opt").forEach(btn => {
-      btn.onclick = () => {
-        setEngagementPick(btn.dataset.sys);
-        renderEngagementPick();   // re-render into the "picked" state
-      };
-    });
-  }
-}
-
-function renderEveningBrief(data) {
-  const exHtml = data.circuits[0].exercises.map(ex => {
-    const meta = briefRepsMeta(ex);
-    return `<li class="ex-line"><span>${ex.name}</span><span class="ex-meta">${meta}</span></li>`;
-  }).join("");
-
-  const est = fmtEstimate(estimateSessionSecs(data, false));
-
+function renderSpaBrief(day) {
+  const rollHtml = day.recovery.map(r =>
+    `<li class="ex-line"><span>${r.name}</span><span class="ex-meta">${r.dose}</span></li>`).join("");
   document.getElementById("main-card").innerHTML = `
     <div class="day-header">
-      <span class="day-badge evening-badge">${data.badge}</span>
-      <h2 class="day-title">${data.title}</h2>
-      <div class="day-subtitle">${data.subtitle} · ${est}</div>
+      <span class="day-badge">${day.badge}</span>
+      <h2 class="day-title">${day.title}</h2>
+      <div class="day-subtitle">${day.subtitle}</div>
     </div>
-    <div class="mantra" style="font-size: 1.1rem; color: var(--evening-deep);">
-      Shape practice — not conditioning.<br>
-      Keep it easy before the pool session.
-    </div>
+    <div class="mantra">"${day.mantra}"</div>
     <div class="brief">
-      <div class="brief-section">
-        <strong>${data.title} — ${data.circuits[0].rounds} rounds</strong>
-        <ul>${exHtml}</ul>
+      <div class="brief-section safety">
+        <strong>⚠️ Safety</strong>
+        <div class="caveat-note" style="margin:0.2rem 0 0;">${day.safety}</div>
       </div>
-      <div class="readiness" id="evening-cut-gate">
-        <strong>Energy check</strong>
-        <div class="caveat-note">Tired, rushed, or hungry? Choose the short recovery version.</div>
-        <div class="readiness-buttons">
-          <button data-cut="no" class="${selectedEveningCut ? "" : "selected"}">Full block</button>
-          <button data-cut="yes" class="${selectedEveningCut ? "selected" : ""}">Fatigue cut</button>
-        </div>
+      <div class="brief-section">
+        <strong>🧊 Recovery menu</strong> · ~${day.timeLo}–${day.timeHi} min
+        <ul>${rollHtml}</ul>
+      </div>
+      <div class="brief-section">
+        <strong>🌬️ Breathing</strong>
+        <div class="caveat-note" style="margin:0.2rem 0 0;">3-count nasal breathing — in through the nose 3, out through the mouth 3.</div>
       </div>
     </div>
+    <div class="caveat-note" style="text-align:center;">No main, no finisher. Recovery is scheduled, not optional.</div>
     <div class="btn-row">
-      <button class="btn btn-primary" id="btn-ready" style="background: var(--evening); color: white;" ${introPlaying ? "disabled" : ""}>
-        ${introPlaying ? "INTRO PLAYING..." : "START REHEARSAL"}
-      </button>
+      <button class="btn btn-primary" id="btn-ready" ${introPlaying ? "disabled" : ""}>
+        ${introPlaying ? "INTRO PLAYING..." : "START RECOVERY"}</button>
     </div>`;
-
-  document.querySelectorAll("#evening-cut-gate button").forEach(btn => {
-    btn.onclick = () => {
-      selectedEveningCut = btn.dataset.cut === "yes";
-      renderEveningBrief(getActiveData());
-    };
-  });
   document.getElementById("btn-ready").onclick = async () => {
     if (introPlaying) return;
-    closeModalAborted = true;
-    skipGreetingOnStart = true;
+    selectedLight = "recovery";
+    closeModalAborted = true; skipGreetingOnStart = true;
     await startSession();
   };
 }
 
-function briefRepsMeta(ex) {
-  // For cadence exercises, just show "by reps" — strip the timing detail from screen
-  if (ex.byReps) return "by reps";
-  const w = exWork(ex);
-  return ex.eachSide ? `${Math.floor(w/2)}s × 2 sides` : `${w}s`;
-}
-
 function renderBrief(data) {
-  const dayKey = selectedDay;
-  const isWarmupChoice = WARMUP_CHOICE_DAYS.has(dayKey) && !!data.warmup;
-  const isVariantDay = selectedSession === "main" && ADDON_DAYS.has(dayKey);
+  const day = DAYS[selectedDay];
+  const locked = gateLocked();
 
   const circuitsHtml = data.circuits.map(c => {
     const exHtml = c.exercises.map(ex => {
-      const meta = briefRepsMeta(ex);
-      const rd = ex.rounds && ex.rounds < c.rounds ? ` <span class="ex-meta">(${ex.rounds} rds)</span>` : "";
-      return `<li class="ex-line"><span>${ex.name}${howToHtml(ex.name)}${rd}</span><span class="ex-meta">${meta}</span></li>`;
+      const gated = ex.gate === "valgus" && locked;
+      return `<li class="ex-line ${gated ? "gated" : ""}">
+        <span>${ex.name}${howToHtml(ex.name)}${exBadges(ex, locked)}</span>
+        <span class="ex-meta">${exMeta(ex)}</span></li>`;
     }).join("");
-    return `
-      <div class="brief-section">
-        <strong>${c.name}</strong> · ${c.rounds} round${c.rounds > 1 ? "s" : ""}
-        <ul>${exHtml}</ul>
-      </div>`;
+    const roundTag = c.block === "main" ? ` · ${c.rounds} round${c.rounds > 1 ? "s" : ""}` : " · no rounds";
+    return `<div class="brief-section"><strong>${c.name}</strong>${roundTag}<ul>${exHtml}</ul></div>`;
   }).join("");
 
-  const eqHtml = `
-    <div class="brief-section">
-      <strong>📦 Equipment to set up</strong>
-      <ul>${data.equipment.map(e => `<li>${e}</li>`).join("")}</ul>
-    </div>`;
+  const eqHtml = `<div class="brief-section"><strong>📦 Equipment</strong>
+    <ul>${data.equipment.map(e => `<li>${e}</li>`).join("")}</ul></div>`;
 
-  const wk = overloadWeek();
-  const est = fmtEstimate(estimateSessionSecs(data, !!data.warmup));
-  const hz = HR_ZONES[data.hrZone] || HR_ZONES.z2;
+  const poolText = { none: "No pool", am: "AM pool", pm: "PM pool", double: "Double pool" }[day.poolLoad] || "";
+  const ropeNote = day.poolLoad === "double"
+    ? `<div class="caveat-note" style="margin:0.2rem 0 0;">🚫 No jump rope today — double-pool day (ankles already loaded).</div>` : "";
 
-  // HR zone chip + Apple Watch reminder
-  const hrHtml = `
-    <div class="brief-section hr-block" style="border-left: 5px solid ${hz.color};">
-      <strong>⌚ Heart Rate — ${data.hrText}</strong>
+  const rulesHtml = `<div class="brief-section">
+      <strong>📌 Standing rules</strong>
       <div class="caveat-note" style="margin:0.2rem 0 0;">
-        Wear your Apple Watch — check your heart rate on the watch face.
-        Target zone: ${hz.label} (${hz.bpm}).
-      </div>
-    </div>`;
+        No-Debt: a missed day is never doubled — quality over quantity.<br>
+        ${locked ? "🔒 Jumps locked to Drop-and-Stick until the valgus gate is earned." : "🔓 Valgus gate unlocked."}
+      </div></div>`;
 
-  // Emerge benchmark banner
-  const benchHtml = data.benchmark ? `
-    <div class="brief-section" style="background: var(--bg2); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem;">
-      <strong>🎯 Today's Benchmark</strong>
-      <div class="caveat-note" style="margin:0.2rem 0 0;">${data.benchmark}</div>
-    </div>` : "";
-
-  // PR Board target
-  const prTargets = data.prTargets || (data.prTarget ? [{ label: data.prTarget }] : []);
-  const prHtml = prTargets.length ? `
-    <div class="brief-section">
-      <strong>📊 PR Board — beat last week</strong>
-      <div class="caveat-note" style="margin:0.2rem 0 0;">${prTargets.map(p => p.label).join("<br>")}</div>
-    </div>` : "";
-
-  // Active weekly engagement system (chosen last Sunday)
-  const engSys = activeEngagement();
-  const engHtml = engSys ? `
-    <div class="brief-section" style="background: var(--bg2); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem;">
-      <strong>${engSys === "peer" ? "🏆" : "🔄"} This week: ${ENGAGEMENT_SYSTEMS[engSys].label}</strong>
-      <div class="caveat-note" style="margin:0.2rem 0 0;">${ENGAGEMENT_SYSTEMS[engSys].desc}</div>
-    </div>` : "";
-
-  // Warm-up: picker on Wed/Thu/Sat, plain note otherwise
-  let warmupHtml = "";
-  if (isWarmupChoice) {
-    warmupHtml = `
-      <div class="brief-section" id="warmup-picker">
-        <strong>Warm-Up / Primer - order the 4 drill slots</strong>
-        <div class="caveat-note" style="margin:0.2rem 0 0.4rem;">
-          Fixed first: ${data.warmup.fixedStart.name} (${data.warmup.fixedStart.duration}s pulse raise).<br>
-          Tap all 4 drills in your order. Fixed last: ${data.warmup.fixedClose.name} (${data.warmup.fixedClose.duration}s).
-        </div>
-        <div class="warmup-options" id="warmup-options"></div>
-      </div>`;
-  } else if (data.warmup) {
-    warmupHtml = `
-      <div class="brief-section">
-        <strong>Warm-Up / Primer first</strong> · ${fmtEstimate(data.warmup.duration)}<br>
-        <div class="caveat-note" style="margin:0.3rem 0 0;">${data.warmup.steps.join(" · ")}</div>
-      </div>`;
+  // Same-day resume
+  const prog = loadDayProgress();
+  let resumeHtml = "", canResume = false;
+  if (prog && prog.done && prog.done.length) {
+    const remaining = BLOCK_ORDER
+      .filter(b => (day.blocks[b] || []).length && !prog.done.includes(b))
+      .map(b => BLOCK_LABEL[b]);
+    if (remaining.length) {
+      canResume = true;
+      resumeHtml = `<div class="brief-section resume">
+        <strong>⏸ Resume today's session</strong>
+        <div class="caveat-note" style="margin:0.2rem 0 0;">
+          Done: ${prog.done.map(b => BLOCK_LABEL[b] || b).join(", ")}.<br>
+          Left: ${remaining.join(", ")}.</div></div>`;
+    }
   }
-
-  // Mon/Tue: user MUST pick a version — no default is pre-selected.
-  const variantNotChosen = isVariantDay && !selectedMainVariant;
-  const addonHtml = isVariantDay ? `
-    <div class="readiness" id="addon-gate">
-      <strong>Pick today's Main version${variantNotChosen ? " — required" : ""}</strong>
-      <div class="caveat-note" style="margin-top:0.3rem;">
-        Attending or unsure (PM pool on): Version B, activation only.
-        Skipped (no PM pool): Version A plus Add-On.
-      </div>
-      <div class="readiness-buttons">
-        <button data-variant="twoaday" class="${selectedMainVariant === "twoaday" ? "selected" : ""}">Attending / unsure</button>
-        <button data-variant="regular" class="${selectedMainVariant === "regular" ? "selected" : ""}">PM pool skipped</button>
-      </div>
-    </div>` : "";
 
   document.getElementById("main-card").innerHTML = `
     <div class="day-header">
       <span class="day-badge">${data.badge}</span>
       <h2 class="day-title">${data.title}</h2>
-      <div class="day-subtitle">${data.subtitle} · Target time ${est} · Week ${wk}</div>
+      <div class="day-subtitle">${data.subtitle} · ⏱ ${day.timeLo}–${day.timeHi} min (cap 35)</div>
     </div>
-    <div class="mantra">"${DAY_MANTRA[dayKey] || MANTRA}"</div>
+    <div class="mantra">"${data.mantra}"</div>
     <div class="brief">
-      ${hrHtml}
-      ${benchHtml}
-      ${prHtml}
-      ${engHtml}
+      <div class="brief-section">
+        <strong>🏊 ${poolText} · default ${effectiveLight().toUpperCase()} light</strong>
+        ${ropeNote}
+      </div>
+      ${rulesHtml}
       ${eqHtml}
-      ${warmupHtml}
-      ${addonHtml}
+      ${resumeHtml}
       ${circuitsHtml}
     </div>
     <div class="caveat-note" style="text-align:center;">
       📱 Put your phone on the floor where you can see it — then leave it there.
     </div>
+    <div class="btn-row" id="brief-btns">
+      ${canResume ? `<button class="btn" id="btn-restart">RESTART DAY</button>
+        <button class="btn btn-primary" id="btn-resume">RESUME ▶</button>`
+      : `<button class="btn btn-primary" id="btn-ready" ${introPlaying ? "disabled" : ""}>${introPlaying ? "INTRO PLAYING..." : "READY ✓"}</button>`}
+    </div>
+    ${renderQuizEntry()}`;
+
+  if (canResume) {
+    document.getElementById("btn-resume").onclick = () => {
+      resumeSkipBlocks = (prog.done || []).slice();
+      if (resumeSkipBlocks.includes("main")) resumeSkipBlocks.push("prep");
+      selectedLight = prog.light || day.defaultLight;
+      closeModalAborted = true; skipGreetingOnStart = true;
+      startSession();
+    };
+    document.getElementById("btn-restart").onclick = () => {
+      clearDayProgress();
+      resumeSkipBlocks = [];
+      renderCard();
+    };
+  } else {
+    document.getElementById("btn-ready").onclick = () => {
+      if (introPlaying) return;
+      resumeSkipBlocks = [];
+      openReadiness();
+    };
+  }
+  wireQuizEntry();
+}
+
+/* ---- Traffic Light: 8-question readiness checklist ---- */
+function openReadiness() {
+  const card = document.getElementById("main-card");
+  const answers = {};
+  const qsHtml = READINESS_QUESTIONS.map((q, i) => `
+    <div class="rq" data-q="${i}">
+      <div class="rq-text">${q.text}${q.painGate ? ' <span class="rq-flag">⚠️</span>' : ""}</div>
+      <div class="rq-btns">
+        <button data-v="yes">Yes</button>
+        <button data-v="no">No</button>
+      </div>
+    </div>`).join("");
+  card.innerHTML = `
+    <div class="day-header">
+      <span class="day-badge">🚦</span>
+      <h2 class="day-title">Are You Ready to Train?</h2>
+      <div class="day-subtitle">Answer honestly — this picks your light. Do it BEFORE you start.</div>
+    </div>
+    <div class="readiness-quiz">${qsHtml}</div>
+    <div class="rq-result" id="rq-result"></div>
     <div class="btn-row">
-      <button class="btn btn-primary" id="btn-ready" ${introPlaying || variantNotChosen ? "disabled" : ""}>${introPlaying ? "INTRO PLAYING..." : (variantNotChosen ? "PICK A VERSION FIRST" : "READY ✓")}</button>
+      <button class="btn" id="rq-back">← Back</button>
+      <button class="btn btn-primary" id="rq-go" disabled>SET MY LIGHT</button>
     </div>`;
 
-  // --- Warm-up picker logic ---
-  if (isWarmupChoice) {
-    sessionWarmupPick = [];
-    const optWrap = document.getElementById("warmup-options");
-    data.warmup.choiceOptions.forEach((opt, i) => {
-      const b = document.createElement("button");
-      b.className = "warmup-opt";
-      b.textContent = `${opt.name} · ${opt.duration}s`;
+  function tallyLight() {
+    const ans = READINESS_QUESTIONS.map((q, i) => answers[i]);
+    if (ans.some(a => a === undefined)) return null;
+    const painIdx = READINESS_QUESTIONS.findIndex(q => q.painGate);
+    if (answers[painIdx] === false) return "recovery";
+    const noCount = ans.filter(a => a === false).length;
+    if (noCount === 0) return "green";
+    if (noCount <= 3) return "yellow";
+    return "red";
+  }
+  const LIGHT_MSG = {
+    green: ["🟢 GREEN — 3 rounds, go for it.", "green"],
+    yellow: ["🟡 YELLOW — 2 rounds, focus on clean.", "yellow"],
+    red: ["🔴 RED — 1 round, quality only.", "red"],
+    recovery: ["🛟 RECOVERY ONLY — stop, do easy recovery, tell a parent.", "recovery"]
+  };
+  function update() {
+    const light = tallyLight();
+    const res = document.getElementById("rq-result");
+    const go = document.getElementById("rq-go");
+    if (!light) { res.innerHTML = ""; go.disabled = true; return; }
+    res.innerHTML = `<div class="rq-light ${LIGHT_MSG[light][1]}">${LIGHT_MSG[light][0]}</div>`;
+    go.disabled = false;
+  }
+  card.querySelectorAll(".rq").forEach(row => {
+    row.querySelectorAll("button").forEach(b => {
       b.onclick = () => {
-        const idx = sessionWarmupPick.indexOf(i);
-        if (idx >= 0) {
-          sessionWarmupPick.splice(idx, 1);
-        } else {
-          if (sessionWarmupPick.length >= data.warmup.choiceOptions.length) return;
-          sessionWarmupPick.push(i);
-        }
-        optWrap.querySelectorAll(".warmup-opt").forEach((el, j) => {
-          const pos = sessionWarmupPick.indexOf(j);
-          el.classList.toggle("picked", pos >= 0);
-          el.dataset.order = pos >= 0 ? (pos + 1) : "";
-        });
-      };
-      optWrap.appendChild(b);
-    });
-  } else {
-    sessionWarmupPick = null;
-  }
-
-  // --- Mon/Tue main-version gate logic ---
-  sessionAddonOn = isVariantDay && selectedMainVariant === "regular";
-  if (isVariantDay) {
-    document.querySelectorAll("#addon-gate .readiness-buttons button").forEach(btn => {
-      btn.onclick = () => {
-        selectedMainVariant = btn.dataset.variant;
-        sessionAddonOn = selectedMainVariant === "regular";
-        renderBrief(getActiveData());
+        answers[+row.dataset.q] = b.dataset.v === "yes";
+        row.querySelectorAll("button").forEach(x => x.classList.remove("selected"));
+        b.classList.add("selected");
+        update();
       };
     });
-  }
-
-  document.getElementById("btn-ready").onclick = async () => {
-    if (introPlaying) return;
-    if (isWarmupChoice && sessionWarmupPick && sessionWarmupPick.length !== data.warmup.choiceOptions.length) {
-      alert("Choose the order for all 4 warm-up primer drills first.");
-      return;
-    }
-    closeModalAborted = true;
-    skipGreetingOnStart = true;
+  });
+  document.getElementById("rq-back").onclick = () => renderCard();
+  document.getElementById("rq-go").onclick = async () => {
+    const light = tallyLight();
+    selectedLight = light;
+    lastReadiness = { answers: READINESS_QUESTIONS.map((q, i) => !!answers[i]), light, date: new Date().toISOString() };
+    saveJSON(LS_READINESS, lastReadiness);
+    if (light === "recovery") { renderRecoveryOnly(); return; }
+    closeModalAborted = true; skipGreetingOnStart = true;
     await startSession();
   };
+}
+
+function renderRecoveryOnly() {
+  document.getElementById("main-card").innerHTML = `
+    <div class="day-header">
+      <span class="day-badge">🛟</span>
+      <h2 class="day-title">Recovery Only Today</h2>
+      <div class="day-subtitle">Any pain, dizziness, or a rough day — that's a STOP.</div>
+    </div>
+    <div class="brief">
+      <div class="brief-section">
+        <strong>What to do now</strong>
+        <ul>
+          <li>Stop — no main circuit today.</li>
+          <li>Tell a parent how you feel.</li>
+          <li>Do easy Spa-style recovery: gentle foam roll + slow breathing.</li>
+          <li>Come back tomorrow. A missed day is never doubled.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="btn-row"><button class="btn btn-primary" id="rq-done">OKAY</button></div>`;
+  document.getElementById("rq-done").onclick = () => { selectedLight = null; renderCard(); };
 }
 
 function refreshReadyButton() {
   const btn = document.getElementById("btn-ready");
   if (!btn) return;
-  const variantNotChosen = selectedSession === "main" && ADDON_DAYS.has(selectedDay) && !selectedMainVariant;
-  btn.disabled = introPlaying || variantNotChosen;
-  if (selectedSession === "evening") {
-    btn.textContent = introPlaying ? "INTRO PLAYING..." : "START REHEARSAL";
-  } else if (variantNotChosen) {
-    btn.textContent = "PICK A VERSION FIRST";
-  } else {
-    btn.textContent = introPlaying ? "INTRO PLAYING..." : "READY ✓";
-  }
+  btn.disabled = introPlaying;
+  btn.textContent = introPlaying ? "INTRO PLAYING..." : (DAYS[selectedDay] && DAYS[selectedDay].spa ? "START RECOVERY" : "READY ✓");
+}
+
+/* gate state (valgus) — shared by brief + quiz */
+function gateLocked() {
+  const g = loadJSON(LS_GATE, { unlocked: false });
+  return !g.unlocked;
 }
 
 /* ============================================================
@@ -3585,13 +3731,13 @@ async function startSession() {
   ensureAudio();
   if (session.running) return;
   let data = getActiveData();
-  const isEvening = selectedSession === "evening";
-  const isActivation = selectedSession === "activation";
+  const isEvening = false;
   session = {
     running: true, paused: false, abort: false, skipExercise: false,
     currentTimer: null, byRepsResolver: null,
-    calmMode: !!data.isCalmDay, currentEx: null, weather: session.weather,
-    skipped: [], doneHoldTimeout: null, doneHoldTriggered: false
+    calmMode: false, currentEx: null, weather: session.weather,
+    skipped: [], doneHoldTimeout: null, doneHoldTriggered: false,
+    perExercise: [], microLoop: null
   };
 
   // Apply skipGreetingOnStart if set
@@ -3600,101 +3746,43 @@ async function startSession() {
     skipGreetingOnStart = false;
   }
 
-  // Build the day's run data — apply warm-up pick + conditional leg add-on
-  let runData = data;
-  if (selectedSession === "main" && (sessionWarmupPick || sessionAddonOn)) {
-    runData = Object.assign({}, data);
-    if (sessionWarmupPick && data.warmup && data.warmup.choiceOptions &&
-        sessionWarmupPick.length === data.warmup.choiceOptions.length) {
-      const selectedSteps = sessionWarmupPick.map(i => data.warmup.choiceOptions[i]);
-      runData.warmup = Object.assign({}, data.warmup, {
-        steps: [
-          `${data.warmup.fixedStart.name} - ${data.warmup.fixedStart.duration}s (fixed first)`,
-          ...selectedSteps.map(step => `${step.name} - ${step.duration}s`),
-          `${data.warmup.fixedClose.name} - ${data.warmup.fixedClose.duration}s (fixed last)`
-        ],
-        sequence: [data.warmup.fixedStart, ...selectedSteps, data.warmup.fixedClose]
-      });
-    }
-    if (sessionAddonOn && ADDON[selectedDay]) {
-      runData.circuits = data.circuits.concat(ADDON[selectedDay].circuits);
-    }
-  }
-
-  plannedSessionSecs = estimateSessionSecs(runData, !!runData.warmup)
-    + (isEvening ? 5 : 8);
+  const runData = data;
+  plannedSessionSecs = estimateSessionSecs(runData, false) + 8;
   elapsedActiveSecs = 0;
   renderSessionShell(runData);
   setSessionControls();
 
-  const dayMantra = DAY_MANTRA[selectedDay] || MANTRA;
+  const dayMantra = (DAYS[selectedDay] && DAYS[selectedDay].mantra) || MANTRA;
+  const lightLabel = { green: "GREEN, 3 rounds", yellow: "YELLOW, 2 rounds",
+    red: "RED, 1 round", recovery: "recovery only" }[effectiveLight()] || "";
 
-  // Mantra / intro
-  if (isEvening) {
-    setStatus("Evening Rehearsal");
-    setExercise({
-      name: "Find your shape",
-      cue: "Quiet space, no rush. Focus on FEELING the position."
-    });
-    await speakAndWait("Evening rehearsal. Find the shape, and keep the effort light.");
-  } else if (isActivation) {
-    setStatus("AM Micro-Activation");
-    setExercise({ name: "Wake up gently", cue: "Move smoothly. Save your effort for the pool." });
-    await speakAndWait("Morning activation. Smooth movement only. Start easy.");
+  setStatus("Let's go!");
+  const firstEx = runData.circuits.length ? runData.circuits[0].exercises[0].name : "your first move";
+  setExercise({ name: "Ready?",
+    cue: `"${dayMantra}" — Light: ${effectiveLight().toUpperCase()}. Starting with ${firstEx}.` });
+  if (runData.spa) {
+    await speakAndWait("Spa Sunday. Two easy recovery holds, slow and gentle.");
   } else {
-    setStatus("Let's go!");
-    const firstEx = runData.warmup ? runData.warmup.name : runData.circuits[0].exercises[0].name;
-    const hz = HR_ZONES[data.hrZone] || HR_ZONES.z2;
-    setExercise({
-      name: "Ready?",
-      cue: `"${dayMantra}" — Wear your Apple Watch. Target ${hz.label}. Starting with ${firstEx}.`
-    });
-    await speakAndWait(
-      "Say it out loud with me, LOUD and PROUD: " + dayMantra + " " +
-      "One more time, even LOUDER — you've got this! " + dayMantra + " " +
-      "Wear your Apple Watch and watch your heart rate. " +
-      "Today's target is " + hz.label + ", " + hz.bpm + ". " +
-      "Put your phone on the floor where you can see it. Starting with " + firstEx + "."
-    );
+    await speakAndWait("Say it out loud with me, loud and proud: " + dayMantra + " " +
+      "Your light today is " + lightLabel + ". " +
+      "Put your phone on the floor where you can see it. Starting with " + firstEx + ".");
   }
 
   const r1 = await sleep(2000);
   if (r1 === "abort") return finalize(false);
-  
-  // Reset skip flag after greeting — warm-up should run normally
+
+  // Reset skip flag after greeting — first block should run normally
   session.skipExercise = false;
   startElapsed();
 
-  // Warm-up (morning sessions only, if warmup exists)
-  if (!isEvening && runData.warmup) {
-    setZone("warmup");
-    setStatus("Warm-up");
-    setProgress([{ text: runData.warmup.name || "Movement Prep", phase: true }, { text: fmtEstimate(runData.warmup.duration) }]);
-    setExercise({ name: runData.warmup.name || "Movement Prep", warmupSteps: runData.warmup.steps });
-    setUpNext(`<span class="label">Up next:</span> <span class="name">${runData.circuits[0].name}</span>`);
-    
-    const warmupResult = await runWarmupCueing(runData.warmup);
-    if (warmupResult === "abort") return finalize(false);
-    
-    // Brief pause after warm-up before circuits
-    await sleep(1000);
-  } else if (!isEvening && !runData.warmup) {
-    // No warm-up: just an 8s pause before first circuit
-    setZone("warmup");
-    setStatus("Get ready...");
-    setExercise({ name: "Almost time", cue: "Get your gear ready. First exercise starts in 8 seconds." });
-    await speakAndWait("Eight seconds until first circuit exercise.");
-    await countdown(8);
-  } else {
-    // Evening — short countdown
-    setZone("evening");
-    setStatus("Starting in 5…");
-    setExercise({ name: "Get into position", cue: "Find a quiet spot on the floor." });
-    await speakAndWait("Starting in five seconds.");
-    await countdown(5);
-  }
+  // Short get-ready pause before the first block
+  setZone("warmup");
+  setStatus("Get ready…");
+  setExercise({ name: "Almost time", cue: "First block starts in 5 seconds." });
+  await speakAndWait("Five seconds to the first block.");
+  const rGo = await countdown(5);
+  if (rGo === "abort") return finalize(false);
 
-  // Use the assembled run data (warm-up pick + add-on) for the circuit loop
   data = runData;
 
   // Set true when the prior rest already announced this exercise (name + cue + 3-2-1-Go),
@@ -3777,6 +3865,18 @@ async function startSession() {
             const r6 = await countdown(work);
             if (r6 === "abort") return finalize(false);
           }
+        }
+
+        // Log each exercise once (first round)
+        if (r === 1) {
+          session.perExercise.push({
+            name: ex.name,
+            block: ex.block || circuit.block,
+            driver: ex.driver || (ex.byReps ? "reps" : "time"),
+            dose: ex.dose || ex.repsDetail || "",
+            gate: ex.gate || null,
+            skipped: !!session.skipExercise
+          });
         }
 
         // ---------- REST ----------
@@ -3869,9 +3969,26 @@ async function startSession() {
         }
       }
     }
+    // Block complete — record for same-day resume
+    recordBlockDone(circuit.block);
   }
 
+  // Swim-skill micro-loop, breath rehearsal, and the occasional "learn this one?"
+  await runSwimSkillExtras(data);
+  if (session.abort) return finalize(false);
+
+  clearDayProgress();   // full completion — nothing left to resume today
   finalize(true);
+}
+
+/* Record a finished block so the day can be resumed later today. Spa days and
+   abandoned sessions keep their partial progress; full completion clears it. */
+function recordBlockDone(blockKey) {
+  if (!blockKey || blockKey === "prep") return;
+  const prog = loadDayProgress() || { done: [], light: effectiveLight() };
+  if (!prog.done.includes(blockKey)) prog.done.push(blockKey);
+  prog.light = effectiveLight();
+  saveDayProgress(prog);
 }
 
 function nextLabel(data, ci, r, ei) {
@@ -3963,8 +4080,9 @@ function finalize(completed) {
   const elapsedSecs = getElapsedSecs();
   stopElapsed();
 
-  const isEvening = selectedSession === "evening";
-  const sessionType = selectedSession === "activation" ? "activation" : isEvening ? "evening" : "main";
+  const isEvening = false;
+  const isSpa = !!(DAYS[selectedDay] && DAYS[selectedDay].spa);
+  const sessionType = isSpa ? "spa" : "main";
 
   if (completed) {
     _pendingFsId = null;
@@ -3986,20 +4104,27 @@ function finalize(completed) {
       const sessionEntry = {
         app: "swimming",
         dayKey: selectedDay,
-        dayTitle: (PLAN[selectedDay] && PLAN[selectedDay].title) || selectedDay,
+        dayTitle: (DAYS[selectedDay] && DAYS[selectedDay].title) || selectedDay,
         isoDate: new Date().toISOString(),
         durationSecs: elapsedSecs,
-        session: isEvening ? "evening" : "morning",
-        planVersion: "v15",
+        session: "morning",
+        planVersion: "2026.2",
         sessionType,
-        mainVariant: sessionType === "main" && ADDON_DAYS.has(selectedDay) ? selectedMainVariant : null,
-        eveningBlock: isEvening ? (selectedEveningCut ? "cut" : (selectedDay === "tuesday" || selectedDay === "thursday" ? "B" : "A")) : null,
-        overloadWeek: overloadWeek(),
-        addOn: sessionType === "main" && sessionAddonOn || false,
+        lightResult: isSpa ? "recovery" : effectiveLight(),
+        readinessAnswers: lastReadiness ? lastReadiness.answers : null,
+        roundsDone: isSpa ? 0 : mainRounds(),
+        perExercise: session.perExercise || [],
+        microLoop: session.microLoop || null,
         skippedCount: session.skipped.length,
         completedFully: true
       };
       saveSession(sessionEntry);
+      // Valgus earn-back: a clean (non-skipped) Drop-and-Stick session counts toward unlock.
+      if ((session.perExercise || []).some(p => p.name === "Drop-and-Stick" && !p.skipped)) {
+        const g = loadJSON(LS_GATE, { unlocked: false, cleanCount: 0 });
+        g.cleanCount = (g.cleanCount || 0) + 1;
+        saveJSON(LS_GATE, g);
+      }
       renderModalWeekSummary();
       // Cloud write — store returned doc ID so reflection can patch mood later
       fsAddSession(sessionEntry).then(id => { _pendingFsId = id; });
@@ -4172,6 +4297,491 @@ function showReflection() {
     }
     renderCard();
   };
+}
+
+/* ============================================================
+   AUTHORED CONTENT POOL — "what goes wrong for a young athlete"
+   Hand-authored items (general knowledge) merged with doc-derived
+   items. Two categories drive selection: reflection (Self-Learning)
+   and quiz (Quick Quiz). faultTheme groups broadly-applicable
+   young-athlete pitfalls.
+   ============================================================ */
+
+const LEARNING_BANK = [
+  // ---- QUIZ: young-athlete judgment (knowledge) ----
+  { id: "ya1", category: "quiz", faultTheme: "fatigue", type: "mc",
+    q: "You feel really sore the next day. Does that mean the workout was good?",
+    answer: "No — sore doesn't mean better. Smooth and clean is the goal.",
+    distractors: ["Yes, more sore = more strong", "Yes, you should add reps next time"] },
+  { id: "ya2", category: "quiz", faultTheme: "reps", type: "mc",
+    q: "What matters more in dryland?",
+    answer: "A few clean reps with good shape",
+    distractors: ["As many reps as possible", "Finishing fastest"] },
+  { id: "ya3", category: "quiz", faultTheme: "breath", type: "mc",
+    q: "Your coach can't hear you breathing on a hollow hold. What should you do?",
+    answer: "Hum or count out loud — if they can't hear it, the rep doesn't count",
+    distractors: ["Hold your breath to stay tight", "Go faster to finish"] },
+  { id: "ya4", category: "quiz", faultTheme: "pain", type: "mc",
+    q: "Your shoulder feels a sharp pinch on pull-ups. What's the rule?",
+    answer: "Stop — sharp pain, pinching, or numbness means stop",
+    distractors: ["Push through one more set", "Switch arms and keep going"] },
+  { id: "ya5", category: "quiz", faultTheme: "freshness", type: "mc",
+    q: "When do you do the sprint / coordination drills?",
+    answer: "Fresh, right after the warm-up — never tired",
+    distractors: ["At the very end when you're tired", "Only if you have extra time"] },
+  { id: "ya6", category: "quiz", faultTheme: "valgus", type: "mc",
+    q: "On a landing, your knees fall inward. What should you do?",
+    answer: "Stop, reset your stance, land slower with knees over toes",
+    distractors: ["Jump higher next time", "Land faster to get it over with"] },
+  { id: "ya7", category: "quiz", faultTheme: "self-check", type: "mc",
+    q: "What's the kid rule for learning a movement?",
+    answer: "Find one mistake, fix one thing, show one better rep",
+    distractors: ["Do it perfectly the first time", "Never make a mistake"] },
+  { id: "ya8", category: "quiz", faultTheme: "recovery", type: "mc",
+    q: "Is rest part of training?",
+    answer: "Yes — recovery is scheduled, not optional",
+    distractors: ["No, rest is wasted time", "Only if you're injured"] },
+  { id: "ya9", category: "quiz", faultTheme: "dose", type: "mc",
+    q: "Dryland makes you tired and worse in the pool. What does that mean?",
+    answer: "The dose is wrong — dryland should leave you fresh",
+    distractors: ["You need to do even more", "That's normal, keep going"] },
+  { id: "ya10", category: "quiz", faultTheme: "streamline", type: "mc",
+    q: "What is the kid cue for a tight body line?",
+    answer: "Make your body one long arrow",
+    distractors: ["Bend in the middle", "Relax everything"] },
+
+  // ---- REFLECTION: self-coaching prompts ----
+  { id: "rf1", category: "reflection", faultTheme: "breath",
+    prompt: "Were you breathing out loud the whole hold, or did you hold your breath?" },
+  { id: "rf2", category: "reflection", faultTheme: "self-check",
+    prompt: "What broke FIRST this set — and what's the ONE thing you'll fix next round?" },
+  { id: "rf3", category: "reflection", faultTheme: "reps",
+    prompt: "Did you chase the number, or keep every rep clean?" },
+  { id: "rf4", category: "reflection", faultTheme: "valgus",
+    prompt: "On your landings, did your knees stay over your toes — or fall inward?" },
+  { id: "rf5", category: "reflection", faultTheme: "streamline",
+    prompt: "Did your ribs stay down and your body stay one long line?" },
+  { id: "rf6", category: "reflection", faultTheme: "hips",
+    prompt: "Did the power come from your hips, or did you push from the heels/arms?" },
+  { id: "rf7", category: "reflection", faultTheme: "shoulders",
+    prompt: "Did your shoulders stay DOWN, or did they creep up toward your ears?" },
+  { id: "rf8", category: "reflection", faultTheme: "pool-transfer",
+    prompt: "Did you feel this same shape in the pool today?" }
+];
+
+/* Build quiz items from the day plans (recall + knowledge + cue match). */
+function buildDerivedQuizItems() {
+  const items = [];
+  const allMain = [];
+  Object.keys(DAYS).forEach(dk => {
+    const d = DAYS[dk];
+    (d.blocks.main || []).concat(d.prepMenu || []).forEach(ex => {
+      if (!allMain.some(e => e.name === ex.name)) allMain.push(ex);
+    });
+  });
+  const allWatch = allMain.filter(e => e.parentWatch).map(e => e.parentWatch);
+  allMain.forEach(ex => {
+    // gate-aware: skip jump-mechanics content while locked
+    if (ex.gate === "valgus" && gateLocked()) return;
+    if (ex.parentWatch) {
+      const distractors = shuffle(allWatch.filter(w => w !== ex.parentWatch)).slice(0, 2);
+      if (distractors.length === 2) {
+        items.push({ id: "recall_" + ex.name, category: "quiz", faultTheme: "recall",
+          type: "mc", exerciseTag: ex.name,
+          q: `${ex.name} — what usually breaks FIRST?`,
+          answer: ex.parentWatch, distractors });
+      }
+    }
+    if (ex.swimTransfer) {
+      const others = shuffle(allMain.filter(e => e.swimTransfer && e.swimTransfer !== ex.swimTransfer))
+        .slice(0, 2).map(e => e.swimTransfer);
+      if (others.length === 2) {
+        items.push({ id: "skill_" + ex.name, category: "quiz", faultTheme: "skillmap",
+          type: "mc", exerciseTag: ex.name,
+          q: `${ex.name} trains the ___?`,
+          answer: ex.swimTransfer, distractors: others });
+      }
+    }
+  });
+  return items;
+}
+
+function quizPool() {
+  const authored = LEARNING_BANK.filter(i => i.category === "quiz");
+  return authored.concat(buildDerivedQuizItems());
+}
+
+function shuffle(a) {
+  const arr = a.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/* ---- rollout: stagger Self-Learning + Quiz in over the first sessions ---- */
+function rolloutAnchorDays() {
+  let r = loadJSON(LS_ROLLOUT, null);
+  if (!r) { r = { start: new Date().toISOString() }; saveJSON(LS_ROLLOUT, r); }
+  return Math.floor((Date.now() - new Date(r.start).getTime()) / 86400000);
+}
+function featuresRolledIn() {
+  // Self-Learning + Quiz appear after a short settling-in period, OR once a
+  // few sessions are logged — whichever comes first.
+  const sessions = (typeof loadSessions === "function" ? loadSessions() : []).length;
+  return rolloutAnchorDays() >= 3 || sessions >= 3;
+}
+
+/* ============================================================
+   QUICK QUIZ — spaced-repetition-lite, gate-aware
+   ============================================================ */
+
+function quizState() {
+  return loadJSON(LS_QUIZ, { items: {}, results: [], streak: 0 });
+}
+function saveQuizState(s) { saveJSON(LS_QUIZ, s); }
+
+// Weight: wrong/never-seen items surface sooner; mastered ones rarely.
+function itemWeight(st, id, inThisWeek) {
+  const rec = st.items[id] || { right: 0, wrong: 0, seen: 0 };
+  let w = 1 + rec.wrong * 2;
+  if (rec.seen === 0) w += 2;
+  if (rec.right >= 3 && rec.wrong === 0) w = 0.25;
+  if (inThisWeek) w *= 2;
+  return w;
+}
+function weightedPick(pool, st, weekSet, n) {
+  const chosen = [];
+  const avail = pool.slice();
+  while (chosen.length < n && avail.length) {
+    const weights = avail.map(it => itemWeight(st, it.id, weekSet.has(it.exerciseTag)));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let roll = Math.random() * total, idx = 0;
+    for (; idx < avail.length; idx++) { roll -= weights[idx]; if (roll <= 0) break; }
+    chosen.push(avail.splice(Math.min(idx, avail.length - 1), 1)[0]);
+  }
+  return chosen;
+}
+
+function thisWeekExerciseNames() {
+  const set = new Set();
+  const day = DAYS[selectedDay] || DAYS[edmontonDayKey()];
+  if (day) (day.blocks.main || []).concat(day.prepMenu || []).forEach(e => set.add(e.name));
+  return set;
+}
+
+function buildQuiz() {
+  const st = quizState();
+  const weekSet = thisWeekExerciseNames();
+  const pool = quizPool();
+  const recall = pool.filter(i => i.faultTheme === "recall");
+  const knowledge = pool.filter(i => i.faultTheme !== "recall");
+  const items = [];
+  if (recall.length) items.push(...weightedPick(recall, st, weekSet, 1));
+  items.push(...weightedPick(knowledge, st, weekSet, 1 + Math.round(Math.random())));
+  // optional readiness reinforcement item
+  if (Math.random() < 0.4) {
+    items.push({ id: "ready1", category: "quiz", faultTheme: "readiness", type: "mc",
+      q: "Before training, what does the readiness check decide?",
+      answer: "Your light — how many rounds you do today",
+      distractors: ["Which day it is", "What you eat after"] });
+  }
+  return shuffle(items).slice(0, 5);
+}
+
+function openQuiz() {
+  const items = buildQuiz();
+  let idx = 0, correct = 0;
+  const card = document.getElementById("main-card");
+  card.classList.remove("session-active");
+
+  function renderItem() {
+    if (idx >= items.length) return finishQuiz();
+    const it = items[idx];
+    const options = shuffle([it.answer, ...it.distractors]);
+    card.innerHTML = `
+      <div class="day-header">
+        <span class="day-badge">❓</span>
+        <h2 class="day-title">Quick Quiz</h2>
+        <div class="day-subtitle">Question ${idx + 1} of ${items.length} · under 90 seconds</div>
+      </div>
+      <div class="quiz-q">${it.q}</div>
+      <div class="quiz-opts">${options.map((o, i) =>
+        `<button class="quiz-opt" data-i="${i}">${o}</button>`).join("")}</div>
+      <div class="quiz-fb" id="quiz-fb"></div>
+      <div class="btn-row"><button class="btn" id="quiz-quit">Quit</button></div>`;
+    card.querySelectorAll(".quiz-opt").forEach(btn => {
+      btn.onclick = () => {
+        const choice = options[+btn.dataset.i];
+        const ok = choice === it.answer;
+        recordQuizAnswer(it.id, ok);
+        if (ok) correct++;
+        card.querySelectorAll(".quiz-opt").forEach(b => {
+          b.disabled = true;
+          if (options[+b.dataset.i] === it.answer) b.classList.add("correct");
+          else if (b === btn) b.classList.add("wrong");
+        });
+        document.getElementById("quiz-fb").innerHTML = ok
+          ? `<div class="fb-ok">✓ Nice!</div>`
+          : `<div class="fb-no">Answer: ${it.answer}</div>`;
+        setTimeout(() => { idx++; renderItem(); }, ok ? 700 : 1600);
+      };
+    });
+    document.getElementById("quiz-quit").onclick = () => renderCard();
+  }
+
+  function finishQuiz() {
+    const st = quizState();
+    st.results.push({ date: new Date().toISOString(), score: correct, total: items.length });
+    st.streak = correct === items.length ? (st.streak || 0) + 1 : 0;
+    saveQuizState(st);
+    const mastered = masteredSkills();
+    card.innerHTML = `
+      <div class="day-header">
+        <span class="day-badge">🏅</span>
+        <h2 class="day-title">Quiz Done!</h2>
+        <div class="day-subtitle">${correct} / ${items.length} correct</div>
+      </div>
+      <div class="brief">
+        <div class="brief-section"><strong>🔥 Streak: ${st.streak} perfect ${st.streak === 1 ? "quiz" : "quizzes"}</strong></div>
+        ${mastered.length ? `<div class="brief-section"><strong>✅ Skills you've mastered</strong>
+          <ul>${mastered.map(m => `<li>${m}</li>`).join("")}</ul></div>`
+        : `<div class="brief-section"><div class="caveat-note">Keep going to master skills — get them right 3 times.</div></div>`}
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="quiz-again">AGAIN</button>
+        <button class="btn btn-primary" id="quiz-back">DONE</button>
+      </div>`;
+    document.getElementById("quiz-again").onclick = () => openQuiz();
+    document.getElementById("quiz-back").onclick = () => renderCard();
+  }
+
+  renderItem();
+}
+
+function recordQuizAnswer(id, ok) {
+  const st = quizState();
+  const rec = st.items[id] || { right: 0, wrong: 0, seen: 0 };
+  rec.seen++;
+  if (ok) rec.right++; else rec.wrong++;
+  st.items[id] = rec;
+  saveQuizState(st);
+}
+function masteredSkills() {
+  const st = quizState();
+  return quizPool()
+    .filter(it => { const r = st.items[it.id]; return r && r.right >= 3 && r.wrong === 0; })
+    .map(it => it.exerciseTag || (it.faultTheme + " sense"))
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .slice(0, 8);
+}
+
+/* Quiz + Learning entry buttons on the day brief (rolled-in only) */
+function renderQuizEntry() {
+  if (!featuresRolledIn()) return "";
+  return `<div class="quiz-entry">
+    <button class="btn btn-quiz" id="btn-quiz">❓ Quick Quiz (under 90s)</button>
+    <button class="btn btn-learn" id="btn-learn">📈 Learning</button>
+  </div>`;
+}
+function wireQuizEntry() {
+  const q = document.getElementById("btn-quiz");
+  if (q) q.onclick = () => openQuiz();
+  const l = document.getElementById("btn-learn");
+  if (l) l.onclick = () => openLearningPanel();
+}
+
+/* Minimal Learning panel — ladder rungs (Top-7) + valgus gate unlock toggle.
+   Stands in for the deferred Parent Admin view. */
+function openLearningPanel() {
+  const card = document.getElementById("main-card");
+  card.classList.remove("session-active");
+  const g = loadJSON(LS_GATE, { unlocked: false, cleanCount: 0 });
+  const recs = loadJSON(LS_LEARNING, []);
+  card.innerHTML = `
+    <div class="day-header">
+      <span class="day-badge">📈</span>
+      <h2 class="day-title">Learning &amp; Independence</h2>
+      <div class="day-subtitle">Set rungs · gate · ${recs.length} self-correction note${recs.length === 1 ? "" : "s"} logged</div>
+    </div>
+    <div class="brief">
+      <div class="brief-section">
+        <strong>🪜 Independence Ladder (L1–L5)</strong>
+        <div id="ladder-list"></div>
+      </div>
+      <div class="brief-section">
+        <strong>🔒 Valgus gate</strong>
+        <div class="caveat-note" style="margin:0.2rem 0 0.4rem;">
+          Jumps stay at Drop-and-Stick until 5/5 clean landings ×2 weeks. Clean landings logged: ${g.cleanCount || 0}.
+        </div>
+        <label class="lc-toggle"><input type="checkbox" id="gate-toggle" ${g.unlocked ? "checked" : ""}>
+          Streamline Dry Jump unlocked (parent-confirmed)</label>
+      </div>
+    </div>
+    <div class="btn-row"><button class="btn btn-primary" id="learn-back">← Back</button></div>`;
+  const list = document.getElementById("ladder-list");
+  TOP7.forEach(name => {
+    const row = document.createElement("div");
+    row.innerHTML = `<div class="lc-row"><strong>${name}</strong></div>`;
+    const slot = document.createElement("div");
+    row.appendChild(slot);
+    list.appendChild(row);
+    renderLadderControl(name, slot);
+  });
+  document.getElementById("gate-toggle").onclick = (e) => {
+    const gg = loadJSON(LS_GATE, { unlocked: false, cleanCount: 0 });
+    gg.unlocked = e.target.checked;
+    saveJSON(LS_GATE, gg);
+  };
+  document.getElementById("learn-back").onclick = () => renderCard();
+}
+
+/* ============================================================
+   SELF-LEARNING — micro-loop, self-correction card, ladder
+   ============================================================ */
+
+function loadLadder() { return loadJSON(LS_LADDER, {}); }
+function saveLadder(l) { saveJSON(LS_LADDER, l); }
+function ladderRung(name) { return loadLadder()[name] || 1; }
+function setLadderRung(name, rung) {
+  const l = loadLadder(); l[name] = Math.max(1, Math.min(5, rung)); saveLadder(l);
+}
+
+/* Runs after the swim-skill block: micro-loop (1 tap), breath rehearsal note,
+   and an occasional skippable "Learn this one?" self-correction card. */
+async function runSwimSkillExtras(data) {
+  if (data.spa) return;
+
+  // 1-tap micro-loop
+  await microLoopPrompt();
+  if (session.abort) return;
+
+  // breath rehearsal reminder
+  setZone("warmup");
+  setStatus("Breath rehearsal");
+  setExercise({ name: "Breath rehearsal", cue: BREATH_REHEARSAL });
+  await speakAndWait("Breath rehearsal. Exhale face down, hum, turn, quick sip, turn back.");
+  await sleep(1500);
+
+  // occasional, skippable self-correction card
+  if (featuresRolledIn() && Math.random() < 0.6) {
+    await maybeLearnThisOne(data);
+  }
+}
+
+function microLoopPrompt() {
+  return new Promise(resolve => {
+    setZone("rest");
+    setStatus("Quick check");
+    const card = document.getElementById("exercise");
+    card.innerHTML = `
+      <div class="ex-name">${MICRO_LOOP.q}</div>
+      <div class="microloop">
+        <button class="ml-opt" data-a="the hips">the hips</button>
+        <button class="ml-opt" data-a="the arms">the arms</button>
+        <button class="ml-opt" data-a="the knees">the knees</button>
+      </div>`;
+    speakIfIdle(MICRO_LOOP.q);
+    card.querySelectorAll(".ml-opt").forEach(b => {
+      b.onclick = () => {
+        const ok = b.dataset.a === MICRO_LOOP.a;
+        session.microLoop = { answer: b.dataset.a, correct: ok };
+        card.querySelectorAll(".ml-opt").forEach(x => {
+          x.disabled = true;
+          if (x.dataset.a === MICRO_LOOP.a) x.classList.add("correct");
+          else if (x === b) x.classList.add("wrong");
+        });
+        speakIfIdle(ok ? "Yes — the hips!" : "It's the hips.");
+        setTimeout(resolve, 800);
+      };
+    });
+    // safety timeout so the session never stalls
+    setTimeout(() => resolve(), 12000);
+  });
+}
+
+/* Self-Correction Card on ONE randomly-chosen main exercise. Skippable. */
+function maybeLearnThisOne(data) {
+  return new Promise(resolve => {
+    const mainEx = (DAYS[selectedDay].blocks.main || []).filter(e => e.parentWatch);
+    if (!mainEx.length) return resolve();
+    const ex = mainEx[Math.floor(Math.random() * mainEx.length)];
+    const reflectItem = shuffle(LEARNING_BANK.filter(i => i.category === "reflection"))[0];
+
+    setZone("warmup");
+    setStatus("Learn this one?");
+    document.getElementById("exercise").innerHTML = `
+      <div class="ex-name">Learn this one? — ${ex.name}</div>
+      <div class="learn-card">
+        <div class="lc-row"><strong>Skill:</strong> ${ex.swimTransfer || "—"}</div>
+        <div class="lc-row"><strong>Common mistake:</strong> ${ex.parentWatch}</div>
+        <div class="lc-row"><strong>Think:</strong> ${reflectItem ? reflectItem.prompt : "What broke first?"}</div>
+        <div class="lc-q">What broke FIRST?</div>
+        <div class="lc-chips" id="lc-chips">
+          ${[ex.parentWatch, "Nothing — clean!", "Lost focus"].map((c, i) =>
+            `<button class="lc-chip" data-c="${i}">${c}</button>`).join("")}
+        </div>
+        <label class="lc-toggle"><input type="checkbox" id="lc-better"> I showed a better rep</label>
+        <label class="lc-toggle"><input type="checkbox" id="lc-pool"> I felt it in the pool</label>
+        <div class="lc-ladder" id="lc-ladder"></div>
+        <div class="lc-btns">
+          <button class="btn" id="lc-skip">Skip</button>
+          <button class="btn btn-primary" id="lc-save">Save</button>
+        </div>
+      </div>`;
+    speakIfIdle("Want to learn this one? Find one mistake, fix one thing.");
+
+    let brokeFirst = null;
+    const exCard = document.getElementById("exercise");
+    exCard.querySelectorAll(".lc-chip").forEach(ch => {
+      ch.onclick = () => {
+        brokeFirst = ch.textContent;
+        exCard.querySelectorAll(".lc-chip").forEach(x => x.classList.remove("selected"));
+        ch.classList.add("selected");
+      };
+    });
+    renderLadderControl(ex.name, document.getElementById("lc-ladder"));
+
+    document.getElementById("lc-skip").onclick = () => resolve();
+    document.getElementById("lc-save").onclick = () => {
+      const recs = loadJSON(LS_LEARNING, []);
+      recs.push({
+        exId: ex.name, date: new Date().toISOString(),
+        whatBrokeFirst: brokeFirst,
+        betterRepShown: document.getElementById("lc-better").checked,
+        noticedInPool: document.getElementById("lc-pool").checked,
+        independenceRung: ladderRung(ex.name)
+      });
+      saveJSON(LS_LEARNING, recs);
+      speakIfIdle("Saved. Nice self-coaching.");
+      resolve();
+    };
+    setTimeout(() => resolve(), 60000); // never stall the session
+  });
+}
+
+/* Independence Ladder L1–L5 control (kid view + minimal parent-confirm). */
+function renderLadderControl(name, slot) {
+  if (!slot) return;
+  const LADDER_TXT = {
+    1: "L1 — does it when told", 2: "L2 — names what broke",
+    3: "L3 — spots it mid-set", 4: "L4 — picks the fix + better rep",
+    5: "L5 — notices it IN THE POOL & self-corrects"
+  };
+  function draw() {
+    const rung = ladderRung(name);
+    slot.innerHTML = `
+      <div class="ladder-row">
+        <button class="lad-btn" data-d="-1">−</button>
+        <span class="lad-val">⭐ ${LADDER_TXT[rung]}</span>
+        <button class="lad-btn" data-d="1">+</button>
+      </div>`;
+    slot.querySelectorAll(".lad-btn").forEach(b => {
+      b.onclick = () => { setLadderRung(name, ladderRung(name) + (+b.dataset.d)); draw(); };
+    });
+  }
+  draw();
 }
 
 /* ============================================================
