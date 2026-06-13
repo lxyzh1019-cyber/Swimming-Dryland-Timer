@@ -1661,6 +1661,7 @@ const DAYS = {
     timeLo: 18, timeHi: 22,
     equipment: ["Jump rope", "Resistance band", "Pull-up bar", "Mat"],
     prSentinel: "Clean Pull-Ups — clean reps in Round 1",
+    amActivation: AM_ACTIVATION(),
     blocks: {
       warmup: [
         X({ name: "Jump Rope", block: "warmup", driver: "time", work: 75, dose: "60–90s", cue: "Off the toes, quiet, tall." }),
@@ -2229,6 +2230,16 @@ function edmontonDayKey() {
   return new Date().toLocaleString("en-US", {
     timeZone: "America/Edmonton", weekday: "long"
   }).toLowerCase();
+}
+
+/* AM Micro-Activation is a wake-up block done at home before leaving —
+   auto-skip it once it's past 6:30 AM (Edmonton local time). */
+function amActivationAvailable() {
+  const hm = new Date().toLocaleTimeString("en-GB", {
+    timeZone: "America/Edmonton", hour: "2-digit", minute: "2-digit", hour12: false
+  });
+  const [h, m] = hm.split(":").map(Number);
+  return (h * 60 + m) < 390; // before 06:30
 }
 
 function sessionOptionsForDay(day) {
@@ -3081,6 +3092,7 @@ function wireEngagementPick() {
 function renderBrief(data) {
   const day = DAYS[selectedDay];
   const locked = gateLocked();
+  const showAm = !!day.amActivation && amActivationAvailable();
 
   const circuitsHtml = data.circuits.map(c => {
     const exHtml = c.exercises.map(ex => {
@@ -3144,7 +3156,7 @@ function renderBrief(data) {
         </div>
         ${day.poolLoad === "double" ? `<div class="caveat-note" style="margin:0.2rem 0 0;">🔁 Two-a-day: the readiness light governs load — no separate skip-gate. Heavy leg add-on only on Green + PM pool skipped by 4 PM.</div>` : ""}
       </div>
-      ${day.amActivation ? `<div class="brief-section"><strong>🌅 AM Micro-Activation</strong> · ~4–5 min, at home before the pool
+      ${showAm ? `<div class="brief-section"><strong>🌅 AM Micro-Activation</strong> · ~4–5 min, at home before the pool
         <div class="caveat-note" style="margin:0.2rem 0 0;">Wakes the system — not a workout. Optional, run it standalone.</div></div>` : ""}
       ${rulesHtml}
       ${eqHtml}
@@ -3155,7 +3167,7 @@ function renderBrief(data) {
       📱 Put your phone on the floor where you can see it — then leave it there.
     </div>
     <div class="btn-row" id="brief-btns">
-      ${day.amActivation ? `<button class="btn" id="btn-amact">🌅 AM Activation</button>` : ""}
+      ${showAm ? `<button class="btn" id="btn-amact">🌅 AM Activation</button>` : ""}
       ${canResume ? `<button class="btn" id="btn-restart">RESTART DAY</button>
         <button class="btn btn-primary" id="btn-resume">RESUME ▶</button>`
       : `<button class="btn btn-primary" id="btn-ready" ${introPlaying ? "disabled" : ""}>${introPlaying ? "INTRO PLAYING..." : "READY ✓"}</button>`}
