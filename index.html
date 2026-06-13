@@ -967,6 +967,26 @@
     background: var(--accent-yellow); cursor: pointer; font-size: 1.2rem; line-height: 1;
   }
   .lad-val { font-family: 'Caveat', cursive; font-size: 1.05rem; }
+
+  /* zone / paused chips */
+  .zone-chip { display:inline-block; font-size:0.65rem; font-weight:700; color:var(--ink);
+    border:1.5px solid var(--ink); border-radius:8px; padding:0 5px; vertical-align:middle; }
+  .paused-chip { display:inline-block; font-size:0.7rem; background:var(--paper-line); color:var(--ink-light);
+    border:1.5px solid var(--paper-line); border-radius:8px; padding:0 6px; margin-left:6px; }
+  /* intent word picker */
+  .intent-opts { display:flex; gap:0.4rem; justify-content:center; flex-wrap:wrap; margin-top:0.6rem; }
+  .intent-opt { padding:0.6rem 1rem; border:2px solid var(--ink); border-radius:14px; background:var(--accent-yellow);
+    font-family:'Patrick Hand',sans-serif; font-size:1.1rem; cursor:pointer; }
+  .intent-opt.correct { background:#c9f5d2; box-shadow:2px 2px 0 var(--ink); }
+  /* engagement options */
+  .engage-opts { display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.3rem; }
+  .engage-opt { flex:1 1 45%; padding:0.5rem 0.7rem; border:2px solid var(--ink); border-radius:var(--radius-sm);
+    background:var(--bg2); cursor:pointer; font-family:'Patrick Hand',sans-serif; font-size:0.95rem; text-align:center; }
+  .engage-opt small { color:var(--ink-light); font-family:'Caveat',cursive; }
+  /* paused overload table */
+  .overload-table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:0.3rem; }
+  .overload-table th, .overload-table td { border:1px solid var(--paper-line); padding:2px 5px; text-align:center; }
+  .overload-table th { background:var(--bg2); }
 </style>
 
 
@@ -1356,6 +1376,35 @@ const ER = (name, repsDetail, rest, reset, cue, redFlag, opts = {}) => ({
    ------------------------------------------------------------ */
 const yt = q => "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
 const EXERCISE_HOWTO = {
+  // — 2026.2 swim-skill / AM-activation drills —
+  "Chair High-Elbow Catch": {
+    text: "Stand bent over a chair-back (or table). With one arm, set a high-elbow catch: forearm turns IN, elbow stays HIGH, fingertips point down. Reach, catch, finish past the hip. Fixes the straight-arm pull.",
+    search: "high elbow catch drill on land chair"
+  },
+  "Towel-Band Catch Pull": {
+    text: "Hold a towel or band anchored high. Lead with a bent elbow, pull long and finish the stroke PAST your hip — feel the lats, not the shoulders.",
+    search: "band lat pull swimming catch drill"
+  },
+  "Long-Axis Rotation Roll": {
+    text: "Lie in a back-streamline (arms overhead, legs lifted). Roll your whole body as one unit side to side, driving the rotation from the hips — no bending in the middle.",
+    search: "long axis rotation core drill swimming"
+  },
+  "Side-Lying Breath Rehearsal": {
+    text: "Lie on your side. Exhale/hum with your face down, rotate so one ear stays in the 'water', take a quick sip of air, return to neutral. Continuous exhale — never hold your breath.",
+    search: "side lying freestyle breathing drill"
+  },
+  "Breaststroke Kick Shape": {
+    text: "On your front or back: draw heels toward your seat, sweep the feet out and around, then snap them together. Kick shape only — no arm stroke.",
+    search: "breaststroke kick technique drill"
+  },
+  "Standing Scap Squeeze": {
+    text: "Stand tall, arms at your sides or in a W. Squeeze your shoulder blades down and together, hold 2 seconds, release. Wakes up the lats and scap stabilizers.",
+    search: "standing scapular retraction squeeze"
+  },
+  "Standing Hollow Brace": {
+    text: "Stand tall, ribs down, belly braced — rehearse the flat-back 'hollow' shape you want in streamline. Hold 10 seconds, breathe.",
+    search: "standing hollow body brace posture"
+  },
   // — Opus-coined / descriptive labels —
   "Hollow-Body Flutter": {
     text: "Lie on your back in a hollow-body hold (lower back PRESSED into the floor, head + shoulders + legs lifted), then flutter-kick your legs quickly. Core stays braced the whole time.",
@@ -1539,6 +1588,67 @@ const FINISHER = () => [
       swimTransfer: "Shoulder control / decompression" })
 ];
 
+/* Swim-Skill / Catch + Breath block = the pre-pool A/B rehearsal (one slot).
+   A on Mon/Wed/Fri, B on Tue/Thu, short touch on Sat. Headline = Chair
+   High-Elbow Catch (fixes the straight-arm fault; serves free/back/fly).
+   De-duplicated from main; breath = continuous exhale (hum), not breath-hold. */
+const SWIMSKILL_A = () => [
+  X({ name: "Chair High-Elbow Catch", block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
+      cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm. [free/back/fly]",
+      swimTransfer: "High-elbow catch", searchableName: "high elbow catch drill chair" }),
+  X({ name: "Towel-Band Catch Pull", block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
+      cue: "Bent elbow leads, pull long, finish PAST the hip.",
+      swimTransfer: "Catch-to-finish pull", searchableName: "band lat pulldown swim catch" }),
+  X({ name: "Long-Axis Rotation Roll", block: "swimskill", driver: "reps", repsDetail: "6/side", dose: "6/side",
+      cue: "Back-streamline, legs lifted, roll as one unit — drive from the hip.",
+      swimTransfer: "Long-axis rotation", searchableName: "long axis rotation drill dryland" }),
+  X({ name: "Side-Lying Breath Rehearsal", block: "swimskill", driver: "reps", repsDetail: "2×6/side", dose: "2×6/side",
+      cue: "Exhale/hum face-down, rotate (one ear in water), quick sip, neutral.",
+      swimTransfer: "Breath timing", searchableName: "side lying breathing drill swimming" }),
+  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+      cue: "Ribs down, long body, hum the breath.",
+      swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
+];
+const SWIMSKILL_B = () => [
+  X({ name: "Chair High-Elbow Catch", block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
+      cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm. [free/back/fly]",
+      swimTransfer: "High-elbow catch", searchableName: "high elbow catch drill chair" }),
+  X({ name: "Forearm Plank Dolphin Undulation", block: "swimskill", driver: "reps", repsDetail: "~24", dose: "~24",
+      cue: "Wave from chest/hip, not the knees.",
+      swimTransfer: "Stroke patterning", searchableName: "forearm plank dolphin undulation" }),
+  X({ name: "Breaststroke Kick Shape", block: "swimskill", driver: "reps", repsDetail: "~20", dose: "~20 (kick only)",
+      cue: "Heels to seat, sweep, snap together — kick only, no arms.",
+      swimTransfer: "Breaststroke kick", searchableName: "breaststroke kick technique on land" }),
+  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+      cue: "Ribs down, long body, hum the breath.",
+      swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
+];
+const SWIMSKILL_SAT = () => [
+  X({ name: "Chair High-Elbow Catch", block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
+      cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm. [free/back/fly]",
+      swimTransfer: "High-elbow catch", searchableName: "high elbow catch drill chair" }),
+  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+      cue: "Ribs down, long body, hum the breath.",
+      swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
+];
+
+/* AM Micro-Activation — ~4–5 min at-home block on pool-morning days (own block). */
+const AM_ACTIVATION = () => [
+  X({ name: "Cat-Camel", block: "amActivation", driver: "reps", repsDetail: "8 slow cycles", dose: "8 cycles", cue: "Un-stiffen the back, segment by segment." }),
+  X({ name: "Standing Scap Squeeze", block: "amActivation", driver: "reps", repsDetail: "10 · 2s hold", dose: "10 · 2s", cue: "Switch on the lats / scap stabilizers." }),
+  X({ name: "Glute Bridge", block: "amActivation", driver: "reps", repsDetail: "10 · 1s top", dose: "10 · 1s top", cue: "Posterior chain — squeeze the top." }),
+  X({ name: "Standing Hollow Brace", block: "amActivation", driver: "time", work: 30, dose: "3×10s", cue: "Rehearse the flat-back before water." }),
+  X({ name: "Leg Swings", block: "amActivation", driver: "reps", repsDetail: "8/dir/leg", dose: "8/dir/leg", cue: "Front-back + lateral — open the hips." }),
+  X({ name: "Easy March / Light Jog", block: "amActivation", driver: "time", work: 20, dose: "20s", cue: "Gentle pulse raise." })
+];
+
+/* Coach-handoff + breath-fork notes shown on the swim-skill brief. */
+const COACH_HANDOFF = "Timing is a WATER skill — hand the coach: catch-up · 6-kick switch · single-arm freestyle. Land builds the parts (catch shape, body line, kick posture); the pool assembles the timing.";
+const BREATH_DECISION = "Breath = continuous exhale (hum / bubbles), NOT breath-hold-for-float. This overrides the hold-to-float video because breath-holding feeds the hip-sink fault. Coach preference overrides this.";
+
+/* Intent words picked AFTER Round 1 (targets what R1 revealed). */
+const INTENT_WORDS = ["FAST", "LOCK", "PUSH", "HOLD", "DRIVE"];
+
 const DAYS = {
   monday: {
     title: "Pull + Hip Drive",
@@ -1550,6 +1660,7 @@ const DAYS = {
     defaultLight: "green",
     timeLo: 18, timeHi: 22,
     equipment: ["Jump rope", "Resistance band", "Pull-up bar", "Mat"],
+    prSentinel: "Clean Pull-Ups — clean reps in Round 1",
     blocks: {
       warmup: [
         X({ name: "Jump Rope", block: "warmup", driver: "time", work: 75, dose: "60–90s", cue: "Off the toes, quiet, tall." }),
@@ -1581,17 +1692,12 @@ const DAYS = {
             parentWatch: "Pelvis tilts / drops", fix: "Slow down, level the pelvis.",
             swimTransfer: "Hip = the motor" }),
         X({ name: "Single-Leg Balance Reach", block: "main", driver: "time", work: 40, eachSide: true, dose: "20s/side",
-            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe.",
+            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe. Progress: eyes-open → eyes-closed → folded towel.",
             parentWatch: "Knee caves inward", fix: "Reach shorter, slow down.",
             swimTransfer: "Start / turn line" })
       ],
       finisher: FINISHER(),
-      swimskill: [
-        X({ name: "Streamline Shape Rehearsal", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
-            cue: "Ribs down, long body, hands stacked.", swimTransfer: "Tighter streamline" }),
-        X({ name: "Prone Dolphin Kick", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
-            cue: "Wave from the chest, not the knees.", swimTransfer: "Stroke patterning" })
-      ]
+      swimskill: SWIMSKILL_A()
     },
     prepMenu: []
   },
@@ -1606,6 +1712,8 @@ const DAYS = {
     defaultLight: "yellow",
     timeLo: 18, timeHi: 18,
     equipment: ["Resistance band", "Dowel", "Mat"],
+    prSentinel: "Hollow Tuck Flutter — seconds held flat",
+    amActivation: AM_ACTIVATION(),
     blocks: {
       warmup: [
         X({ name: "Wall Slides", block: "warmup", driver: "reps", repsDetail: "8", dose: "8", cue: "Back on wall, ribs down — no arching." }),
@@ -1637,17 +1745,12 @@ const DAYS = {
             parentWatch: "Rounding the back", fix: "Hinge from the hip, flat back.",
             swimTransfer: "Hip drive for the start" }),
         X({ name: "Single-Leg Balance Reach", block: "main", driver: "time", work: 40, eachSide: true, dose: "20s/side",
-            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe.",
+            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe. Progress: eyes-open → eyes-closed → folded towel.",
             parentWatch: "Knee caves inward", fix: "Reach shorter, slow down.",
             swimTransfer: "Start / turn line" })
       ],
       finisher: FINISHER(),
-      swimskill: [
-        X({ name: "Floor Body-Line Hold", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
-            cue: "Flat back, one straight line.", swimTransfer: "Streamline shape" }),
-        X({ name: "Catch-Position Hold", block: "swimskill", driver: "time", work: 30, dose: "2×15s",
-            cue: "High elbow, fingertips down.", swimTransfer: "Stronger catch" })
-      ]
+      swimskill: SWIMSKILL_B()
     },
     prepMenu: [
       X({ name: "Pallof Press", block: "main", driver: "reps", repsDetail: "10/side · 2s hold", dose: "10/side · 2s hold",
@@ -1671,6 +1774,7 @@ const DAYS = {
     defaultLight: "yellow",
     timeLo: 20, timeHi: 20,
     equipment: ["Jump rope", "Pull-up bar", "Mat"],
+    prSentinel: "Drop-and-Stick — clean landings out of 5",
     blocks: {
       warmup: [
         X({ name: "Jump Rope", block: "warmup", driver: "time", work: 75, dose: "60–90s", cue: "Off the toes, quiet, tall." }),
@@ -1703,7 +1807,7 @@ const DAYS = {
             parentWatch: "Pelvis tilts / drops", fix: "Slow down, level the pelvis.",
             swimTransfer: "Hip = the motor" }),
         X({ name: "Single-Leg Balance Reach", block: "main", driver: "time", work: 40, eachSide: true, dose: "20s/side",
-            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe.",
+            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe. Progress: eyes-open → eyes-closed → folded towel.",
             parentWatch: "Knee caves inward", fix: "Reach shorter, slow down.",
             swimTransfer: "Start / turn line" }),
         X({ name: "Drop-and-Stick", block: "main", driver: "reps", repsDetail: "5 · hold 3s", dose: "5 · hold 3s",
@@ -1713,12 +1817,7 @@ const DAYS = {
             swimTransfer: "Turn / landing absorption" })
       ],
       finisher: FINISHER(),
-      swimskill: [
-        X({ name: "Prone Dolphin Kick", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
-            cue: "Wave from the chest, not the knees.", swimTransfer: "Stroke patterning" }),
-        X({ name: "Streamline Shape Rehearsal", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
-            cue: "Ribs down, long body, hands stacked.", swimTransfer: "Tighter streamline" })
-      ]
+      swimskill: SWIMSKILL_A()
     },
     prepMenu: []
   },
@@ -1733,6 +1832,7 @@ const DAYS = {
     defaultLight: "yellow",
     timeLo: 19, timeHi: 19,
     equipment: ["Resistance band", "Mat"],
+    prSentinel: "Hollow Tuck Flutter — seconds held flat",
     blocks: {
       warmup: [
         X({ name: "Band Pass-Through", block: "warmup", driver: "reps", repsDetail: "8–10", dose: "8–10", cue: "Wide, slow, no shrug." }),
@@ -1765,17 +1865,12 @@ const DAYS = {
             parentWatch: "Pelvis tilts / drops", fix: "Slow down, level the pelvis.",
             swimTransfer: "Hip = the motor" }),
         X({ name: "Single-Leg Balance Reach", block: "main", driver: "time", work: 40, eachSide: true, dose: "20s/side",
-            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe.",
+            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe. Progress: eyes-open → eyes-closed → folded towel.",
             parentWatch: "Knee caves inward", fix: "Reach shorter, slow down.",
             swimTransfer: "Start / turn line" })
       ],
       finisher: FINISHER(),
-      swimskill: [
-        X({ name: "Catch-Position Hold", block: "swimskill", driver: "time", work: 30, dose: "2×15s",
-            cue: "High elbow, fingertips down.", swimTransfer: "Stronger catch" }),
-        X({ name: "Floor Body-Line Hold", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
-            cue: "Flat back, one straight line.", swimTransfer: "Streamline shape" })
-      ]
+      swimskill: SWIMSKILL_B()
     },
     prepMenu: [
       X({ name: "Band External Rotation", block: "main", driver: "reps", repsDetail: "12/side", dose: "12/side",
@@ -1799,6 +1894,8 @@ const DAYS = {
     defaultLight: "green",
     timeLo: 19, timeHi: 23,
     equipment: ["Jump rope", "Resistance band", "Dowel", "Mat"],
+    prSentinel: "Hollow Tuck Flutter — seconds held flat",
+    amActivation: AM_ACTIVATION(),
     blocks: {
       warmup: [
         X({ name: "Jump Rope", block: "warmup", driver: "time", work: 75, dose: "60–90s", cue: "Off the toes, quiet, tall." }),
@@ -1831,17 +1928,12 @@ const DAYS = {
             parentWatch: "Rounding the back", fix: "Hinge from the hip, flat back.",
             swimTransfer: "Hip drive for the start" }),
         X({ name: "Single-Leg Balance Reach", block: "main", driver: "time", work: 40, eachSide: true, dose: "20s/side",
-            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe.",
+            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe. Progress: eyes-open → eyes-closed → folded towel.",
             parentWatch: "Knee caves inward", fix: "Reach shorter, slow down.",
             swimTransfer: "Start / turn line" })
       ],
       finisher: FINISHER(),
-      swimskill: [
-        X({ name: "Streamline Shape Rehearsal", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
-            cue: "Ribs down, long body, hands stacked.", swimTransfer: "Tighter streamline" }),
-        X({ name: "Catch-Position Hold", block: "swimskill", driver: "time", work: 30, dose: "2×15s",
-            cue: "High elbow, fingertips down.", swimTransfer: "Stronger catch" })
-      ]
+      swimskill: SWIMSKILL_A()
     },
     prepMenu: [
       X({ name: "Pallof Press", block: "main", driver: "reps", repsDetail: "10/side · 2s hold", dose: "10/side · 2s hold",
@@ -1865,6 +1957,7 @@ const DAYS = {
     defaultLight: "green",
     timeLo: 23, timeHi: 28,
     equipment: ["Jump rope", "Pull-up bar", "Med ball / partner", "Mat"],
+    prSentinel: "Drop-and-Stick — clean landings out of 5",
     blocks: {
       warmup: [
         X({ name: "Jump Rope", block: "warmup", driver: "time", work: 75, dose: "60–90s", cue: "Off the toes, quiet, tall." }),
@@ -1900,7 +1993,7 @@ const DAYS = {
             parentWatch: "Pelvis tilts / drops", fix: "Slow down, level the pelvis.",
             swimTransfer: "Hip = the motor" }),
         X({ name: "Single-Leg Balance Reach", block: "main", driver: "time", work: 40, eachSide: true, dose: "20s/side",
-            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe.",
+            reset: "Quiet foot, knee over toe.", cue: "Quiet foot, knee over toe. Progress: eyes-open → eyes-closed → folded towel.",
             parentWatch: "Knee caves inward", fix: "Reach shorter, slow down.",
             swimTransfer: "Start / turn line" }),
         X({ name: "Drop-and-Stick", block: "main", driver: "reps", repsDetail: "5 · hold 3s", dose: "5 · hold 3s",
@@ -1910,14 +2003,7 @@ const DAYS = {
             swimTransfer: "Turn / landing absorption" })
       ],
       finisher: FINISHER(),
-      swimskill: [
-        X({ name: "Streamline Shape Rehearsal", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
-            cue: "Ribs down, long body, hands stacked.", swimTransfer: "Tighter streamline" }),
-        X({ name: "Prone Dolphin Kick", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
-            cue: "Wave from the chest, not the knees.", swimTransfer: "Stroke patterning" }),
-        X({ name: "Catch-Position Hold", block: "swimskill", driver: "time", work: 30, dose: "2×15s",
-            cue: "High elbow, fingertips down.", swimTransfer: "Stronger catch" })
-      ]
+      swimskill: SWIMSKILL_SAT()
     },
     prepMenu: [
       X({ name: "Partner Ball Toss", block: "main", driver: "reps", repsDetail: "2×8", dose: "2×8",
@@ -1968,7 +2054,10 @@ const STANDING_RULES = [
   "Coordination / sprint always FRESH — first after warm-up, never to fatigue."
 ];
 
-const ENGAGEMENT_SYSTEMS = {};
+const ENGAGEMENT_SYSTEMS = {
+  peer: { label: "Peer Challenge vs Parent", desc: "Same marker, parent genuinely tries. Reveal after both are done." },
+  roleflip: { label: "Role Flip", desc: "Jess demos one exercise + gives the parent ONE coaching cue." }
+};
 
 const DAY_KEYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -2778,8 +2867,17 @@ function renderSchedule() {
 const BLOCK_ORDER = ["warmup", "coordination", "main", "finisher", "swimskill"];
 const BLOCK_LABEL = {
   warmup: "Warm-up", coordination: "Coordination", main: "Main Circuit",
-  prep: "Prep Pair", finisher: "Finisher", swimskill: "Swim-Skill"
+  prep: "Prep Pair", finisher: "Finisher", swimskill: "Swim-Skill", amActivation: "AM Micro-Activation"
 };
+
+/* HR zones re-mapped to blocks (guide, not a target). Z2 easy, Z3 main, Z4 power. */
+const BLOCK_HR = { warmup: "z2", coordination: "z4", main: "z3", prep: "z3",
+  finisher: "z2", swimskill: "z2", amActivation: "z2" };
+function blockZone(blockKey) { return HR_ZONES[BLOCK_HR[blockKey] || "z2"] || HR_ZONES.z2; }
+function zoneChip(blockKey) {
+  const z = blockZone(blockKey);
+  return `<span class="zone-chip" style="background:${z.color}" title="${z.bpm}">${(BLOCK_HR[blockKey] || "z2").toUpperCase()}</span>`;
+}
 
 // Persistence keys + tiny JSON helpers (2026.2 records)
 const LS_READINESS   = "swim_readiness";
@@ -2922,6 +3020,8 @@ function renderSpaBrief(day) {
         <strong>🌬️ Breathing</strong>
         <div class="caveat-note" style="margin:0.2rem 0 0;">3-count nasal breathing — in through the nose 3, out through the mouth 3.</div>
       </div>
+      ${renderSundayTouch()}
+      ${renderEngagementPick()}
     </div>
     <div class="caveat-note" style="text-align:center;">No main, no finisher. Recovery is scheduled, not optional.</div>
     <div class="btn-row">
@@ -2934,6 +3034,48 @@ function renderSpaBrief(day) {
     closeModalAborted = true; skipGreetingOnStart = true;
     await startSession();
   };
+  wireSundayTouch();
+  wireEngagementPick();
+}
+
+/* Weekly Sunday touch — light ~5 min: review PR log + set ONE focus for next week.
+   Separate from the (deferred) biweekly outcome review. */
+function renderSundayTouch() {
+  const log = loadJSON("swim_pr_log", []);
+  const focus = loadJSON("swim_week_focus", {});
+  const recent = log.slice(0, 5).map(r =>
+    `<li class="ex-line"><span>${(r.day || "").slice(0,3)} · ${r.label}</span><span class="ex-meta">${r.value}</span></li>`).join("");
+  return `<div class="brief-section">
+    <strong>🗓️ Weekly Sunday touch</strong> · ~5 min
+    <div class="caveat-note" style="margin:0.2rem 0 0.3rem;">Review your log, watch ONE reference video, set ONE focus.</div>
+    ${recent ? `<ul>${recent}</ul>` : `<div class="caveat-note">No PR numbers logged yet.</div>`}
+    <label class="lc-toggle" style="margin-top:0.3rem;">One focus for next week:
+      <input type="text" id="week-focus-input" placeholder="e.g. ribs down on every hollow" value="${focus.text || ""}" style="width:100%;margin-top:0.2rem;"></label>
+  </div>`;
+}
+function wireSundayTouch() {
+  const inp = document.getElementById("week-focus-input");
+  if (inp) inp.onchange = () => saveJSON("swim_week_focus", { text: inp.value, date: new Date().toISOString() });
+}
+
+/* Weekly Engagement Pick — peer challenge vs role flip, one per week. */
+function renderEngagementPick() {
+  const active = activeEngagement();
+  const sys = active ? ENGAGEMENT_SYSTEMS[active] : null;
+  return `<div class="brief-section">
+    <strong>🎲 Weekly Engagement Pick</strong>
+    ${sys ? `<div class="caveat-note" style="margin:0.2rem 0;">✓ This week: <strong>${sys.label}</strong> — ${sys.desc}</div>` : ""}
+    <div class="caveat-note" style="margin:0.2rem 0 0.3rem;">Pick ONE for the coming week:</div>
+    <div class="engage-opts">
+      <button class="engage-opt" data-sys="peer">🏆 Peer Challenge<br><small>Same marker vs parent</small></button>
+      <button class="engage-opt" data-sys="roleflip">🔄 Role Flip<br><small>You demo + coach the parent</small></button>
+    </div>
+  </div>`;
+}
+function wireEngagementPick() {
+  document.querySelectorAll(".engage-opt").forEach(b => {
+    b.onclick = () => { setEngagementPick(b.dataset.sys); renderCard(); };
+  });
 }
 
 function renderBrief(data) {
@@ -2948,7 +3090,10 @@ function renderBrief(data) {
         <span class="ex-meta">${exMeta(ex)}</span></li>`;
     }).join("");
     const roundTag = c.block === "main" ? ` · ${c.rounds} round${c.rounds > 1 ? "s" : ""}` : " · no rounds";
-    return `<div class="brief-section"><strong>${c.name}</strong>${roundTag}<ul>${exHtml}</ul></div>`;
+    const notes = c.block === "swimskill"
+      ? `<div class="caveat-note" style="margin:0.3rem 0 0;">🤝 ${COACH_HANDOFF}</div>
+         <div class="caveat-note" style="margin:0.2rem 0 0;">🌬️ ${BREATH_DECISION}</div>` : "";
+    return `<div class="brief-section"><strong>${c.name}</strong> ${zoneChip(c.block)}${roundTag}<ul>${exHtml}</ul>${notes}</div>`;
   }).join("");
 
   const eqHtml = `<div class="brief-section"><strong>📦 Equipment</strong>
@@ -2993,7 +3138,14 @@ function renderBrief(data) {
       <div class="brief-section">
         <strong>🏊 ${poolText} · default ${effectiveLight().toUpperCase()} light</strong>
         ${ropeNote}
+        <div class="caveat-note" style="margin:0.2rem 0 0;">
+          ⌚ HR zones are a guide, not a target — if she can hum the breath, she isn't redlining.
+          <span class="paused-chip">⏸ progression paused</span>
+        </div>
+        ${day.poolLoad === "double" ? `<div class="caveat-note" style="margin:0.2rem 0 0;">🔁 Two-a-day: the readiness light governs load — no separate skip-gate. Heavy leg add-on only on Green + PM pool skipped by 4 PM.</div>` : ""}
       </div>
+      ${day.amActivation ? `<div class="brief-section"><strong>🌅 AM Micro-Activation</strong> · ~4–5 min, at home before the pool
+        <div class="caveat-note" style="margin:0.2rem 0 0;">Wakes the system — not a workout. Optional, run it standalone.</div></div>` : ""}
       ${rulesHtml}
       ${eqHtml}
       ${resumeHtml}
@@ -3003,11 +3155,15 @@ function renderBrief(data) {
       📱 Put your phone on the floor where you can see it — then leave it there.
     </div>
     <div class="btn-row" id="brief-btns">
+      ${day.amActivation ? `<button class="btn" id="btn-amact">🌅 AM Activation</button>` : ""}
       ${canResume ? `<button class="btn" id="btn-restart">RESTART DAY</button>
         <button class="btn btn-primary" id="btn-resume">RESUME ▶</button>`
       : `<button class="btn btn-primary" id="btn-ready" ${introPlaying ? "disabled" : ""}>${introPlaying ? "INTRO PLAYING..." : "READY ✓"}</button>`}
     </div>
     ${renderQuizEntry()}`;
+
+  const amBtn = document.getElementById("btn-amact");
+  if (amBtn) amBtn.onclick = () => { if (!introPlaying) runAmActivation(); };
 
   if (canResume) {
     document.getElementById("btn-resume").onclick = () => {
@@ -3727,6 +3883,54 @@ function stopElapsed() {
    SESSION FLOW
    ============================================================ */
 
+/* AM Micro-Activation — standalone mini-runner (no PR / no day-progress). */
+async function runAmActivation() {
+  const day = DAYS[selectedDay];
+  if (!day || !day.amActivation || session.running) return;
+  ensureAudio();
+  const list = day.amActivation;
+  session = { running: true, paused: false, abort: false, skipExercise: false,
+    currentTimer: null, byRepsResolver: null, calmMode: false, currentEx: null,
+    weather: session.weather, skipped: [], doneHoldTimeout: null, doneHoldTriggered: false,
+    perExercise: [], microLoop: null, intentWord: null };
+  plannedSessionSecs = 300; elapsedActiveSecs = 0;
+  renderSessionShell({ badge: day.badge, title: "AM Micro-Activation", subtitle: "~4–5 min · wake the system" });
+  setSessionControls();
+  setStatus("AM Activation");
+  setExercise({ name: "Wake up gently", cue: "Smooth movement only. Save your effort for the pool." });
+  await speakAndWait("Morning activation. Smooth movement, wake the system. Save your effort for the pool.");
+  startElapsed();
+  function finishAm() {
+    if (session.currentTimer) clearInterval(session.currentTimer);
+    session.running = false; stopElapsed();
+    setZone(""); setStatus("AM Activation done ✓"); setTimer("✓");
+    setExercise({ name: "Nice and awake!", cue: "Now head to the pool — save the main session for later." });
+    setUpNext("");
+    speak("Activation complete. Off to the pool.");
+    document.getElementById("controls").innerHTML = `<button class="btn btn-primary" id="btn-back">DONE</button>`;
+    document.getElementById("btn-back").onclick = () => renderCard();
+  }
+  for (let i = 0; i < list.length; i++) {
+    const ex = list[i]; session.skipExercise = false; session.currentEx = ex;
+    setZone("warmup"); setStatus("AM Micro-Activation");
+    setProgress([{ text: "AM Activation", phase: true }, { text: `${i + 1}/${list.length}` }]);
+    setUpNext(i + 1 < list.length ? `<span class="label">Up next:</span> <span class="name">${list[i + 1].name}</span>` : "");
+    if (ex.byReps) {
+      setExercise({ name: ex.name, detail: ex.dose, cue: ex.cue });
+      await speakAndWait(`${ex.name}. ${ex.cue || ""} Go.`);
+      const r = await runRepsWithVoice(ex); if (r === "abort") return finishAm();
+      setSessionControls();
+    } else {
+      setExercise({ name: ex.name, detail: ex.dose || `${ex.work}s`, cue: ex.cue });
+      setTimer(ex.work);
+      await speakAndWait(`${ex.name}. ${ex.cue || ""} Three, two, one, go.`);
+      const r = await countdown(ex.work); if (r === "abort") return finishAm();
+    }
+    if (i < list.length - 1) await sleep(800);
+  }
+  finishAm();
+}
+
 async function startSession() {
   ensureAudio();
   if (session.running) return;
@@ -3737,7 +3941,7 @@ async function startSession() {
     currentTimer: null, byRepsResolver: null,
     calmMode: false, currentEx: null, weather: session.weather,
     skipped: [], doneHoldTimeout: null, doneHoldTriggered: false,
-    perExercise: [], microLoop: null
+    perExercise: [], microLoop: null, intentWord: null
   };
 
   // Apply skipGreetingOnStart if set
@@ -3893,6 +4097,11 @@ async function startSession() {
           const isLastCircuit = ci === data.circuits.length - 1;
 
           if (isLastOfRound && !(isLastRound && isLastCircuit)) {
+            // Intent word AFTER Round 1 of the main block (targets what R1 revealed)
+            if (circuit.block === "main" && r === 1 && !session.intentWord) {
+              const iw = await intentWordPrompt();
+              if (iw === "abort") return finalize(false);
+            }
             // Round rest
             setZone("roundrest");
             setStatus("Round rest");
@@ -4115,6 +4324,8 @@ function finalize(completed) {
         roundsDone: isSpa ? 0 : mainRounds(),
         perExercise: session.perExercise || [],
         microLoop: session.microLoop || null,
+        intentWord: session.intentWord || null,
+        prSentinel: isSpa ? null : (DAYS[selectedDay] && DAYS[selectedDay].prSentinel) || null,
         skippedCount: session.skipped.length,
         completedFully: true
       };
@@ -4213,15 +4424,13 @@ function showReflection() {
   const wkData = tracker[`week${week}`] || {};
 
   const active = getActiveData();
-  const prMetrics = (selectedSession === "main" && active.prTargets) || [];
-  const inputsHtml = prMetrics.length ? `
+  const sentinel = !active.spa && DAYS[selectedDay] ? DAYS[selectedDay].prSentinel : null;
+  const inputsHtml = sentinel ? `
     <div class="post-session-inputs">
-      <h4>📊 PR Board — Week ${week}</h4>
-      ${prMetrics.map((metric, i) => `
-        <label>${metric.label}</label>
-        <input type="${metric.type}" data-pr-key="${metric.key}" ${metric.type === "number" ? 'min="0" max="200"' : ''}
-               placeholder="${metric.ph}" value="${wkData[metric.key] || ''}">`).join("")}
-      <div class="caveat-note" style="margin:0.3rem 0 0;">Log clean numbers only - no grinding.</div>
+      <h4>📊 PR-of-the-day — say it aloud</h4>
+      <label>${sentinel}</label>
+      <input type="number" id="pr-sentinel-input" min="0" max="999" placeholder="your number">
+      <div class="caveat-note" style="margin:0.3rem 0 0;">One land-sentinel number. Say it out loud, then log it.</div>
     </div>
   ` : '';
 
@@ -4283,6 +4492,13 @@ function showReflection() {
       if (input.value) t[w][input.dataset.prKey] = input.value;
     });
     saveTracker(t);
+    // PR-of-the-day land-sentinel log
+    const prInput = document.getElementById("pr-sentinel-input");
+    if (prInput && prInput.value && sentinel) {
+      const log = loadJSON("swim_pr_log", []);
+      log.unshift({ date: new Date().toISOString(), day: selectedDay, label: sentinel, value: Number(prInput.value) });
+      saveJSON("swim_pr_log", log.slice(0, 60));
+    }
     // Patch mood + PR metric back to the Firestore doc (fire-and-forget)
     if (_pendingFsId) {
       const patch = {};
@@ -4618,8 +4834,36 @@ function openLearningPanel() {
         <label class="lc-toggle"><input type="checkbox" id="gate-toggle" ${g.unlocked ? "checked" : ""}>
           Streamline Dry Jump unlocked (parent-confirmed)</label>
       </div>
+      <div class="brief-section">
+        <strong>⏸ Progressive Overload — PAUSED</strong>
+        <div class="caveat-note" style="margin:0.2rem 0 0.3rem;">
+          Stored, not applied. Unlocks only when base execution is verified clean (filmed/observed) —
+          loading a broken pattern just bakes it in.
+        </div>
+        <table class="overload-table">
+          <tr><th>Parameter</th><th>Wk1–2</th><th>Wk3–4</th><th>Wk5–6</th></tr>
+          <tr><td>Core timed holds</td><td>30s</td><td>32s</td><td>34s</td></tr>
+          <tr><td>Drop-and-Stick rep-cap</td><td>Base</td><td>Base</td><td>+1</td></tr>
+          <tr><td>Rep-based strength</td><td>Base</td><td>+1</td><td>+2</td></tr>
+          <tr><td>Pull-Up eccentric</td><td>4s</td><td>5s</td><td>6s</td></tr>
+          <tr><td>Coordination + rope</td><td colspan="3">Fixed — never progressed</td></tr>
+        </table>
+      </div>
+      <div class="brief-section">
+        <strong>📊 PR-of-the-day log</strong>
+        <div id="pr-log-list"></div>
+      </div>
+      <div class="brief-section">
+        <strong>🌬️ Breath decision (recorded)</strong>
+        <div class="caveat-note" style="margin:0.2rem 0 0;">${BREATH_DECISION}</div>
+      </div>
     </div>
     <div class="btn-row"><button class="btn btn-primary" id="learn-back">← Back</button></div>`;
+  const prLog = loadJSON("swim_pr_log", []);
+  const prSlot = document.getElementById("pr-log-list");
+  prSlot.innerHTML = prLog.length
+    ? `<ul>${prLog.slice(0, 10).map(r => `<li class="ex-line"><span>${(r.date || "").slice(0,10)} · ${r.label}</span><span class="ex-meta">${r.value}</span></li>`).join("")}</ul>`
+    : `<div class="caveat-note">No PR numbers logged yet.</div>`;
   const list = document.getElementById("ladder-list");
   TOP7.forEach(name => {
     const row = document.createElement("div");
@@ -4668,6 +4912,34 @@ async function runSwimSkillExtras(data) {
   if (featuresRolledIn() && Math.random() < 0.6) {
     await maybeLearnThisOne(data);
   }
+}
+
+/* Intent word picked AFTER Round 1 — one word for rounds 2–3. */
+function intentWordPrompt() {
+  return new Promise(resolve => {
+    setZone("rest");
+    setStatus("Pick your word");
+    document.getElementById("exercise").innerHTML = `
+      <div class="ex-name">After Round 1 — pick ONE word</div>
+      <div class="ex-cue">What fixes what you just felt? Say it out loud for Rounds 2–3.</div>
+      <div class="intent-opts">${INTENT_WORDS.map(w =>
+        `<button class="intent-opt" data-w="${w}">${w}</button>`).join("")}</div>`;
+    speakIfIdle("After round one — pick one word to fix what you felt. Say it out loud.");
+    const card = document.getElementById("exercise");
+    const watchdog = setInterval(() => {
+      if (session.abort) { clearInterval(watchdog); resolve("abort"); }
+    }, 200);
+    card.querySelectorAll(".intent-opt").forEach(b => {
+      b.onclick = () => {
+        clearInterval(watchdog);
+        session.intentWord = b.dataset.w;
+        card.querySelectorAll(".intent-opt").forEach(x => { x.disabled = true; if (x === b) x.classList.add("correct"); });
+        speakIfIdle(b.dataset.w + "! Carry it into rounds two and three.");
+        setTimeout(() => resolve("done"), 700);
+      };
+    });
+    setTimeout(() => { clearInterval(watchdog); resolve("done"); }, 15000);
+  });
 }
 
 function microLoopPrompt() {
