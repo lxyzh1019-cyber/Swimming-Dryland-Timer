@@ -950,7 +950,14 @@
   .quiz-opt.wrong   { background: #ffd1c7; }
   .quiz-fb { text-align: center; min-height: 1.8rem; margin-top: 0.6rem; }
   .fb-ok { color: #2e9e57; font-family: 'Gochi Hand', cursive; font-size: 1.6rem; }
-  .fb-no { color: #d4612f; font-family: 'Caveat', cursive; font-size: 1.4rem; }
+  .fb-no { color: #d4612f; font-family: 'Gochi Hand', cursive; font-size: 1.5rem; }
+  .quiz-explain {
+    margin: 0.6rem auto 0; max-width: 30rem; text-align: left;
+    background: #eaf6ff; border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    padding: 0.8rem 1rem; box-shadow: 2px 2px 0 var(--ink);
+  }
+  .quiz-explain .qe-ans { font-family: 'Gochi Hand', cursive; font-size: 1.35rem; color: #2e7d32; margin-bottom: 0.3rem; }
+  .quiz-explain .qe-why { font-size: 1.2rem; line-height: 1.4; }
 
   /* Micro-loop + learn card + ladder */
   .microloop { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; margin-top: 0.6rem; }
@@ -4623,43 +4630,53 @@ const LEARNING_BANK = [
   { id: "ya1", category: "quiz", faultTheme: "fatigue", type: "mc",
     q: "You feel really sore the next day. Does that mean the workout was good?",
     answer: "No — sore doesn't mean better. Smooth and clean is the goal.",
-    distractors: ["Yes, more sore = more strong", "Yes, you should add reps next time"] },
+    distractors: ["Yes, more sore = more strong", "Yes, you should add reps next time"],
+    explain: "Being sore just means your muscles are waking up — it doesn't mean you got faster. Clean, smooth reps are what help your swimming." },
   { id: "ya2", category: "quiz", faultTheme: "reps", type: "mc",
     q: "What matters more in dryland?",
     answer: "A few clean reps with good shape",
-    distractors: ["As many reps as possible", "Finishing fastest"] },
+    distractors: ["As many reps as possible", "Finishing fastest"],
+    explain: "A few reps with a great shape beat lots of sloppy ones. Better reps, not more reps." },
   { id: "ya3", category: "quiz", faultTheme: "breath", type: "mc",
     q: "Your coach can't hear you breathing on a hollow hold. What should you do?",
     answer: "Hum or count out loud — if they can't hear it, the rep doesn't count",
-    distractors: ["Hold your breath to stay tight", "Go faster to finish"] },
+    distractors: ["Hold your breath to stay tight", "Go faster to finish"],
+    explain: "Humming out loud proves you're breathing, not holding your breath. Holding your breath makes your hips sink in the water." },
   { id: "ya4", category: "quiz", faultTheme: "pain", type: "mc",
     q: "Your shoulder feels a sharp pinch on pull-ups. What's the rule?",
     answer: "Stop — sharp pain, pinching, or numbness means stop",
-    distractors: ["Push through one more set", "Switch arms and keep going"] },
+    distractors: ["Push through one more set", "Switch arms and keep going"],
+    explain: "Sharp pain, pinching, or numbness is your body saying STOP. Always stop and tell a grown-up — pushing through can hurt you." },
   { id: "ya5", category: "quiz", faultTheme: "freshness", type: "mc",
     q: "When do you do the sprint / coordination drills?",
     answer: "Fresh, right after the warm-up — never tired",
-    distractors: ["At the very end when you're tired", "Only if you have extra time"] },
+    distractors: ["At the very end when you're tired", "Only if you have extra time"],
+    explain: "Fast, springy drills need a fresh body, so they go right after the warm-up — never when you're worn out." },
   { id: "ya6", category: "quiz", faultTheme: "valgus", type: "mc",
     q: "On a landing, your knees fall inward. What should you do?",
     answer: "Stop, reset your stance, land slower with knees over toes",
-    distractors: ["Jump higher next time", "Land faster to get it over with"] },
+    distractors: ["Jump higher next time", "Land faster to get it over with"],
+    explain: "Knees caving inward isn't safe. Stop, set your feet, and land softly with your knees lined up over your toes." },
   { id: "ya7", category: "quiz", faultTheme: "self-check", type: "mc",
     q: "What's the kid rule for learning a movement?",
     answer: "Find one mistake, fix one thing, show one better rep",
-    distractors: ["Do it perfectly the first time", "Never make a mistake"] },
+    distractors: ["Do it perfectly the first time", "Never make a mistake"],
+    explain: "The rule is: find one mistake, fix one thing, show one better rep. You don't have to be perfect — just a little better each time." },
   { id: "ya8", category: "quiz", faultTheme: "recovery", type: "mc",
     q: "Is rest part of training?",
     answer: "Yes — recovery is scheduled, not optional",
-    distractors: ["No, rest is wasted time", "Only if you're injured"] },
+    distractors: ["No, rest is wasted time", "Only if you're injured"],
+    explain: "Rest IS training — your body gets stronger while it recovers. That's why Spa Sunday is planned, not skipped." },
   { id: "ya9", category: "quiz", faultTheme: "dose", type: "mc",
     q: "Dryland makes you tired and worse in the pool. What does that mean?",
     answer: "The dose is wrong — dryland should leave you fresh",
-    distractors: ["You need to do even more", "That's normal, keep going"] },
+    distractors: ["You need to do even more", "That's normal, keep going"],
+    explain: "Dryland should leave you fresh for the pool. If it makes you slower in the water, it was too much — do less." },
   { id: "ya10", category: "quiz", faultTheme: "streamline", type: "mc",
     q: "What is the kid cue for a tight body line?",
     answer: "Make your body one long arrow",
-    distractors: ["Bend in the middle", "Relax everything"] },
+    distractors: ["Bend in the middle", "Relax everything"],
+    explain: "'Make your body one long arrow' — ribs down, long and tight. A loose middle makes you drag in the water." },
 
   // ---- REFLECTION: self-coaching prompts ----
   { id: "rf1", category: "reflection", faultTheme: "breath",
@@ -4796,7 +4813,8 @@ function buildQuiz() {
     items.push({ id: "ready1", category: "quiz", faultTheme: "readiness", type: "mc",
       q: "Before training, what does the readiness check decide?",
       answer: "Your light — how many rounds you do today",
-      distractors: ["Which day it is", "What you eat after"] });
+      distractors: ["Which day it is", "What you eat after"],
+      explain: "The 8 questions set your light: green is 3 rounds, yellow 2, red 1. Answering honestly keeps the workout right for how you feel." });
   }
   return shuffle(items).slice(0, 5);
 }
@@ -4821,7 +4839,8 @@ function openQuiz() {
       <div class="quiz-opts">${options.map((o, i) =>
         `<button class="quiz-opt" data-i="${i}">${o}</button>`).join("")}</div>
       <div class="quiz-fb" id="quiz-fb"></div>
-      <div class="btn-row"><button class="btn" id="quiz-quit">Quit</button></div>`;
+      <div class="btn-row" id="quiz-controls"><button class="btn" id="quiz-quit">Quit</button></div>`;
+    const last = idx === items.length - 1;
     card.querySelectorAll(".quiz-opt").forEach(btn => {
       btn.onclick = () => {
         const choice = options[+btn.dataset.i];
@@ -4833,13 +4852,28 @@ function openQuiz() {
           if (options[+b.dataset.i] === it.answer) b.classList.add("correct");
           else if (b === btn) b.classList.add("wrong");
         });
-        document.getElementById("quiz-fb").innerHTML = ok
-          ? `<div class="fb-ok">✓ Nice!</div>`
-          : `<div class="fb-no">Answer: ${it.answer}</div>`;
-        setTimeout(() => { idx++; renderItem(); }, ok ? 700 : 1600);
+        const fb = document.getElementById("quiz-fb");
+        if (ok) {
+          fb.innerHTML = `<div class="fb-ok">✓ Nice!</div>`;
+          speakIfIdle("Nice work!");
+          setTimeout(() => { idx++; renderItem(); }, 800);
+        } else {
+          // Wrong → pause and explain. The kid must read it and tap to continue.
+          const why = quizExplain(it);
+          fb.innerHTML = `<div class="fb-no">Not quite — let's learn it.</div>
+            <div class="quiz-explain">
+              <div class="qe-ans">✅ ${it.answer}</div>
+              <div class="qe-why">${why}</div>
+            </div>`;
+          speakIfIdle("Not quite. The answer is: " + it.answer + ". " + why);
+          document.getElementById("quiz-controls").innerHTML =
+            `<button class="btn btn-primary" id="quiz-next">${last ? "See results ▶" : "Got it — next ▶"}</button>`;
+          document.getElementById("quiz-next").onclick = () => { idx++; renderItem(); };
+        }
       };
     });
-    document.getElementById("quiz-quit").onclick = () => renderCard();
+    const quitBtn = document.getElementById("quiz-quit");
+    if (quitBtn) quitBtn.onclick = () => renderCard();
   }
 
   function finishQuiz() {
@@ -4869,6 +4903,17 @@ function openQuiz() {
   }
 
   renderItem();
+}
+
+/* Kid-friendly explanation shown when an answer is wrong. Uses the item's
+   authored `explain` when present, else derives one from the item data. */
+function quizExplain(it) {
+  if (it.explain) return it.explain;
+  if (it.faultTheme === "recall" && it.exerciseTag)
+    return `On ${it.exerciseTag}, the thing that usually breaks first is "${it.answer}". That's what to watch for.`;
+  if (it.faultTheme === "skillmap" && it.exerciseTag)
+    return `${it.exerciseTag} builds ${it.answer}.`;
+  return `The right answer is: ${it.answer}.`;
 }
 
 function recordQuizAnswer(id, ok) {
