@@ -906,16 +906,16 @@
   /* Readiness checklist */
   .readiness-quiz { margin: 0.6rem 0; }
   .rq {
-    display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
-    padding: 0.5rem 0; border-bottom: 1.5px dashed var(--paper-line);
+    display: flex; align-items: center; justify-content: space-between; gap: 0.7rem;
+    padding: 0.7rem 0; border-bottom: 1.5px dashed var(--paper-line);
   }
-  .rq-text { flex: 1; font-size: 1rem; }
+  .rq-text { flex: 1; font-size: 1.25rem; line-height: 1.35; }
   .rq-flag { color: #ff7b54; }
-  .rq-btns { display: flex; gap: 0.4rem; flex: 0 0 auto; }
+  .rq-btns { display: flex; gap: 0.5rem; flex: 0 0 auto; }
   .rq-btns button {
-    min-width: 52px; padding: 0.4rem 0.6rem; border: 2px solid var(--ink);
+    min-width: 62px; padding: 0.55rem 0.8rem; border: 2px solid var(--ink);
     border-radius: var(--radius-sm); background: var(--bg2); cursor: pointer;
-    font-family: 'Patrick Hand', sans-serif; font-size: 1rem;
+    font-family: 'Patrick Hand', sans-serif; font-size: 1.2rem;
   }
   .rq-btns button.selected { background: var(--accent-yellow); box-shadow: 2px 2px 0 var(--ink); }
   .rq-light {
@@ -987,6 +987,19 @@
   .overload-table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:0.3rem; }
   .overload-table th, .overload-table td { border:1px solid var(--paper-line); padding:2px 5px; text-align:center; }
   .overload-table th { background:var(--bg2); }
+
+  /* session exercise list (current highlighted) */
+  .ex-list { margin-top: 0.8rem; border:2px solid var(--paper-line); border-radius: var(--radius-sm); padding:0.4rem 0.6rem; }
+  .ex-list > summary { font-family:'Gochi Hand',cursive; font-size:1.1rem; cursor:pointer; }
+  .ex-list ul { list-style:none; margin:0.4rem 0 0; padding:0; max-height:260px; overflow-y:auto; }
+  .sx-head { font-family:'Gochi Hand',cursive; color:var(--jess-deep); margin-top:0.4rem; font-size:0.95rem; }
+  .sx-item { display:flex; justify-content:space-between; gap:0.5rem; padding:0.3rem 0.4rem; border-radius:6px; font-size:0.95rem; }
+  .sx-item.current { background:var(--accent-yellow); font-weight:700; box-shadow:2px 2px 0 var(--ink); }
+  .sx-item.current span:first-child::before { content:"▶ "; }
+  @media (min-width: 820px) {
+    .session-active .ex-list { position:absolute; top:90px; right:-280px; width:260px; margin:0; background:var(--bg); }
+    .session-active { position:relative; }
+  }
 </style>
 
 
@@ -2850,9 +2863,20 @@ function renderTabs() {
       resumeSkipBlocks = [];
       renderTabs();
       renderCard();
+      greetDay(key);
     };
     tabs.appendChild(tab);
   });
+}
+
+/* Spoken daily greeting when a day is selected (tab tap is a user gesture). */
+function greetDay(key) {
+  if (introPlaying) return;
+  const day = DAYS[key];
+  if (!day) return;
+  ensureAudio();
+  const name = DAY_LONG[DAY_KEYS.indexOf(key)] || key;
+  interruptSpeech(`${name}. ${day.mantra}`);
 }
 
 function renderSchedule() {
@@ -2952,8 +2976,14 @@ function getActiveData() {
   if (!day) return { badge: "", title: "", subtitle: "", equipment: [], circuits: [], warmup: null, noOverload: true };
   let circuits;
   if (day.spa) {
-    circuits = [{ name: "Recovery Holds", block: "swimskill", rounds: 1,
-      roundRest: ROUND_REST, exercises: day.recoveryHolds || [] }];
+    // Spa session walks the recovery menu (foam-roll/gun) then the easy holds.
+    const menu = (day.recovery || []).map(r => {
+      const { secs, eachSide } = recoveryDoseSecs(r.dose);
+      return { name: r.name, block: "recovery", driver: "time", work: secs,
+        dose: r.dose, cue: r.why, eachSide, rest: 3 };
+    });
+    circuits = [{ name: "Recovery", block: "recovery", rounds: 1, roundRest: ROUND_REST,
+      exercises: menu.concat(day.recoveryHolds || []) }];
   } else {
     circuits = assembleDay(day, { skip: resumeSkipBlocks });
   }
@@ -2963,6 +2993,15 @@ function getActiveData() {
     spa: !!day.spa, poolLoad: day.poolLoad, mantra: day.mantra,
     circuits
   };
+}
+
+/* Parse a recovery dose string ("60s/side", "2 min", "30–45s/muscle") to seconds. */
+function recoveryDoseSecs(dose) {
+  const m = String(dose).match(/(\d+)\s*(?:–\s*\d+)?\s*(min|s)?/i);
+  let secs = m ? parseInt(m[1], 10) : 40;
+  if (m && /min/i.test(m[2] || "")) secs *= 60;
+  const eachSide = /\/side/i.test(dose);
+  return { secs: eachSide ? secs * 2 : secs, eachSide };
 }
 
 /* ---- day-progress (same-day resume) ---- */
@@ -3011,6 +3050,8 @@ function renderCard() {
 function renderSpaBrief(day) {
   const rollHtml = day.recovery.map(r =>
     `<li class="ex-line"><span>${r.name}</span><span class="ex-meta">${r.dose}</span></li>`).join("");
+  const holdsHtml = (day.recoveryHolds || []).map(h =>
+    `<li class="ex-line"><span>${h.name}${howToHtml(h.name)}</span><span class="ex-meta">${h.dose || ""}</span></li>`).join("");
   document.getElementById("main-card").innerHTML = `
     <div class="day-header">
       <span class="day-badge">${day.badge}</span>
@@ -3026,6 +3067,10 @@ function renderSpaBrief(day) {
       <div class="brief-section">
         <strong>🧊 Recovery menu</strong> · ~${day.timeLo}–${day.timeHi} min
         <ul>${rollHtml}</ul>
+      </div>
+      <div class="brief-section">
+        <strong>🧘 Recovery holds</strong> · gentle
+        <ul>${holdsHtml}</ul>
       </div>
       <div class="brief-section">
         <strong>🌬️ Breathing</strong>
@@ -3404,7 +3449,26 @@ function renderSessionShell(data) {
     </div>
     <div class="exercise" id="exercise"></div>
     <div class="upnext" id="upnext"></div>
-    <div class="btn-row" id="controls"></div>`;
+    <div class="btn-row" id="controls"></div>
+    ${renderSessionExList(data)}`;
+}
+
+/* A scannable list of every exercise in today's session; the current one is
+   highlighted as the session runs. */
+function renderSessionExList(data) {
+  if (!data || !data.circuits) return "";
+  const rows = data.circuits.map((c, ci) => {
+    const head = `<li class="sx-head">${c.name}${c.rounds > 1 ? ` ×${c.rounds}` : ""}</li>`;
+    const items = c.exercises.map((ex, ei) =>
+      `<li class="sx-item" id="sx-${ci}-${ei}"><span>${ex.name}</span><span class="ex-meta">${exMeta(ex)}</span></li>`).join("");
+    return head + items;
+  }).join("");
+  return `<details class="ex-list" id="ex-list" open><summary>📋 Today's exercises</summary><ul>${rows}</ul></details>`;
+}
+function highlightSessionEx(ci, ei) {
+  document.querySelectorAll(".sx-item.current").forEach(el => el.classList.remove("current"));
+  const el = document.getElementById(`sx-${ci}-${ei}`);
+  if (el) { el.classList.add("current"); el.scrollIntoView({ block: "nearest" }); }
 }
 
 function setZone(mode) { document.getElementById("timer-zone").className = "timer-zone " + mode; }
@@ -4020,8 +4084,9 @@ async function startSession() {
         // ---------- WORK ----------
         setZone(isEvening ? "evening" : "work");
         setStatus(circuit.name);
+        // Only multi-round circuits (the main block) show a Round chip.
         setProgress([
-          { text: `Round ${r}/${circuit.rounds}`, phase: true },
+          ...(circuit.rounds > 1 ? [{ text: `Round ${r}/${circuit.rounds}`, phase: true }] : [{ text: circuit.name, phase: true }]),
           { text: `Exercise ${ei + 1}/${circuit.exercises.length}` }
         ]);
 
@@ -4031,6 +4096,7 @@ async function startSession() {
           : (ex.eachSide ? `${Math.floor(work/2)}s each side` : `${work}s`);
 
         setExercise({ name: ex.name, detail, cue: ex.cue });
+        highlightSessionEx(ci, ei);
 
         const next = nextLabel(data, ci, r, ei);
         setUpNext(next ? `<span class="label">Up next:</span> <span class="name">${next}</span>` : "");
@@ -4108,30 +4174,25 @@ async function startSession() {
           const isLastRound = r === circuit.rounds;
           const isLastCircuit = ci === data.circuits.length - 1;
 
-          if (isLastOfRound && !(isLastRound && isLastCircuit)) {
+          // A "round break" only happens between rounds of the SAME multi-round
+          // circuit (the main block). Moving to a different block is a "block
+          // break" — no Round wording.
+          const isRoundBreak = isLastOfRound && r < circuit.rounds;
+          const isBlockBreak = isLastOfRound && r === circuit.rounds && !isLastCircuit;
+          if (isRoundBreak) {
             // Intent word AFTER Round 1 of the main block (targets what R1 revealed)
             if (circuit.block === "main" && r === 1 && !session.intentWord) {
               const iw = await intentWordPrompt();
               if (iw === "abort") return finalize(false);
             }
-            // Round rest
             setZone("roundrest");
             setStatus("Round rest");
-            const nextLabelText = isLastRound ? data.circuits[ci + 1].name : `Round ${r + 1}`;
-
-            const roundProgress = r < circuit.rounds
-              ? `Round ${r} done! You got ${circuit.rounds - r} more to crush!`
-              : `${circuit.name} complete! Time to bring the fire to the next one!`;
-
-            // Extra: mid-session self-check during round rest
-            const selfCheck = "Did that feel different from Round one? No answer needed — just ask yourself.";
-
+            const roundProgress = `Round ${r} done! You've got ${circuit.rounds - r} more to crush!`;
+            const selfCheck = "Did that feel different from the first round? Just ask yourself.";
             setExercise({ name: "Round Rest", cue: roundProgress + " — " + selfCheck, hydrate: true });
-            setUpNext(`<span class="label">Up next:</span> <span class="name">${nextLabelText}</span>`);
-            // Voice completes before timer
+            setUpNext(`<span class="label">Up next:</span> <span class="name">Round ${r + 1}</span>`);
             await speakAndWait(roundProgress);
             if (appSettings.voiceStyle !== "quiet") speakIfIdle(selfCheck);
-
             const leadTime = upcomingEx && HARD_EXERCISES.has(upcomingEx.name) ? 8 : 5;
             const result = await countdown(configuredRoundRest(), {
               onTick: (rem) => {
@@ -4144,6 +4205,23 @@ async function startSession() {
             if (result !== "skip" && appSettings.voiceStyle !== "quiet") {
               await speakAndWait(nextEncouragement());
             }
+          } else if (isBlockBreak) {
+            // Block transition — finished a whole block, move to the next one.
+            const nextBlockName = data.circuits[ci + 1].name;
+            setZone("roundrest");
+            setStatus("Next block");
+            const msg = `${circuit.name} done! Next up: ${nextBlockName}.`;
+            setExercise({ name: `${circuit.name} ✓`, cue: msg, hydrate: true });
+            setUpNext(`<span class="label">Up next:</span> <span class="name">${nextBlockName}</span>`);
+            await speakAndWait(msg);
+            const result = await countdown(8, {
+              onTick: (rem) => {
+                if (rem === 4 && upcomingEx) {
+                  speakIfIdle("Get ready for " + upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : ""));
+                }
+              }
+            });
+            if (result === "abort") return finalize(false);
           } else {
             // Inter-exercise rest — speak the NEXT exercise's reset cue (v2)
             const restDuration = configuredExerciseRest();
