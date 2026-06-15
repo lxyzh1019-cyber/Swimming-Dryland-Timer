@@ -1008,6 +1008,32 @@
   .sx-item { display:flex; justify-content:space-between; gap:0.5rem; padding:0.45rem 0.5rem; border-radius:6px; font-size:1.1rem; }
   .sx-item.current { background:var(--accent-yellow); font-weight:700; box-shadow:2px 2px 0 var(--ink); }
   .sx-item.current span:first-child::before { content:"▶ "; }
+
+  /* countdown ring around the timer */
+  .timer-ring {
+    --pct: 100; --ring: #6fb1fc;
+    width: 13rem; height: 13rem; margin: 0 auto; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: conic-gradient(var(--ring) calc(var(--pct) * 1%), rgba(0,0,0,0.08) 0);
+    transition: background 0.25s linear;
+  }
+  .timer-ring .timer { width: 11rem; height: 11rem; border-radius: 50%; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; margin: 0; }
+  @media (max-width: 480px) { .timer-ring { width: 11rem; height: 11rem; } .timer-ring .timer { width: 9.2rem; height: 9.2rem; } }
+
+  /* per-block colour cards */
+  .block-card strong { letter-spacing: 0.3px; }
+
+  /* "For the grown-up" collapsible */
+  .grownup { margin: 0.4rem 0 0.8rem; border: 2px dashed var(--paper-line); border-radius: var(--radius-sm); padding: 0.5rem 0.8rem; background: var(--bg2); }
+  .grownup > summary { font-family: 'Gochi Hand', cursive; font-size: 1.15rem; color: var(--ink-light); cursor: pointer; }
+  .grownup .gu-body { margin-top: 0.4rem; }
+  .grownup .gu-body strong { display: block; margin-top: 0.5rem; }
+
+  /* confetti */
+  .confetti-layer { position: fixed; inset: 0; pointer-events: none; z-index: 9999; overflow: hidden; }
+  .confetti { position: absolute; top: -3rem; animation: confetti-fall linear forwards; }
+  @keyframes confetti-fall { to { transform: translateY(112vh) rotate(540deg); opacity: 0.85; } }
   @media (min-width: 820px) {
     .session-active .ex-list { position:absolute; top:90px; right:-280px; width:260px; margin:0; background:var(--bg); }
     .session-active { position:relative; }
@@ -2926,6 +2952,21 @@ function zoneChip(blockKey) {
   return `<span class="zone-chip" style="background:${z.color}" title="${z.bpm}">${(BLOCK_HR[blockKey] || "z2").toUpperCase()}</span>`;
 }
 
+/* Per-block colour + emoji so the kid always knows which part she's in. */
+const BLOCK_META = {
+  warmup:       { emoji: "🔥", color: "#ff9e6d" },
+  coordination: { emoji: "⚡", color: "#ffd166" },
+  main:         { emoji: "💪", color: "#6fb1fc" },
+  prep:         { emoji: "🎯", color: "#b08bf8" },
+  finisher:     { emoji: "🪝", color: "#7ee0b8" },
+  swimskill:    { emoji: "🏊", color: "#5ec8e0" },
+  recovery:     { emoji: "🧊", color: "#9fd6ff" },
+  amActivation: { emoji: "🌅", color: "#ffc27a" }
+};
+function blockEmoji(b) { return (BLOCK_META[b] || {}).emoji || "•"; }
+function blockColor(b) { return (BLOCK_META[b] || {}).color || "var(--ink)"; }
+function lightColor(l) { return { green: "#7ee0b8", yellow: "#ffd166", red: "#ff8a7a", recovery: "#9fd6ff" }[l] || "#cccccc"; }
+
 // Persistence keys + tiny JSON helpers (2026.2 records)
 const LS_READINESS   = "swim_readiness";
 const LS_DAYPROG     = "swim_day_progress";
@@ -3159,10 +3200,9 @@ function renderBrief(data) {
         <span class="ex-meta">${exMeta(ex)}</span></li>`;
     }).join("");
     const roundTag = c.block === "main" ? ` · ${c.rounds} round${c.rounds > 1 ? "s" : ""}` : " · no rounds";
-    const notes = c.block === "swimskill"
-      ? `<div class="caveat-note" style="margin:0.3rem 0 0;">🤝 ${COACH_HANDOFF}</div>
-         <div class="caveat-note" style="margin:0.2rem 0 0;">🌬️ ${BREATH_DECISION}</div>` : "";
-    return `<div class="brief-section"><strong>${c.name}</strong> ${zoneChip(c.block)}${roundTag}<ul>${exHtml}</ul>${notes}</div>`;
+    return `<div class="brief-section block-card" style="border-left:6px solid ${blockColor(c.block)}">
+      <strong>${blockEmoji(c.block)} ${c.name}</strong> ${zoneChip(c.block)}${roundTag}
+      <ul>${exHtml}</ul></div>`;
   }).join("");
 
   const eqHtml = `<div class="brief-section"><strong>📦 Equipment</strong>
@@ -3172,12 +3212,23 @@ function renderBrief(data) {
   const ropeNote = day.poolLoad === "double"
     ? `<div class="caveat-note" style="margin:0.2rem 0 0;">🚫 No jump rope today — double-pool day (ankles already loaded).</div>` : "";
 
-  const rulesHtml = `<div class="brief-section">
-      <strong>📌 Standing rules</strong>
-      <div class="caveat-note" style="margin:0.2rem 0 0;">
-        No-Debt: a missed day is never doubled — quality over quantity.<br>
-        ${locked ? "🔒 Jumps locked to Drop-and-Stick until the valgus gate is earned." : "🔓 Valgus gate unlocked."}
-      </div></div>`;
+  // Grown-up reference — collapsed so the kid screen stays clean.
+  const hasSwim = data.circuits.some(c => c.block === "swimskill");
+  const grownupHtml = `<details class="grownup">
+      <summary>🧑‍🏫 For the grown-up</summary>
+      <div class="gu-body">
+        <strong>📌 Standing rules</strong>
+        <div class="caveat-note">No-Debt: a missed day is never doubled — quality over quantity.<br>
+          ${locked ? "🔒 Jumps locked to Drop-and-Stick until the valgus gate is earned." : "🔓 Valgus gate unlocked."}</div>
+        <strong>⌚ Heart-rate zones</strong>
+        <div class="caveat-note">A guide, not a target — if she can hum the breath, she isn't redlining.
+          <span class="paused-chip">⏸ progression paused</span></div>
+        ${day.poolLoad === "double" ? `<strong>🔁 Two-a-day</strong>
+          <div class="caveat-note">The readiness light governs load — no separate skip-gate. Heavy leg add-on only on Green + PM pool skipped by 4 PM.</div>` : ""}
+        ${hasSwim ? `<strong>🏊 Swim-skill coaching</strong>
+          <div class="caveat-note">🤝 ${COACH_HANDOFF}</div>
+          <div class="caveat-note">🌬️ ${BREATH_DECISION}</div>` : ""}
+      </div></details>`;
 
   // Same-day resume
   const prog = loadDayProgress();
@@ -3204,21 +3255,16 @@ function renderBrief(data) {
     </div>
     <div class="mantra">"${data.mantra}"</div>
     <div class="brief">
-      <div class="brief-section">
-        <strong>🏊 ${poolText} · default ${effectiveLight().toUpperCase()} light</strong>
+      <div class="brief-section" style="border-left:6px solid ${lightColor(effectiveLight())};">
+        <strong>🏊 ${poolText} · ${effectiveLight().toUpperCase()} light</strong>
         ${ropeNote}
-        <div class="caveat-note" style="margin:0.2rem 0 0;">
-          ⌚ HR zones are a guide, not a target — if she can hum the breath, she isn't redlining.
-          <span class="paused-chip">⏸ progression paused</span>
-        </div>
-        ${day.poolLoad === "double" ? `<div class="caveat-note" style="margin:0.2rem 0 0;">🔁 Two-a-day: the readiness light governs load — no separate skip-gate. Heavy leg add-on only on Green + PM pool skipped by 4 PM.</div>` : ""}
       </div>
-      ${showAm ? `<div class="brief-section"><strong>🌅 AM Micro-Activation</strong> · ~4–5 min, at home before the pool
+      ${showAm ? `<div class="brief-section block-card" style="border-left:6px solid ${blockColor("amActivation")}"><strong>🌅 AM Micro-Activation</strong> · ~4–5 min, at home before the pool
         <div class="caveat-note" style="margin:0.2rem 0 0;">Wakes the system — not a workout. Optional, run it standalone.</div></div>` : ""}
-      ${rulesHtml}
       ${eqHtml}
       ${resumeHtml}
       ${circuitsHtml}
+      ${grownupHtml}
     </div>
     <div class="caveat-note" style="text-align:center;">
       📱 Put your phone on the floor where you can see it — then leave it there.
@@ -3434,6 +3480,25 @@ function fmtEstimate(secs) {
   return `~${m} min`;
 }
 
+/* A lightweight emoji confetti burst — no library. */
+function celebrate(emojis) {
+  const set = emojis || ["⭐", "🎉", "💪", "🏊", "✨", "🥳"];
+  const layer = document.createElement("div");
+  layer.className = "confetti-layer";
+  document.body.appendChild(layer);
+  for (let i = 0; i < 26; i++) {
+    const s = document.createElement("span");
+    s.className = "confetti";
+    s.textContent = set[Math.floor(Math.random() * set.length)];
+    s.style.left = Math.random() * 100 + "vw";
+    s.style.fontSize = (1 + Math.random() * 1.7) + "rem";
+    s.style.animationDelay = (Math.random() * 0.35) + "s";
+    s.style.animationDuration = (1.6 + Math.random() * 1.3) + "s";
+    layer.appendChild(s);
+  }
+  setTimeout(() => layer.remove(), 3300);
+}
+
 function renderSessionShell(data) {
   const card = document.getElementById("main-card");
   card.classList.add("session-active");
@@ -3456,7 +3521,9 @@ function renderSessionShell(data) {
     </div>
     <div class="status" id="status" role="status" aria-live="polite">Get ready…</div>
     <div class="timer-zone" id="timer-zone">
-      <div class="timer" id="timer" aria-live="off">--:--</div>
+      <div class="timer-ring" id="timer-ring" style="--pct:100">
+        <div class="timer" id="timer" aria-live="off">--:--</div>
+      </div>
       <div class="progress" id="progress"></div>
     </div>
     <div class="exercise" id="exercise"></div>
@@ -3470,7 +3537,7 @@ function renderSessionShell(data) {
 function renderSessionExList(data) {
   if (!data || !data.circuits) return "";
   const rows = data.circuits.map((c, ci) => {
-    const head = `<li class="sx-head">${c.name}${c.rounds > 1 ? ` ×${c.rounds}` : ""}</li>`;
+    const head = `<li class="sx-head" style="border-left:4px solid ${blockColor(c.block)};padding-left:7px;">${blockEmoji(c.block)} ${c.name}${c.rounds > 1 ? ` ×${c.rounds}` : ""}</li>`;
     const items = c.exercises.map((ex, ei) =>
       `<li class="sx-item" id="sx-${ci}-${ei}"><span>${ex.name}</span><span class="ex-meta">${exMeta(ex)}</span></li>`).join("");
     return head + items;
@@ -3483,7 +3550,17 @@ function highlightSessionEx(ci, ei) {
   if (el) { el.classList.add("current"); el.scrollIntoView({ block: "nearest" }); }
 }
 
-function setZone(mode) { document.getElementById("timer-zone").className = "timer-zone " + mode; }
+const ZONE_RING = { work: "#6fb1fc", rest: "#7ee0b8", roundrest: "#ffd166",
+  warmup: "#ff9e6d", sideswitch: "#b08bf8", evening: "#9fb6ff" };
+function setZone(mode) {
+  document.getElementById("timer-zone").className = "timer-zone " + mode;
+  const ring = document.getElementById("timer-ring");
+  if (ring) ring.style.setProperty("--ring", ZONE_RING[mode] || "#6fb1fc");
+}
+function setTimerRing(pct) {
+  const ring = document.getElementById("timer-ring");
+  if (ring) ring.style.setProperty("--pct", Math.max(0, Math.min(100, pct)));
+}
 function setTimer(s, urgent = false) {
   const t = document.getElementById("timer");
   t.textContent = fmt(s);
@@ -3545,6 +3622,7 @@ function countdown(seconds, opts = {}) {
   return new Promise(resolve => {
     let remaining = seconds;
     setTimer(remaining);
+    setTimerRing(100);
     session.currentTimer = setInterval(() => {
       if (session.abort)        { clearInterval(session.currentTimer); resolve("abort"); return; }
       if (session.skipExercise) { clearInterval(session.currentTimer); resolve("skip");  return; }
@@ -3553,6 +3631,7 @@ function countdown(seconds, opts = {}) {
       remaining--;
       const urgent = remaining <= 3 && remaining > 0;
       setTimer(Math.max(remaining, 0), urgent);
+      setTimerRing(seconds > 0 ? (remaining / seconds) * 100 : 0);
       if (opts.onTick) opts.onTick(remaining);
 
       if (remaining <= 3 && remaining > 0) beep(remaining === 1 ? 880 : 440, 0.1);
@@ -4095,11 +4174,12 @@ async function startSession() {
 
         // ---------- WORK ----------
         setZone(isEvening ? "evening" : "work");
-        setStatus(circuit.name);
+        setStatus(`${blockEmoji(circuit.block)} ${circuit.name}`);
         // Only multi-round circuits (the main block) show a Round chip.
+        const leftInBlock = circuit.exercises.length - (ei + 1);
         setProgress([
-          ...(circuit.rounds > 1 ? [{ text: `Round ${r}/${circuit.rounds}`, phase: true }] : [{ text: circuit.name, phase: true }]),
-          { text: `Exercise ${ei + 1}/${circuit.exercises.length}` }
+          ...(circuit.rounds > 1 ? [{ text: `Round ${r}/${circuit.rounds}`, phase: true }] : [{ text: `${blockEmoji(circuit.block)} ${circuit.name}`, phase: true }]),
+          { text: leftInBlock > 0 ? `${ei + 1}/${circuit.exercises.length} · ${leftInBlock} left` : `last one!` }
         ]);
 
         const work = ex.byReps ? 0 : exWork(ex);
@@ -4460,6 +4540,7 @@ function finalize(completed) {
           cue: `Great work — ${fmtMMSS(elapsedSecs)} on the clock. Sip water, breathe, walk it off.`
         });
         setUpNext("");
+        celebrate();
         speak("Training complete. Fantastic effort.");
       }
       if (session.skipped.length) {
@@ -4879,8 +4960,10 @@ function openQuiz() {
   function finishQuiz() {
     const st = quizState();
     st.results.push({ date: new Date().toISOString(), score: correct, total: items.length });
-    st.streak = correct === items.length ? (st.streak || 0) + 1 : 0;
+    const perfect = correct === items.length;
+    st.streak = perfect ? (st.streak || 0) + 1 : 0;
     saveQuizState(st);
+    if (perfect) celebrate(["⭐", "🏅", "🎉", "✨", "💯"]);
     const mastered = masteredSkills();
     card.innerHTML = `
       <div class="day-header">
