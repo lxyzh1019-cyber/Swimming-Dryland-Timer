@@ -30,7 +30,8 @@
 
   .caveat-note {
     font-family: 'Caveat', cursive;
-    font-size: 1rem;
+    font-size: 1.15rem;
+    line-height: 1.4;
     color: var(--ink-light);
     margin: 0.5rem 0;
     text-align: left;
@@ -334,10 +335,11 @@
     border-radius: var(--radius); padding: 6px; box-shadow: 3px 3px 0 var(--ink);
   }
   .day-tab {
-    text-align: center; padding: 0.45rem 0.2rem; border-radius: var(--radius-sm);
-    cursor: pointer; font-family: 'Patrick Hand', sans-serif; font-size: 0.95rem;
+    text-align: center; padding: 0.6rem 0.2rem; border-radius: var(--radius-sm);
+    cursor: pointer; font-family: 'Patrick Hand', sans-serif; font-size: 1.1rem;
     color: var(--ink-light); border: 2px solid transparent;
-    transition: all 0.15s; user-select: none;
+    transition: all 0.15s; user-select: none; min-height: 44px;
+    display: flex; align-items: center; justify-content: center;
   }
   .day-tab:hover { background: var(--bg2); }
   .day-tab.today { background: var(--accent-yellow); color: var(--ink); }
@@ -371,8 +373,8 @@
     background: var(--bg); border: 2px solid var(--ink); border-radius: var(--radius-sm);
     padding: 0.8rem 1rem; margin-bottom: 0.8rem; box-shadow: 2px 2px 0 var(--ink);
   }
-  .brief-section ul { list-style: none; padding: 0; margin: 0.3rem 0 0; font-size: 1.05rem; }
-  .brief-section li { padding: 0.15rem 0; line-height: 1.4; }
+  .brief-section ul { list-style: none; padding: 0; margin: 0.3rem 0 0; font-size: 1.2rem; }
+  .brief-section li { padding: 0.25rem 0; line-height: 1.45; }
   .brief-section li::before { content: "• "; color: var(--jess-deep); font-weight: bold; }
   .brief-section .ex-line {
     display: flex; justify-content: space-between; align-items: baseline;
@@ -380,7 +382,7 @@
   }
   .brief-section .ex-line span:first-child { flex: 1 1 60%; min-width: 0; }
   .brief-section .ex-line .ex-meta {
-    color: var(--ink-light); font-family: 'Caveat', cursive; font-size: 1.1rem;
+    color: var(--ink-light); font-family: 'Caveat', cursive; font-size: 1.25rem;
     flex: 0 0 auto; white-space: nowrap;
   }
   .readiness {
@@ -491,8 +493,8 @@
 
   .btn-row { display: flex; gap: 0.5rem; margin-top: 0.8rem; flex-wrap: wrap; }
   .btn {
-    font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 1.1rem;
-    padding: 0.85rem 0.7rem; border: 3px solid var(--ink); border-radius: var(--radius-sm);
+    font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 1.15rem;
+    padding: 0.9rem 0.8rem; min-height: 48px; border: 3px solid var(--ink); border-radius: var(--radius-sm);
     box-shadow: 4px 4px 0 var(--ink); cursor: pointer; color: var(--ink);
     transition: transform 0.08s, box-shadow 0.08s; letter-spacing: 0.5px;
   }
@@ -566,15 +568,18 @@
   }
 
   @media (max-width: 480px) {
-    body { font-size: 1.05rem; padding: 0.6rem; }
+    body { font-size: 1.15rem; padding: 0.6rem; }
     .timer { font-size: 5rem; }
-    .day-title { font-size: 1.6rem; }
+    .day-title { font-size: 1.7rem; }
     .header h1 { font-size: 2rem; }
-    .day-tab { font-size: 0.8rem; padding: 0.35rem 0.1rem; }
-    .sch-cell { font-size: 0.7rem; }
-    .btn { font-size: 1rem; padding: 0.7rem 0.4rem; }
+    .day-tab { font-size: 1rem; padding: 0.5rem 0.15rem; }
+    .sch-cell { font-size: 0.85rem; }
+    .btn { font-size: 1.15rem; padding: 0.85rem 0.5rem; }
     .modal { padding: 1.5rem; }
     .modal h2 { font-size: 1.8rem; }
+    .rq-text { font-size: 1.15rem; }
+    .quiz-q { font-size: 1.45rem; }
+    .quiz-opt { font-size: 1.2rem; }
   }
 
   /* Landscape iPad optimization (wide screens, shorter height) */
@@ -689,8 +694,8 @@
     display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
   }
   .week-summary .ws-cell {
-    text-align: center; font-size: 0.75rem; line-height: 1.2;
-    padding: 0.3rem 0.1rem; background: var(--paper);
+    text-align: center; font-size: 0.85rem; line-height: 1.2;
+    padding: 0.35rem 0.1rem; background: var(--paper);
     border: 1.5px solid var(--ink); border-radius: 6px;
   }
   .week-summary .ws-cell.done {
@@ -704,7 +709,7 @@
     font-size: 0.85rem; color: var(--ink);
   }
   .week-summary .ws-types {
-    font-family: 'Patrick Hand', sans-serif; font-size: 0.7rem;
+    font-family: 'Patrick Hand', sans-serif; font-size: 0.8rem;
     min-height: 1.8em; color: var(--ink-light); margin-top: 0.15rem;
   }
   .week-summary .ws-total {
@@ -893,8 +898,8 @@
   /* ===== 2026.2 — badges, readiness, learning, quiz ===== */
   .ex-line.gated { opacity: 0.6; }
   .ex-badge {
-    display: inline-block; font-size: 0.7rem; font-family: 'Nunito', sans-serif;
-    border-radius: 10px; padding: 1px 6px; margin-left: 4px; vertical-align: middle;
+    display: inline-block; font-size: 0.9rem; font-family: 'Nunito', sans-serif;
+    border-radius: 10px; padding: 1px 7px; margin-left: 4px; vertical-align: middle;
     border: 1.5px solid var(--ink);
   }
   .ex-badge.gate   { background: #ffe0e0; }
@@ -906,16 +911,16 @@
   /* Readiness checklist */
   .readiness-quiz { margin: 0.6rem 0; }
   .rq {
-    display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
-    padding: 0.5rem 0; border-bottom: 1.5px dashed var(--paper-line);
+    display: flex; align-items: center; justify-content: space-between; gap: 0.7rem;
+    padding: 0.7rem 0; border-bottom: 1.5px dashed var(--paper-line);
   }
-  .rq-text { flex: 1; font-size: 1rem; }
+  .rq-text { flex: 1; font-size: 1.25rem; line-height: 1.35; }
   .rq-flag { color: #ff7b54; }
-  .rq-btns { display: flex; gap: 0.4rem; flex: 0 0 auto; }
+  .rq-btns { display: flex; gap: 0.5rem; flex: 0 0 auto; }
   .rq-btns button {
-    min-width: 52px; padding: 0.4rem 0.6rem; border: 2px solid var(--ink);
+    min-width: 62px; padding: 0.55rem 0.8rem; border: 2px solid var(--ink);
     border-radius: var(--radius-sm); background: var(--bg2); cursor: pointer;
-    font-family: 'Patrick Hand', sans-serif; font-size: 1rem;
+    font-family: 'Patrick Hand', sans-serif; font-size: 1.2rem;
   }
   .rq-btns button.selected { background: var(--accent-yellow); box-shadow: 2px 2px 0 var(--ink); }
   .rq-light {
@@ -935,31 +940,38 @@
     font-family: 'Patrick Hand', sans-serif; font-size: 1.05rem; box-shadow: 2px 2px 0 var(--ink);
   }
   .btn-learn { background: var(--accent-yellow); }
-  .quiz-q { font-size: 1.2rem; font-family: 'Gochi Hand', cursive; margin: 0.8rem 0; text-align: center; }
-  .quiz-opts { display: flex; flex-direction: column; gap: 0.5rem; }
+  .quiz-q { font-size: 1.65rem; line-height: 1.3; font-family: 'Gochi Hand', cursive; margin: 0.9rem 0; text-align: center; }
+  .quiz-opts { display: flex; flex-direction: column; gap: 0.6rem; }
   .quiz-opt {
-    padding: 0.7rem 0.9rem; border: 2px solid var(--ink); border-radius: var(--radius-sm);
-    background: var(--bg2); cursor: pointer; font-family: 'Nunito', sans-serif; font-size: 1rem; text-align: left;
+    padding: 1rem 1rem; min-height: 56px; border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    background: var(--bg2); cursor: pointer; font-family: 'Nunito', sans-serif; font-size: 1.3rem; line-height: 1.3; text-align: left;
   }
   .quiz-opt.correct { background: #c9f5d2; }
   .quiz-opt.wrong   { background: #ffd1c7; }
-  .quiz-fb { text-align: center; min-height: 1.6rem; margin-top: 0.5rem; }
-  .fb-ok { color: #2e9e57; font-family: 'Gochi Hand', cursive; font-size: 1.2rem; }
-  .fb-no { color: #d4612f; font-family: 'Caveat', cursive; font-size: 1.05rem; }
+  .quiz-fb { text-align: center; min-height: 1.8rem; margin-top: 0.6rem; }
+  .fb-ok { color: #2e9e57; font-family: 'Gochi Hand', cursive; font-size: 1.6rem; }
+  .fb-no { color: #d4612f; font-family: 'Gochi Hand', cursive; font-size: 1.5rem; }
+  .quiz-explain {
+    margin: 0.6rem auto 0; max-width: 30rem; text-align: left;
+    background: #eaf6ff; border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    padding: 0.8rem 1rem; box-shadow: 2px 2px 0 var(--ink);
+  }
+  .quiz-explain .qe-ans { font-family: 'Gochi Hand', cursive; font-size: 1.35rem; color: #2e7d32; margin-bottom: 0.3rem; }
+  .quiz-explain .qe-why { font-size: 1.2rem; line-height: 1.4; }
 
   /* Micro-loop + learn card + ladder */
-  .microloop { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-top: 0.6rem; }
+  .microloop { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; margin-top: 0.6rem; }
   .ml-opt, .lc-chip {
-    padding: 0.5rem 0.9rem; border: 2px solid var(--ink); border-radius: 20px;
-    background: var(--bg2); cursor: pointer; font-family: 'Patrick Hand', sans-serif; font-size: 1rem;
+    padding: 0.7rem 1.1rem; min-height: 48px; border: 2px solid var(--ink); border-radius: 20px;
+    background: var(--bg2); cursor: pointer; font-family: 'Patrick Hand', sans-serif; font-size: 1.25rem;
   }
   .ml-opt.correct, .lc-chip.selected { background: #c9f5d2; }
   .ml-opt.wrong { background: #ffd1c7; }
   .learn-card { background: var(--bg2); border: 2px solid var(--paper-line); border-radius: var(--radius-sm); padding: 0.7rem 0.8rem; margin-top: 0.5rem; text-align: left; }
-  .lc-row { margin: 0.2rem 0; font-size: 0.95rem; }
-  .lc-q { margin: 0.5rem 0 0.3rem; font-family: 'Gochi Hand', cursive; }
+  .lc-row { margin: 0.3rem 0; font-size: 1.1rem; }
+  .lc-q { margin: 0.5rem 0 0.3rem; font-family: 'Gochi Hand', cursive; font-size: 1.3rem; }
   .lc-chips { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-  .lc-toggle { display: block; margin: 0.4rem 0; font-size: 0.95rem; cursor: pointer; }
+  .lc-toggle { display: block; margin: 0.5rem 0; font-size: 1.1rem; cursor: pointer; }
   .lc-btns { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
   .ladder-row { display: flex; align-items: center; gap: 0.6rem; margin: 0.5rem 0; }
   .lad-btn {
@@ -969,10 +981,10 @@
   .lad-val { font-family: 'Caveat', cursive; font-size: 1.05rem; }
 
   /* zone / paused chips */
-  .zone-chip { display:inline-block; font-size:0.65rem; font-weight:700; color:var(--ink);
-    border:1.5px solid var(--ink); border-radius:8px; padding:0 5px; vertical-align:middle; }
-  .paused-chip { display:inline-block; font-size:0.7rem; background:var(--paper-line); color:var(--ink-light);
-    border:1.5px solid var(--paper-line); border-radius:8px; padding:0 6px; margin-left:6px; }
+  .zone-chip { display:inline-block; font-size:0.85rem; font-weight:700; color:var(--ink);
+    border:1.5px solid var(--ink); border-radius:8px; padding:1px 7px; vertical-align:middle; }
+  .paused-chip { display:inline-block; font-size:0.9rem; background:var(--paper-line); color:var(--ink-light);
+    border:1.5px solid var(--paper-line); border-radius:8px; padding:1px 7px; margin-left:6px; }
   /* intent word picker */
   .intent-opts { display:flex; gap:0.4rem; justify-content:center; flex-wrap:wrap; margin-top:0.6rem; }
   .intent-opt { padding:0.6rem 1rem; border:2px solid var(--ink); border-radius:14px; background:var(--accent-yellow);
@@ -980,13 +992,52 @@
   .intent-opt.correct { background:#c9f5d2; box-shadow:2px 2px 0 var(--ink); }
   /* engagement options */
   .engage-opts { display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.3rem; }
-  .engage-opt { flex:1 1 45%; padding:0.5rem 0.7rem; border:2px solid var(--ink); border-radius:var(--radius-sm);
-    background:var(--bg2); cursor:pointer; font-family:'Patrick Hand',sans-serif; font-size:0.95rem; text-align:center; }
-  .engage-opt small { color:var(--ink-light); font-family:'Caveat',cursive; }
+  .engage-opt { flex:1 1 45%; padding:0.7rem 0.8rem; min-height:52px; border:2px solid var(--ink); border-radius:var(--radius-sm);
+    background:var(--bg2); cursor:pointer; font-family:'Patrick Hand',sans-serif; font-size:1.15rem; text-align:center; }
+  .engage-opt small { display:block; margin-top:0.2rem; color:var(--ink-light); font-family:'Caveat',cursive; font-size:1rem; }
   /* paused overload table */
   .overload-table { width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:0.3rem; }
   .overload-table th, .overload-table td { border:1px solid var(--paper-line); padding:2px 5px; text-align:center; }
   .overload-table th { background:var(--bg2); }
+
+  /* session exercise list (current highlighted) */
+  .ex-list { margin-top: 0.8rem; border:2px solid var(--paper-line); border-radius: var(--radius-sm); padding:0.4rem 0.6rem; }
+  .ex-list > summary { font-family:'Gochi Hand',cursive; font-size:1.1rem; cursor:pointer; }
+  .ex-list ul { list-style:none; margin:0.4rem 0 0; padding:0; max-height:260px; overflow-y:auto; }
+  .sx-head { font-family:'Gochi Hand',cursive; color:var(--jess-deep); margin-top:0.4rem; font-size:1.15rem; }
+  .sx-item { display:flex; justify-content:space-between; gap:0.5rem; padding:0.45rem 0.5rem; border-radius:6px; font-size:1.1rem; }
+  .sx-item.current { background:var(--accent-yellow); font-weight:700; box-shadow:2px 2px 0 var(--ink); }
+  .sx-item.current span:first-child::before { content:"▶ "; }
+
+  /* countdown ring around the timer */
+  .timer-ring {
+    --pct: 100; --ring: #6fb1fc;
+    width: 13rem; height: 13rem; margin: 0 auto; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: conic-gradient(var(--ring) calc(var(--pct) * 1%), rgba(0,0,0,0.08) 0);
+    transition: background 0.25s linear;
+  }
+  .timer-ring .timer { width: 11rem; height: 11rem; border-radius: 50%; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; margin: 0; }
+  @media (max-width: 480px) { .timer-ring { width: 11rem; height: 11rem; } .timer-ring .timer { width: 9.2rem; height: 9.2rem; } }
+
+  /* per-block colour cards */
+  .block-card strong { letter-spacing: 0.3px; }
+
+  /* "For the grown-up" collapsible */
+  .grownup { margin: 0.4rem 0 0.8rem; border: 2px dashed var(--paper-line); border-radius: var(--radius-sm); padding: 0.5rem 0.8rem; background: var(--bg2); }
+  .grownup > summary { font-family: 'Gochi Hand', cursive; font-size: 1.15rem; color: var(--ink-light); cursor: pointer; }
+  .grownup .gu-body { margin-top: 0.4rem; }
+  .grownup .gu-body strong { display: block; margin-top: 0.5rem; }
+
+  /* confetti */
+  .confetti-layer { position: fixed; inset: 0; pointer-events: none; z-index: 9999; overflow: hidden; }
+  .confetti { position: absolute; top: -3rem; animation: confetti-fall linear forwards; }
+  @keyframes confetti-fall { to { transform: translateY(112vh) rotate(540deg); opacity: 0.85; } }
+  @media (min-width: 820px) {
+    .session-active .ex-list { position:absolute; top:90px; right:-280px; width:260px; margin:0; background:var(--bg); }
+    .session-active { position:relative; }
+  }
 </style>
 
 
@@ -2850,9 +2901,20 @@ function renderTabs() {
       resumeSkipBlocks = [];
       renderTabs();
       renderCard();
+      greetDay(key);
     };
     tabs.appendChild(tab);
   });
+}
+
+/* Spoken daily greeting when a day is selected (tab tap is a user gesture). */
+function greetDay(key) {
+  if (introPlaying) return;
+  const day = DAYS[key];
+  if (!day) return;
+  ensureAudio();
+  const name = DAY_LONG[DAY_KEYS.indexOf(key)] || key;
+  interruptSpeech(`${name}. ${day.mantra}`);
 }
 
 function renderSchedule() {
@@ -2889,6 +2951,21 @@ function zoneChip(blockKey) {
   const z = blockZone(blockKey);
   return `<span class="zone-chip" style="background:${z.color}" title="${z.bpm}">${(BLOCK_HR[blockKey] || "z2").toUpperCase()}</span>`;
 }
+
+/* Per-block colour + emoji so the kid always knows which part she's in. */
+const BLOCK_META = {
+  warmup:       { emoji: "🔥", color: "#ff9e6d" },
+  coordination: { emoji: "⚡", color: "#ffd166" },
+  main:         { emoji: "💪", color: "#6fb1fc" },
+  prep:         { emoji: "🎯", color: "#b08bf8" },
+  finisher:     { emoji: "🪝", color: "#7ee0b8" },
+  swimskill:    { emoji: "🏊", color: "#5ec8e0" },
+  recovery:     { emoji: "🧊", color: "#9fd6ff" },
+  amActivation: { emoji: "🌅", color: "#ffc27a" }
+};
+function blockEmoji(b) { return (BLOCK_META[b] || {}).emoji || "•"; }
+function blockColor(b) { return (BLOCK_META[b] || {}).color || "var(--ink)"; }
+function lightColor(l) { return { green: "#7ee0b8", yellow: "#ffd166", red: "#ff8a7a", recovery: "#9fd6ff" }[l] || "#cccccc"; }
 
 // Persistence keys + tiny JSON helpers (2026.2 records)
 const LS_READINESS   = "swim_readiness";
@@ -2952,8 +3029,14 @@ function getActiveData() {
   if (!day) return { badge: "", title: "", subtitle: "", equipment: [], circuits: [], warmup: null, noOverload: true };
   let circuits;
   if (day.spa) {
-    circuits = [{ name: "Recovery Holds", block: "swimskill", rounds: 1,
-      roundRest: ROUND_REST, exercises: day.recoveryHolds || [] }];
+    // Spa session walks the recovery menu (foam-roll/gun) then the easy holds.
+    const menu = (day.recovery || []).map(r => {
+      const { secs, eachSide } = recoveryDoseSecs(r.dose);
+      return { name: r.name, block: "recovery", driver: "time", work: secs,
+        dose: r.dose, cue: r.why, eachSide, rest: 3 };
+    });
+    circuits = [{ name: "Recovery", block: "recovery", rounds: 1, roundRest: ROUND_REST,
+      exercises: menu.concat(day.recoveryHolds || []) }];
   } else {
     circuits = assembleDay(day, { skip: resumeSkipBlocks });
   }
@@ -2963,6 +3046,15 @@ function getActiveData() {
     spa: !!day.spa, poolLoad: day.poolLoad, mantra: day.mantra,
     circuits
   };
+}
+
+/* Parse a recovery dose string ("60s/side", "2 min", "30–45s/muscle") to seconds. */
+function recoveryDoseSecs(dose) {
+  const m = String(dose).match(/(\d+)\s*(?:–\s*\d+)?\s*(min|s)?/i);
+  let secs = m ? parseInt(m[1], 10) : 40;
+  if (m && /min/i.test(m[2] || "")) secs *= 60;
+  const eachSide = /\/side/i.test(dose);
+  return { secs: eachSide ? secs * 2 : secs, eachSide };
 }
 
 /* ---- day-progress (same-day resume) ---- */
@@ -3011,6 +3103,8 @@ function renderCard() {
 function renderSpaBrief(day) {
   const rollHtml = day.recovery.map(r =>
     `<li class="ex-line"><span>${r.name}</span><span class="ex-meta">${r.dose}</span></li>`).join("");
+  const holdsHtml = (day.recoveryHolds || []).map(h =>
+    `<li class="ex-line"><span>${h.name}${howToHtml(h.name)}</span><span class="ex-meta">${h.dose || ""}</span></li>`).join("");
   document.getElementById("main-card").innerHTML = `
     <div class="day-header">
       <span class="day-badge">${day.badge}</span>
@@ -3026,6 +3120,10 @@ function renderSpaBrief(day) {
       <div class="brief-section">
         <strong>🧊 Recovery menu</strong> · ~${day.timeLo}–${day.timeHi} min
         <ul>${rollHtml}</ul>
+      </div>
+      <div class="brief-section">
+        <strong>🧘 Recovery holds</strong> · gentle
+        <ul>${holdsHtml}</ul>
       </div>
       <div class="brief-section">
         <strong>🌬️ Breathing</strong>
@@ -3102,10 +3200,9 @@ function renderBrief(data) {
         <span class="ex-meta">${exMeta(ex)}</span></li>`;
     }).join("");
     const roundTag = c.block === "main" ? ` · ${c.rounds} round${c.rounds > 1 ? "s" : ""}` : " · no rounds";
-    const notes = c.block === "swimskill"
-      ? `<div class="caveat-note" style="margin:0.3rem 0 0;">🤝 ${COACH_HANDOFF}</div>
-         <div class="caveat-note" style="margin:0.2rem 0 0;">🌬️ ${BREATH_DECISION}</div>` : "";
-    return `<div class="brief-section"><strong>${c.name}</strong> ${zoneChip(c.block)}${roundTag}<ul>${exHtml}</ul>${notes}</div>`;
+    return `<div class="brief-section block-card" style="border-left:6px solid ${blockColor(c.block)}">
+      <strong>${blockEmoji(c.block)} ${c.name}</strong> ${zoneChip(c.block)}${roundTag}
+      <ul>${exHtml}</ul></div>`;
   }).join("");
 
   const eqHtml = `<div class="brief-section"><strong>📦 Equipment</strong>
@@ -3115,12 +3212,23 @@ function renderBrief(data) {
   const ropeNote = day.poolLoad === "double"
     ? `<div class="caveat-note" style="margin:0.2rem 0 0;">🚫 No jump rope today — double-pool day (ankles already loaded).</div>` : "";
 
-  const rulesHtml = `<div class="brief-section">
-      <strong>📌 Standing rules</strong>
-      <div class="caveat-note" style="margin:0.2rem 0 0;">
-        No-Debt: a missed day is never doubled — quality over quantity.<br>
-        ${locked ? "🔒 Jumps locked to Drop-and-Stick until the valgus gate is earned." : "🔓 Valgus gate unlocked."}
-      </div></div>`;
+  // Grown-up reference — collapsed so the kid screen stays clean.
+  const hasSwim = data.circuits.some(c => c.block === "swimskill");
+  const grownupHtml = `<details class="grownup">
+      <summary>🧑‍🏫 For the grown-up</summary>
+      <div class="gu-body">
+        <strong>📌 Standing rules</strong>
+        <div class="caveat-note">No-Debt: a missed day is never doubled — quality over quantity.<br>
+          ${locked ? "🔒 Jumps locked to Drop-and-Stick until the valgus gate is earned." : "🔓 Valgus gate unlocked."}</div>
+        <strong>⌚ Heart-rate zones</strong>
+        <div class="caveat-note">A guide, not a target — if she can hum the breath, she isn't redlining.
+          <span class="paused-chip">⏸ progression paused</span></div>
+        ${day.poolLoad === "double" ? `<strong>🔁 Two-a-day</strong>
+          <div class="caveat-note">The readiness light governs load — no separate skip-gate. Heavy leg add-on only on Green + PM pool skipped by 4 PM.</div>` : ""}
+        ${hasSwim ? `<strong>🏊 Swim-skill coaching</strong>
+          <div class="caveat-note">🤝 ${COACH_HANDOFF}</div>
+          <div class="caveat-note">🌬️ ${BREATH_DECISION}</div>` : ""}
+      </div></details>`;
 
   // Same-day resume
   const prog = loadDayProgress();
@@ -3147,21 +3255,16 @@ function renderBrief(data) {
     </div>
     <div class="mantra">"${data.mantra}"</div>
     <div class="brief">
-      <div class="brief-section">
-        <strong>🏊 ${poolText} · default ${effectiveLight().toUpperCase()} light</strong>
+      <div class="brief-section" style="border-left:6px solid ${lightColor(effectiveLight())};">
+        <strong>🏊 ${poolText} · ${effectiveLight().toUpperCase()} light</strong>
         ${ropeNote}
-        <div class="caveat-note" style="margin:0.2rem 0 0;">
-          ⌚ HR zones are a guide, not a target — if she can hum the breath, she isn't redlining.
-          <span class="paused-chip">⏸ progression paused</span>
-        </div>
-        ${day.poolLoad === "double" ? `<div class="caveat-note" style="margin:0.2rem 0 0;">🔁 Two-a-day: the readiness light governs load — no separate skip-gate. Heavy leg add-on only on Green + PM pool skipped by 4 PM.</div>` : ""}
       </div>
-      ${showAm ? `<div class="brief-section"><strong>🌅 AM Micro-Activation</strong> · ~4–5 min, at home before the pool
+      ${showAm ? `<div class="brief-section block-card" style="border-left:6px solid ${blockColor("amActivation")}"><strong>🌅 AM Micro-Activation</strong> · ~4–5 min, at home before the pool
         <div class="caveat-note" style="margin:0.2rem 0 0;">Wakes the system — not a workout. Optional, run it standalone.</div></div>` : ""}
-      ${rulesHtml}
       ${eqHtml}
       ${resumeHtml}
       ${circuitsHtml}
+      ${grownupHtml}
     </div>
     <div class="caveat-note" style="text-align:center;">
       📱 Put your phone on the floor where you can see it — then leave it there.
@@ -3377,6 +3480,25 @@ function fmtEstimate(secs) {
   return `~${m} min`;
 }
 
+/* A lightweight emoji confetti burst — no library. */
+function celebrate(emojis) {
+  const set = emojis || ["⭐", "🎉", "💪", "🏊", "✨", "🥳"];
+  const layer = document.createElement("div");
+  layer.className = "confetti-layer";
+  document.body.appendChild(layer);
+  for (let i = 0; i < 26; i++) {
+    const s = document.createElement("span");
+    s.className = "confetti";
+    s.textContent = set[Math.floor(Math.random() * set.length)];
+    s.style.left = Math.random() * 100 + "vw";
+    s.style.fontSize = (1 + Math.random() * 1.7) + "rem";
+    s.style.animationDelay = (Math.random() * 0.35) + "s";
+    s.style.animationDuration = (1.6 + Math.random() * 1.3) + "s";
+    layer.appendChild(s);
+  }
+  setTimeout(() => layer.remove(), 3300);
+}
+
 function renderSessionShell(data) {
   const card = document.getElementById("main-card");
   card.classList.add("session-active");
@@ -3399,15 +3521,46 @@ function renderSessionShell(data) {
     </div>
     <div class="status" id="status" role="status" aria-live="polite">Get ready…</div>
     <div class="timer-zone" id="timer-zone">
-      <div class="timer" id="timer" aria-live="off">--:--</div>
+      <div class="timer-ring" id="timer-ring" style="--pct:100">
+        <div class="timer" id="timer" aria-live="off">--:--</div>
+      </div>
       <div class="progress" id="progress"></div>
     </div>
     <div class="exercise" id="exercise"></div>
     <div class="upnext" id="upnext"></div>
-    <div class="btn-row" id="controls"></div>`;
+    <div class="btn-row" id="controls"></div>
+    ${renderSessionExList(data)}`;
 }
 
-function setZone(mode) { document.getElementById("timer-zone").className = "timer-zone " + mode; }
+/* A scannable list of every exercise in today's session; the current one is
+   highlighted as the session runs. */
+function renderSessionExList(data) {
+  if (!data || !data.circuits) return "";
+  const rows = data.circuits.map((c, ci) => {
+    const head = `<li class="sx-head" style="border-left:4px solid ${blockColor(c.block)};padding-left:7px;">${blockEmoji(c.block)} ${c.name}${c.rounds > 1 ? ` ×${c.rounds}` : ""}</li>`;
+    const items = c.exercises.map((ex, ei) =>
+      `<li class="sx-item" id="sx-${ci}-${ei}"><span>${ex.name}</span><span class="ex-meta">${exMeta(ex)}</span></li>`).join("");
+    return head + items;
+  }).join("");
+  return `<details class="ex-list" id="ex-list" open><summary>📋 Today's exercises</summary><ul>${rows}</ul></details>`;
+}
+function highlightSessionEx(ci, ei) {
+  document.querySelectorAll(".sx-item.current").forEach(el => el.classList.remove("current"));
+  const el = document.getElementById(`sx-${ci}-${ei}`);
+  if (el) { el.classList.add("current"); el.scrollIntoView({ block: "nearest" }); }
+}
+
+const ZONE_RING = { work: "#6fb1fc", rest: "#7ee0b8", roundrest: "#ffd166",
+  warmup: "#ff9e6d", sideswitch: "#b08bf8", evening: "#9fb6ff" };
+function setZone(mode) {
+  document.getElementById("timer-zone").className = "timer-zone " + mode;
+  const ring = document.getElementById("timer-ring");
+  if (ring) ring.style.setProperty("--ring", ZONE_RING[mode] || "#6fb1fc");
+}
+function setTimerRing(pct) {
+  const ring = document.getElementById("timer-ring");
+  if (ring) ring.style.setProperty("--pct", Math.max(0, Math.min(100, pct)));
+}
 function setTimer(s, urgent = false) {
   const t = document.getElementById("timer");
   t.textContent = fmt(s);
@@ -3469,6 +3622,7 @@ function countdown(seconds, opts = {}) {
   return new Promise(resolve => {
     let remaining = seconds;
     setTimer(remaining);
+    setTimerRing(100);
     session.currentTimer = setInterval(() => {
       if (session.abort)        { clearInterval(session.currentTimer); resolve("abort"); return; }
       if (session.skipExercise) { clearInterval(session.currentTimer); resolve("skip");  return; }
@@ -3477,6 +3631,7 @@ function countdown(seconds, opts = {}) {
       remaining--;
       const urgent = remaining <= 3 && remaining > 0;
       setTimer(Math.max(remaining, 0), urgent);
+      setTimerRing(seconds > 0 ? (remaining / seconds) * 100 : 0);
       if (opts.onTick) opts.onTick(remaining);
 
       if (remaining <= 3 && remaining > 0) beep(remaining === 1 ? 880 : 440, 0.1);
@@ -4019,10 +4174,12 @@ async function startSession() {
 
         // ---------- WORK ----------
         setZone(isEvening ? "evening" : "work");
-        setStatus(circuit.name);
+        setStatus(`${blockEmoji(circuit.block)} ${circuit.name}`);
+        // Only multi-round circuits (the main block) show a Round chip.
+        const leftInBlock = circuit.exercises.length - (ei + 1);
         setProgress([
-          { text: `Round ${r}/${circuit.rounds}`, phase: true },
-          { text: `Exercise ${ei + 1}/${circuit.exercises.length}` }
+          ...(circuit.rounds > 1 ? [{ text: `Round ${r}/${circuit.rounds}`, phase: true }] : [{ text: `${blockEmoji(circuit.block)} ${circuit.name}`, phase: true }]),
+          { text: leftInBlock > 0 ? `${ei + 1}/${circuit.exercises.length} · ${leftInBlock} left` : `last one!` }
         ]);
 
         const work = ex.byReps ? 0 : exWork(ex);
@@ -4031,6 +4188,7 @@ async function startSession() {
           : (ex.eachSide ? `${Math.floor(work/2)}s each side` : `${work}s`);
 
         setExercise({ name: ex.name, detail, cue: ex.cue });
+        highlightSessionEx(ci, ei);
 
         const next = nextLabel(data, ci, r, ei);
         setUpNext(next ? `<span class="label">Up next:</span> <span class="name">${next}</span>` : "");
@@ -4108,30 +4266,25 @@ async function startSession() {
           const isLastRound = r === circuit.rounds;
           const isLastCircuit = ci === data.circuits.length - 1;
 
-          if (isLastOfRound && !(isLastRound && isLastCircuit)) {
+          // A "round break" only happens between rounds of the SAME multi-round
+          // circuit (the main block). Moving to a different block is a "block
+          // break" — no Round wording.
+          const isRoundBreak = isLastOfRound && r < circuit.rounds;
+          const isBlockBreak = isLastOfRound && r === circuit.rounds && !isLastCircuit;
+          if (isRoundBreak) {
             // Intent word AFTER Round 1 of the main block (targets what R1 revealed)
             if (circuit.block === "main" && r === 1 && !session.intentWord) {
               const iw = await intentWordPrompt();
               if (iw === "abort") return finalize(false);
             }
-            // Round rest
             setZone("roundrest");
             setStatus("Round rest");
-            const nextLabelText = isLastRound ? data.circuits[ci + 1].name : `Round ${r + 1}`;
-
-            const roundProgress = r < circuit.rounds
-              ? `Round ${r} done! You got ${circuit.rounds - r} more to crush!`
-              : `${circuit.name} complete! Time to bring the fire to the next one!`;
-
-            // Extra: mid-session self-check during round rest
-            const selfCheck = "Did that feel different from Round one? No answer needed — just ask yourself.";
-
+            const roundProgress = `Round ${r} done! You've got ${circuit.rounds - r} more to crush!`;
+            const selfCheck = "Did that feel different from the first round? Just ask yourself.";
             setExercise({ name: "Round Rest", cue: roundProgress + " — " + selfCheck, hydrate: true });
-            setUpNext(`<span class="label">Up next:</span> <span class="name">${nextLabelText}</span>`);
-            // Voice completes before timer
+            setUpNext(`<span class="label">Up next:</span> <span class="name">Round ${r + 1}</span>`);
             await speakAndWait(roundProgress);
             if (appSettings.voiceStyle !== "quiet") speakIfIdle(selfCheck);
-
             const leadTime = upcomingEx && HARD_EXERCISES.has(upcomingEx.name) ? 8 : 5;
             const result = await countdown(configuredRoundRest(), {
               onTick: (rem) => {
@@ -4144,6 +4297,23 @@ async function startSession() {
             if (result !== "skip" && appSettings.voiceStyle !== "quiet") {
               await speakAndWait(nextEncouragement());
             }
+          } else if (isBlockBreak) {
+            // Block transition — finished a whole block, move to the next one.
+            const nextBlockName = data.circuits[ci + 1].name;
+            setZone("roundrest");
+            setStatus("Next block");
+            const msg = `${circuit.name} done! Next up: ${nextBlockName}.`;
+            setExercise({ name: `${circuit.name} ✓`, cue: msg, hydrate: true });
+            setUpNext(`<span class="label">Up next:</span> <span class="name">${nextBlockName}</span>`);
+            await speakAndWait(msg);
+            const result = await countdown(8, {
+              onTick: (rem) => {
+                if (rem === 4 && upcomingEx) {
+                  speakIfIdle("Get ready for " + upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : ""));
+                }
+              }
+            });
+            if (result === "abort") return finalize(false);
           } else {
             // Inter-exercise rest — speak the NEXT exercise's reset cue (v2)
             const restDuration = configuredExerciseRest();
@@ -4370,6 +4540,7 @@ function finalize(completed) {
           cue: `Great work — ${fmtMMSS(elapsedSecs)} on the clock. Sip water, breathe, walk it off.`
         });
         setUpNext("");
+        celebrate();
         speak("Training complete. Fantastic effort.");
       }
       if (session.skipped.length) {
@@ -4540,43 +4711,53 @@ const LEARNING_BANK = [
   { id: "ya1", category: "quiz", faultTheme: "fatigue", type: "mc",
     q: "You feel really sore the next day. Does that mean the workout was good?",
     answer: "No — sore doesn't mean better. Smooth and clean is the goal.",
-    distractors: ["Yes, more sore = more strong", "Yes, you should add reps next time"] },
+    distractors: ["Yes, more sore = more strong", "Yes, you should add reps next time"],
+    explain: "Being sore just means your muscles are waking up — it doesn't mean you got faster. Clean, smooth reps are what help your swimming." },
   { id: "ya2", category: "quiz", faultTheme: "reps", type: "mc",
     q: "What matters more in dryland?",
     answer: "A few clean reps with good shape",
-    distractors: ["As many reps as possible", "Finishing fastest"] },
+    distractors: ["As many reps as possible", "Finishing fastest"],
+    explain: "A few reps with a great shape beat lots of sloppy ones. Better reps, not more reps." },
   { id: "ya3", category: "quiz", faultTheme: "breath", type: "mc",
     q: "Your coach can't hear you breathing on a hollow hold. What should you do?",
     answer: "Hum or count out loud — if they can't hear it, the rep doesn't count",
-    distractors: ["Hold your breath to stay tight", "Go faster to finish"] },
+    distractors: ["Hold your breath to stay tight", "Go faster to finish"],
+    explain: "Humming out loud proves you're breathing, not holding your breath. Holding your breath makes your hips sink in the water." },
   { id: "ya4", category: "quiz", faultTheme: "pain", type: "mc",
     q: "Your shoulder feels a sharp pinch on pull-ups. What's the rule?",
     answer: "Stop — sharp pain, pinching, or numbness means stop",
-    distractors: ["Push through one more set", "Switch arms and keep going"] },
+    distractors: ["Push through one more set", "Switch arms and keep going"],
+    explain: "Sharp pain, pinching, or numbness is your body saying STOP. Always stop and tell a grown-up — pushing through can hurt you." },
   { id: "ya5", category: "quiz", faultTheme: "freshness", type: "mc",
     q: "When do you do the sprint / coordination drills?",
     answer: "Fresh, right after the warm-up — never tired",
-    distractors: ["At the very end when you're tired", "Only if you have extra time"] },
+    distractors: ["At the very end when you're tired", "Only if you have extra time"],
+    explain: "Fast, springy drills need a fresh body, so they go right after the warm-up — never when you're worn out." },
   { id: "ya6", category: "quiz", faultTheme: "valgus", type: "mc",
     q: "On a landing, your knees fall inward. What should you do?",
     answer: "Stop, reset your stance, land slower with knees over toes",
-    distractors: ["Jump higher next time", "Land faster to get it over with"] },
+    distractors: ["Jump higher next time", "Land faster to get it over with"],
+    explain: "Knees caving inward isn't safe. Stop, set your feet, and land softly with your knees lined up over your toes." },
   { id: "ya7", category: "quiz", faultTheme: "self-check", type: "mc",
     q: "What's the kid rule for learning a movement?",
     answer: "Find one mistake, fix one thing, show one better rep",
-    distractors: ["Do it perfectly the first time", "Never make a mistake"] },
+    distractors: ["Do it perfectly the first time", "Never make a mistake"],
+    explain: "The rule is: find one mistake, fix one thing, show one better rep. You don't have to be perfect — just a little better each time." },
   { id: "ya8", category: "quiz", faultTheme: "recovery", type: "mc",
     q: "Is rest part of training?",
     answer: "Yes — recovery is scheduled, not optional",
-    distractors: ["No, rest is wasted time", "Only if you're injured"] },
+    distractors: ["No, rest is wasted time", "Only if you're injured"],
+    explain: "Rest IS training — your body gets stronger while it recovers. That's why Spa Sunday is planned, not skipped." },
   { id: "ya9", category: "quiz", faultTheme: "dose", type: "mc",
     q: "Dryland makes you tired and worse in the pool. What does that mean?",
     answer: "The dose is wrong — dryland should leave you fresh",
-    distractors: ["You need to do even more", "That's normal, keep going"] },
+    distractors: ["You need to do even more", "That's normal, keep going"],
+    explain: "Dryland should leave you fresh for the pool. If it makes you slower in the water, it was too much — do less." },
   { id: "ya10", category: "quiz", faultTheme: "streamline", type: "mc",
     q: "What is the kid cue for a tight body line?",
     answer: "Make your body one long arrow",
-    distractors: ["Bend in the middle", "Relax everything"] },
+    distractors: ["Bend in the middle", "Relax everything"],
+    explain: "'Make your body one long arrow' — ribs down, long and tight. A loose middle makes you drag in the water." },
 
   // ---- REFLECTION: self-coaching prompts ----
   { id: "rf1", category: "reflection", faultTheme: "breath",
@@ -4713,7 +4894,8 @@ function buildQuiz() {
     items.push({ id: "ready1", category: "quiz", faultTheme: "readiness", type: "mc",
       q: "Before training, what does the readiness check decide?",
       answer: "Your light — how many rounds you do today",
-      distractors: ["Which day it is", "What you eat after"] });
+      distractors: ["Which day it is", "What you eat after"],
+      explain: "The 8 questions set your light: green is 3 rounds, yellow 2, red 1. Answering honestly keeps the workout right for how you feel." });
   }
   return shuffle(items).slice(0, 5);
 }
@@ -4738,7 +4920,8 @@ function openQuiz() {
       <div class="quiz-opts">${options.map((o, i) =>
         `<button class="quiz-opt" data-i="${i}">${o}</button>`).join("")}</div>
       <div class="quiz-fb" id="quiz-fb"></div>
-      <div class="btn-row"><button class="btn" id="quiz-quit">Quit</button></div>`;
+      <div class="btn-row" id="quiz-controls"><button class="btn" id="quiz-quit">Quit</button></div>`;
+    const last = idx === items.length - 1;
     card.querySelectorAll(".quiz-opt").forEach(btn => {
       btn.onclick = () => {
         const choice = options[+btn.dataset.i];
@@ -4750,20 +4933,37 @@ function openQuiz() {
           if (options[+b.dataset.i] === it.answer) b.classList.add("correct");
           else if (b === btn) b.classList.add("wrong");
         });
-        document.getElementById("quiz-fb").innerHTML = ok
-          ? `<div class="fb-ok">✓ Nice!</div>`
-          : `<div class="fb-no">Answer: ${it.answer}</div>`;
-        setTimeout(() => { idx++; renderItem(); }, ok ? 700 : 1600);
+        const fb = document.getElementById("quiz-fb");
+        if (ok) {
+          fb.innerHTML = `<div class="fb-ok">✓ Nice!</div>`;
+          speakIfIdle("Nice work!");
+          setTimeout(() => { idx++; renderItem(); }, 800);
+        } else {
+          // Wrong → pause and explain. The kid must read it and tap to continue.
+          const why = quizExplain(it);
+          fb.innerHTML = `<div class="fb-no">Not quite — let's learn it.</div>
+            <div class="quiz-explain">
+              <div class="qe-ans">✅ ${it.answer}</div>
+              <div class="qe-why">${why}</div>
+            </div>`;
+          speakIfIdle("Not quite. The answer is: " + it.answer + ". " + why);
+          document.getElementById("quiz-controls").innerHTML =
+            `<button class="btn btn-primary" id="quiz-next">${last ? "See results ▶" : "Got it — next ▶"}</button>`;
+          document.getElementById("quiz-next").onclick = () => { idx++; renderItem(); };
+        }
       };
     });
-    document.getElementById("quiz-quit").onclick = () => renderCard();
+    const quitBtn = document.getElementById("quiz-quit");
+    if (quitBtn) quitBtn.onclick = () => renderCard();
   }
 
   function finishQuiz() {
     const st = quizState();
     st.results.push({ date: new Date().toISOString(), score: correct, total: items.length });
-    st.streak = correct === items.length ? (st.streak || 0) + 1 : 0;
+    const perfect = correct === items.length;
+    st.streak = perfect ? (st.streak || 0) + 1 : 0;
     saveQuizState(st);
+    if (perfect) celebrate(["⭐", "🏅", "🎉", "✨", "💯"]);
     const mastered = masteredSkills();
     card.innerHTML = `
       <div class="day-header">
@@ -4786,6 +4986,17 @@ function openQuiz() {
   }
 
   renderItem();
+}
+
+/* Kid-friendly explanation shown when an answer is wrong. Uses the item's
+   authored `explain` when present, else derives one from the item data. */
+function quizExplain(it) {
+  if (it.explain) return it.explain;
+  if (it.faultTheme === "recall" && it.exerciseTag)
+    return `On ${it.exerciseTag}, the thing that usually breaks first is "${it.answer}". That's what to watch for.`;
+  if (it.faultTheme === "skillmap" && it.exerciseTag)
+    return `${it.exerciseTag} builds ${it.answer}.`;
+  return `The right answer is: ${it.answer}.`;
 }
 
 function recordQuizAnswer(id, ok) {
