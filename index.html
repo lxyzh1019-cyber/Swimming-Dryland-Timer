@@ -131,13 +131,33 @@
     color: var(--ink);
     margin: 0 0 1rem;
   }
-  .howto-modal a {
+  .howto-cat {
+    font-family: 'Nunito', sans-serif; font-weight: 800;
+    font-size: 0.8rem; letter-spacing: 0.4px; text-transform: uppercase;
+    color: var(--ink-light); margin-bottom: 0.2rem;
+  }
+  .howto-modal a { word-break: break-word; }
+  .howto-modal a.howto-watch {
     display: inline-block;
+    margin: 0 0 0.7rem;
+    padding: 0.55rem 1.1rem;
+    background: var(--accent-yellow);
+    color: var(--ink);
+    border: 3px solid var(--ink);
+    border-radius: var(--radius-sm);
+    box-shadow: 2px 2px 0 var(--ink);
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 1.1rem;
+    text-decoration: none;
+  }
+  .howto-modal a.howto-watch:hover { background: var(--accent-orange); color: #fff; }
+  .howto-modal a.howto-channel {
+    display: block;
     margin-bottom: 1rem;
-    color: var(--jess-deep);
+    color: var(--ink-light);
     font-family: 'Patrick Hand', sans-serif;
-    font-size: 1rem;
-    word-break: break-word;
+    font-size: 0.95rem;
   }
   .howto-modal .close-row {
     text-align: right;
@@ -373,18 +393,20 @@
     background: var(--bg); border: 2px solid var(--ink); border-radius: var(--radius-sm);
     padding: 0.8rem 1rem; margin-bottom: 0.8rem; box-shadow: 2px 2px 0 var(--ink);
   }
-  .brief-section ul { list-style: none; padding: 0; margin: 0.3rem 0 0; font-size: 1.2rem; }
-  .brief-section li { padding: 0.25rem 0; line-height: 1.45; }
+  .brief-section ul { list-style: none; padding: 0; margin: 0.4rem 0 0; font-size: 1.45rem; }
+  .brief-section li { padding: 0.4rem 0; line-height: 1.5; }
   .brief-section li::before { content: "• "; color: var(--jess-deep); font-weight: bold; }
   .brief-section .ex-line {
     display: flex; justify-content: space-between; align-items: baseline;
-    gap: 0.5rem; flex-wrap: wrap;
+    gap: 0.5rem 0.8rem; flex-wrap: wrap;
   }
-  .brief-section .ex-line span:first-child { flex: 1 1 60%; min-width: 0; }
+  .brief-section .ex-line span:first-child { flex: 1 1 65%; min-width: 60%; }
   .brief-section .ex-line .ex-meta {
-    color: var(--ink-light); font-family: 'Caveat', cursive; font-size: 1.25rem;
+    color: var(--ink-light); font-family: 'Caveat', cursive; font-size: 1.45rem;
     flex: 0 0 auto; white-space: nowrap;
   }
+  /* Bigger tap target for the "?" how-to button inside list rows */
+  .ex-line .howto-btn, .sx-item .howto-btn { font-size: 0.85em; width: 1.5em; height: 1.5em; }
   .readiness {
     background: var(--bg2); border: 2px dashed var(--paper-line);
     border-radius: var(--radius-sm); padding: 0.8rem; margin-bottom: 0.8rem; text-align: center;
@@ -1103,9 +1125,11 @@
 <!-- How-to overlay (shown when "?" next to an exercise is tapped) -->
 <div class="modal-overlay" id="howto-overlay" role="presentation">
   <div class="howto-modal" role="dialog" aria-modal="true" aria-labelledby="howto-title">
+    <div id="howto-cat" class="howto-cat"></div>
     <h3 id="howto-title"></h3>
     <p id="howto-text"></p>
-    <a id="howto-link" target="_blank" rel="noopener"></a>
+    <a id="howto-link" class="howto-watch" target="_blank" rel="noopener"></a>
+    <a id="howto-channel" class="howto-channel" target="_blank" rel="noopener"></a>
     <div class="close-row">
       <button class="btn-close" type="button" id="howto-close-btn">Close</button>
     </div>
@@ -1502,12 +1526,35 @@ const ER = (name, repsDetail, rest, reset, cue, redFlag, opts = {}) => ({
 });
 
 /* ------------------------------------------------------------
-   HOW-TO LOOKUP — for exercises whose names are not common
-   search terms. Each entry: 1-line plain description + a
-   YouTube SEARCH URL so the link never goes dead. Tap the "?"
-   next to the exercise name to see it.
+   HOW-TO LOOKUP — tap the "?" next to ANY exercise to see a
+   1-line plain description plus a demo video.
+
+   VALIDATED COACHING CHANNELS — to keep guidance consistent (and
+   safe for a kid), each block routes to ONE trusted channel that
+   actually covers that kind of work: swim drills, mobility, speed,
+   or strength. Swap any channel below — links update automatically.
+   The demo link is a broad YouTube search with the channel NAME
+   appended, so it ALWAYS returns real videos (never a blank page)
+   while still biasing results toward the validated channel.
    ------------------------------------------------------------ */
-const yt = q => "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
+const COACH_CHANNELS = {
+  swim:     { label: "Swim technique",       name: "Effortless Swimming", url: "https://www.youtube.com/@effortlessswimming" },
+  mobility: { label: "Mobility & warm-up",   name: "Tom Merrick",         url: "https://www.youtube.com/@TomMerrick" },
+  speed:    { label: "Speed & coordination", name: "ALTIS",               url: "https://www.youtube.com/@ALTIS" },
+  strength: { label: "Strength & core",      name: "ATHLEAN-X",           url: "https://www.youtube.com/@athleanx" }
+};
+// Which validated channel covers each block.
+const BLOCK_CHANNEL = {
+  warmup: "mobility", recovery: "mobility",
+  coordination: "speed",
+  main: "strength", prep: "strength", finisher: "strength", amActivation: "strength",
+  swimskill: "swim"
+};
+const channelForBlock = b => COACH_CHANNELS[BLOCK_CHANNEL[b]] || COACH_CHANNELS.strength;
+// Broad search biased to the validated channel — ALWAYS returns results, and
+// the channel name also disambiguates generic moves ("Superman ATHLEAN-X").
+const yt = (q, ch) =>
+  "https://www.youtube.com/results?search_query=" + encodeURIComponent(q + " " + ch.name);
 const EXERCISE_HOWTO = {
   // — 2026.2 swim-skill / AM-activation drills —
   "Chair High-Elbow Catch": {
@@ -1614,20 +1661,33 @@ const EXERCISE_HOWTO = {
     search: "side lying hip abduction kick swimmer"
   }
 };
-function howToHtml(name) {
-  const h = EXERCISE_HOWTO[name];
-  if (!h) return "";
-  return ` <button class="howto-btn" type="button" data-howto="${name.replace(/"/g, "&quot;")}" aria-label="How to do ${name.replace(/"/g, "&quot;")}" title="How to">?</button>`;
+// Every exercise gets a "?" — those without a written blurb fall back to a
+// channel demo search built from the exercise name (see showHowTo).
+// `block` lets us route the demo to the channel that covers that kind of work.
+// A "?" only shows for real exercises (block given, or a hand-written blurb) —
+// never on prompt screens like "Ready?" or "Switch sides".
+function howToHtml(name, block) {
+  if (!name || (!block && !EXERCISE_HOWTO[name])) return "";
+  const safe = name.replace(/"/g, "&quot;");
+  const b = (block || "").replace(/"/g, "&quot;");
+  return ` <button class="howto-btn" type="button" data-howto="${safe}" data-block="${b}" aria-label="How to do ${safe}" title="How to">?</button>`;
 }
-function showHowTo(name) {
-  const h = EXERCISE_HOWTO[name];
-  if (!h) return;
+function showHowTo(name, block) {
+  const ch = channelForBlock(block);
+  const h = EXERCISE_HOWTO[name] || {
+    text: "Watch a demo on the coaching channel, or ask your coach to show you the shape before you start.",
+    search: name
+  };
   logEvent("howto", { name });
   document.getElementById("howto-title").textContent = name;
   document.getElementById("howto-text").textContent = h.text;
+  const cat = document.getElementById("howto-cat");
+  if (cat) cat.textContent = ch.label + " · " + ch.name;
   const link = document.getElementById("howto-link");
-  link.href = yt(h.search);
-  link.textContent = "Search YouTube for \"" + h.search + "\"";
+  link.href = yt(h.search, ch);
+  link.textContent = "▶ Watch a demo on " + ch.name;
+  const chan = document.getElementById("howto-channel");
+  if (chan) { chan.href = ch.url; chan.textContent = "Browse the " + ch.name + " channel"; }
   document.getElementById("howto-overlay").classList.add("show");
 }
 function closeHowTo() {
@@ -1635,7 +1695,7 @@ function closeHowTo() {
 }
 document.addEventListener("click", e => {
   const btn = e.target.closest && e.target.closest(".howto-btn");
-  if (btn) { e.preventDefault(); e.stopPropagation(); showHowTo(btn.dataset.howto); }
+  if (btn) { e.preventDefault(); e.stopPropagation(); showHowTo(btn.dataset.howto, btn.dataset.block); }
 });
 {
   const closeBtn = document.getElementById("howto-close-btn");
@@ -3368,7 +3428,7 @@ function renderSpaBrief(day) {
   const rollHtml = day.recovery.map(r =>
     `<li class="ex-line"><span>${r.name}</span><span class="ex-meta">${r.dose}</span></li>`).join("");
   const holdsHtml = (day.recoveryHolds || []).map(h =>
-    `<li class="ex-line"><span>${h.name}${howToHtml(h.name)}</span><span class="ex-meta">${h.dose || ""}</span></li>`).join("");
+    `<li class="ex-line"><span>${h.name}${howToHtml(h.name, "swimskill")}</span><span class="ex-meta">${h.dose || ""}</span></li>`).join("");
   document.getElementById("main-card").innerHTML = `
     <div class="day-header">
       <span class="day-badge">${day.badge}</span>
@@ -3460,7 +3520,7 @@ function renderBrief(data) {
     const exHtml = c.exercises.map(ex => {
       const gated = ex.gate === "valgus" && locked;
       return `<li class="ex-line ${gated ? "gated" : ""}">
-        <span>${ex.name}${howToHtml(ex.name)}${exBadges(ex, locked)}</span>
+        <span>${ex.name}${howToHtml(ex.name, c.block)}${exBadges(ex, locked)}</span>
         <span class="ex-meta">${exMeta(ex)}</span></li>`;
     }).join("");
     const roundTag = c.block === "main" ? ` · ${c.rounds} round${c.rounds > 1 ? "s" : ""}` : " · no rounds";
@@ -3803,7 +3863,7 @@ function renderSessionExList(data) {
   const rows = data.circuits.map((c, ci) => {
     const head = `<li class="sx-head" style="border-left:4px solid ${blockColor(c.block)};padding-left:7px;">${blockEmoji(c.block)} ${c.name}${c.rounds > 1 ? ` ×${c.rounds}` : ""}</li>`;
     const items = c.exercises.map((ex, ei) =>
-      `<li class="sx-item" id="sx-${ci}-${ei}"><span>${ex.name}</span><span class="ex-meta">${exMeta(ex)}</span></li>`).join("");
+      `<li class="sx-item" id="sx-${ci}-${ei}"><span>${ex.name}${howToHtml(ex.name, c.block)}</span><span class="ex-meta">${exMeta(ex)}</span></li>`).join("");
     return head + items;
   }).join("");
   return `<details class="ex-list" id="ex-list" open><summary>📋 Today's exercises</summary><ul>${rows}</ul></details>`;
@@ -3835,9 +3895,9 @@ function setProgress(chips) {
   document.getElementById("progress").innerHTML =
     chips.map(c => `<span class="chip${c.phase ? " phase" : ""}">${c.text}</span>`).join("");
 }
-function setExercise({ name, detail, cue, redFlag, warmupSteps, hydrate }) {
+function setExercise({ name, detail, cue, redFlag, warmupSteps, hydrate, block }) {
   const html = [];
-  if (name)   html.push(`<div class="ex-name">${name}${howToHtml(name)}</div>`);
+  if (name)   html.push(`<div class="ex-name">${name}${howToHtml(name, block)}</div>`);
   if (detail) html.push(`<div class="ex-detail">${detail}</div>`);
   if (warmupSteps) html.push(`<div class="ex-cue">${warmupSteps.map(s => "• " + s).join("<br>")}</div>`);
   else if (cue) html.push(`<div class="ex-cue">${cue}</div>`);
@@ -4638,12 +4698,12 @@ async function runAmActivation() {
     setProgress([{ text: "AM Activation", phase: true }, { text: `${i + 1}/${list.length}` }]);
     setUpNext(i + 1 < list.length ? `<span class="label">Up next:</span> <span class="name">${list[i + 1].name}</span>` : "");
     if (ex.byReps) {
-      setExercise({ name: ex.name, detail: ex.dose, cue: ex.cue });
+      setExercise({ name: ex.name, detail: ex.dose, cue: ex.cue, block: ex.block });
       await speakAndWait(`${ex.name}. ${ex.cue || ""} Go.`);
       const r = await runRepsWithVoice(ex); if (r === "abort") return finishAm();
       setSessionControls();
     } else {
-      setExercise({ name: ex.name, detail: ex.dose || `${ex.work}s`, cue: ex.cue });
+      setExercise({ name: ex.name, detail: ex.dose || `${ex.work}s`, cue: ex.cue, block: ex.block });
       setTimer(ex.work);
       await speakAndWait(`${ex.name}. ${ex.cue || ""} Three, two, one, go.`);
       const r = await countdown(ex.work); if (r === "abort") return finishAm();
@@ -4743,7 +4803,7 @@ async function startSession() {
           ? screenRepsDetail(ex)
           : (ex.eachSide ? `${Math.floor(work/2)}s each side` : `${work}s`);
 
-        setExercise({ name: ex.name, detail, cue: ex.cue });
+        setExercise({ name: ex.name, detail, cue: ex.cue, block: circuit.block });
         highlightSessionEx(ci, ei);
 
         const next = nextLabel(data, ci, r, ei);
