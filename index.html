@@ -867,6 +867,65 @@
     color: var(--ink); margin: 0.8rem 0 0.3rem; text-align: left;
   }
 
+  /* ===== Analytics: insights + wins ===== */
+  .insight-note {
+    font-family: 'Caveat', cursive; font-size: 1rem; color: var(--ink-light);
+    margin: 0.1rem 0 0.6rem;
+  }
+  .risk-row {
+    display: flex; align-items: center; gap: 0.8rem;
+    background: var(--bg2); border: 2px solid var(--paper-line);
+    border-radius: var(--radius-sm); padding: 0.7rem 0.9rem; margin: 0.4rem 0;
+  }
+  .risk-row .risk-big {
+    font-family: 'Gochi Hand', cursive; font-size: 1.8rem; min-width: 64px; text-align: center;
+  }
+  .risk-row .risk-text { flex: 1; }
+  .risk-row .risk-text b { display: block; font-size: 1.05rem; }
+  .risk-row .risk-text small { color: var(--ink-light); }
+  .risk-row.is-good  { border-color: #5bbd72; }
+  .risk-row.is-warn  { border-color: var(--accent-orange); }
+  .risk-row.is-bad   { border-color: #e0584e; }
+  .chip-pill {
+    display: inline-block; border-radius: 14px; padding: 2px 10px; margin: 2px;
+    font-family: 'Patrick Hand', sans-serif; font-size: 0.85rem; border: 2px solid var(--ink);
+  }
+  .chip-green { background: #cdeed5; } .chip-yellow { background: #fdf0c4; }
+  .chip-red { background: #f6d2cf; } .chip-recovery { background: #d8e6f5; }
+  .insight-table { width: 100%; border-collapse: collapse; margin: 0.4rem 0 0.8rem; font-size: 0.92rem; }
+  .insight-table th, .insight-table td {
+    text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--paper-line);
+  }
+  .insight-table th { font-family: 'Patrick Hand', sans-serif; color: var(--ink-light); }
+  .insight-table td.num { text-align: right; font-family: 'Caveat', cursive; font-size: 1.05rem; }
+  .spark { vertical-align: middle; }
+  .heat-grid { display: grid; grid-template-columns: auto repeat(7, 1fr); gap: 3px; margin: 0.4rem 0; }
+  .heat-cell {
+    aspect-ratio: 1 / 1; border-radius: 4px; background: var(--paper-line);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; color: var(--ink-light);
+  }
+  .heat-cell.lit-1 { background: #cdeed5; } .heat-cell.lit-2 { background: #8fd6a3; color: #14401f; }
+  .heat-head { font-family: 'Patrick Hand', sans-serif; font-size: 0.75rem; color: var(--ink-light); text-align: center; }
+  .funnel-row { display: flex; align-items: center; gap: 0.5rem; margin: 3px 0; font-size: 0.9rem; }
+  .funnel-bar { height: 16px; border-radius: 8px; background: var(--jess-deep); min-width: 2px; }
+  .funnel-row .funnel-lab { min-width: 92px; }
+  .wins-hero {
+    text-align: center; background: var(--bg2); border: 2px solid var(--accent-yellow);
+    border-radius: var(--radius-sm); padding: 1rem; margin: 0.5rem 0;
+  }
+  .wins-hero .big { font-family: 'Gochi Hand', cursive; font-size: 2.6rem; color: var(--jess-deep); line-height: 1; }
+  .wins-hero .lab { font-family: 'Caveat', cursive; font-size: 1.1rem; color: var(--ink-light); }
+  .pr-win {
+    display: flex; align-items: center; gap: 0.6rem; background: var(--bg2);
+    border: 2px solid var(--paper-line); border-radius: var(--radius-sm);
+    padding: 0.5rem 0.7rem; margin: 0.35rem 0;
+  }
+  .pr-win .pr-emoji { font-size: 1.6rem; }
+  .pr-win .pr-name { flex: 1; font-family: 'Patrick Hand', sans-serif; }
+  .pr-win .pr-delta { font-family: 'Gochi Hand', cursive; font-size: 1.2rem; color: #2e8b4f; }
+  .pr-win .pr-delta.flat { color: var(--ink-light); }
+
   /* ===== Test / Practice mode ===== */
   .test-toggle-row {
     display: flex; align-items: center; gap: 0.5rem;
@@ -1077,9 +1136,11 @@
     </button>
 
     <div class="modal-secondary-btns">
+      <button id="btn-open-wins">🌟 My Wins</button>
       <button id="btn-open-tracker">📊 4-Week Progress</button>
       <button id="btn-open-history">📅 Last 7 Sessions</button>
       <button id="btn-open-achievements">🏅 Achievements</button>
+      <button id="btn-open-insights">📈 Coach Insights</button>
       <button id="btn-reset-week" title="Clear this week's session times">🔄 Reset Week</button>
     </div>
   </div>
@@ -1120,6 +1181,27 @@
     <div id="ach-content"><div class="history-empty">Loading…</div></div>
     <div class="modal-secondary-btns" style="margin-top:1rem;">
       <button id="btn-ach-back">← Back</button>
+    </div>
+  </div>
+
+  <!-- Athlete motivational view: My Wins -->
+  <div class="modal" id="modal-wins" role="dialog" aria-modal="true" aria-labelledby="modal-wins-title" style="display:none; max-width: 560px; overflow-y: auto; max-height: 90vh;">
+    <h2 id="modal-wins-title">🌟 My Wins</h2>
+    <p>Look how far you've come, Jess!</p>
+    <div id="wins-content"><div class="history-empty">Loading…</div></div>
+    <div class="modal-secondary-btns" style="margin-top:1rem;">
+      <button id="btn-wins-back">← Back</button>
+    </div>
+  </div>
+
+  <!-- Coach/parent diagnostic view: Insights -->
+  <div class="modal" id="modal-insights" role="dialog" aria-modal="true" aria-labelledby="modal-insights-title" style="display:none; max-width: 620px; overflow-y: auto; max-height: 92vh;">
+    <h2 id="modal-insights-title">📈 Coach Insights</h2>
+    <p>Diagnostics from logged training data — for the grown-ups.</p>
+    <div id="insights-content"><div class="history-empty">Crunching the numbers…</div></div>
+    <div class="modal-secondary-btns" style="margin-top:1rem;">
+      <button id="btn-insights-back">← Back</button>
+      <button id="btn-insights-export" class="btn-evening">⬇︎ Export weekly summary</button>
     </div>
   </div>
 </div>
@@ -1540,6 +1622,7 @@ function howToHtml(name) {
 function showHowTo(name) {
   const h = EXERCISE_HOWTO[name];
   if (!h) return;
+  logEvent("howto", { name });
   document.getElementById("howto-title").textContent = name;
   document.getElementById("howto-text").textContent = h.text;
   const link = document.getElementById("howto-link");
@@ -2418,9 +2501,11 @@ function initModal() {
   renderModalTrackerReminder();
 
   // Wire secondary buttons
+  document.getElementById("btn-open-wins").onclick        = openWinsView;
   document.getElementById("btn-open-tracker").onclick     = openTrackerView;
   document.getElementById("btn-open-history").onclick     = openHistoryView;
   document.getElementById("btn-open-achievements").onclick = openAchievementsView;
+  document.getElementById("btn-open-insights").onclick    = openInsightsView;
   document.getElementById("btn-reset-week").onclick = () => {
     if (!confirm("Reset this week's session times? (Tracker data is kept.)")) return;
     clearThisWeekSessions();
@@ -2430,6 +2515,9 @@ function initModal() {
   document.getElementById("btn-tracker-save").onclick = saveTrackerFromUI;
   document.getElementById("btn-history-back").onclick = closeAllSubViews;
   document.getElementById("btn-ach-back").onclick     = closeAllSubViews;
+  document.getElementById("btn-wins-back").onclick     = closeAllSubViews;
+  document.getElementById("btn-insights-back").onclick  = closeAllSubViews;
+  document.getElementById("btn-insights-export").onclick = exportWeeklySummary;
 }
 
 /* ===== Pass 2: weekly summary in modal ===== */
@@ -2502,7 +2590,7 @@ function renderModalTrackerReminder() {
 }
 
 /* ===== Sub-view navigation ===== */
-const SUB_VIEWS = ["modal-tracker", "modal-history", "modal-achievements"];
+const SUB_VIEWS = ["modal-tracker", "modal-history", "modal-achievements", "modal-wins", "modal-insights"];
 function showSubView(id) {
   document.getElementById("modal-main").style.display = "none";
   SUB_VIEWS.forEach(v => {
@@ -2694,6 +2782,182 @@ function renderAchievements(docs, slot) {
     <div class="milestone-list">${badgesHtml}</div>`;
 }
 
+
+/* ===== Athlete view: My Wins (motivational) ===== */
+function openWinsView() {
+  showSubView("modal-wins");
+  const slot = document.getElementById("wins-content");
+  const k = computeKPIs();
+  if (!k.totalSessions) {
+    slot.innerHTML = `<div class="history-empty">Finish your first session to start collecting wins! 🌟</div>`;
+    return;
+  }
+  const thisWk = Math.round(sumSecs(thisWeekSessions().filter(s => s.completedFully !== false)) / 60);
+  // last week's minutes
+  const monday = mondayOfThisWeek();
+  const lastMon = new Date(monday); lastMon.setDate(lastMon.getDate() - 7);
+  const lastWk = Math.round(sumSecs(loadSessions().filter(s => {
+    if (s.completedFully === false || !s.isoDate) return false;
+    const d = new Date(s.isoDate); return d >= lastMon && d < monday;
+  })) / 60);
+  const wkDelta = thisWk - lastWk;
+
+  const prWins = k.prs.filter(p => p.delta != null && p.delta > 0).slice(0, 5);
+  const prHtml = prWins.length ? prWins.map(p => `
+    <div class="pr-win">
+      <span class="pr-emoji">🏅</span>
+      <span class="pr-name">${p.label.split("—")[0].trim()}</span>
+      <span class="pr-delta">+${p.delta} → ${p.last}</span>
+    </div>`).join("")
+    : `<div class="insight-note">Log a PR number after a session to see your new bests here!</div>`;
+
+  const strongerLine = wkDelta > 0
+    ? `You trained ${wkDelta} more minute${wkDelta === 1 ? "" : "s"} than last week. You're getting stronger! 💪`
+    : (k.streak > 1 ? `${k.streak} days in a row — that's how champions are built! 🔥`
+                    : `Every session counts. Show up and stack a win today! 🌊`);
+
+  slot.innerHTML = `
+    <div class="wins-hero">
+      <div class="big">🔥 ${k.streak}</div>
+      <div class="lab">day streak${k.longestStreak > k.streak ? ` · best ever ${k.longestStreak}` : ""}</div>
+    </div>
+    <div class="ach-grid">
+      <div class="ach-card"><span class="ach-icon">⏱</span><div class="ach-val">${thisWk}m</div><div class="ach-label">This week</div></div>
+      <div class="ach-card"><span class="ach-icon">${wkDelta >= 0 ? "⬆️" : "➡️"}</span><div class="ach-val">${wkDelta >= 0 ? "+" : ""}${wkDelta}m</div><div class="ach-label">vs last week</div></div>
+      <div class="ach-card"><span class="ach-icon">✅</span><div class="ach-val">${k.last7}</div><div class="ach-label">Sessions (7d)</div></div>
+      <div class="ach-card"><span class="ach-icon">🏆</span><div class="ach-val">${k.totalSessions}</div><div class="ach-label">All time</div></div>
+    </div>
+    <div class="self-check-banner" style="text-align:center;">${strongerLine}</div>
+    <div class="ach-section-title">🏅 New personal bests</div>
+    ${prHtml}`;
+}
+
+/* ===== Coach/parent view: Insights (diagnostic) ===== */
+function openInsightsView() {
+  showSubView("modal-insights");
+  renderInsights(computeKPIs(), document.getElementById("insights-content"));
+}
+function renderInsights(k, slot) {
+  if (!k.totalSessions) {
+    slot.innerHTML = `<div class="history-empty">No completed sessions yet — insights appear after training data is logged.</div>`;
+    return;
+  }
+  // ---- Risk panel: ACWR ----
+  const acwrTxt = k.acwr == null ? "n/a" : k.acwr.toFixed(2);
+  const acwrMap = {
+    sweet: ["is-good", "Sweet spot (0.8–1.3)"],
+    low:   ["is-warn", "Detraining risk (<0.8) — load is light"],
+    watch: ["is-warn", "Climbing (1.3–1.5) — monitor"],
+    high:  ["is-bad",  "Spike (>1.5) — overtraining/injury risk"],
+    none:  ["", "Need ~4 weeks of data"]
+  };
+  const [acwrCls, acwrDesc] = acwrMap[k.acwrZone] || ["", ""];
+  const acwrRow = `
+    <div class="risk-row ${acwrCls}">
+      <div class="risk-big">${acwrTxt}</div>
+      <div class="risk-text"><b>Acute : Chronic Workload</b><small>${acwrDesc}<br>7-day ${k.minutes7}m vs ~${Math.round(k.minutes28/4)}m/wk chronic</small></div>
+    </div>`;
+
+  // ---- Hard-while-green + pain flags ----
+  const hwgCls = k.hardWhileGreen >= 3 ? "is-warn" : "is-good";
+  const painCls = k.painFlags >= 2 ? "is-bad" : (k.painFlags === 1 ? "is-warn" : "is-good");
+  const flagRows = `
+    <div class="risk-row ${hwgCls}">
+      <div class="risk-big">${k.hardWhileGreen}</div>
+      <div class="risk-text"><b>"Hard" while readiness Green</b><small>High count can signal under-recovery / overreaching.</small></div>
+    </div>
+    <div class="risk-row ${painCls}">
+      <div class="risk-big">${k.painFlags}</div>
+      <div class="risk-text"><b>Pain-gate flags</b><small>Sessions where the body was NOT pain-free at check-in.</small></div>
+    </div>`;
+
+  // ---- Readiness distribution ----
+  const r = k.readiness;
+  const readinessHtml = `
+    <div class="ach-section-title">Readiness mix</div>
+    <div>
+      <span class="chip-pill chip-green">🟢 ${r.green} green</span>
+      <span class="chip-pill chip-yellow">🟡 ${r.yellow} yellow</span>
+      <span class="chip-pill chip-red">🔴 ${r.red} red</span>
+      <span class="chip-pill chip-recovery">🔵 ${r.recovery} recovery</span>
+    </div>`;
+
+  // ---- Weekly load trend ----
+  const loadHtml = `
+    <div class="ach-section-title">Weekly active minutes (last ${k.weeklyMins.length})</div>
+    ${svgBars(k.weeklyMins, { w: 220, h: 40 })}
+    <span class="insight-note">${k.weeklyMins.join(" · ")} min</span>`;
+
+  // ---- PR trends ----
+  const prRows = k.prs.length ? k.prs.map(p => {
+    const deltaTxt = p.delta == null ? "—" : (p.delta >= 0 ? "+" + p.delta : String(p.delta));
+    const flag = p.plateau ? " ⚠️" : (p.delta > 0 ? " ⬆️" : "");
+    return `<tr>
+      <td>${p.label.split("—")[0].trim()}${flag}</td>
+      <td>${svgSparkline(p.values, { w: 90, h: 24 })}</td>
+      <td class="num">${p.last}</td>
+      <td class="num">${deltaTxt}</td>
+      <td class="num">${p.staleDays == null ? "—" : p.staleDays + "d"}</td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="5" class="insight-note">No PR numbers logged yet.</td></tr>`;
+  const prHtml = `
+    <div class="ach-section-title">PR trends <small style="font-weight:normal">(⚠️ = plateau)</small></div>
+    <table class="insight-table">
+      <thead><tr><th>Metric</th><th>Trend</th><th>Last</th><th>Δ</th><th>Age</th></tr></thead>
+      <tbody>${prRows}</tbody>
+    </table>`;
+
+  // ---- Skip-rate friction ----
+  const skipRows = k.skipRates.length ? k.skipRates.slice(0, 8).map(s =>
+    `<tr><td>${s.name}</td><td class="num">${s.skipped}/${s.seen}</td><td class="num">${Math.round(s.rate * 100)}%</td></tr>`
+  ).join("") : `<tr><td colspan="3" class="insight-note">No skips recorded — clean attendance!</td></tr>`;
+  const reasonChips = Object.entries(k.skipReasons).map(([reason, n]) =>
+    `<span class="chip-pill">${reason}: ${n}</span>`).join("") || `<span class="insight-note">No skip reasons logged yet.</span>`;
+  const skipHtml = `
+    <div class="ach-section-title">Most-skipped exercises</div>
+    <table class="insight-table">
+      <thead><tr><th>Exercise</th><th>Skipped</th><th>Rate</th></tr></thead>
+      <tbody>${skipRows}</tbody>
+    </table>
+    <div class="insight-note">Why skipped:</div><div>${reasonChips}</div>`;
+
+  // ---- Adherence: day-of-week heatmap ----
+  const dowCounts = [0,0,0,0,0,0,0]; // Mon..Sun
+  k.lastSessions.forEach(s => { if (!s.isoDate) return; const d = new Date(s.isoDate).getDay(); dowCounts[d === 0 ? 6 : d - 1]++; });
+  const maxDow = Math.max(1, ...dowCounts);
+  const heatHeads = ["M","T","W","T","F","S","S"].map(h => `<div class="heat-head">${h}</div>`).join("");
+  const heatCells = dowCounts.map(c => {
+    const lvl = c === 0 ? 0 : (c >= maxDow * 0.66 ? 2 : 1);
+    return `<div class="heat-cell lit-${lvl}" title="${c} sessions">${c || ""}</div>`;
+  }).join("");
+  const adherenceHtml = `
+    <div class="ach-section-title">When training happens</div>
+    <div class="heat-grid" style="grid-template-columns:repeat(7,1fr);">${heatHeads}${heatCells}</div>
+    <span class="insight-note">Planned-day completion: ${k.plannedHit}/${k.plannedTotal}${k.avgPauses != null ? ` · avg ${k.avgPauses.toFixed(1)} pauses/session` : ""}</span>`;
+
+  // ---- Completion funnel ----
+  const f = k.funnel;
+  const denom = Math.max(1, f.starts);
+  const funnelStages = [
+    ["Started", f.starts], ["Completed", f.completes], ["Abandoned", f.aborts]
+  ];
+  const funnelRows = funnelStages.map(([lab, n]) =>
+    `<div class="funnel-row"><span class="funnel-lab">${lab}</span><span class="funnel-bar" style="width:${Math.round((n/denom)*180)}px"></span><span>${n}</span></div>`
+  ).join("");
+  const stageBreak = Object.entries(f.abortStages).map(([s, n]) => `<span class="chip-pill">${s}: ${n}</span>`).join("");
+  const howtoChips = k.topHowto.map(h => `<span class="chip-pill">${h.name} ×${h.n}</span>`).join("")
+    || `<span class="insight-note">No how-to lookups logged.</span>`;
+  const funnelHtml = `
+    <div class="ach-section-title">Session funnel</div>
+    ${f.starts ? funnelRows : `<span class="insight-note">No session events logged yet (instrumentation starts from next session).</span>`}
+    ${stageBreak ? `<div class="insight-note" style="margin-top:4px;">Drop-off by block: ${stageBreak}</div>` : ""}
+    <div class="ach-section-title">Coaching demand (how-to opens)</div>
+    <div>${howtoChips}</div>`;
+
+  slot.innerHTML =
+    `<div class="ach-section-title">Risk panel</div>` + acwrRow + flagRows +
+    readinessHtml + loadHtml + prHtml + skipHtml + adherenceHtml + funnelHtml;
+}
 
 function renderTrackerTable() {
   const t = loadTracker();
@@ -4010,20 +4274,310 @@ function getCurrentTrackerWeek() {
 }
 
 /* ============================================================
+   ANALYTICS — event log + KPI engine + charts + export
+   Local-first: computes over swim_sessions_v2 (source of truth),
+   swim_tracker_v2, swim_pr_log, and a new swim_events_v1 stream.
+   Two audiences: athlete (My Wins) + coach/parent (Insights).
+   ============================================================ */
+
+const LS_EVENTS = "swim_events_v1";
+const EVENT_RETENTION_MS = 120 * 24 * 60 * 60 * 1000; // 120 days
+const EVENT_CAP = 1500;
+
+function loadEvents() { return readStorage(LS_EVENTS, []); }
+// Lightweight behavioural instrumentation. Never throws, never blocks a session.
+function logEvent(type, data) {
+  try {
+    const cutoff = Date.now() - EVENT_RETENTION_MS;
+    let all = loadEvents().filter(e => (e.t || 0) >= cutoff);
+    all.push({ t: Date.now(), iso: new Date().toISOString(), type, ...(data || {}) });
+    if (all.length > EVENT_CAP) all = all.slice(all.length - EVENT_CAP);
+    writeStorage(LS_EVENTS, all);
+  } catch {}
+}
+
+/* Patch the most recent localStorage session record (so mood / pr / skip
+   reasons live alongside lightResult — closes the readiness→outcome gap). */
+function patchLastSession(patch) {
+  const all = loadSessions();
+  if (!all.length) return;
+  all[all.length - 1] = { ...all[all.length - 1], ...patch };
+  localStorage.setItem(LS_SESSIONS, JSON.stringify(all));
+}
+
+const DAY_MS = 86400000;
+function daysAgoCount(sessions, days) {
+  const cutoff = Date.now() - days * DAY_MS;
+  return sessions.filter(s => s.isoDate && new Date(s.isoDate).getTime() >= cutoff);
+}
+function sumSecs(sessions) { return sessions.reduce((a, s) => a + (s.durationSecs || 0), 0); }
+
+// Longest run of consecutive calendar days with ≥1 completed session.
+function longestStreak(sessions) {
+  const days = [...new Set(sessions.map(s => (s.isoDate || "").slice(0, 10)).filter(Boolean))].sort();
+  let best = 0, run = 0, prev = null;
+  days.forEach(d => {
+    if (prev && Math.round((new Date(d) - new Date(prev)) / DAY_MS) === 1) run++;
+    else run = 1;
+    prev = d; if (run > best) best = run;
+  });
+  return best;
+}
+// Current streak anchored to today/yesterday (Edmonton).
+function currentStreak(sessions) {
+  const days = [...new Set(sessions.map(s => (s.isoDate || "").slice(0, 10)).filter(Boolean))].sort();
+  if (!days.length) return 0;
+  let cur = new Date(days[days.length - 1]);
+  const today = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Edmonton" }));
+  const anchor = new Date(today); anchor.setDate(anchor.getDate() - 1);
+  if (cur < anchor) return 0;
+  let streak = 1;
+  for (let i = days.length - 2; i >= 0; i--) {
+    const prev = new Date(days[i]);
+    if (Math.round((cur - prev) / DAY_MS) === 1) { streak++; cur = prev; } else break;
+  }
+  return streak;
+}
+
+// Least-squares slope (units per entry) over a numeric series.
+function linregSlope(values) {
+  const n = values.length;
+  if (n < 2) return 0;
+  let sx = 0, sy = 0, sxy = 0, sxx = 0;
+  values.forEach((y, x) => { sx += x; sy += y; sxy += x * y; sxx += x * x; });
+  const denom = n * sxx - sx * sx;
+  return denom === 0 ? 0 : (n * sxy - sx * sy) / denom;
+}
+
+/* PR trajectories grouped by metric label, from swim_pr_log (newest-first). */
+function prTrajectories() {
+  const log = loadJSON("swim_pr_log", []);
+  const byLabel = {};
+  // log is newest-first; reverse into chronological order per label
+  [...log].reverse().forEach(e => {
+    if (!e || !e.label || !Number.isFinite(Number(e.value))) return;
+    (byLabel[e.label] = byLabel[e.label] || []).push({ date: e.date, value: Number(e.value) });
+  });
+  return Object.entries(byLabel).map(([label, pts]) => {
+    const values = pts.map(p => p.value);
+    const last = values[values.length - 1];
+    const prev = values.length > 1 ? values[values.length - 2] : null;
+    const best = Math.max(...values);
+    const slope = linregSlope(values);
+    const lastDate = pts[pts.length - 1].date;
+    const staleDays = lastDate ? Math.floor((Date.now() - new Date(lastDate)) / DAY_MS) : null;
+    return { label, values, last, prev, delta: prev == null ? null : last - prev,
+      best, slope, lastDate, staleDays, plateau: values.length >= 3 && slope <= 0 };
+  }).sort((a, b) => (b.values.length - a.values.length));
+}
+
+/* Master KPI computation over the local source of truth. */
+function computeKPIs() {
+  const sessions = loadSessions().filter(s => s.completedFully !== false);
+  const events = loadEvents();
+
+  const last7 = daysAgoCount(sessions, 7);
+  const last28 = daysAgoCount(sessions, 28);
+
+  // ---- Training load + ACWR (acute 7d load vs chronic weekly avg over 28d) ----
+  const acuteMins = sumSecs(last7) / 60;
+  const chronicMins = (sumSecs(last28) / 60) / 4; // avg per week across 4 weeks
+  const acwr = chronicMins > 0 ? acuteMins / chronicMins : null;
+  let acwrZone = "none";
+  if (acwr != null) {
+    if (acwr < 0.8) acwrZone = "low";
+    else if (acwr <= 1.3) acwrZone = "sweet";
+    else if (acwr <= 1.5) acwrZone = "watch";
+    else acwrZone = "high";
+  }
+
+  // ---- Readiness + mood distributions ----
+  const readiness = { green: 0, yellow: 0, red: 0, recovery: 0 };
+  const mood = { easy: 0, just: 0, hard: 0 };
+  let hardWhileGreen = 0, painFlags = 0;
+  sessions.forEach(s => {
+    if (s.lightResult && readiness[s.lightResult] !== undefined) readiness[s.lightResult]++;
+    if (s.mood && mood[s.mood] !== undefined) mood[s.mood]++;
+    if (s.mood === "hard" && s.lightResult === "green") hardWhileGreen++;
+    // Readiness q2 (index 1) is the pain gate: false = NOT pain-free.
+    if (Array.isArray(s.readinessAnswers) && s.readinessAnswers[1] === false) painFlags++;
+  });
+
+  // ---- Skip rates per exercise (from perExercise across sessions) ----
+  const exStat = {};
+  sessions.forEach(s => (s.perExercise || []).forEach(p => {
+    const k = p.name; if (!k) return;
+    exStat[k] = exStat[k] || { seen: 0, skipped: 0 };
+    exStat[k].seen++; if (p.skipped) exStat[k].skipped++;
+  }));
+  const skipRates = Object.entries(exStat)
+    .map(([name, v]) => ({ name, seen: v.seen, skipped: v.skipped, rate: v.skipped / v.seen }))
+    .filter(x => x.skipped > 0)
+    .sort((a, b) => b.rate - a.rate || b.skipped - a.skipped);
+
+  // ---- Skip reasons (from reflection-captured reasons) ----
+  const skipReasons = {};
+  sessions.forEach(s => (s.skipReasons || []).forEach(r => {
+    if (!r || !r.reason) return; skipReasons[r.reason] = (skipReasons[r.reason] || 0) + 1;
+  }));
+
+  // ---- Completion funnel from event stream ----
+  const starts = events.filter(e => e.type === "session_start").length;
+  const completes = events.filter(e => e.type === "session_complete").length;
+  const aborts = events.filter(e => e.type === "session_abort").length;
+  const abortStages = {};
+  events.filter(e => e.type === "session_abort").forEach(e => {
+    const k = e.atBlock || "unknown"; abortStages[k] = (abortStages[k] || 0) + 1;
+  });
+
+  // ---- How-to (coaching demand) ----
+  const howtoCount = {};
+  events.filter(e => e.type === "howto").forEach(e => {
+    if (e.name) howtoCount[e.name] = (howtoCount[e.name] || 0) + 1;
+  });
+  const topHowto = Object.entries(howtoCount).map(([name, n]) => ({ name, n }))
+    .sort((a, b) => b.n - a.n).slice(0, 6);
+
+  // ---- Adherence: planned-day completion (was day X done on weekday X) ----
+  let plannedHit = 0, plannedTotal = 0;
+  sessions.forEach(s => {
+    if (!s.dayKey || !s.isoDate) return;
+    plannedTotal++;
+    const dow = new Date(s.isoDate).getDay(); // 0 Sun..6 Sat
+    const idx = (typeof DAY_KEYS !== "undefined") ? DAY_KEYS.indexOf(s.dayKey) : -1;
+    if (idx === dow) plannedHit++;
+  });
+
+  // ---- Weekly active minutes, last 8 weeks (oldest→newest) ----
+  const weekBuckets = {};
+  sessions.forEach(s => {
+    if (!s.isoDate) return;
+    const dt = new Date(s.isoDate); const dow = dt.getDay();
+    const mon = new Date(dt); mon.setHours(0,0,0,0);
+    mon.setDate(dt.getDate() - (dow === 0 ? 6 : dow - 1));
+    const key = mon.toISOString().slice(0, 10);
+    weekBuckets[key] = (weekBuckets[key] || 0) + (s.durationSecs || 0);
+  });
+  const weekKeys = Object.keys(weekBuckets).sort();
+  const weeklyMins = weekKeys.slice(-8).map(k => Math.round(weekBuckets[k] / 60));
+
+  // ---- Pause behaviour (per-session avg from saved metrics) ----
+  const withPause = sessions.filter(s => Number.isFinite(s.pauseCount));
+  const avgPauses = withPause.length
+    ? withPause.reduce((a, s) => a + s.pauseCount, 0) / withPause.length : null;
+
+  return {
+    totalSessions: sessions.length,
+    last7: last7.length, last28: last28.length,
+    minutes7: Math.round(acuteMins), minutes28: Math.round(sumSecs(last28) / 60),
+    streak: currentStreak(sessions), longestStreak: longestStreak(sessions),
+    acwr, acwrZone, weeklyMins,
+    readiness, mood, hardWhileGreen, painFlags,
+    skipRates, skipReasons,
+    funnel: { starts, completes, aborts, abortStages },
+    topHowto, plannedHit, plannedTotal,
+    avgPauses, prs: prTrajectories(),
+    lastSessions: sessions
+  };
+}
+
+/* ---- Tiny dependency-free SVG charts (single-file ethos) ---- */
+function svgSparkline(values, opts = {}) {
+  const w = opts.w || 120, h = opts.h || 28, pad = 3;
+  if (!values || values.length < 2) return `<span class="insight-note">—</span>`;
+  const min = Math.min(...values), max = Math.max(...values);
+  const span = max - min || 1;
+  const step = (w - pad * 2) / (values.length - 1);
+  const pts = values.map((v, i) =>
+    `${(pad + i * step).toFixed(1)},${(h - pad - ((v - min) / span) * (h - pad * 2)).toFixed(1)}`).join(" ");
+  const last = values[values.length - 1];
+  const lx = pad + (values.length - 1) * step;
+  const ly = h - pad - ((last - min) / span) * (h - pad * 2);
+  const col = opts.color || "#2f7fb5";
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">
+    <polyline fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${pts}"/>
+    <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="2.6" fill="${col}"/></svg>`;
+}
+function svgBars(values, opts = {}) {
+  const w = opts.w || 150, h = opts.h || 34, gap = 2;
+  if (!values || !values.length) return `<span class="insight-note">—</span>`;
+  const max = Math.max(...values, 1);
+  const bw = (w - gap * (values.length - 1)) / values.length;
+  const bars = values.map((v, i) => {
+    const bh = Math.max(1, (v / max) * (h - 2));
+    return `<rect x="${(i * (bw + gap)).toFixed(1)}" y="${(h - bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="1.5" fill="${opts.color || "#3a9d5d"}"/>`;
+  }).join("");
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${bars}</svg>`;
+}
+
+/* ---- Weekly summary export (downloadable CSV, no backend) ---- */
+function buildWeeklyCSV() {
+  const k = computeKPIs();
+  const rows = [];
+  rows.push(["Swimming Dryland — Weekly Coach Summary"]);
+  rows.push(["Generated", new Date().toISOString()]);
+  rows.push([]);
+  rows.push(["Metric", "Value"]);
+  rows.push(["Sessions (last 7d)", k.last7]);
+  rows.push(["Sessions (last 28d)", k.last28]);
+  rows.push(["Active minutes (7d)", k.minutes7]);
+  rows.push(["Active minutes (28d)", k.minutes28]);
+  rows.push(["Current streak (days)", k.streak]);
+  rows.push(["Longest streak (days)", k.longestStreak]);
+  rows.push(["ACWR", k.acwr != null ? k.acwr.toFixed(2) : "n/a"]);
+  rows.push(["ACWR zone", k.acwrZone]);
+  rows.push(["Hard-while-green count", k.hardWhileGreen]);
+  rows.push(["Pain-gate flags", k.painFlags]);
+  rows.push(["Planned-day completion", `${k.plannedHit}/${k.plannedTotal}`]);
+  rows.push([]);
+  rows.push(["Readiness", "green", "yellow", "red", "recovery"]);
+  rows.push(["count", k.readiness.green, k.readiness.yellow, k.readiness.red, k.readiness.recovery]);
+  rows.push([]);
+  rows.push(["Mood", "easy", "just right", "hard"]);
+  rows.push(["count", k.mood.easy, k.mood.just, k.mood.hard]);
+  rows.push([]);
+  rows.push(["PR metric", "last", "best", "delta", "trend/wk", "days since"]);
+  k.prs.forEach(p => rows.push([p.label, p.last, p.best,
+    p.delta == null ? "" : (p.delta >= 0 ? "+" + p.delta : p.delta),
+    p.slope.toFixed(2), p.staleDays == null ? "" : p.staleDays]));
+  rows.push([]);
+  rows.push(["Most-skipped exercise", "skipped", "seen", "rate"]);
+  k.skipRates.slice(0, 10).forEach(s => rows.push([s.name, s.skipped, s.seen, (s.rate * 100).toFixed(0) + "%"]));
+  return rows.map(r => r.map(c => {
+    const v = String(c == null ? "" : c);
+    return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  }).join(",")).join("\n");
+}
+function exportWeeklySummary() {
+  try {
+    const csv = buildWeeklyCSV();
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `swim-dryland-summary-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (e) { alert("Could not build export: " + e.message); }
+}
+
+/* ============================================================
    PASS 2: ELAPSED TIMER
    ============================================================ */
 
 let elapsedStart = null;
 let elapsedInterval = null;
 let elapsedActiveSecs = 0;
+let elapsedPausedSecs = 0;
 let plannedSessionSecs = 0;
 
 function startElapsed() {
   elapsedStart = Date.now();
   elapsedActiveSecs = 0;
+  elapsedPausedSecs = 0;
   if (elapsedInterval) clearInterval(elapsedInterval);
   elapsedInterval = setInterval(() => {
-    if (session.paused) return;
+    if (session.paused) { elapsedPausedSecs += 1; return; }
     elapsedActiveSecs += 1;
     const el = document.getElementById("elapsed-time");
     if (!el) return;
@@ -4108,8 +4662,9 @@ async function startSession() {
     currentTimer: null, byRepsResolver: null,
     calmMode: false, currentEx: null, weather: session.weather,
     skipped: [], doneHoldTimeout: null, doneHoldTriggered: false,
-    perExercise: [], microLoop: null, intentWord: null
+    perExercise: [], microLoop: null, intentWord: null, pauseCount: 0
   };
+  if (!testMode) logEvent("session_start", { day: selectedDay, light: effectiveLight() });
 
   // Apply skipGreetingOnStart if set
   if (skipGreetingOnStart) {
@@ -4419,6 +4974,8 @@ function togglePause() {
   session.paused = !session.paused;
   const btn = document.getElementById("btn-pause");
   if (btn) btn.textContent = session.paused ? "RESUME" : "PAUSE";
+  if (session.paused) session.pauseCount = (session.pauseCount || 0) + 1;
+  logEvent(session.paused ? "pause" : "resume", { ex: session.currentEx ? session.currentEx.name : null });
   // Pause and resume deliberately replace any active coaching cue.
   interruptSpeech(session.paused ? "Paused." : "Resuming.");
 }
@@ -4441,6 +4998,7 @@ function skipExercise() {
       round: document.getElementById("progress")?.innerText || "",
       at: Date.now()
     });
+    logEvent("skip", { ex: session.currentEx.name, block: session.currentEx.block || null });
   }
   session.skipExercise = true;
   if (session.byRepsResolver) {
@@ -4509,9 +5067,14 @@ function finalize(completed) {
         intentWord: session.intentWord || null,
         prSentinel: isSpa ? null : (DAYS[selectedDay] && DAYS[selectedDay].prSentinel) || null,
         skippedCount: session.skipped.length,
+        pauseCount: session.pauseCount || 0,
+        pausedSecs: elapsedPausedSecs,
+        plannedSecs: plannedSessionSecs,
         completedFully: true
       };
       saveSession(sessionEntry);
+      logEvent("session_complete", { day: selectedDay, durationSecs: elapsedSecs,
+        skipped: session.skipped.length, pauses: session.pauseCount || 0 });
       // Valgus earn-back: a clean (non-skipped) Drop-and-Stick session counts toward unlock.
       if ((session.perExercise || []).some(p => p.name === "Drop-and-Stick" && !p.skipped)) {
         const g = loadJSON(LS_GATE, { unlocked: false, cleanCount: 0 });
@@ -4555,6 +5118,10 @@ function finalize(completed) {
     }
     showReflection();
   } else {
+    if (!testMode) logEvent("session_abort", { day: selectedDay,
+      atExercise: session.currentEx ? session.currentEx.name : null,
+      atBlock: session.currentEx ? (session.currentEx.block || null) : null,
+      elapsedSecs });
     setZone("");
     setStatus("Stopped — tap START to try again");
     setExercise({ name: "Stopped", cue: "Come back when you're ready." });
@@ -4656,7 +5223,20 @@ function showReflection() {
   });
   const skipSummary = document.getElementById("skip-summary");
   if (session.skipped.length) {
-    skipSummary.textContent = `Skipped this session: ${session.skipped.map(s => s.name).join(", ")}`;
+    const uniqueSkips = [...new Set(session.skipped.map(s => s.name))];
+    skipSummary.innerHTML = `Skipped this session — why? <small>(helps the coach tune your plan)</small>` +
+      uniqueSkips.map((name, i) => `
+        <div class="skip-reason-row" style="margin-top:0.3rem;">
+          <span style="font-family:'Patrick Hand',sans-serif;">${name}</span>
+          <select class="skip-reason-pick" data-skip-name="${name.replace(/"/g, "&quot;")}" style="margin-left:0.4rem;">
+            <option value="">(reason…)</option>
+            <option value="pain">Pain / sore</option>
+            <option value="too hard">Too hard</option>
+            <option value="no time">No time</option>
+            <option value="no gear">No equipment</option>
+            <option value="other">Other</option>
+          </select>
+        </div>`).join("");
   } else {
     skipSummary.textContent = "No skipped exercises this session.";
   }
@@ -4682,18 +5262,28 @@ function showReflection() {
       log.unshift({ date: new Date().toISOString(), day: selectedDay, label: sentinel, value: Number(prInput.value) });
       saveJSON("swim_pr_log", log.slice(0, 60));
     }
-    // Patch mood + PR metric back to the Firestore doc (fire-and-forget)
-    if (_pendingFsId) {
-      const patch = {};
-      if (chosenFeel) patch.mood = chosenFeel;
-      const prValues = {};
-      document.querySelectorAll("[data-pr-key]").forEach(input => {
-        if (input.value) prValues[input.dataset.prKey] = input.value;
-      });
-      if (Object.keys(prValues).length) patch.pr = prValues;
-      if (Object.keys(patch).length) fsUpdateSession(_pendingFsId, patch);
-      _pendingFsId = null;
+    // Collect skip reasons captured in the reflection picker
+    const skipReasons = [];
+    document.querySelectorAll(".skip-reason-pick").forEach(sel => {
+      if (sel.value) skipReasons.push({ name: sel.dataset.skipName, reason: sel.value });
+    });
+    // Build the patch once, apply to BOTH localStorage (analytics source of
+    // truth) and the Firestore doc — closes the readiness→outcome gap.
+    const patch = {};
+    if (chosenFeel) patch.mood = chosenFeel;
+    const prValues = {};
+    document.querySelectorAll("[data-pr-key]").forEach(input => {
+      if (input.value) prValues[input.dataset.prKey] = input.value;
+    });
+    const prInputEl = document.getElementById("pr-sentinel-input");
+    if (prInputEl && prInputEl.value && sentinel) prValues[sentinel] = prInputEl.value;
+    if (Object.keys(prValues).length) patch.pr = prValues;
+    if (skipReasons.length) patch.skipReasons = skipReasons;
+    if (Object.keys(patch).length) {
+      patchLastSession(patch);
+      if (_pendingFsId) fsUpdateSession(_pendingFsId, patch);
     }
+    _pendingFsId = null;
     renderCard();
   };
 }
