@@ -3965,51 +3965,8 @@ function screenRepsDetail(ex) {
 // Build the ordered voice cue sequence for a reps exercise
 // Returns array of strings to speak one by one, looping until DONE
 function buildVoiceCues(ex) {
-  const name = ex.name;
-
-  if (/glute bridge slow/i.test(name)) {
-    const cues = [];
-    for (let i = 1; i <= 10; i++) {
-      cues.push(`${i}. Up 2 3`, "Hold 2 3", "Down 2 3");
-    }
-    return cues;
-  }
-  if (/glute bridge/i.test(name)) {
-    const cues = [];
-    for (let i = 1; i <= 12; i++) {
-      cues.push(`${i}. Up 2`, "Hold", "Down 2");
-    }
-    return cues;
-  }
-  if (/calf raise/i.test(name)) {
-    const cues = [];
-    for (let i = 1; i <= 15; i++) {
-      cues.push(`${i}. Up 2`, "Hold", "Down 2");
-    }
-    return cues;
-  }
-  if (/clamshell/i.test(name)) {
-    const cues = [];
-    for (let i = 1; i <= 15; i++) {
-      cues.push(`${i}. Open 2`, "Hold", "Close 2");
-    }
-    return cues;
-  }
-  if (/dead bug/i.test(name)) {
-    const cues = [];
-    for (let i = 1; i <= 10; i++) {
-      cues.push(`${i}. Extend`, "And return");
-    }
-    return cues;
-  }
-  if (/bird dog/i.test(name)) {
-    const cues = [];
-    for (let i = 1; i <= 10; i++) {
-      cues.push(`${i}. Extend`, "Hold 2 3 4 5", "Return");
-    }
-    return cues;
-  }
-  // Default: count reps
+  // Default: count reps. Patterned exercises route through the metronome
+  // (getExercisePattern) instead of this list.
   const repMatch = (ex.repsDetail || "").match(/(\d+)\s*reps?/i);
   const count = repMatch ? parseInt(repMatch[1]) : 10;
   return Array.from({ length: count }, (_, i) => String(i + 1));
@@ -4018,27 +3975,73 @@ function buildVoiceCues(ex) {
 // Tempo notation like "2-1-2" / "2-0-2" → seconds for up / hold / down phases.
 const TEMPO_PATTERN = /(\d)-(\d)-(\d)/;
 
-function parseTempo(ex) {
-  const m = (ex.repsDetail || "").match(TEMPO_PATTERN);
-  if (!m) return null;
-  const repMatch = (ex.repsDetail || "").match(/(\d+)\s*reps?/i);
-  return {
-    up: parseInt(m[1]),
-    hold: parseInt(m[2]),
-    down: parseInt(m[3]),
-    count: repMatch ? parseInt(repMatch[1]) : 10
-  };
+function repCount(ex, fallback) {
+  const m = (ex.repsDetail || "").match(/(\d+)\s*reps?/i);
+  return m ? parseInt(m[1]) : fallback;
 }
 
-// Paced metronome for tempo reps: phase word (non-blocking) + one beep per second,
-// so the audible cadence is precise. Skips zero-second phases (e.g. 2-0-2 hold).
-async function runTempoLoop(ex, tempo, isDone) {
-  const phaseDefs = [
-    { word: "Up",   secs: tempo.up,   freq: 660 },
-    { word: "Hold", secs: tempo.hold, freq: 880 },
-    { word: "Down", secs: tempo.down, freq: 440 },
-  ];
-  for (let i = 1; i <= tempo.count; i++) {
+// Return a {count, phases:[{word,secs,freq}]} pattern for any rep exercise
+// whose cadence is known (tempo notation, or named patterns like glute bridge).
+// Each phase is paced as: spoken word at start + one beep per second.
+function getExercisePattern(ex) {
+  const m = (ex.repsDetail || "").match(TEMPO_PATTERN);
+  if (m) {
+    return { count: repCount(ex, 10), phases: [
+      { word: "Up",   secs: parseInt(m[1]), freq: 660 },
+      { word: "Hold", secs: parseInt(m[2]), freq: 880 },
+      { word: "Down", secs: parseInt(m[3]), freq: 440 },
+    ]};
+  }
+  const name = ex.name;
+  if (/glute bridge slow/i.test(name)) return { count: 10, phases: [
+    { word: "Up",   secs: 3, freq: 660 },
+    { word: "Hold", secs: 3, freq: 880 },
+    { word: "Down", secs: 3, freq: 440 },
+  ]};
+  if (/glute bridge/i.test(name)) return { count: 12, phases: [
+    { word: "Up",   secs: 2, freq: 660 },
+    { word: "Hold", secs: 1, freq: 880 },
+    { word: "Down", secs: 2, freq: 440 },
+  ]};
+  if (/calf raise/i.test(name)) return { count: 15, phases: [
+    { word: "Up",   secs: 2, freq: 660 },
+    { word: "Hold", secs: 1, freq: 880 },
+    { word: "Down", secs: 2, freq: 440 },
+  ]};
+  if (/clamshell/i.test(name)) return { count: 15, phases: [
+    { word: "Open",  secs: 2, freq: 660 },
+    { word: "Hold",  secs: 1, freq: 880 },
+    { word: "Close", secs: 2, freq: 440 },
+  ]};
+  if (/dead bug/i.test(name)) return { count: 10, phases: [
+    { word: "Extend", secs: 2, freq: 660 },
+    { word: "Return", secs: 2, freq: 440 },
+  ]};
+  if (/bird dog/i.test(name)) return { count: 10, phases: [
+    { word: "Extend", secs: 1, freq: 660 },
+    { word: "Hold",   secs: 5, freq: 880 },
+    { word: "Return", secs: 1, freq: 440 },
+  ]};
+  return null;
+}
+
+// Paced metronome for patterned reps: phase word (non-blocking, only at phase start)
+// + one beep per second, so the audible cadence is precise. Zero-second phases skipped.
+async function runTempoLoop(ex, pattern, isDone) {
+  const phaseDefs = pattern.phases;
+  // Sleep that also breaks when DONE is pressed (cueDone via isDone()),
+  // so runRepsWithVoice doesn't hang awaiting the voiceLoop after DONE-while-paused.
+  async function tempoSleep(ms) {
+    const start = Date.now();
+    let pausedMs = 0;
+    while (true) {
+      if (isDone() || session.abort || session.skipExercise) return "interrupt";
+      if (session.paused) { pausedMs += 100; }
+      else if (Date.now() - start - pausedMs >= ms) return "done";
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }
+  for (let i = 1; i <= pattern.count; i++) {
     for (let p = 0; p < phaseDefs.length; p++) {
       const ph = phaseDefs[p];
       if (ph.secs <= 0) continue;
@@ -4048,12 +4051,10 @@ async function runTempoLoop(ex, tempo, isDone) {
       speak(p === 0 ? `${i}. ${ph.word}` : ph.word);
       beep(ph.freq, 0.1);
       for (let s = 1; s < ph.secs; s++) {
-        const r = await sleep(1000);
-        if (r === "abort" || r === "skip" || isDone()) return;
+        if (await tempoSleep(1000) === "interrupt") return;
         beep(ph.freq, 0.08);
       }
-      const rLast = await sleep(1000);
-      if (rLast === "abort" || rLast === "skip" || isDone()) return;
+      if (await tempoSleep(1000) === "interrupt") return;
     }
   }
 }
@@ -4062,8 +4063,8 @@ async function runTempoLoop(ex, tempo, isDone) {
 // Shows DONE button — Jen presses when finished.
 // Voice loops through cues; pressing DONE interrupts cleanly and instantly.
 async function runRepsWithVoice(ex) {
-  const tempo = parseTempo(ex);
-  const cues = tempo ? null : buildVoiceCues(ex);
+  const pattern = getExercisePattern(ex);
+  const cues = pattern ? null : buildVoiceCues(ex);
   let cueDone = false;
 
   setTimer("✓");
@@ -4090,8 +4091,8 @@ async function runRepsWithVoice(ex) {
 
   // Voice cue loop — runs until cueDone is set
   // Respects session.paused (waits until unpaused before next cue)
-  const voiceLoop = tempo
-    ? runTempoLoop(ex, tempo, () => cueDone)
+  const voiceLoop = pattern
+    ? runTempoLoop(ex, pattern, () => cueDone)
     : (async () => {
         for (const cue of cues) {
           if (cueDone) break;
