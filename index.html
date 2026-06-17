@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Gochi+Hand&family=Caveat:wght@400;700&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #FBF6EC;
+    --bg: #EFF6F8;
     --bg2: #F4EBD6;
     --paper: #FBF6EC;
     --paper-line: #e8dfc3;
@@ -43,6 +43,7 @@
 
 
   html, body { margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
 
   body {
     font-family: 'Patrick Hand', 'Nunito', sans-serif;
@@ -638,6 +639,37 @@
     .header h1 { font-size: 2.2rem; }
   }
 
+  /* iPad landscape: timer + exercise on the left, sidebar list on the right.
+     Explicit grid-template-areas so row heights stay aligned across columns. */
+  @media (min-width: 1024px), (min-width: 900px) and (orientation: landscape) {
+    .session-active {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      grid-template-areas:
+        "banner   banner"
+        "header   header"
+        "elapsed  elapsed"
+        "progress progress"
+        "status   sidebar"
+        "timer    sidebar"
+        "exercise sidebar"
+        "upnext   sidebar"
+        "controls sidebar";
+      gap: 0.6rem 1.2rem;
+    }
+    .session-active .test-mode-banner { grid-area: banner; }
+    .session-active .day-header       { grid-area: header; }
+    .session-active .elapsed-bar      { grid-area: elapsed; }
+    .session-active .planned-progress { grid-area: progress; }
+    .session-active .status           { grid-area: status; }
+    .session-active .timer-zone       { grid-area: timer; }
+    .session-active .exercise         { grid-area: exercise; }
+    .session-active .upnext           { grid-area: upnext; }
+    .session-active .btn-row          { grid-area: controls; }
+    .session-active .ex-list { grid-area: sidebar; margin-top: 0; align-self: stretch; }
+    .session-active .ex-list ul { max-height: calc(100vh - 8rem); }
+  }
+
   /* Landscape iPad with taller viewport (iPad Pro landscape) */
   @media (min-width: 1366px) and (orientation: landscape) {
     .exercise { min-height: 120px; }
@@ -1217,6 +1249,20 @@
   .tracker-reminder .tr-title,
   .tracker-reminder .tr-body { position: relative; padding-right: 92px; }
 
+  /* Swim-theme: subtle water wash + low-opacity wave strip at bottom of viewport. */
+  body { position: relative; }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(207, 233, 240, 0.0) 0%, rgba(12, 165, 196, 0.06) 60%, rgba(12, 165, 196, 0.12) 100%),
+      url("assets/wave-3.png") repeat-x left bottom / 320px auto;
+    opacity: 0.55;
+  }
+
   /* Wave splashes on .brief cards — corners only, never on .timer-zone. */
   .brief {
     position: relative;
@@ -1404,8 +1450,28 @@
   /* Header banner inside modal — swimmer-girl top */
   .modal-banner {
     display: block; width: 100%; max-width: 380px;
-    margin: -0.6rem auto 0.2rem;
+    margin: 0 auto;
     pointer-events: none; user-select: none;
+  }
+  /* Water-band that frames the small PNG so it reads as a portrait inside a pool strip */
+  .modal-banner-strip {
+    position: relative;
+    width: 100%;
+    margin: -0.6rem 0 0.2rem;
+    padding: 0.4rem 0 0.5rem;
+    background:
+      url("assets/wave-1.png") no-repeat left center / 110px 70px,
+      url("assets/wave-2.png") no-repeat right center / 110px 70px,
+      linear-gradient(180deg, rgba(207, 233, 240, 0.55), rgba(12, 165, 196, 0.18));
+    border-radius: 18px;
+    overflow: hidden;
+  }
+  .swim-hero {
+    width: 100%;
+    max-width: 720px;
+    height: auto;
+    display: block;
+    margin: 0 auto;
   }
 
   /* Calendar-icon day tiles */
@@ -1979,8 +2045,179 @@
     .brief-section.equipment .gear-illus { width: 80px; }
   }
   @media (min-width: 768px) {
-    .brief-section.equipment { padding-right: 130px !important; }
+    .brief-section.equipment { padding-right: 130px !important; grid-column: 1 / -1; }
     .brief-section.equipment .gear-illus { width: 120px; }
+  }
+  @media (min-width: 640px) {
+    .brief-section.equipment ul {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      column-gap: 1.5rem;
+    }
+  }
+
+  /* Pass 4: promote .upnext into a sticky banner (B). */
+  .upnext {
+    background: linear-gradient(180deg, rgba(12, 165, 196, 0.10), rgba(12, 165, 196, 0.02));
+    border: 1.5px dashed var(--wc-teal-edge);
+    border-radius: 14px;
+    padding: 0.5rem 0.8rem;
+    position: sticky; top: 0;
+    z-index: 3;
+    font-size: 1.5rem;
+  }
+  .upnext::before { content: "→ "; color: var(--jess-deep); font-weight: 900; }
+
+  /* Pass 4: hint-strip rendered inside the exercise card (E + 10). */
+  .hint-strip {
+    display: flex; align-items: center; gap: 0.5rem;
+    margin: 0.4rem 0 0.5rem;
+    padding: 0.4rem 0.6rem;
+    background: var(--bg);
+    border: 1.5px solid var(--paper-line);
+    border-radius: 10px;
+    font-family: 'Patrick Hand', sans-serif;
+    font-size: 1rem;
+    color: var(--ink-light);
+  }
+  .hint-strip .hint-icon { color: var(--jess-deep); font-weight: 900; }
+  .hint-strip .hint-cue { flex: 1 1 auto; min-width: 0; }
+  .hint-strip .hint-watch {
+    background: var(--jess); color: white;
+    border: 2px solid var(--ink); border-radius: 8px;
+    padding: 0.15rem 0.55rem; cursor: pointer;
+    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.9rem;
+    box-shadow: 2px 2px 0 var(--ink);
+  }
+
+  /* Pass 4: new control row layout — PAUSE (60%), SKIP ghost (30%), kebab (E + 10). */
+  .btn-row.session-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 3fr) auto;
+    gap: 0.5rem;
+    align-items: stretch;
+    position: relative;
+  }
+  .btn-row.session-controls .btn-pause { width: 100%; min-width: 0; flex: none; font-size: 1.3rem; }
+  .btn-row.session-controls .btn-skip {
+    width: 100%; min-width: 0; flex: none;
+    background: transparent;
+    border-style: dashed;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-row.session-controls .btn-skip .skip-fill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+    background: rgba(214, 69, 69, 0.25);
+    transition: width 0.05s linear;
+    pointer-events: none;
+  }
+  .btn-row.session-controls .btn-skip .skip-label { position: relative; z-index: 1; }
+  .kebab {
+    background: var(--paper);
+    border: 3px solid var(--ink); border-radius: var(--radius-sm);
+    box-shadow: 4px 4px 0 var(--ink);
+    width: 48px; min-height: 48px;
+    font-size: 1.5rem; font-weight: 900;
+    cursor: pointer;
+  }
+  .kebab-menu {
+    position: absolute;
+    right: 0; top: calc(100% + 4px);
+    background: var(--paper);
+    border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    box-shadow: 4px 4px 0 var(--ink);
+    padding: 0.4rem;
+    display: none;
+    z-index: 10;
+    min-width: 180px;
+  }
+  .kebab-menu.show { display: block; }
+  .kebab-menu .btn-stop-menu {
+    display: block; width: 100%; text-align: left;
+    background: var(--accent-pink);
+    border: 2px solid var(--ink); border-radius: 8px;
+    padding: 0.6rem 0.8rem; font-family: 'Nunito', sans-serif; font-weight: 700;
+    cursor: pointer;
+  }
+  .kebab-menu .btn-stop-menu.confirm { background: var(--red-flag); color: white; }
+
+  /* Pass 4: celebration card on real-session completion (D). */
+  .celebration-card {
+    position: relative;
+    text-align: center;
+    padding: 1.5rem 1rem;
+    background: linear-gradient(180deg, rgba(255, 209, 102, 0.25), var(--paper));
+    border: 2px solid var(--ink);
+    border-radius: var(--radius);
+    box-shadow: 4px 4px 0 var(--ink);
+    margin: 1rem 0;
+  }
+  .celebration-card .marlin { font-size: 5rem; line-height: 1; }
+  .celebration-card .mantra-echo {
+    font-family: 'Caveat', cursive; font-size: 1.6rem;
+    color: var(--accent-orange); margin: 0.5rem 0 1rem;
+  }
+  .celebration-card .next-action {
+    display: inline-block;
+    background: var(--jess); color: white;
+    border: 3px solid var(--ink); border-radius: var(--radius-sm);
+    box-shadow: 4px 4px 0 var(--ink);
+    padding: 0.8rem 1.4rem;
+    font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 1.2rem;
+    cursor: pointer;
+  }
+
+  /* Pass 4: brief anchor-nav chips (G). */
+  .brief-anchor-nav {
+    display: flex; gap: 0.4rem; flex-wrap: wrap;
+    margin: 0.5rem 0 0.8rem;
+  }
+  .brief-anchor-nav a {
+    background: var(--paper);
+    border: 1.5px solid var(--wc-teal-edge);
+    border-radius: 999px;
+    padding: 0.25rem 0.7rem;
+    font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 0.85rem;
+    color: var(--jess-deep);
+    text-decoration: none;
+  }
+  .brief-anchor-nav a:hover { background: var(--wc-teal-soft); }
+
+  /* Pass 4: traffic-light override buttons (section 6). */
+  .rq-lights {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 0.4rem; margin: 0.5rem 0;
+  }
+  .rq-lights button {
+    padding: 0.6rem 0.4rem;
+    border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    background: var(--paper);
+    box-shadow: 3px 3px 0 var(--ink);
+    font-family: 'Nunito', sans-serif; font-weight: 900;
+    cursor: pointer; font-size: 0.95rem;
+    position: relative;
+  }
+  .rq-lights button.selected { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  .rq-lights button.recommended::after {
+    content: "Recommended ✓";
+    position: absolute; left: 50%; bottom: -1.1rem;
+    transform: translateX(-50%);
+    font-size: 0.7rem; color: var(--jess-deep);
+    white-space: nowrap;
+  }
+  .rq-lights .light-green { background: var(--accent-green); }
+  .rq-lights .light-yellow { background: var(--accent-yellow); }
+  .rq-lights .light-red { background: var(--accent-pink); }
+  .rq-lights .light-recovery { background: var(--accent-purple); }
+  .rq-override-hint {
+    font-family: 'Caveat', cursive; color: var(--ink-light);
+    text-align: center; margin: 1.2rem 0 0.4rem; font-size: 1.1rem;
+  }
+
+  /* Pass 4: phone-portrait #timer should dominate the block-pill (H). */
+  @media (max-width: 480px) and (orientation: portrait) {
+    #timer { font-size: 6rem !important; font-weight: 900; letter-spacing: -4px; }
   }
 
   /* === RESPONSIVE — side-by-side on tablet ≥768px ====================== */
@@ -1997,6 +2234,7 @@
     }
     /* These rows always span the full width even in 2-col mode */
     #modal-main .modal-banner,
+    #modal-main .modal-banner-strip,
     #modal-main > h2,
     #modal-main > p:first-of-type,
     #modal-main .modal-day-buttons,
@@ -2037,16 +2275,43 @@
 <!-- Day picker modal (shows on load) -->
 <div class="modal-overlay show" id="modal-overlay" role="presentation">
   <div class="modal" id="modal-main" role="dialog" aria-modal="true" aria-labelledby="modal-main-title">
-    <img class="modal-banner" src="assets/swim-banner.png" alt="" aria-hidden="true">
+    <div class="modal-banner-strip" aria-hidden="true">
+      <svg class="swim-hero" viewBox="0 0 1200 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Swimmer mid-stroke in three lane lines">
+        <defs>
+          <linearGradient id="hero-water" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#bfe3ec"/>
+            <stop offset="100%" stop-color="#0CA5C4"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="1200" height="220" fill="url(#hero-water)" opacity="0.35"/>
+        <path d="M0,60 Q150,30 300,60 T600,60 T900,60 T1200,60" fill="none" stroke="#0A8BA8" stroke-width="3" opacity="0.55"/>
+        <path d="M0,110 Q150,80 300,110 T600,110 T900,110 T1200,110" fill="none" stroke="#0CA5C4" stroke-width="3" opacity="0.6"/>
+        <path d="M0,170 Q150,140 300,170 T600,170 T900,170 T1200,170" fill="none" stroke="#7fc8d8" stroke-width="3" opacity="0.55"/>
+        <g transform="translate(520,90)">
+          <ellipse cx="60" cy="35" rx="90" ry="22" fill="#0A8BA8" opacity="0.85"/>
+          <circle cx="20" cy="28" r="14" fill="#2a2320"/>
+          <path d="M30,30 Q60,-10 120,5" fill="none" stroke="#2a2320" stroke-width="10" stroke-linecap="round"/>
+          <path d="M90,40 Q140,55 170,30" fill="none" stroke="#2a2320" stroke-width="9" stroke-linecap="round"/>
+        </g>
+        <circle cx="200" cy="40" r="6" fill="#ff7b54" opacity="0.7"/>
+        <circle cx="240" cy="55" r="4" fill="#ffd166" opacity="0.8"/>
+        <circle cx="950" cy="45" r="5" fill="#ff7b54" opacity="0.65"/>
+        <circle cx="990" cy="60" r="4" fill="#ffd166" opacity="0.75"/>
+        <circle cx="430" cy="120" r="4" fill="#ffffff" opacity="0.8"/>
+        <circle cx="720" cy="125" r="5" fill="#ffffff" opacity="0.8"/>
+      </svg>
+    </div>
     <h2 id="modal-main-title">Which day are <em class="wc-cursive">you</em> training?</h2>
     <p>Pick your workout below</p>
-    
+
     <div class="modal-day-buttons" id="modal-days"></div>
 
     <div class="modal-grid">
       <div class="modal-col modal-col-left">
         <div class="week-summary" id="week-summary"></div>
         <div class="tracker-reminder" id="tracker-reminder"></div>
+        <div id="modal-settings-slot"></div>
+        <div id="modal-testmode-slot"></div>
       </div>
       <div class="modal-col modal-col-right">
         <div class="modal-session-picker" id="modal-session-picker">
@@ -3443,7 +3708,7 @@ function initModal() {
     const idx = DAY_KEYS.indexOf(key);
     const btn = document.createElement("button");
     btn.className = "modal-day-btn";
-    btn.innerHTML = `<span class="day-icon" aria-hidden="true">📅</span><span class="day-label">${DAY_SHORT[idx]}</span>`;
+    btn.innerHTML = `<span class="day-icon" aria-hidden="true">${DAY_PICTOGRAM[key] || "📅"}</span><span class="day-label">${DAY_SHORT[idx]}</span>`;
 
     if (key === today) btn.classList.add("today");
     if (DAYS[key].spa) btn.classList.add("rest");
@@ -3462,7 +3727,7 @@ function initModal() {
     modalDays.appendChild(btn);
   });
 
-  // Settings panel
+  // Settings panel — injected into the LEFT column for balance (pass 4 §3).
   const settingsBox = document.createElement("div");
   settingsBox.className = "modal-settings";
   settingsBox.innerHTML = `
@@ -3484,6 +3749,10 @@ function initModal() {
       <label for="round-rest">Rest between rounds (s)</label>
       <input id="round-rest" type="number" min="10" max="180" />
     </div>
+  `;
+  const testBox = document.createElement("div");
+  testBox.className = "modal-settings";
+  testBox.innerHTML = `
     <div class="test-toggle-row">
       <input id="test-mode" type="checkbox" />
       <label for="test-mode">🧪 Test mode (practice run)
@@ -3491,7 +3760,12 @@ function initModal() {
       </label>
     </div>
   `;
-  document.getElementById("modal-msg").before(settingsBox);
+  const settingsSlot = document.getElementById("modal-settings-slot");
+  const testSlot = document.getElementById("modal-testmode-slot");
+  if (settingsSlot) settingsSlot.appendChild(settingsBox);
+  else document.getElementById("modal-msg").before(settingsBox);
+  if (testSlot) testSlot.appendChild(testBox);
+  else document.getElementById("modal-msg").before(testBox);
   document.getElementById("voice-style").value = appSettings.voiceStyle;
   document.getElementById("exercise-rest").value = appSettings.exerciseRestSeconds;
   document.getElementById("round-rest").value = appSettings.roundRestSeconds;
@@ -4189,6 +4463,10 @@ async function runWarmupCueing(warmup) {
    RENDER — tabs, schedule, day card
    ============================================================ */
 
+const DAY_PICTOGRAM = {
+  monday: "✊", tuesday: "🧭", wednesday: "⚡",
+  thursday: "🛟", friday: "🪷", saturday: "🔥", sunday: "🧊"
+};
 function renderTabs() {
   const today = edmontonDayKey();
   const tabs = document.getElementById("day-tabs");
@@ -4201,7 +4479,7 @@ function renderTabs() {
     if (key === today) tab.classList.add("today");
     if (key === selectedDay) tab.classList.add("active");
     if (DAYS[key].spa) tab.classList.add("rest");
-    tab.textContent = DAY_SHORT[idx];
+    tab.innerHTML = `<span aria-hidden="true">${DAY_PICTOGRAM[key] || ""}</span> ${DAY_SHORT[idx]}`;
     tab.onclick = () => {
       if (session.running) return;
       selectedDay = key;
@@ -4588,7 +4866,7 @@ function renderBrief(data) {
       <ul>${exHtml}</ul></div>`;
   }).join("");
 
-  const eqHtml = `<div class="brief-section equipment">
+  const eqHtml = `<div class="brief-section equipment" id="brief-gear">
     <img class="gear-illus" src="assets/swim-gear.png" alt="" aria-hidden="true">
     <div class="block-head">
       <span class="wc-bubble peach">📦</span>
@@ -4639,7 +4917,13 @@ function renderBrief(data) {
   const subtitleLine = `${data.subtitle} · ⏱ ${fmtDayRange(day).replace("~", "")}`;
   document.getElementById("main-card").innerHTML = `
     ${briefTopIllustration(data.title, [data.badge, subtitleLine])}
-    <div class="mantra full-width">"${data.mantra}"</div>
+    <nav class="brief-anchor-nav full-width" aria-label="Jump to section">
+      <a href="#brief-mantra">Mantra</a>
+      <a href="#brief-gear">Gear</a>
+      <a href="#brief-blocks">Blocks</a>
+      <a href="#brief-coach">Coach</a>
+    </nav>
+    <div class="mantra full-width" id="brief-mantra">"${data.mantra}"</div>
     <div class="brief">
       <div class="brief-section full-width" style="border-left:6px solid ${lightColor(effectiveLight())};">
         <div class="block-head">
@@ -4657,8 +4941,8 @@ function renderBrief(data) {
         <div class="caveat-note" style="margin:0.2rem 0 0;">Wakes the system — not a workout. Optional, run it standalone.</div></div>` : ""}
       ${eqHtml}
       ${resumeHtml}
-      ${circuitsHtml}
-      <div class="full-width">${grownupHtml}</div>
+      <div id="brief-blocks" class="full-width" style="grid-column: 1 / -1; display: contents;">${circuitsHtml}</div>
+      <div class="full-width" id="brief-coach">${grownupHtml}</div>
     </div>
     <div class="caveat-note" style="text-align:center;">
       📱 Put your phone on the floor where you can see it — then leave it there.
@@ -4717,11 +5001,19 @@ function openReadiness() {
     </div>
     <div class="readiness-quiz">${qsHtml}</div>
     <div class="rq-result" id="rq-result"></div>
+    <div class="rq-override-hint">Your body knows best — tap a different light if this doesn't fit today.</div>
+    <div class="rq-lights" id="rq-lights" aria-label="Choose your light">
+      <button class="light-green" data-light="green">🟢 GREEN</button>
+      <button class="light-yellow" data-light="yellow">🟡 YELLOW</button>
+      <button class="light-red" data-light="red">🔴 RED</button>
+      <button class="light-recovery" data-light="recovery">🛟 RECOVERY</button>
+    </div>
     <div class="btn-row">
       <button class="btn" id="rq-back">← Back</button>
-      <button class="btn btn-primary" id="rq-go" disabled>SET MY LIGHT</button>
+      <button class="btn btn-primary" id="rq-go" disabled>READY ✓</button>
     </div>`;
 
+  let chosenLight = null;
   function tallyLight() {
     const ans = READINESS_QUESTIONS.map((q, i) => answers[i]);
     if (ans.some(a => a === undefined)) return null;
@@ -4736,15 +5028,27 @@ function openReadiness() {
     green: ["🟢 GREEN — 3 rounds, go for it.", "green"],
     yellow: ["🟡 YELLOW — 2 rounds, focus on clean.", "yellow"],
     red: ["🔴 RED — 1 round, quality only.", "red"],
-    recovery: ["🛟 RECOVERY ONLY — stop, do easy recovery, tell a parent.", "recovery"]
+    recovery: ["🛟 RECOVERY — gentle foam roll + Sunday-style holds.", "recovery"]
   };
+  function paintLights() {
+    const recommended = tallyLight();
+    const buttons = card.querySelectorAll(".rq-lights button");
+    buttons.forEach(b => {
+      b.classList.remove("recommended", "selected");
+      if (b.dataset.light === recommended) b.classList.add("recommended");
+      if (b.dataset.light === chosenLight) b.classList.add("selected");
+    });
+  }
   function update() {
     const light = tallyLight();
     const res = document.getElementById("rq-result");
     const go = document.getElementById("rq-go");
-    if (!light) { res.innerHTML = ""; go.disabled = true; return; }
-    res.innerHTML = `<div class="rq-light ${LIGHT_MSG[light][1]}">${LIGHT_MSG[light][0]}</div>`;
+    if (!light) { res.innerHTML = ""; go.disabled = true; paintLights(); return; }
+    if (!chosenLight) chosenLight = light;
+    const active = chosenLight || light;
+    res.innerHTML = `<div class="rq-light ${LIGHT_MSG[active][1]}">${LIGHT_MSG[active][0]}</div>`;
     go.disabled = false;
+    paintLights();
   }
   card.querySelectorAll(".rq").forEach(row => {
     row.querySelectorAll("button").forEach(b => {
@@ -4756,16 +5060,34 @@ function openReadiness() {
       };
     });
   });
+  card.querySelectorAll(".rq-lights button").forEach(b => {
+    b.onclick = () => {
+      chosenLight = b.dataset.light;
+      update();
+    };
+  });
   document.getElementById("rq-back").onclick = () => renderCard();
   document.getElementById("rq-go").onclick = async () => {
-    const light = tallyLight();
+    const light = chosenLight || tallyLight();
     selectedLight = light;
     lastReadiness = { answers: READINESS_QUESTIONS.map((q, i) => !!answers[i]), light, date: new Date().toISOString() };
     saveJSON(LS_READINESS, lastReadiness);
-    if (light === "recovery") { renderRecoveryOnly(); return; }
     closeModalAborted = true; skipGreetingOnStart = true;
+    if (light === "recovery") { await runRecoverySession(); return; }
     await startSession();
   };
+}
+
+/* Run a recovery session by temporarily routing through Sunday's spa flow,
+   so RECOVERY is a real session — not a dead-end card. */
+async function runRecoverySession() {
+  const originalDay = selectedDay;
+  selectedDay = "sunday";
+  try {
+    await startSession();
+  } finally {
+    selectedDay = originalDay;
+  }
 }
 
 function renderRecoveryOnly() {
@@ -4925,15 +5247,15 @@ function renderSessionShell(data) {
       <div class="planned-progress-text" id="planned-progress-text">0% of target time</div>
     </div>
     <div class="status" id="status" role="status" aria-live="polite">Get ready…</div>
+    <div class="exercise" id="exercise"></div>
     <div class="timer-zone" id="timer-zone">
       <div class="timer-ring" id="timer-ring" style="--pct:100">
         <div class="timer" id="timer" aria-live="off">--:--</div>
       </div>
       <div class="progress" id="progress"></div>
     </div>
-    <div class="exercise" id="exercise"></div>
-    <div class="upnext" id="upnext"></div>
-    <div class="btn-row" id="controls"></div>
+    <div class="upnext" id="upnext" aria-live="polite"></div>
+    <div class="btn-row session-controls" id="controls"></div>
     ${renderSessionExList(data)}`;
 }
 
@@ -4955,7 +5277,13 @@ function renderSessionExList(data) {
 function highlightSessionEx(ci, ei) {
   document.querySelectorAll(".sx-item.current").forEach(el => el.classList.remove("current"));
   const el = document.getElementById(`sx-${ci}-${ei}`);
-  if (el) { el.classList.add("current"); el.scrollIntoView({ block: "center", behavior: "smooth" }); }
+  if (!el) return;
+  el.classList.add("current");
+  const ul = el.closest("ul");
+  if (ul) {
+    const target = el.offsetTop - (ul.clientHeight - el.offsetHeight) / 2;
+    ul.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+  }
 }
 function markExerciseDone(ci, ei) {
   const el = document.getElementById(`sx-${ci}-${ei}`);
@@ -4995,44 +5323,130 @@ function setProgress(chips) {
 function setExercise({ name, detail, cue, redFlag, warmupSteps, hydrate, block }) {
   const html = [];
   if (name)   html.push(`<div class="ex-name">${name}${howToHtml(name, block)}</div>`);
+  // Pass 4 (E + 10): inline hint-strip under the name — non-modal cue + watch link.
+  // Only show when there's a real exercise + cue (not for "Rest" / "Switch sides" pseudo-cards).
+  const looksLikeRealEx = name && cue && !/^(Rest|Switch sides|Round Rest|Stopped|Done|Nice|Get ready)/i.test(name);
+  if (looksLikeRealEx) {
+    const safeName = String(name).replace(/"/g, "&quot;");
+    html.push(`<div class="hint-strip">
+      <span class="hint-icon" aria-hidden="true">❓</span>
+      <span class="hint-cue">${cue}</span>
+      <button type="button" class="hint-watch" data-watch-name="${safeName}" data-watch-block="${block || ''}">▶ Watch</button>
+    </div>`);
+  }
   if (detail) html.push(`<div class="ex-detail">${detail}</div>`);
   if (warmupSteps) html.push(`<div class="ex-cue">${warmupSteps.map(s => "• " + s).join("<br>")}</div>`);
-  else if (cue) html.push(`<div class="ex-cue">${cue}</div>`);
+  else if (cue && !looksLikeRealEx) html.push(`<div class="ex-cue">${cue}</div>`);
   if (redFlag) html.push(`<div class="ex-redflag">${redFlag}</div>`);
   if (hydrate) html.push(`<div class="ex-hydrate">💧 Sip water · breathe deep · shake it out</div>`);
-  document.getElementById("exercise").innerHTML = html.join("");
+  const exEl = document.getElementById("exercise");
+  exEl.innerHTML = html.join("");
+  const watchBtn = exEl.querySelector(".hint-watch");
+  if (watchBtn) {
+    watchBtn.onclick = () => showHowTo(watchBtn.dataset.watchName, watchBtn.dataset.watchBlock || null);
+  }
 }
 function setUpNext(text) { document.getElementById("upnext").innerHTML = text || ""; }
 
 function setSessionControls() {
-  document.getElementById("controls").innerHTML = `
+  const controls = document.getElementById("controls");
+  controls.className = "btn-row session-controls";
+  controls.innerHTML = `
     <button class="btn btn-pause" id="btn-pause">PAUSE</button>
-    <button class="btn btn-form"  id="btn-form">FORM</button>
-    <button class="btn btn-skip"  id="btn-skip">SKIP EX</button>
-    <button class="btn btn-stop"  id="btn-stop">STOP</button>`;
+    <button class="btn btn-skip"  id="btn-skip" aria-label="Hold to skip">
+      <span class="skip-fill" id="skip-fill"></span>
+      <span class="skip-label">SKIP EX</span>
+    </button>
+    <button class="kebab" id="btn-kebab" aria-label="More" aria-haspopup="true">⋮</button>
+    <div class="kebab-menu" id="kebab-menu" role="menu">
+      <button class="btn-stop-menu" id="btn-stop">STOP</button>
+    </div>`;
   document.getElementById("btn-pause").onclick = togglePause;
-  document.getElementById("btn-form").onclick = formCheck;
-  document.getElementById("btn-skip").onclick = skipExercise;
-  document.getElementById("btn-stop").onclick = stopSession;
+  wireLongPressSkip(document.getElementById("btn-skip"));
+  wireKebab();
 }
 
 function setDoneControls() {
-  document.getElementById("controls").innerHTML = `
-    <button class="btn btn-done"  id="btn-done">DONE ✓</button>
+  const controls = document.getElementById("controls");
+  controls.className = "btn-row session-controls";
+  controls.innerHTML = `
+    <button class="btn btn-done"  id="btn-done" style="grid-column: 1 / -1;">DONE ✓</button>
     <button class="btn btn-pause" id="btn-pause">PAUSE</button>
-    <button class="btn btn-form"  id="btn-form">FORM</button>
-    <button class="btn btn-skip"  id="btn-skip">SKIP EX</button>
-    <button class="btn btn-stop"  id="btn-stop">STOP</button>`;
+    <button class="btn btn-skip"  id="btn-skip" aria-label="Hold to skip">
+      <span class="skip-fill" id="skip-fill"></span>
+      <span class="skip-label">SKIP EX</span>
+    </button>
+    <button class="kebab" id="btn-kebab" aria-label="More" aria-haspopup="true">⋮</button>
+    <div class="kebab-menu" id="kebab-menu" role="menu">
+      <button class="btn-stop-menu" id="btn-stop">STOP</button>
+    </div>`;
   document.getElementById("btn-done").onclick = () => {
     if (session.byRepsResolver) {
       beep(880, 0.15);
-      session.byRepsResolver("done"); // wrapper handles null + clearInterval
+      session.byRepsResolver("done");
     }
   };
   document.getElementById("btn-pause").onclick = togglePause;
-  document.getElementById("btn-form").onclick = formCheck;
-  document.getElementById("btn-skip").onclick = skipExercise;
-  document.getElementById("btn-stop").onclick = stopSession;
+  wireLongPressSkip(document.getElementById("btn-skip"));
+  wireKebab();
+}
+
+/* 1.5s long-press to skip — visible fill grows in the button to telegraph intent. */
+function wireLongPressSkip(btn) {
+  if (!btn) return;
+  const HOLD_MS = 1500;
+  let holdStart = 0, raf = 0, timer = 0, fired = false;
+  const fill = btn.querySelector(".skip-fill");
+  const reset = () => {
+    cancelAnimationFrame(raf); clearTimeout(timer);
+    if (fill) fill.style.width = "0%";
+    holdStart = 0; fired = false;
+  };
+  const tick = () => {
+    if (!holdStart) return;
+    const pct = Math.min(100, ((Date.now() - holdStart) / HOLD_MS) * 100);
+    if (fill) fill.style.width = pct + "%";
+    if (pct < 100) raf = requestAnimationFrame(tick);
+  };
+  const start = (e) => {
+    if (fired) return;
+    holdStart = Date.now();
+    raf = requestAnimationFrame(tick);
+    timer = setTimeout(() => { fired = true; reset(); skipExerciseConfirmed(); }, HOLD_MS);
+  };
+  btn.addEventListener("pointerdown", start);
+  btn.addEventListener("pointerup", reset);
+  btn.addEventListener("pointerleave", reset);
+  btn.addEventListener("pointercancel", reset);
+  // Block the native click — skip must come from the long-press handler only.
+  btn.addEventListener("click", e => e.preventDefault());
+}
+
+function wireKebab() {
+  const kebab = document.getElementById("btn-kebab");
+  const menu = document.getElementById("kebab-menu");
+  const stopBtn = document.getElementById("btn-stop");
+  if (!kebab || !menu || !stopBtn) return;
+  kebab.onclick = (e) => {
+    e.stopPropagation();
+    menu.classList.toggle("show");
+  };
+  document.addEventListener("click", () => menu.classList.remove("show"), { once: true });
+  let stopArmed = false;
+  stopBtn.onclick = () => {
+    if (!stopArmed) {
+      stopArmed = true;
+      stopBtn.textContent = "Tap again to STOP";
+      stopBtn.classList.add("confirm");
+      setTimeout(() => {
+        stopArmed = false;
+        stopBtn.textContent = "STOP";
+        stopBtn.classList.remove("confirm");
+      }, 3000);
+      return;
+    }
+    stopSessionConfirmed();
+  };
 }
 
 /* ============================================================
@@ -5937,7 +6351,7 @@ async function startSession() {
                 name: "Switch sides",
                 cue: `Reposition for the other side. ${ex.name} continues.`
               });
-              await speakAndWait("Switch sides. Take five seconds to reposition.");
+              await speakAndWait("Nice. Switch sides — five to reset.");
               const r4 = await countdown(SIDE_SWITCH_BUFFER);
               if (r4 === "abort") return finalize(false);
 
@@ -6021,7 +6435,7 @@ async function startSession() {
             const nextBlockName = data.circuits[ci + 1].name;
             setZone("roundrest");
             setStatus("Next block");
-            const msg = `${circuit.name} done! Next up: ${nextBlockName}.`;
+            const msg = `Block done! Next up: ${nextBlockName}.`;
             setExercise({ name: `${circuit.name} ✓`, cue: msg, hydrate: true });
             setUpNext(`<span class="label">Up next:</span> <span class="name">${nextBlockName}</span>`);
             await speakAndWait(msg);
@@ -6150,7 +6564,11 @@ function formCheck() {
 }
 
 function skipExercise() {
-  if (!confirm("Skip this exercise and move on?")) return;
+  // Legacy entry point: route through the confirmed path so old callers still work.
+  skipExerciseConfirmed();
+}
+
+function skipExerciseConfirmed() {
   if (session.currentEx) {
     session.skipped.push({
       name: session.currentEx.name,
@@ -6162,16 +6580,16 @@ function skipExercise() {
   session.skipExercise = true;
   session.justSkipped = true;
   if (session.byRepsResolver) {
-    session.byRepsResolver("skip"); // wrapper handles null + clearInterval
+    session.byRepsResolver("skip");
   }
-  interruptSpeech("Skipping.");
+  interruptSpeech("Okay, skipping — you've got the next one.");
 }
 
-function stopSession() {
-  if (!confirm("Stop the whole session?")) return;
+function stopSession() { stopSessionConfirmed(); }
+function stopSessionConfirmed() {
   session.abort = true;
   if (session.byRepsResolver) {
-    session.byRepsResolver("abort"); // wrapper handles null + clearInterval
+    session.byRepsResolver("abort");
   }
   interruptSpeech("Session stopped.");
 }
@@ -6207,7 +6625,7 @@ function finalize(completed) {
       });
       setUpNext("");
       speak(isEvening
-        ? "Practice rehearsal complete. Nothing recorded — you've got the shapes down."
+        ? "Rehearsal done — you've got the shapes."
         : "Practice run complete. Nothing recorded. You know the movements now.");
     } else {
       // Save session record — localStorage (source of truth) + Firestore (cloud record)
@@ -6266,6 +6684,26 @@ function finalize(completed) {
         setUpNext("");
         celebrate();
         speak("Training complete. Fantastic effort.");
+        // Pass 4 (D): celebration card — marlin + mantra + ONE next action.
+        const day = DAYS[selectedDay];
+        const mantra = (day && day.mantra) || "Honest work landed.";
+        const cardEl = document.getElementById("main-card");
+        if (cardEl) {
+          const cel = document.createElement("div");
+          cel.className = "celebration-card full-width";
+          cel.innerHTML = `
+            <div class="marlin" aria-hidden="true">🐟</div>
+            <h3 style="font-family:'Gochi Hand',cursive;font-size:2rem;color:var(--jess-deep);margin:0.3rem 0;">You crushed it, Jess!</h3>
+            <div class="mantra-echo">"${mantra}"</div>
+            <button type="button" class="next-action" id="cel-next">See your week →</button>`;
+          cardEl.prepend(cel);
+          const next = document.getElementById("cel-next");
+          if (next) next.onclick = () => {
+            cel.remove();
+            renderModalWeekSummary();
+            document.getElementById("modal-overlay").classList.add("show");
+          };
+        }
       }
       if (session.skipped.length) {
         skipHistory.unshift({
