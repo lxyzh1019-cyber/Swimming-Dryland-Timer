@@ -7,21 +7,21 @@
 <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Gochi+Hand&family=Caveat:wght@400;700&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #fef9ef;
-    --bg2: #fff4db;
-    --paper: #fffdf5;
+    --bg: #FBF6EC;
+    --bg2: #F4EBD6;
+    --paper: #FBF6EC;
     --paper-line: #e8dfc3;
     --ink: #2a2320;
     --ink-light: #6b5d4f;
-    --jess: #6fb1fc;
-    --jess-deep: #4a8fd6;
+    --jess: #0CA5C4;
+    --jess-deep: #0A8BA8;
     --accent-orange: #ff7b54;
     --accent-yellow: #ffd166;
     --accent-green: #95d5b2;
     --accent-pink: #ff9eb5;
     --accent-purple: #c3aed6;
     --red-flag: #d64545;
-    --rest-blue: #b8d8f0;
+    --rest-blue: #cfe9d8;
     --evening: #7c6fbf;
     --evening-deep: #5b50a0;
     --radius: 18px;
@@ -48,7 +48,7 @@
     font-family: 'Patrick Hand', 'Nunito', sans-serif;
     background: var(--bg);
     background-image:
-      radial-gradient(circle at 10% 20%, rgba(111, 177, 252, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 10% 20%, rgba(12, 165, 196, 0.08) 0%, transparent 40%),
       radial-gradient(circle at 90% 80%, rgba(255, 158, 181, 0.08) 0%, transparent 40%);
     color: var(--ink);
     min-height: 100vh;
@@ -454,7 +454,7 @@
 
   .timer-zone { text-align: center; padding: 1rem 0; transition: background 0.3s ease; }
   .timer-zone.work       { background: linear-gradient(180deg, transparent, rgba(255, 209, 102, 0.18)); }
-  .timer-zone.rest       { background: linear-gradient(180deg, transparent, rgba(184, 216, 240, 0.35)); }
+  .timer-zone.rest       { background: linear-gradient(180deg, transparent, rgba(207, 233, 216, 0.45)); }
   .timer-zone.warmup     { background: linear-gradient(180deg, transparent, rgba(149, 213, 178, 0.25)); }
   .timer-zone.roundrest  { background: linear-gradient(180deg, transparent, rgba(195, 174, 214, 0.3)); }
   .timer-zone.sideswitch { background: linear-gradient(180deg, transparent, rgba(255, 158, 181, 0.25)); }
@@ -781,6 +781,40 @@
   .modal-secondary-btns {
     display: flex; gap: 0.5rem; margin-top: 0.6rem;
   }
+  .subview-tabs {
+    display: flex; gap: 0.4rem; margin: 0 0 0.8rem;
+    flex-wrap: wrap;
+  }
+  .subview-tabs button {
+    flex: 1; min-width: 80px;
+    font-family: 'Patrick Hand', sans-serif; font-size: 0.95rem;
+    padding: 0.45rem 0.4rem;
+    border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    background: var(--paper); color: var(--ink);
+    box-shadow: 2px 2px 0 var(--ink); cursor: pointer;
+  }
+  .subview-tabs button:hover {
+    background: var(--bg2);
+    transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink);
+  }
+  .subview-tabs button.active {
+    background: var(--jess); color: white; font-weight: 700;
+    cursor: default;
+  }
+  .subview-tabs button.active:hover {
+    transform: none; box-shadow: 2px 2px 0 var(--ink);
+  }
+  .subview-footer {
+    display: flex; justify-content: center; margin-top: 0.8rem;
+  }
+  .link-btn {
+    background: none; border: none; box-shadow: none;
+    padding: 0.3rem 0.5rem;
+    font-family: 'Caveat', cursive; font-size: 1.05rem;
+    color: var(--jess-deep); cursor: pointer;
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+  .link-btn:hover { color: var(--ink); }
   .modal-secondary-btns button {
     flex: 1; font-family: 'Patrick Hand', sans-serif; font-size: 1rem;
     padding: 0.5rem 0.4rem; border: 2px solid var(--ink);
@@ -1119,6 +1153,94 @@
     .session-active .ex-list { position:absolute; top:90px; right:-280px; width:260px; margin:0; background:var(--bg); }
     .session-active { position:relative; }
   }
+
+  /* ===== Swim watercolor decor =====
+     All images are decorative; pointer-events disabled; aria-hidden in markup. */
+  .header { position: relative; }
+  .header .swim-banner {
+    display: block;
+    width: 100%;
+    max-width: 340px;
+    height: auto;
+    margin: 0 auto 0.2rem;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .tracker-reminder { position: relative; overflow: hidden; }
+  .tracker-reminder .swim-gear {
+    position: absolute;
+    right: -8px;
+    bottom: -6px;
+    width: 92px;
+    height: auto;
+    opacity: 0.85;
+    pointer-events: none;
+    user-select: none;
+  }
+  .tracker-reminder .tr-title,
+  .tracker-reminder .tr-body { position: relative; padding-right: 92px; }
+
+  /* Wave splashes on .brief cards — corners only, never on .timer-zone. */
+  .brief {
+    position: relative;
+    overflow: hidden;
+    background-image: url("assets/wave-3.png");
+    background-repeat: no-repeat;
+    background-position: top right;
+    background-size: 90px auto;
+  }
+  .brief::before,
+  .brief::after {
+    content: "";
+    position: absolute;
+    width: 110px;
+    height: 70px;
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+    opacity: 0.45;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .brief::before {
+    top: 6px; left: -10px;
+    background-image: url("assets/wave-1.png");
+  }
+  .brief::after {
+    bottom: 6px; right: -10px;
+    background-image: url("assets/wave-2.png");
+  }
+  .brief > * { position: relative; z-index: 1; }
+  /* Hard rule: never let decor sit over the live timer. */
+  .timer-zone, .timer-zone * { position: relative; z-index: 2; }
+  .timer-zone::before, .timer-zone::after { content: none !important; background-image: none !important; }
+
+  /* Marlin reward on session completion (injected by celebrate()) */
+  .marlin-reward {
+    position: fixed;
+    right: 1rem;
+    bottom: 1.2rem;
+    width: 140px;
+    height: auto;
+    z-index: 9998;
+    pointer-events: none;
+    user-select: none;
+    animation: marlin-leap 1.2s ease-out forwards;
+  }
+  @keyframes marlin-leap {
+    0%   { transform: translateY(40vh) rotate(-12deg); opacity: 0; }
+    35%  { opacity: 1; }
+    100% { transform: translateY(0) rotate(0); opacity: 1; }
+  }
+  @media (max-width: 480px) {
+    .header .swim-banner { max-width: 260px; }
+    .tracker-reminder .swim-gear { width: 72px; }
+    .tracker-reminder .tr-title,
+    .tracker-reminder .tr-body { padding-right: 72px; }
+    .brief::before, .brief::after { width: 80px; height: 50px; opacity: 0.35; }
+    .marlin-reward { width: 110px; }
+  }
 </style>
 
 
@@ -1160,17 +1282,18 @@
     </button>
 
     <div class="modal-secondary-btns">
-      <button id="btn-open-wins">🌟 My Wins</button>
-      <button id="btn-open-tracker">📊 4-Week Progress</button>
-      <button id="btn-open-history">📅 Last 7 Sessions</button>
-      <button id="btn-open-achievements">🏅 Achievements</button>
-      <button id="btn-open-insights">📈 Coach Insights</button>
-      <button id="btn-reset-week" title="Clear this week's session times">🔄 Reset Week</button>
+      <button id="btn-open-progress">📈 Progress</button>
+      <button id="btn-open-winsgroup">🏆 Wins</button>
     </div>
   </div>
 
   <!-- Tracker view -->
   <div class="modal" id="modal-tracker" role="dialog" aria-modal="true" aria-labelledby="modal-tracker-title" style="display:none; max-width: 560px;">
+    <nav class="subview-tabs" aria-label="Progress sections">
+      <button class="active" data-tab="tracker">📊 4-Week</button>
+      <button data-tab="history">📅 Last 7</button>
+      <button data-tab="insights">📈 Insights</button>
+    </nav>
     <h2 id="modal-tracker-title">📊 PR Board — 4 Weeks</h2>
     <p>Beat last week. Same metric, same day — numbers only, no judgment.</p>
 
@@ -1186,10 +1309,18 @@
       <button id="btn-tracker-back">← Back</button>
       <button id="btn-tracker-save" class="btn-evening">Save</button>
     </div>
+    <div class="subview-footer">
+      <button class="link-btn" id="btn-reset-week" title="Clear this week's session times">↺ Reset this week's times</button>
+    </div>
   </div>
 
   <!-- History view: last 7 sessions from Firestore -->
   <div class="modal" id="modal-history" role="dialog" aria-modal="true" aria-labelledby="modal-history-title" style="display:none; max-width: 540px;">
+    <nav class="subview-tabs" aria-label="Progress sections">
+      <button data-tab="tracker">📊 4-Week</button>
+      <button class="active" data-tab="history">📅 Last 7</button>
+      <button data-tab="insights">📈 Insights</button>
+    </nav>
     <h2 id="modal-history-title">📅 Last 7 Sessions</h2>
     <p>Your recent training, pulled from the cloud.</p>
     <div id="history-list-slot"><div class="history-empty">Loading…</div></div>
@@ -1200,6 +1331,10 @@
 
   <!-- Achievements view -->
   <div class="modal" id="modal-achievements" role="dialog" aria-modal="true" aria-labelledby="modal-ach-title" style="display:none; max-width: 580px; overflow-y: auto; max-height: 90vh;">
+    <nav class="subview-tabs" aria-label="Wins sections">
+      <button data-tab="wins">🌟 My Wins</button>
+      <button class="active" data-tab="achievements">🏅 Achievements</button>
+    </nav>
     <h2 id="modal-ach-title">🏅 Achievements</h2>
     <p>Keep going — every session counts!</p>
     <div id="ach-content"><div class="history-empty">Loading…</div></div>
@@ -1210,6 +1345,10 @@
 
   <!-- Athlete motivational view: My Wins -->
   <div class="modal" id="modal-wins" role="dialog" aria-modal="true" aria-labelledby="modal-wins-title" style="display:none; max-width: 560px; overflow-y: auto; max-height: 90vh;">
+    <nav class="subview-tabs" aria-label="Wins sections">
+      <button class="active" data-tab="wins">🌟 My Wins</button>
+      <button data-tab="achievements">🏅 Achievements</button>
+    </nav>
     <h2 id="modal-wins-title">🌟 My Wins</h2>
     <p>Look how far you've come, Jess!</p>
     <div id="wins-content"><div class="history-empty">Loading…</div></div>
@@ -1220,6 +1359,11 @@
 
   <!-- Coach/parent diagnostic view: Insights -->
   <div class="modal" id="modal-insights" role="dialog" aria-modal="true" aria-labelledby="modal-insights-title" style="display:none; max-width: 620px; overflow-y: auto; max-height: 92vh;">
+    <nav class="subview-tabs" aria-label="Progress sections">
+      <button data-tab="tracker">📊 4-Week</button>
+      <button data-tab="history">📅 Last 7</button>
+      <button class="active" data-tab="insights">📈 Insights</button>
+    </nav>
     <h2 id="modal-insights-title">📈 Coach Insights</h2>
     <p>Diagnostics from logged training data — for the grown-ups.</p>
     <div id="insights-content"><div class="history-empty">Crunching the numbers…</div></div>
@@ -1234,6 +1378,7 @@
 <main class="page-content" id="page-content">
   <div class="wrap">
     <header class="header">
+      <img class="swim-banner" src="assets/swim-banner.png" alt="" aria-hidden="true">
       <h1>🏊 Land Training</h1>
       <div class="sub">Jess · Dryland 2026.2 · readiness · learning · quiz</div>
     </header>
@@ -2560,17 +2705,29 @@ function initModal() {
   renderModalWeekSummary();
   renderModalTrackerReminder();
 
-  // Wire secondary buttons
-  document.getElementById("btn-open-wins").onclick        = openWinsView;
-  document.getElementById("btn-open-tracker").onclick     = openTrackerView;
-  document.getElementById("btn-open-history").onclick     = openHistoryView;
-  document.getElementById("btn-open-achievements").onclick = openAchievementsView;
-  document.getElementById("btn-open-insights").onclick    = openInsightsView;
+  // Wire consolidated secondary buttons
+  document.getElementById("btn-open-progress").onclick   = openTrackerView;
+  document.getElementById("btn-open-winsgroup").onclick  = openWinsView;
   document.getElementById("btn-reset-week").onclick = () => {
     if (!confirm("Reset this week's session times? (Tracker data is kept.)")) return;
     clearThisWeekSessions();
     renderModalWeekSummary();
   };
+  // Wire subview tabs — each .subview-tabs button[data-tab] opens its matching view
+  const TAB_OPENERS = {
+    tracker: openTrackerView,
+    history: openHistoryView,
+    insights: openInsightsView,
+    wins: openWinsView,
+    achievements: openAchievementsView
+  };
+  document.querySelectorAll(".subview-tabs button[data-tab]").forEach(btn => {
+    btn.onclick = () => {
+      if (btn.classList.contains("active")) return;
+      const fn = TAB_OPENERS[btn.dataset.tab];
+      if (fn) fn();
+    };
+  });
   document.getElementById("btn-tracker-back").onclick = closeAllSubViews;
   document.getElementById("btn-tracker-save").onclick = saveTrackerFromUI;
   document.getElementById("btn-history-back").onclick = closeAllSubViews;
@@ -2643,10 +2800,11 @@ function renderModalTrackerReminder() {
   if (missing.length > 0 && week > 0) {
     reminderBody += `
       <div class="tr-body" style="margin-top: 0.4rem;">
-        💡 Week ${week} still needs: <strong>${missing.join(", ")}</strong>. Tap "📊 Progress" to log.
+        💡 Week ${week} still needs: <strong>${missing.join(", ")}</strong>. Tap "📈 Progress" to log.
       </div>`;
   }
-  document.getElementById("tracker-reminder").innerHTML = reminderBody;
+  document.getElementById("tracker-reminder").innerHTML =
+    reminderBody + `<img class="swim-gear" src="assets/swim-gear.png" alt="" aria-hidden="true">`;
 }
 
 /* ===== Sub-view navigation ===== */
@@ -3289,7 +3447,7 @@ const BLOCK_META = {
 };
 function blockEmoji(b) { return (BLOCK_META[b] || {}).emoji || "•"; }
 function blockColor(b) { return (BLOCK_META[b] || {}).color || "var(--ink)"; }
-function lightColor(l) { return { green: "#7ee0b8", yellow: "#ffd166", red: "#ff8a7a", recovery: "#9fd6ff" }[l] || "#cccccc"; }
+function lightColor(l) { return { green: "#7ee0b8", yellow: "#ffd166", red: "#ff8a7a", recovery: "#7fd0d8" }[l] || "#cccccc"; }
 
 // Persistence keys + tiny JSON helpers (2026.2 records)
 const LS_READINESS   = "swim_readiness";
@@ -3821,6 +3979,15 @@ function celebrate(emojis) {
     layer.appendChild(s);
   }
   setTimeout(() => layer.remove(), 3300);
+
+  // Marlin reward — decorative; auto-removes so it doesn't linger across screens.
+  const marlin = document.createElement("img");
+  marlin.className = "marlin-reward";
+  marlin.src = "assets/swim-marlin.png";
+  marlin.alt = "";
+  marlin.setAttribute("aria-hidden", "true");
+  document.body.appendChild(marlin);
+  setTimeout(() => marlin.remove(), 6000);
 }
 
 function renderSessionShell(data) {
@@ -3874,12 +4041,12 @@ function highlightSessionEx(ci, ei) {
   if (el) { el.classList.add("current"); el.scrollIntoView({ block: "nearest" }); }
 }
 
-const ZONE_RING = { work: "#6fb1fc", rest: "#7ee0b8", roundrest: "#ffd166",
+const ZONE_RING = { work: "#0CA5C4", rest: "#7ee0b8", roundrest: "#ffd166",
   warmup: "#ff9e6d", sideswitch: "#b08bf8", evening: "#9fb6ff" };
 function setZone(mode) {
   document.getElementById("timer-zone").className = "timer-zone " + mode;
   const ring = document.getElementById("timer-ring");
-  if (ring) ring.style.setProperty("--ring", ZONE_RING[mode] || "#6fb1fc");
+  if (ring) ring.style.setProperty("--ring", ZONE_RING[mode] || "#0CA5C4");
 }
 function setTimerRing(pct) {
   const ring = document.getElementById("timer-ring");
