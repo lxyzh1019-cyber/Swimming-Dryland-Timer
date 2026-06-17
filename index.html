@@ -244,9 +244,10 @@
   /* Session picker (morning / evening) */
   .modal-session-picker {
     display: none;
-    margin: 1rem 0 1.5rem;
+    margin: 0 0 1rem;
   }
   .modal-session-picker.show { display: block; }
+  .modal-session-picker:empty { display: none !important; }
 
   .modal-session-picker .label {
     font-family: 'Caveat', cursive;
@@ -1015,14 +1016,16 @@
   }
   .test-mode-banner {
     background: var(--accent-purple); color: var(--ink);
-    border: 2px solid var(--ink); border-radius: var(--radius-sm);
-    padding: 0.5rem 0.8rem; margin-bottom: 0.6rem; text-align: center;
+    border: 2px solid var(--ink); border-radius: 999px;
+    padding: 0.3rem 0.9rem; margin-bottom: 0.6rem; text-align: center;
     box-shadow: 2px 2px 0 var(--ink);
-    font-family: 'Gochi Hand', cursive; font-size: 1.15rem;
+    font-family: 'Caveat', cursive; font-style: italic; font-size: 1.05rem;
+    display: inline-block; align-self: start;
   }
   .test-mode-banner small {
-    display: block; font-family: 'Caveat', cursive;
-    font-size: 0.95rem; color: var(--ink);
+    display: inline; margin-left: 0.4rem;
+    font-family: 'Caveat', cursive;
+    font-size: 0.9rem; color: var(--ink-light);
   }
 
   /* ===== 2026.2 — badges, readiness, learning, quiz ===== */
@@ -1130,14 +1133,25 @@
   .overload-table th, .overload-table td { border:1px solid var(--paper-line); padding:2px 5px; text-align:center; }
   .overload-table th { background:var(--bg2); }
 
-  /* session exercise list (current highlighted) */
-  .ex-list { margin-top: 0.8rem; border:2px solid var(--paper-line); border-radius: var(--radius-sm); padding:0.4rem 0.6rem; }
-  .ex-list > summary { font-family:'Gochi Hand',cursive; font-size:1.1rem; cursor:pointer; }
-  .ex-list ul { list-style:none; margin:0.4rem 0 0; padding:0; max-height:260px; overflow-y:auto; }
-  .sx-head { font-family:'Gochi Hand',cursive; color:var(--jess-deep); margin-top:0.4rem; font-size:1.15rem; }
-  .sx-item { display:flex; justify-content:space-between; gap:0.5rem; padding:0.45rem 0.5rem; border-radius:6px; font-size:1.1rem; }
+  /* session exercise list — rough progress tracker, always visible during session */
+  .ex-list { margin-top: 1rem; border:2px solid var(--wc-teal-edge); border-radius: 14px; padding:0.6rem 0.9rem; background: var(--paper); box-shadow: var(--wc-shadow-soft); }
+  .ex-list > summary {
+    font-family:'Caveat', cursive; font-style: italic; font-weight: 700;
+    font-size:1.45rem; color: var(--jess-deep); cursor:pointer;
+    list-style: none; display: flex; align-items: center; gap: 0.4rem;
+    padding: 0.2rem 0;
+  }
+  .ex-list > summary::-webkit-details-marker { display: none; }
+  .ex-list > summary::after { content: "›"; margin-left:auto; font-size:1.6rem; color: var(--jess-deep); transition: transform 0.2s; }
+  .ex-list[open] > summary::after { transform: rotate(90deg); }
+  #ex-list-progress { font-family:'Patrick Hand', sans-serif; font-style: normal; font-size: 1rem; color: var(--ink-light); font-weight: 600; }
+  .ex-list ul { list-style:none; margin:0.5rem 0 0; padding:0; max-height:340px; overflow-y:auto; scroll-behavior: smooth; }
+  .sx-head { font-family:'Caveat', cursive; font-style: italic; color:var(--jess-deep); margin-top:0.5rem; font-size:1.25rem; font-weight: 700; }
+  .sx-item { display:flex; justify-content:space-between; gap:0.5rem; padding:0.5rem 0.55rem; border-radius:8px; font-size:1.1rem; transition: background 0.15s; }
   .sx-item.current { background:var(--accent-yellow); font-weight:700; box-shadow:2px 2px 0 var(--ink); }
   .sx-item.current span:first-child::before { content:"▶ "; }
+  .sx-item.done { opacity: 0.55; text-decoration: line-through; }
+  .sx-item.done span:first-child::before { content:"✓ "; color: var(--jess-deep); text-decoration: none; display: inline-block; opacity: 1; }
 
   /* countdown ring around the timer */
   .timer-ring {
@@ -1164,22 +1178,29 @@
   .confetti-layer { position: fixed; inset: 0; pointer-events: none; z-index: 9999; overflow: hidden; }
   .confetti { position: absolute; top: -3rem; animation: confetti-fall linear forwards; }
   @keyframes confetti-fall { to { transform: translateY(112vh) rotate(540deg); opacity: 0.85; } }
-  @media (min-width: 820px) {
-    .session-active .ex-list { position:absolute; top:90px; right:-280px; width:260px; margin:0; background:var(--bg); }
-    .session-active { position:relative; }
+  /* On tablet, give the ex-list more vertical room so more progress is visible */
+  @media (min-width: 900px) {
+    .session-active .ex-list ul { max-height: 50vh; }
   }
 
   /* ===== Swim watercolor decor =====
      All images are decorative; pointer-events disabled; aria-hidden in markup. */
-  .header { position: relative; }
+  .header { position: relative; display: flex; align-items: center; gap: 1rem; text-align: left !important; }
   .header .swim-banner {
     display: block;
-    width: 100%;
-    max-width: 340px;
+    width: 120px;
     height: auto;
-    margin: 0 auto 0.2rem;
+    margin: 0;
+    flex: 0 0 auto;
     pointer-events: none;
     user-select: none;
+  }
+  .header .header-text { flex: 1; min-width: 0; }
+  .header h1 { font-size: 2rem !important; margin: 0 !important; }
+  .header .sub { font-size: 1.1rem !important; }
+  @media (min-width: 768px) {
+    .header .swim-banner { width: 160px; }
+    .header h1 { font-size: 2.4rem !important; }
   }
 
   .tracker-reminder { position: relative; overflow: hidden; }
@@ -1249,7 +1270,7 @@
     100% { transform: translateY(0) rotate(0); opacity: 1; }
   }
   @media (max-width: 480px) {
-    .header .swim-banner { max-width: 260px; }
+    .header .swim-banner { width: 90px; }
     .tracker-reminder .swim-gear { width: 72px; }
     .tracker-reminder .tr-title,
     .tracker-reminder .tr-body { padding-right: 72px; }
@@ -1438,10 +1459,10 @@
   }
   .week-summary::after {
     content: ""; position: absolute;
-    right: -10px; top: -10px;
-    width: 90px; height: 60px;
+    right: -16px; top: -18px;
+    width: 160px; height: 100px;
     background: url("assets/wave-2.png") no-repeat center / contain;
-    opacity: 0.35; pointer-events: none;
+    opacity: 0.45; pointer-events: none;
   }
   .ws-title {
     display: flex; align-items: center; gap: 0.45rem;
@@ -1500,9 +1521,8 @@
   }
   .tracker-reminder .swim-gear {
     position: absolute;
-    left: -10px; top: 50%;
-    transform: translateY(-50%);
-    width: 8rem; height: auto;
+    left: -10px; top: 0.6rem;
+    width: 6.5rem; height: auto;
     opacity: 0.95;
     pointer-events: none;
   }
@@ -1644,12 +1664,12 @@
   .modal-footer-band .dot { color: var(--accent-orange); margin: 0 0.2rem; }
   .modal-footer-band::before, .modal-footer-band::after {
     content: ""; position: absolute; top: 50%; transform: translateY(-50%);
-    width: 60px; height: 30px;
+    width: 140px; height: 60px;
     background-size: contain; background-repeat: no-repeat;
-    opacity: 0.45;
+    opacity: 0.55;
   }
-  .modal-footer-band::before { left: -4px; background-image: url("assets/wave-1.png"); }
-  .modal-footer-band::after { right: -4px; background-image: url("assets/wave-2.png"); }
+  .modal-footer-band::before { left: -18px; background-image: url("assets/wave-1.png"); }
+  .modal-footer-band::after { right: -18px; background-image: url("assets/wave-2.png"); }
 
   /* Equipment line (showed under modal-msg) softening */
   .equipment-line {
@@ -1751,9 +1771,11 @@
     border-radius: 999px !important;
     background: transparent !important;
     box-shadow: none !important;
-    color: var(--jess-deep);
+    color: var(--ink) !important;
+    font-weight: 700;
     padding: 0.4rem 0.5rem !important;
   }
+  .day-tab:not(.active):hover { background: rgba(255,255,255,0.6) !important; }
   .day-tab.active {
     background: linear-gradient(180deg, var(--jess), var(--jess-deep)) !important;
     color: white !important;
@@ -1868,21 +1890,17 @@
     .week-summary::after { width: 70px; height: 45px; }
     .tracker-reminder { padding-left: 5.5rem; min-height: 6.5rem; }
     .tracker-reminder .swim-gear { width: 6rem; }
-    .modal-footer-band { letter-spacing: 0.25em; font-size: 0.75rem; }
-    .modal-footer-band::before, .modal-footer-band::after { width: 40px; height: 22px; }
+    .modal-footer-band { letter-spacing: 0.22em; font-size: 0.75rem; padding-left: 80px; padding-right: 80px; }
+    .modal-footer-band::before, .modal-footer-band::after { width: 80px; height: 40px; opacity: 0.5; }
+    .week-summary::after { width: 110px; height: 70px; right: -10px; top: -12px; }
   }
 
-  /* === BRIEF TOP ILLUSTRATION + BLOCK HEADS ============================ */
+  /* === BRIEF TOP HEADING + BLOCK HEADS ============================ */
   .brief-top {
     text-align: center;
-    padding: 0.6rem 0 1rem;
+    padding: 0.4rem 0 0.8rem;
     border-bottom: 1.5px dashed var(--paper-line);
     margin-bottom: 1rem;
-  }
-  .brief-top-illus {
-    display: block; margin: 0 auto 0.4rem;
-    width: 130px; height: auto;
-    pointer-events: none; user-select: none;
   }
   .brief-top-title {
     font-family: 'Caveat', cursive;
@@ -1902,9 +1920,10 @@
   }
 
   .block-head {
-    display: flex; align-items: center; gap: 0.6rem;
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
     margin-bottom: 0.45rem;
   }
+  .block-head .zone-chip { flex: 0 0 auto; }
   .block-head .block-title {
     flex: 1;
     font-family: 'Caveat', cursive;
@@ -1943,6 +1962,27 @@
     background: none;
   }
 
+  /* During the live session, strip every distraction off the page so the timer dominates */
+  body.in-session .header,
+  body.in-session .day-tabs,
+  body.in-session details.schedule { display: none !important; }
+
+  /* Equipment card — swim-gear watercolor floats right inside its own card */
+  .brief-section.equipment { position: relative; overflow: hidden; padding-right: 110px !important; }
+  .brief-section.equipment .gear-illus {
+    position: absolute; right: -6px; bottom: -6px;
+    width: 100px; height: auto; opacity: 0.95;
+    pointer-events: none; user-select: none;
+  }
+  @media (max-width: 480px) {
+    .brief-section.equipment { padding-right: 88px !important; }
+    .brief-section.equipment .gear-illus { width: 80px; }
+  }
+  @media (min-width: 768px) {
+    .brief-section.equipment { padding-right: 130px !important; }
+    .brief-section.equipment .gear-illus { width: 120px; }
+  }
+
   /* === RESPONSIVE — side-by-side on tablet ≥768px ====================== */
   @media (min-width: 768px) {
     .wrap { max-width: 940px; }
@@ -1975,7 +2015,6 @@
     .brief > .resume {
       grid-column: 1 / -1;
     }
-    .brief-top-illus { width: 150px; }
     .brief-top-title { font-size: 2.4rem; }
   }
 </style>
@@ -2007,13 +2046,13 @@
     <div class="modal-grid">
       <div class="modal-col modal-col-left">
         <div class="week-summary" id="week-summary"></div>
+        <div class="tracker-reminder" id="tracker-reminder"></div>
+      </div>
+      <div class="modal-col modal-col-right">
         <div class="modal-session-picker" id="modal-session-picker">
           <div class="label">Choose today's activity:</div>
           <div class="session-btns" id="session-btns"></div>
         </div>
-      </div>
-      <div class="modal-col modal-col-right">
-        <div class="tracker-reminder" id="tracker-reminder"></div>
         <div class="modal-confirm-msg" id="modal-msg"></div>
         <button class="modal-btn" id="modal-confirm-btn" disabled>
           Let's Go! 💪
@@ -2122,8 +2161,10 @@
   <div class="wrap">
     <header class="header">
       <img class="swim-banner" src="assets/swim-banner.png" alt="" aria-hidden="true">
-      <h1>🏊 Land Training</h1>
-      <div class="sub">Jess · Dryland 2026.2 · readiness · learning · quiz</div>
+      <div class="header-text">
+        <h1>🏊 Land Training</h1>
+        <div class="sub">Jess · Dryland 2026.2 · readiness · learning · quiz</div>
+      </div>
     </header>
 
     <nav class="day-tabs" id="day-tabs" aria-label="Day picker"></nav>
@@ -4236,10 +4277,11 @@ function blockColor(b) { return (BLOCK_META[b] || {}).color || "var(--ink)"; }
 function lightColor(l) { return { green: "#7ee0b8", yellow: "#ffd166", red: "#ff8a7a", recovery: "#7fd0d8" }[l] || "#cccccc"; }
 
 // Rough per-circuit duration in seconds (work + per-ex rests + per-round rests).
-function estimateCircuitSecs(c) {
+// `rounds` overrides the circuit's own rounds — used by the day low/high estimator.
+function estimateCircuitSecs(c, rounds) {
   const restEx = (appSettings && appSettings.restEx) || 5;
   const restRound = (appSettings && appSettings.restRound) || 25;
-  const rounds = c.rounds || 1;
+  const useRounds = rounds || c.rounds || 1;
   const exList = c.exercises || [];
   const exTotal = exList.reduce((s, ex) => {
     if (ex.driver === "time" && ex.work) return s + ex.work;
@@ -4247,15 +4289,43 @@ function estimateCircuitSecs(c) {
     return s + 30;
   }, 0);
   const oneRound = exTotal + restEx * Math.max(0, exList.length - 1);
-  return oneRound * rounds + restRound * Math.max(0, rounds - 1);
+  return oneRound * useRounds + restRound * Math.max(0, useRounds - 1);
 }
 
-// Centered watercolor header for the brief — uses swim-gear.png as the
-// clipboard+mat stand-in (no dedicated PNG available yet).
+// Day-level low/high time estimates: low uses 1 round for the main circuit,
+// high uses 3 rounds. Other blocks always run once. Returns minutes (rounded).
+function estimateDayMinRange(day) {
+  const circuits = (() => {
+    if (!day) return [];
+    if (day.spa) return [{ name: "Recovery", block: "recovery", rounds: 1,
+      exercises: (day.recovery || []).concat(day.recoveryHolds || []) }];
+    return BLOCK_ORDER.map(bk => {
+      const exs = (day.blocks && day.blocks[bk]) || [];
+      if (!exs.length) return null;
+      return { name: BLOCK_LABEL[bk], block: bk, rounds: 1, exercises: exs };
+    }).filter(Boolean);
+  })();
+  const blockBreakSecs = 8 * Math.max(0, circuits.length - 1);
+  const calc = (mainRoundCount) => {
+    const total = circuits.reduce((s, c) => {
+      const r = c.block === "main" ? mainRoundCount : 1;
+      return s + estimateCircuitSecs(c, r);
+    }, 0) + blockBreakSecs;
+    return Math.max(1, Math.round(total / 60));
+  };
+  return { lo: calc(1), hi: calc(3) };
+}
+
+function fmtDayRange(day) {
+  const r = estimateDayMinRange(day);
+  return r.lo === r.hi ? `~${r.lo} min` : `~${r.lo}–${r.hi} min`;
+}
+
+// Cursive heading + subtitle for the brief — the swim-gear watercolor moved
+// into the Equipment card so it reads as gear, not as page art.
 function briefTopIllustration(title, subtitleParts) {
   return `
     <div class="brief-top full-width">
-      <img class="brief-top-illus" src="assets/swim-gear.png" alt="" aria-hidden="true">
       <h2 class="brief-top-title">${title}</h2>
       <div class="brief-top-sub">${subtitleParts.filter(Boolean).join(" · ")}</div>
     </div>`;
@@ -4388,6 +4458,7 @@ function exBadges(ex, locked) {
 
 function renderCard() {
   document.getElementById("main-card").classList.remove("session-active");
+  document.body.classList.remove("in-session");
   const day = DAYS[selectedDay];
   if (!day) return;
   if (day.spa) { renderSpaBrief(day); return; }
@@ -4415,7 +4486,7 @@ function renderSpaBrief(day) {
         <div class="block-head">
           <span class="wc-bubble teal">🧊</span>
           <strong class="block-title">Recovery menu</strong>
-          <span class="wc-pill duration">~${day.timeLo}–${day.timeHi} min</span>
+          <span class="wc-pill duration">${fmtDayRange(day)}</span>
         </div>
         <ul>${rollHtml}</ul>
       </div>
@@ -4510,13 +4581,15 @@ function renderBrief(data) {
       <div class="block-head">
         <span class="wc-bubble" style="background:${blockColor(c.block)}33;color:${blockColor(c.block)};">${blockEmoji(c.block)}</span>
         <strong class="block-title">${c.name}</strong>
+        ${zoneChip(c.block)}
         <span class="wc-pill duration">${dur}</span>
       </div>
-      <div class="block-meta">${zoneChip(c.block)}${roundTag ? ` · ${roundTag}` : ""}</div>
+      ${roundTag ? `<div class="block-meta">${roundTag}</div>` : ""}
       <ul>${exHtml}</ul></div>`;
   }).join("");
 
-  const eqHtml = `<div class="brief-section">
+  const eqHtml = `<div class="brief-section equipment">
+    <img class="gear-illus" src="assets/swim-gear.png" alt="" aria-hidden="true">
     <div class="block-head">
       <span class="wc-bubble peach">📦</span>
       <strong class="block-title">Equipment</strong>
@@ -4563,7 +4636,7 @@ function renderBrief(data) {
   }
 
   document.body.classList.add("in-brief");
-  const subtitleLine = `${data.subtitle} · ⏱ ${day.timeLo}–${day.timeHi} min`;
+  const subtitleLine = `${data.subtitle} · ⏱ ${fmtDayRange(day).replace("~", "")}`;
   document.getElementById("main-card").innerHTML = `
     ${briefTopIllustration(data.title, [data.badge, subtitleLine])}
     <div class="mantra full-width">"${data.mantra}"</div>
@@ -4831,6 +4904,7 @@ function celebrate(emojis) {
 
 function renderSessionShell(data) {
   document.body.classList.remove("in-brief");
+  document.body.classList.add("in-session");
   const card = document.getElementById("main-card");
   card.classList.add("session-active");
   const isEvening = selectedSession === "evening";
@@ -4864,21 +4938,37 @@ function renderSessionShell(data) {
 }
 
 /* A scannable list of every exercise in today's session; the current one is
-   highlighted as the session runs. */
+   highlighted as the session runs, completed ones get struck through. */
 function renderSessionExList(data) {
   if (!data || !data.circuits) return "";
+  let total = 0;
   const rows = data.circuits.map((c, ci) => {
     const head = `<li class="sx-head" style="border-left:4px solid ${blockColor(c.block)};padding-left:7px;">${blockEmoji(c.block)} ${c.name}${c.rounds > 1 ? ` ×${c.rounds}` : ""}</li>`;
-    const items = c.exercises.map((ex, ei) =>
-      `<li class="sx-item" id="sx-${ci}-${ei}"><span>${ex.name}${howToHtml(ex.name, c.block)}</span><span class="ex-meta">${exMeta(ex)}</span></li>`).join("");
+    const items = c.exercises.map((ex, ei) => {
+      total++;
+      return `<li class="sx-item" id="sx-${ci}-${ei}"><span>${ex.name}${howToHtml(ex.name, c.block)}</span><span class="ex-meta">${exMeta(ex)}</span></li>`;
+    }).join("");
     return head + items;
   }).join("");
-  return `<details class="ex-list" id="ex-list" open><summary>📋 Today's exercises</summary><ul>${rows}</ul></details>`;
+  return `<details class="ex-list" id="ex-list" open><summary>📋 <span class="ex-list-title">Today's exercises</span> · <span id="ex-list-progress">0/${total} done</span></summary><ul>${rows}</ul></details>`;
 }
 function highlightSessionEx(ci, ei) {
   document.querySelectorAll(".sx-item.current").forEach(el => el.classList.remove("current"));
   const el = document.getElementById(`sx-${ci}-${ei}`);
-  if (el) { el.classList.add("current"); el.scrollIntoView({ block: "nearest" }); }
+  if (el) { el.classList.add("current"); el.scrollIntoView({ block: "center", behavior: "smooth" }); }
+}
+function markExerciseDone(ci, ei) {
+  const el = document.getElementById(`sx-${ci}-${ei}`);
+  if (el && !el.classList.contains("done")) {
+    el.classList.add("done");
+    el.classList.remove("current");
+    const prog = document.getElementById("ex-list-progress");
+    if (prog) {
+      const doneCount = document.querySelectorAll(".sx-item.done").length;
+      const total = document.querySelectorAll(".sx-item").length;
+      prog.textContent = `${doneCount}/${total} done`;
+    }
+  }
 }
 
 const ZONE_RING = { work: "#0CA5C4", rest: "#7ee0b8", roundrest: "#ffd166",
@@ -5866,6 +5956,10 @@ async function startSession() {
           }
         }
 
+        // Mark this exercise complete in the sidebar progress tracker
+        // (only on final round so multi-round circuits don't strike too early)
+        if (r === circuit.rounds) markExerciseDone(ci, ei);
+
         // Log each exercise once (first round)
         if (r === 1) {
           session.perExercise.push({
@@ -5940,8 +6034,11 @@ async function startSession() {
             });
             if (result === "abort") return finalize(false);
           } else {
-            // Inter-exercise rest — speak the NEXT exercise's reset cue (v2)
-            const restDuration = configuredExerciseRest();
+            // Inter-exercise rest — speak the NEXT exercise's name FIRST, then run
+            // the timer. Floor at 4s after a skip so the user gets a real breather.
+            let restDuration = configuredExerciseRest();
+            if (session.justSkipped) restDuration = Math.max(restDuration, 4);
+            session.justSkipped = false;
             setZone("rest");
             setStatus("Rest");
             const nextReset = upcomingEx && upcomingEx.reset ? upcomingEx.reset : "";
@@ -5952,32 +6049,24 @@ async function startSession() {
             });
             setUpNext(`<span class="label">Up next:</span> <span class="name">${upcoming}</span>`);
 
-            // Speak "Rest, next move: NAME. CUE" upfront — timer starts immediately.
-            // 3,2,1 only fire if the announcement has finished by then; otherwise
-            // we just queue "Go" after the announcement finishes naturally.
+            // Speak "Rest. Next: NAME." and WAIT — guarantees the cue is heard
+            // before the countdown starts. Short message keeps total rest tight.
             const nextName = upcomingEx ? upcomingEx.name : "";
-            const nextCue = upcomingEx && upcomingEx.reset ? upcomingEx.reset : "";
-            const announceMsg = nextName
-              ? `Rest, next move: ${nextName}.${nextCue ? " " + nextCue : ""}`
-              : "Rest.";
-            if (appSettings.voiceStyle !== "quiet") speak(announceMsg);
+            const announceMsg = nextName ? `Rest. Next: ${nextName}.` : "Rest.";
+            if (appSettings.voiceStyle !== "quiet") {
+              await speakAndWait(announceMsg);
+            }
 
             let said3 = false, said2 = false, said1 = false;
             const result = await countdown(restDuration, {
               onTick: (rem) => {
-                const announceDone = !speech || (!speech.speaking && !speech.pending);
-                if (!said3 && rem === 3) { said3 = true; if (announceDone) speak("3"); }
-                if (!said2 && rem === 2) { said2 = true; if (announceDone) speak("2"); }
-                if (!said1 && rem === 1) { said1 = true; if (announceDone) speak("1"); }
+                if (!said3 && rem === 3) { said3 = true; speak("3"); }
+                if (!said2 && rem === 2) { said2 = true; speak("2"); }
+                if (!said1 && rem === 1) { said1 = true; speak("1"); }
               }
             });
             if (result === "abort") return finalize(false);
-            if (result === "skip") {
-              if (speech) speech.cancel();
-            } else {
-              // Queue "Go" — if the announcement is still mid-sentence, it will
-              // finish naturally and "Go" follows. Do NOT cancel speech, or the
-              // announcement gets cut off in the middle.
+            if (result !== "skip") {
               speak("Go");
               preAnnounced = true;
             }
@@ -6071,10 +6160,11 @@ function skipExercise() {
     logEvent("skip", { ex: session.currentEx.name, block: session.currentEx.block || null });
   }
   session.skipExercise = true;
+  session.justSkipped = true;
   if (session.byRepsResolver) {
     session.byRepsResolver("skip"); // wrapper handles null + clearInterval
   }
-  interruptSpeech("Skipping. Moving on.");
+  interruptSpeech("Skipping.");
 }
 
 function stopSession() {
@@ -6095,6 +6185,7 @@ function finalize(completed) {
   session.running = false;
   session.paused = false;
   session.abort = false;
+  document.body.classList.remove("in-session");
 
   const elapsedSecs = getElapsedSecs();
   stopElapsed();
