@@ -1453,27 +1453,6 @@
     margin: 0 auto;
     pointer-events: none; user-select: none;
   }
-  /* Water-band that frames the small PNG so it reads as a portrait inside a pool strip */
-  .modal-banner-strip {
-    position: relative;
-    width: 100%;
-    margin: -0.6rem 0 0.2rem;
-    padding: 0.4rem 0 0.5rem;
-    background:
-      url("assets/wave-1.png") no-repeat left center / 110px 70px,
-      url("assets/wave-2.png") no-repeat right center / 110px 70px,
-      linear-gradient(180deg, rgba(207, 233, 240, 0.55), rgba(12, 165, 196, 0.18));
-    border-radius: 18px;
-    overflow: hidden;
-  }
-  .swim-hero {
-    width: 100%;
-    max-width: 720px;
-    height: auto;
-    display: block;
-    margin: 0 auto;
-  }
-
   /* Calendar-icon day tiles */
   .modal-day-buttons {
     grid-template-columns: repeat(7, 1fr);
@@ -1500,6 +1479,11 @@
     filter: drop-shadow(0 1px 0 rgba(124, 111, 191, 0.35));
   }
   .modal-day-btn .day-label { font-size: 0.78rem; }
+  .modal-day-btn .day-date {
+    font-size: 0.95rem; font-weight: 800; line-height: 1.1;
+    color: var(--jess-deep);
+  }
+  .modal-day-btn.selected .day-date { color: white; }
   .modal-day-btn:hover { transform: translateY(-1px); }
   .modal-day-btn.today {
     background: linear-gradient(180deg, rgba(255, 209, 102, 0.45), var(--paper));
@@ -2217,7 +2201,35 @@
 
   /* Pass 4: phone-portrait #timer should dominate the block-pill (H). */
   @media (max-width: 480px) and (orientation: portrait) {
-    #timer { font-size: 6rem !important; font-weight: 900; letter-spacing: -4px; }
+    #timer { font-size: 5rem !important; font-weight: 900; letter-spacing: -4px; }
+  }
+
+  /* Fit-to-screen: in portrait (phone + portrait tablet, where the side-by-side
+     grid is NOT active) the live session must show DONE/PAUSE/SKIP without
+     scrolling. Tighten vertical rhythm, shrink the ring, and pin the controls
+     to the bottom of the viewport. */
+  @media (orientation: portrait) and (max-width: 1023px) {
+    .session-active { display: flex; flex-direction: column; gap: 0.35rem; }
+    .session-active .day-header      { margin: 0; }
+    .session-active .elapsed-bar     { margin: 0; }
+    .session-active .planned-progress{ margin: 0; }
+    .session-active .status          { margin: 0.1rem 0; }
+    .session-active .timer-zone      { padding: 0.25rem 0; }
+    .timer-ring      { width: 9.5rem; height: 9.5rem; }
+    .timer-ring .timer { width: 7.8rem; height: 7.8rem; }
+    #timer           { font-size: 4.4rem !important; letter-spacing: -3px; }
+    .session-active .progress  { margin-top: 0.25rem; }
+    .session-active .exercise  { margin: 0; }
+    .session-active .ex-name   { font-size: 1.6rem; }
+    .session-active .hint-strip{ margin: 0.3rem 0; }
+    .session-active .upnext    { font-size: 1.15rem; padding: 0.35rem 0.7rem; }
+    .session-active .btn-row.session-controls {
+      position: sticky; bottom: 0; z-index: 6;
+      background: var(--paper);
+      padding: 0.5rem 0 0.3rem; margin-top: 0.25rem;
+      box-shadow: 0 -6px 12px rgba(0, 0, 0, 0.07);
+    }
+    .session-active .ex-list { margin-top: 0.3rem; }
   }
 
   /* === RESPONSIVE — side-by-side on tablet ≥768px ====================== */
@@ -2234,7 +2246,6 @@
     }
     /* These rows always span the full width even in 2-col mode */
     #modal-main .modal-banner,
-    #modal-main .modal-banner-strip,
     #modal-main > h2,
     #modal-main > p:first-of-type,
     #modal-main .modal-day-buttons,
@@ -2275,32 +2286,7 @@
 <!-- Day picker modal (shows on load) -->
 <div class="modal-overlay show" id="modal-overlay" role="presentation">
   <div class="modal" id="modal-main" role="dialog" aria-modal="true" aria-labelledby="modal-main-title">
-    <div class="modal-banner-strip" aria-hidden="true">
-      <svg class="swim-hero" viewBox="0 0 1200 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Swimmer mid-stroke in three lane lines">
-        <defs>
-          <linearGradient id="hero-water" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#bfe3ec"/>
-            <stop offset="100%" stop-color="#0CA5C4"/>
-          </linearGradient>
-        </defs>
-        <rect x="0" y="0" width="1200" height="220" fill="url(#hero-water)" opacity="0.35"/>
-        <path d="M0,60 Q150,30 300,60 T600,60 T900,60 T1200,60" fill="none" stroke="#0A8BA8" stroke-width="3" opacity="0.55"/>
-        <path d="M0,110 Q150,80 300,110 T600,110 T900,110 T1200,110" fill="none" stroke="#0CA5C4" stroke-width="3" opacity="0.6"/>
-        <path d="M0,170 Q150,140 300,170 T600,170 T900,170 T1200,170" fill="none" stroke="#7fc8d8" stroke-width="3" opacity="0.55"/>
-        <g transform="translate(520,90)">
-          <ellipse cx="60" cy="35" rx="90" ry="22" fill="#0A8BA8" opacity="0.85"/>
-          <circle cx="20" cy="28" r="14" fill="#2a2320"/>
-          <path d="M30,30 Q60,-10 120,5" fill="none" stroke="#2a2320" stroke-width="10" stroke-linecap="round"/>
-          <path d="M90,40 Q140,55 170,30" fill="none" stroke="#2a2320" stroke-width="9" stroke-linecap="round"/>
-        </g>
-        <circle cx="200" cy="40" r="6" fill="#ff7b54" opacity="0.7"/>
-        <circle cx="240" cy="55" r="4" fill="#ffd166" opacity="0.8"/>
-        <circle cx="950" cy="45" r="5" fill="#ff7b54" opacity="0.65"/>
-        <circle cx="990" cy="60" r="4" fill="#ffd166" opacity="0.75"/>
-        <circle cx="430" cy="120" r="4" fill="#ffffff" opacity="0.8"/>
-        <circle cx="720" cy="125" r="5" fill="#ffffff" opacity="0.8"/>
-      </svg>
-    </div>
+    <img class="modal-banner" src="assets/swim-banner.png" alt="" aria-hidden="true">
     <h2 id="modal-main-title">Which day are <em class="wc-cursive">you</em> training?</h2>
     <p>Pick your workout below</p>
 
@@ -2309,15 +2295,15 @@
     <div class="modal-grid">
       <div class="modal-col modal-col-left">
         <div class="week-summary" id="week-summary"></div>
-        <div class="tracker-reminder" id="tracker-reminder"></div>
         <div id="modal-settings-slot"></div>
-        <div id="modal-testmode-slot"></div>
+        <div class="tracker-reminder" id="tracker-reminder"></div>
       </div>
       <div class="modal-col modal-col-right">
         <div class="modal-session-picker" id="modal-session-picker">
           <div class="label">Choose today's activity:</div>
           <div class="session-btns" id="session-btns"></div>
         </div>
+        <div id="modal-testmode-slot"></div>
         <div class="modal-confirm-msg" id="modal-msg"></div>
         <button class="modal-btn" id="modal-confirm-btn" disabled>
           Let's Go! 💪
@@ -3656,6 +3642,27 @@ function edmontonDayKey() {
   }).toLowerCase();
 }
 
+/* Day-of-month for each weekday of the CURRENT (Mon–Sun) week, in Edmonton time.
+   Anchors at UTC-noon off Edmonton's local date so DST/midnight can't drift the
+   day. Returns { monday: 15, tuesday: 16, … }. */
+function edmontonWeekDates() {
+  const tz = "America/Edmonton";
+  const [y, m, d] = new Date().toLocaleDateString("en-CA", { timeZone: tz })
+    .split("-").map(Number);
+  const anchor = new Date(Date.UTC(y, m - 1, d, 12));
+  const dow = anchor.getUTCDay();               // 0=Sun … 6=Sat
+  const monday = new Date(anchor);
+  monday.setUTCDate(anchor.getUTCDate() + (dow === 0 ? -6 : 1 - dow));
+  const keys = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  const out = {};
+  keys.forEach((k, i) => {
+    const dt = new Date(monday);
+    dt.setUTCDate(monday.getUTCDate() + i);
+    out[k] = dt.getUTCDate();
+  });
+  return out;
+}
+
 /* AM Micro-Activation is a wake-up block done at home before leaving —
    auto-skip it once it's past 6:30 AM (Edmonton local time). */
 function amActivationAvailable() {
@@ -3703,12 +3710,13 @@ function initModal() {
   const sessionPicker = document.getElementById("modal-session-picker");
 
   const order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-  
+  const weekDates = edmontonWeekDates();
+
   order.forEach(key => {
     const idx = DAY_KEYS.indexOf(key);
     const btn = document.createElement("button");
     btn.className = "modal-day-btn";
-    btn.innerHTML = `<span class="day-icon" aria-hidden="true">${DAY_PICTOGRAM[key] || "📅"}</span><span class="day-label">${DAY_SHORT[idx]}</span>`;
+    btn.innerHTML = `<span class="day-icon" aria-hidden="true">${DAY_PICTOGRAM[key] || "📅"}</span><span class="day-label">${DAY_SHORT[idx]}</span><span class="day-date">${weekDates[key]}</span>`;
 
     if (key === today) btn.classList.add("today");
     if (DAYS[key].spa) btn.classList.add("rest");
@@ -3883,29 +3891,23 @@ function renderModalTrackerReminder() {
   ];
   const missing = dayMetrics.filter(m => !wkData[m.key]).map(m => m.label);
 
-  // Per-day gear list — falls back to a universal kit on Sunday / unknown day
-  const dayGear = (selectedDay && DAY_EQUIPMENT[selectedDay])
-    || DAY_EQUIPMENT[today]
-    || "Goggles, Swim cap, Towel, Water bottle, Kickboard, Pull buoy, Fins, Bands, Bag";
-  const gearItems = dayGear.split(",").map(s => s.trim()).filter(Boolean);
-  const gearListHtml = `<ul class="gear-list">${gearItems.map(g => `<li>${g}</li>`).join("")}</ul>`;
-
+  // The "don't forget your gear" card was dropped (not useful); this node now
+  // surfaces only the Sunday PR-logging reminder and the missing-metrics nudge.
   let reminderBody = "";
   if (isSunday) {
-    reminderBody = `
+    reminderBody += `
       <div class="self-check-banner">📅 Sunday — log this week's PR numbers, then make the engagement pick.</div>`;
   }
-  reminderBody += `
-    <div class="tr-title">Don't forget your gear!</div>
-    <div class="tr-body">${gearListHtml}</div>`;
   if (missing.length > 0 && week > 0) {
     reminderBody += `
       <div class="tr-body" style="margin-top: 0.4rem; font-size: 0.9rem; color: var(--ink-light);">
         💡 Week ${week} still needs: <strong>${missing.join(", ")}</strong>. Tap "📈 Progress" to log.
       </div>`;
   }
-  document.getElementById("tracker-reminder").innerHTML =
-    `<img class="swim-gear" src="assets/swim-gear.png" alt="" aria-hidden="true">` + reminderBody;
+  const reminderEl = document.getElementById("tracker-reminder");
+  reminderEl.innerHTML = reminderBody;
+  // Collapse the card entirely when there's nothing to show.
+  reminderEl.style.display = reminderBody ? "" : "none";
 }
 
 /* ===== Sub-view navigation ===== */
@@ -5268,11 +5270,14 @@ function renderSessionExList(data) {
     const head = `<li class="sx-head" style="border-left:4px solid ${blockColor(c.block)};padding-left:7px;">${blockEmoji(c.block)} ${c.name}${c.rounds > 1 ? ` ×${c.rounds}` : ""}</li>`;
     const items = c.exercises.map((ex, ei) => {
       total++;
-      return `<li class="sx-item" id="sx-${ci}-${ei}"><span>${ex.name}${howToHtml(ex.name, c.block)}</span><span class="ex-meta">${exMeta(ex)}</span></li>`;
+      return `<li class="sx-item" id="sx-${ci}-${ei}"><span>${ex.name}</span><span class="ex-meta">${exMeta(ex)}</span></li>`;
     }).join("");
     return head + items;
   }).join("");
-  return `<details class="ex-list" id="ex-list" open><summary>📋 <span class="ex-list-title">Today's exercises</span> · <span id="ex-list-progress">0/${total} done</span></summary><ul>${rows}</ul></details>`;
+  // Open by default only in the side-by-side (sidebar) layout where there's room;
+  // in phone/portrait it starts collapsed so DONE/PAUSE/SKIP stay above the fold.
+  const sidebarLayout = window.matchMedia("(min-width: 1024px), (min-width: 900px) and (orientation: landscape)").matches;
+  return `<details class="ex-list" id="ex-list"${sidebarLayout ? " open" : ""}><summary>📋 <span class="ex-list-title">Today's exercises</span> · <span id="ex-list-progress">0/${total} done</span></summary><ul>${rows}</ul></details>`;
 }
 function highlightSessionEx(ci, ei) {
   document.querySelectorAll(".sx-item.current").forEach(el => el.classList.remove("current"));
@@ -5322,14 +5327,15 @@ function setProgress(chips) {
 }
 function setExercise({ name, detail, cue, redFlag, warmupSteps, hydrate, block }) {
   const html = [];
-  if (name)   html.push(`<div class="ex-name">${name}${howToHtml(name, block)}</div>`);
+  // The "▶ Watch" button in the hint-strip is the single help affordance here —
+  // no separate "?" on the name (avoids showing two ways to the same demo).
+  if (name)   html.push(`<div class="ex-name">${name}</div>`);
   // Pass 4 (E + 10): inline hint-strip under the name — non-modal cue + watch link.
   // Only show when there's a real exercise + cue (not for "Rest" / "Switch sides" pseudo-cards).
   const looksLikeRealEx = name && cue && !/^(Rest|Switch sides|Round Rest|Stopped|Done|Nice|Get ready)/i.test(name);
   if (looksLikeRealEx) {
     const safeName = String(name).replace(/"/g, "&quot;");
     html.push(`<div class="hint-strip">
-      <span class="hint-icon" aria-hidden="true">❓</span>
       <span class="hint-cue">${cue}</span>
       <button type="button" class="hint-watch" data-watch-name="${safeName}" data-watch-block="${block || ''}">▶ Watch</button>
     </div>`);
