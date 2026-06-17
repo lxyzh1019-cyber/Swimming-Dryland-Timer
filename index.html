@@ -496,6 +496,12 @@
     font-family: 'Caveat', cursive; font-size: 1.3rem;
     color: var(--jess-deep); margin-bottom: 0.5rem;
   }
+  /* Dose (reps / seconds) shown inline on the exercise-name line. */
+  .ex-dose {
+    font-family: 'Caveat', cursive; font-size: 0.62em; font-weight: 700;
+    color: var(--jess-deep); white-space: nowrap;
+  }
+  .ex-dose::before { content: "· "; color: var(--ink-light); }
   .ex-cue {
     font-family: 'Patrick Hand', sans-serif; font-size: 1.1rem;
     color: var(--ink); line-height: 1.4;
@@ -653,7 +659,7 @@
         "status   sidebar"
         "timer    sidebar"
         "exercise sidebar"
-        "upnext   sidebar"
+        "upnext    sidebar"
         "controls sidebar";
       gap: 0.6rem 1.2rem;
     }
@@ -668,6 +674,9 @@
     .session-active .btn-row          { grid-area: controls; }
     .session-active .ex-list { grid-area: sidebar; margin-top: 0; align-self: stretch; }
     .session-active .ex-list ul { max-height: calc(100vh - 8rem); }
+    /* Bigger timer now that the phase title is gone. */
+    .session-active .timer-ring { width: 15rem; height: 15rem; }
+    .session-active .timer-ring .timer { width: 12.6rem; height: 12.6rem; }
   }
 
   /* Landscape iPad with taller viewport (iPad Pro landscape) */
@@ -1433,6 +1442,7 @@
 
   /* Soften the day-picker modal frame */
   #modal-main {
+    position: relative;
     border-width: 2px;
     border-color: var(--wc-teal-edge);
     box-shadow: var(--wc-shadow-card);
@@ -1447,10 +1457,11 @@
     font-size: 1.25rem;
     margin-bottom: 1rem;
   }
-  /* Header banner inside modal — swimmer-girl top */
+  /* Header banner inside modal — small swimmer in the top-left corner */
   .modal-banner {
-    display: block; width: 100%; max-width: 380px;
-    margin: 0 auto;
+    position: absolute; top: 0.7rem; left: 0.9rem;
+    display: block; width: 92px; height: auto;
+    margin: 0; z-index: 2;
     pointer-events: none; user-select: none;
   }
   /* Calendar-icon day tiles */
@@ -1496,6 +1507,24 @@
   }
   .modal-day-btn.selected .day-icon { filter: brightness(2) drop-shadow(0 1px 0 rgba(0,0,0,0.2)); }
   .modal-day-btn.rest { opacity: 0.55; }
+  /* Completed-this-week marker, integrated onto the date selector itself. */
+  .modal-day-btn { position: relative; }
+  .modal-day-btn.done { border-color: var(--jess); }
+  .modal-day-btn.done::after {
+    content: "✓"; position: absolute; top: -6px; right: -6px;
+    width: 18px; height: 18px; line-height: 18px; text-align: center;
+    font-size: 0.7rem; font-weight: 900; color: white;
+    background: var(--jess-deep); border: 1.5px solid var(--paper);
+    border-radius: 50%;
+  }
+  .modal-week-caption {
+    font-family: 'Nunito', sans-serif; font-weight: 700;
+    font-size: 0.85rem; color: var(--jess-deep);
+    text-align: center; margin: -0.4rem 0 0.9rem;
+  }
+  /* Bottom CTA band — Let's Go centered, full width under both columns. */
+  .modal-cta { text-align: center; margin-top: 1rem; }
+  .modal-cta .modal-btn { margin-left: auto; margin-right: auto; }
 
   /* Week summary — pale teal panel */
   .week-summary {
@@ -2199,28 +2228,35 @@
     text-align: center; margin: 1.2rem 0 0.4rem; font-size: 1.1rem;
   }
 
+  /* Shrink the block/phase title (e.g. "🔥 Warm-up") to a thin line during a
+     live session — it's largely redundant with the progress chips, but still
+     carries transient cues ("Round rest", "Switch sides", "Stopped…"). The
+     reclaimed space goes to the timer. */
+  .session-active .status {
+    font-size: 1.05rem; min-height: 0; margin: 0; opacity: 0.85;
+  }
+
   /* Pass 4: phone-portrait #timer should dominate the block-pill (H). */
   @media (max-width: 480px) and (orientation: portrait) {
-    #timer { font-size: 5rem !important; font-weight: 900; letter-spacing: -4px; }
+    #timer { font-size: 5.4rem !important; font-weight: 900; letter-spacing: -4px; }
   }
 
   /* Fit-to-screen: in portrait (phone + portrait tablet, where the side-by-side
      grid is NOT active) the live session must show DONE/PAUSE/SKIP without
-     scrolling. Tighten vertical rhythm, shrink the ring, and pin the controls
-     to the bottom of the viewport. */
+     scrolling. Tighten vertical rhythm and pin the controls to the bottom while
+     keeping the timer ring large. */
   @media (orientation: portrait) and (max-width: 1023px) {
     .session-active { display: flex; flex-direction: column; gap: 0.35rem; }
     .session-active .day-header      { margin: 0; }
     .session-active .elapsed-bar     { margin: 0; }
     .session-active .planned-progress{ margin: 0; }
-    .session-active .status          { margin: 0.1rem 0; }
-    .session-active .timer-zone      { padding: 0.25rem 0; }
-    .timer-ring      { width: 9.5rem; height: 9.5rem; }
-    .timer-ring .timer { width: 7.8rem; height: 7.8rem; }
-    #timer           { font-size: 4.4rem !important; letter-spacing: -3px; }
-    .session-active .progress  { margin-top: 0.25rem; }
+    .session-active .timer-zone      { padding: 0.2rem 0; }
+    .timer-ring      { width: 11.5rem; height: 11.5rem; }
+    .timer-ring .timer { width: 9.6rem; height: 9.6rem; }
+    #timer           { font-size: 5.4rem !important; letter-spacing: -3px; }
+    .session-active .progress  { margin-top: 0.2rem; }
     .session-active .exercise  { margin: 0; }
-    .session-active .ex-name   { font-size: 1.6rem; }
+    .session-active .ex-name   { font-size: 1.7rem; }
     .session-active .hint-strip{ margin: 0.3rem 0; }
     .session-active .upnext    { font-size: 1.15rem; padding: 0.35rem 0.7rem; }
     .session-active .btn-row.session-controls {
@@ -2291,27 +2327,30 @@
     <p>Pick your workout below</p>
 
     <div class="modal-day-buttons" id="modal-days"></div>
+    <div class="modal-week-caption" id="week-summary"></div>
 
     <div class="modal-grid">
       <div class="modal-col modal-col-left">
-        <div class="week-summary" id="week-summary"></div>
-        <div id="modal-settings-slot"></div>
-        <div class="tracker-reminder" id="tracker-reminder"></div>
-      </div>
-      <div class="modal-col modal-col-right">
         <div class="modal-session-picker" id="modal-session-picker">
           <div class="label">Choose today's activity:</div>
           <div class="session-btns" id="session-btns"></div>
         </div>
+        <div id="modal-settings-slot"></div>
+      </div>
+      <div class="modal-col modal-col-right">
         <div id="modal-testmode-slot"></div>
-        <div class="modal-confirm-msg" id="modal-msg"></div>
-        <button class="modal-btn" id="modal-confirm-btn" disabled>
-          Let's Go! 💪
-        </button>
-        <div class="modal-secondary-btns">
-          <button id="btn-open-progress">📈 Progress</button>
-          <button id="btn-open-winsgroup">🏆 Wins</button>
-        </div>
+        <div class="tracker-reminder" id="tracker-reminder"></div>
+      </div>
+    </div>
+
+    <div class="modal-cta">
+      <div class="modal-confirm-msg" id="modal-msg"></div>
+      <button class="modal-btn" id="modal-confirm-btn" disabled>
+        Let's Go! 💪
+      </button>
+      <div class="modal-secondary-btns">
+        <button id="btn-open-progress">📈 Progress</button>
+        <button id="btn-open-winsgroup">🏆 Wins</button>
       </div>
     </div>
 
@@ -3716,6 +3755,7 @@ function initModal() {
     const idx = DAY_KEYS.indexOf(key);
     const btn = document.createElement("button");
     btn.className = "modal-day-btn";
+    btn.dataset.dayKey = key;
     btn.innerHTML = `<span class="day-icon" aria-hidden="true">${DAY_PICTOGRAM[key] || "📅"}</span><span class="day-label">${DAY_SHORT[idx]}</span><span class="day-date">${weekDates[key]}</span>`;
 
     if (key === today) btn.classList.add("today");
@@ -3841,7 +3881,7 @@ function initModal() {
   document.getElementById("btn-insights-export").onclick = exportWeeklySummary;
 }
 
-/* ===== Pass 2: weekly summary in modal ===== */
+/* ===== Pass 2 → 6: completed sessions integrated onto the date selectors ===== */
 function renderModalWeekSummary() {
   const sessions = thisWeekSessions().filter(s => s.completedFully !== false);
   const byDay = {};
@@ -3850,24 +3890,19 @@ function renderModalWeekSummary() {
     byDay[s.dayKey].secs += s.durationSecs || 0;
     byDay[s.dayKey].labels.push(sessionLabel(s));
   });
-  const order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-  const cellsHtml = order.map(key => {
-    const idx = DAY_KEYS.indexOf(key);
-    const entry = byDay[key];
-    const done = !!entry;
-    return `
-      <div class="ws-cell ${done ? 'done' : ''}">
-        <div class="ws-day">${DAY_SHORT[idx]}</div>
-        <div class="ws-types">${done ? entry.labels.join("<br>") : "—"}</div>
-        <div class="ws-time">${done ? fmtMMSS(entry.secs) : '—'}</div>
-      </div>`;
-  }).join("");
+  // Mark each day-picker button that already has a completed session this week.
+  document.querySelectorAll(".modal-day-btn").forEach(btn => {
+    const k = btn.dataset.dayKey;
+    if (k) btn.classList.toggle("done", !!byDay[k]);
+  });
   const total = sessions.reduce((sum, s) => sum + (s.durationSecs || 0), 0);
   const totalText = total > 0 ? fmtHHMM(total) : "Let's start the week!";
-  document.getElementById("week-summary").innerHTML = `
-    <div class="ws-title">This week's completed sessions</div>
-    <div class="ws-grid">${cellsHtml}</div>
-    <div class="ws-total">${sessions.length} session${sessions.length === 1 ? "" : "s"} · ${totalText}</div>`;
+  const cap = document.getElementById("week-summary");
+  if (cap) {
+    cap.innerHTML = sessions.length
+      ? `✓ ${sessions.length} session${sessions.length === 1 ? "" : "s"} this week · ${totalText}`
+      : `0 sessions · Let's start the week!`;
+  }
 }
 
 /* ===== Pass 2: tracker reminder in modal ===== */
@@ -5286,7 +5321,12 @@ function highlightSessionEx(ci, ei) {
   el.classList.add("current");
   const ul = el.closest("ul");
   if (ul) {
-    const target = el.offsetTop - (ul.clientHeight - el.offsetHeight) / 2;
+    // Center on the current item. Use rect math (not offsetTop) so it works
+    // regardless of the list's offsetParent — offsetTop was pushing the active
+    // row out of view instead of centering it.
+    const elRect = el.getBoundingClientRect();
+    const ulRect = ul.getBoundingClientRect();
+    const target = ul.scrollTop + (elRect.top - ulRect.top) - (ul.clientHeight - el.offsetHeight) / 2;
     ul.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
   }
 }
@@ -5327,9 +5367,12 @@ function setProgress(chips) {
 }
 function setExercise({ name, detail, cue, redFlag, warmupSteps, hydrate, block }) {
   const html = [];
-  // The "▶ Watch" button in the hint-strip is the single help affordance here —
-  // no separate "?" on the name (avoids showing two ways to the same demo).
-  if (name)   html.push(`<div class="ex-name">${name}</div>`);
+  // Name + dose share one line (e.g. "Wall Slides · 8 reps") to save vertical
+  // space; the "▶ Watch" button is the single help affordance (no "?").
+  if (name) {
+    const dose = detail ? ` <span class="ex-dose">${detail}</span>` : "";
+    html.push(`<div class="ex-name">${name}${dose}</div>`);
+  }
   // Pass 4 (E + 10): inline hint-strip under the name — non-modal cue + watch link.
   // Only show when there's a real exercise + cue (not for "Rest" / "Switch sides" pseudo-cards).
   const looksLikeRealEx = name && cue && !/^(Rest|Switch sides|Round Rest|Stopped|Done|Nice|Get ready)/i.test(name);
@@ -5340,7 +5383,7 @@ function setExercise({ name, detail, cue, redFlag, warmupSteps, hydrate, block }
       <button type="button" class="hint-watch" data-watch-name="${safeName}" data-watch-block="${block || ''}">▶ Watch</button>
     </div>`);
   }
-  if (detail) html.push(`<div class="ex-detail">${detail}</div>`);
+  // (detail is rendered inline with the name above — no separate row)
   if (warmupSteps) html.push(`<div class="ex-cue">${warmupSteps.map(s => "• " + s).join("<br>")}</div>`);
   else if (cue && !looksLikeRealEx) html.push(`<div class="ex-cue">${cue}</div>`);
   if (redFlag) html.push(`<div class="ex-redflag">${redFlag}</div>`);
