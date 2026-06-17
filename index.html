@@ -1871,6 +1871,113 @@
     .modal-footer-band { letter-spacing: 0.25em; font-size: 0.75rem; }
     .modal-footer-band::before, .modal-footer-band::after { width: 40px; height: 22px; }
   }
+
+  /* === BRIEF TOP ILLUSTRATION + BLOCK HEADS ============================ */
+  .brief-top {
+    text-align: center;
+    padding: 0.6rem 0 1rem;
+    border-bottom: 1.5px dashed var(--paper-line);
+    margin-bottom: 1rem;
+  }
+  .brief-top-illus {
+    display: block; margin: 0 auto 0.4rem;
+    width: 130px; height: auto;
+    pointer-events: none; user-select: none;
+  }
+  .brief-top-title {
+    font-family: 'Caveat', cursive;
+    font-style: italic;
+    font-weight: 700;
+    color: var(--jess-deep);
+    font-size: 2.1rem;
+    margin: 0;
+    line-height: 1.05;
+  }
+  .brief-top-sub {
+    font-family: 'Caveat', cursive;
+    font-style: italic;
+    color: var(--ink-light);
+    font-size: 1.15rem;
+    margin-top: 0.2rem;
+  }
+
+  .block-head {
+    display: flex; align-items: center; gap: 0.6rem;
+    margin-bottom: 0.45rem;
+  }
+  .block-head .block-title {
+    flex: 1;
+    font-family: 'Caveat', cursive;
+    font-style: italic;
+    color: var(--ink);
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+  .block-head .wc-pill.duration {
+    background: var(--wc-teal-soft);
+    color: var(--jess-deep);
+    font-size: 0.85rem;
+    padding: 0.2rem 0.7rem;
+    border: 1.5px solid var(--wc-teal-edge);
+    cursor: default;
+  }
+  .block-head .wc-bubble { font-size: 1.15rem; width: 2.2rem; height: 2.2rem; }
+  .block-meta {
+    font-family: 'Patrick Hand', sans-serif;
+    color: var(--ink-light);
+    font-size: 0.9rem;
+    margin-top: -0.2rem;
+    margin-bottom: 0.45rem;
+  }
+  .block-meta:empty { display: none; }
+
+  /* Hide page-level swim-banner header while a brief card is showing */
+  body.in-brief .header .swim-banner { display: none; }
+  body.in-brief .header h1,
+  body.in-brief .header .sub { display: none; }
+  body.in-brief .header {
+    min-height: 0;
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+    background: none;
+  }
+
+  /* === RESPONSIVE — side-by-side on tablet ≥768px ====================== */
+  @media (min-width: 768px) {
+    .wrap { max-width: 940px; }
+    #modal-main { max-width: 880px; }
+
+    /* Landing modal becomes a 2-column grid */
+    #modal-main .modal-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    /* These rows always span the full width even in 2-col mode */
+    #modal-main .modal-banner,
+    #modal-main > h2,
+    #modal-main > p:first-of-type,
+    #modal-main .modal-day-buttons,
+    #modal-main .modal-footer-band {
+      grid-column: 1 / -1;
+    }
+
+    /* Brief blocks tile in 2 columns */
+    .brief {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 0.9rem;
+    }
+    .brief > .full-width,
+    .brief > details,
+    .brief > .resume {
+      grid-column: 1 / -1;
+    }
+    .brief-top-illus { width: 150px; }
+    .brief-top-title { font-size: 2.4rem; }
+  }
 </style>
 
 
@@ -1897,24 +2004,25 @@
     
     <div class="modal-day-buttons" id="modal-days"></div>
 
-    <div class="week-summary" id="week-summary"></div>
-
-    <div class="tracker-reminder" id="tracker-reminder"></div>
-
-    <div class="modal-session-picker" id="modal-session-picker">
-      <div class="label">Choose today's activity:</div>
-      <div class="session-btns" id="session-btns"></div>
-    </div>
-    
-    <div class="modal-confirm-msg" id="modal-msg"></div>
-    
-    <button class="modal-btn" id="modal-confirm-btn" disabled>
-      Let's Go! 💪
-    </button>
-
-    <div class="modal-secondary-btns">
-      <button id="btn-open-progress">📈 Progress</button>
-      <button id="btn-open-winsgroup">🏆 Wins</button>
+    <div class="modal-grid">
+      <div class="modal-col modal-col-left">
+        <div class="week-summary" id="week-summary"></div>
+        <div class="modal-session-picker" id="modal-session-picker">
+          <div class="label">Choose today's activity:</div>
+          <div class="session-btns" id="session-btns"></div>
+        </div>
+      </div>
+      <div class="modal-col modal-col-right">
+        <div class="tracker-reminder" id="tracker-reminder"></div>
+        <div class="modal-confirm-msg" id="modal-msg"></div>
+        <button class="modal-btn" id="modal-confirm-btn" disabled>
+          Let's Go! 💪
+        </button>
+        <div class="modal-secondary-btns">
+          <button id="btn-open-progress">📈 Progress</button>
+          <button id="btn-open-winsgroup">🏆 Wins</button>
+        </div>
+      </div>
     </div>
 
     <div class="modal-footer-band">
@@ -2267,18 +2375,46 @@ const SKIP_HISTORY_KEY   = "swimTrainingSkipHistoryV2";
 const ENGAGE_KEY         = "swimEngagementPickV2";
 const SKIP_RETENTION_MS  = 7 * 24 * 60 * 60 * 1000;
 const DONE_HOLD_MS       = 1000;
-const ENCOURAGEMENTS = [
-  "Strong finish. Great focus.",
-  "That was awesome effort.",
-  "You are leveling up.",
-  "Clean round. Keep rolling.",
-  "Big energy. Nice work.",
-  "That control was excellent.",
-  "Power and calm. Great combo.",
-  "You stayed disciplined. Love it.",
-  "That round looked solid.",
-  "High quality effort right there."
-];
+const ENCOURAGEMENTS_BY_STYLE = {
+  classic: [
+    "Strong finish.",
+    "Good control on that set.",
+    "Clean round. Stay steady.",
+    "Solid effort.",
+    "Discipline is showing. Nice work.",
+    "Power and calm. Good combo.",
+    "That round looked sharp.",
+    "Quality work.",
+    "Hold your line.",
+    "Keep the form tidy."
+  ],
+  fun: [
+    "Boom. That was awesome!",
+    "Level up unlocked!",
+    "Big energy. Love it!",
+    "You're a beast — keep rolling!",
+    "Crushing it. High five!",
+    "Whoa, that was clean!",
+    "Sparkly form. So good!",
+    "You stayed cool under pressure. Nice!",
+    "Banger of a round!",
+    "That was straight up fire!"
+  ],
+  encouraging: [
+    "You're doing great. Keep going.",
+    "Every rep counts. Proud of you.",
+    "One round at a time. You've got this.",
+    "Breathe — you're strong.",
+    "Trust the work. It's adding up.",
+    "Steady. Strong. Calm.",
+    "You showed up. That matters.",
+    "Small wins build big wins.",
+    "Your body remembers. Keep teaching it.",
+    "Soft hands, strong core. Beautiful."
+  ]
+};
+// Back-compat: kept so any stray reference still works.
+const ENCOURAGEMENTS = ENCOURAGEMENTS_BY_STYLE.classic;
 const PRONUNCIATION_MAP = {
   "Pallof Press (band)": "Pal-off Press, band",
   "Pallof Press": "Pal-off Press",
@@ -2684,7 +2820,7 @@ const DAYS = {
     theme: "Anti-Rotation + Posterior",
     mantra: "I am SHARP. I am STRONG. I can SWIM THIS.",
     poolLoad: "double",
-    defaultLight: "yellow",
+    defaultLight: "green",
     timeLo: 18, timeHi: 18,
     equipment: ["Resistance band", "Dowel", "Mat"],
     prSentinel: "Hollow Tuck Flutter — seconds held flat",
@@ -2746,7 +2882,7 @@ const DAYS = {
     theme: "Rhythm + Dynamic",
     mantra: "Practice makes perfect.",
     poolLoad: "pm",
-    defaultLight: "yellow",
+    defaultLight: "green",
     timeLo: 20, timeHi: 20,
     equipment: ["Jump rope", "Pull-up bar", "Mat"],
     prSentinel: "Drop-and-Stick — clean landings out of 5",
@@ -2804,7 +2940,7 @@ const DAYS = {
     theme: "Pull-Up Rest + Control",
     mantra: "I am SHARP. I am FAST. I can SWIM THIS.",
     poolLoad: "pm",
-    defaultLight: "yellow",
+    defaultLight: "green",
     timeLo: 19, timeHi: 19,
     equipment: ["Resistance band", "Mat"],
     prSentinel: "Hollow Tuck Flutter — seconds held flat",
@@ -3110,10 +3246,18 @@ function ensureAudio() {
   if (audioCtx.state === "suspended") audioCtx.resume();
 }
 
+const VOICE_PERSONA = {
+  classic:     { rate: 1.00, pitch: 1.00 },
+  fun:         { rate: 1.12, pitch: 1.15 },
+  encouraging: { rate: 0.94, pitch: 0.95 },
+  quiet:       { rate: 1.00, pitch: 1.00 }  // gated upstream — never reaches here
+};
 function createCoachUtterance(msg) {
   const u = new SpeechSynthesisUtterance(applyPronunciationMap(msg));
-  u.rate = VOICE_RATE;
-  u.pitch = VOICE_PITCH;
+  const style = (appSettings && appSettings.voiceStyle) || "classic";
+  const p = VOICE_PERSONA[style] || VOICE_PERSONA.classic;
+  u.rate  = VOICE_RATE  * p.rate;
+  u.pitch = VOICE_PITCH * p.pitch;
   if (_coachVoice) u.voice = _coachVoice;
   return u;
 }
@@ -4091,6 +4235,32 @@ function blockEmoji(b) { return (BLOCK_META[b] || {}).emoji || "•"; }
 function blockColor(b) { return (BLOCK_META[b] || {}).color || "var(--ink)"; }
 function lightColor(l) { return { green: "#7ee0b8", yellow: "#ffd166", red: "#ff8a7a", recovery: "#7fd0d8" }[l] || "#cccccc"; }
 
+// Rough per-circuit duration in seconds (work + per-ex rests + per-round rests).
+function estimateCircuitSecs(c) {
+  const restEx = (appSettings && appSettings.restEx) || 5;
+  const restRound = (appSettings && appSettings.restRound) || 25;
+  const rounds = c.rounds || 1;
+  const exList = c.exercises || [];
+  const exTotal = exList.reduce((s, ex) => {
+    if (ex.driver === "time" && ex.work) return s + ex.work;
+    if (ex.reps) return s + 25;
+    return s + 30;
+  }, 0);
+  const oneRound = exTotal + restEx * Math.max(0, exList.length - 1);
+  return oneRound * rounds + restRound * Math.max(0, rounds - 1);
+}
+
+// Centered watercolor header for the brief — uses swim-gear.png as the
+// clipboard+mat stand-in (no dedicated PNG available yet).
+function briefTopIllustration(title, subtitleParts) {
+  return `
+    <div class="brief-top full-width">
+      <img class="brief-top-illus" src="assets/swim-gear.png" alt="" aria-hidden="true">
+      <h2 class="brief-top-title">${title}</h2>
+      <div class="brief-top-sub">${subtitleParts.filter(Boolean).join(" · ")}</div>
+    </div>`;
+}
+
 // Persistence keys + tiny JSON helpers (2026.2 records)
 const LS_READINESS   = "swim_readiness";
 const LS_DAYPROG     = "swim_day_progress";
@@ -4229,28 +4399,39 @@ function renderSpaBrief(day) {
     `<li class="ex-line"><span>${r.name}</span><span class="ex-meta">${r.dose}</span></li>`).join("");
   const holdsHtml = (day.recoveryHolds || []).map(h =>
     `<li class="ex-line"><span>${h.name}${howToHtml(h.name, "swimskill")}</span><span class="ex-meta">${h.dose || ""}</span></li>`).join("");
+  document.body.classList.add("in-brief");
   document.getElementById("main-card").innerHTML = `
-    <div class="day-header">
-      <span class="day-badge">${day.badge}</span>
-      <h2 class="day-title">${day.title}</h2>
-      <div class="day-subtitle">${day.subtitle}</div>
-    </div>
-    <div class="mantra">"${day.mantra}"</div>
+    ${briefTopIllustration(day.title, [day.badge, day.subtitle])}
+    <div class="mantra full-width">"${day.mantra}"</div>
     <div class="brief">
-      <div class="brief-section safety">
-        <strong>⚠️ Safety</strong>
+      <div class="brief-section safety full-width">
+        <div class="block-head">
+          <span class="wc-bubble yellow">⚠️</span>
+          <strong class="block-title">Safety</strong>
+        </div>
         <div class="caveat-note" style="margin:0.2rem 0 0;">${day.safety}</div>
       </div>
       <div class="brief-section">
-        <strong>🧊 Recovery menu</strong> · ~${day.timeLo}–${day.timeHi} min
+        <div class="block-head">
+          <span class="wc-bubble teal">🧊</span>
+          <strong class="block-title">Recovery menu</strong>
+          <span class="wc-pill duration">~${day.timeLo}–${day.timeHi} min</span>
+        </div>
         <ul>${rollHtml}</ul>
       </div>
       <div class="brief-section">
-        <strong>🧘 Recovery holds</strong> · gentle
+        <div class="block-head">
+          <span class="wc-bubble lavender">🧘</span>
+          <strong class="block-title">Recovery holds</strong>
+          <span class="wc-pill duration">gentle</span>
+        </div>
         <ul>${holdsHtml}</ul>
       </div>
       <div class="brief-section">
-        <strong>🌬️ Breathing</strong>
+        <div class="block-head">
+          <span class="wc-bubble mint">🌬️</span>
+          <strong class="block-title">Breathing</strong>
+        </div>
         <div class="caveat-note" style="margin:0.2rem 0 0;">3-count nasal breathing — in through the nose 3, out through the mouth 3.</div>
       </div>
       ${renderSundayTouch()}
@@ -4323,13 +4504,23 @@ function renderBrief(data) {
         <span>${ex.name}${howToHtml(ex.name, c.block)}${exBadges(ex, locked)}</span>
         <span class="ex-meta">${exMeta(ex)}</span></li>`;
     }).join("");
-    const roundTag = c.block === "main" ? ` · ${c.rounds} round${c.rounds > 1 ? "s" : ""}` : " · no rounds";
+    const roundTag = c.block === "main" ? `${c.rounds} round${c.rounds > 1 ? "s" : ""}` : "";
+    const dur = fmtEstimate(estimateCircuitSecs(c));
     return `<div class="brief-section block-card" style="border-left:6px solid ${blockColor(c.block)}">
-      <strong>${blockEmoji(c.block)} ${c.name}</strong> ${zoneChip(c.block)}${roundTag}
+      <div class="block-head">
+        <span class="wc-bubble" style="background:${blockColor(c.block)}33;color:${blockColor(c.block)};">${blockEmoji(c.block)}</span>
+        <strong class="block-title">${c.name}</strong>
+        <span class="wc-pill duration">${dur}</span>
+      </div>
+      <div class="block-meta">${zoneChip(c.block)}${roundTag ? ` · ${roundTag}` : ""}</div>
       <ul>${exHtml}</ul></div>`;
   }).join("");
 
-  const eqHtml = `<div class="brief-section"><strong>📦 Equipment</strong>
+  const eqHtml = `<div class="brief-section">
+    <div class="block-head">
+      <span class="wc-bubble peach">📦</span>
+      <strong class="block-title">Equipment</strong>
+    </div>
     <ul>${data.equipment.map(e => `<li>${e}</li>`).join("")}</ul></div>`;
 
   const poolText = { none: "No pool", am: "AM pool", pm: "PM pool", double: "Double pool" }[day.poolLoad] || "";
@@ -4371,24 +4562,30 @@ function renderBrief(data) {
     }
   }
 
+  document.body.classList.add("in-brief");
+  const subtitleLine = `${data.subtitle} · ⏱ ${day.timeLo}–${day.timeHi} min`;
   document.getElementById("main-card").innerHTML = `
-    <div class="day-header">
-      <span class="day-badge">${data.badge}</span>
-      <h2 class="day-title">${data.title}</h2>
-      <div class="day-subtitle">${data.subtitle} · ⏱ ${day.timeLo}–${day.timeHi} min (cap 35)</div>
-    </div>
-    <div class="mantra">"${data.mantra}"</div>
+    ${briefTopIllustration(data.title, [data.badge, subtitleLine])}
+    <div class="mantra full-width">"${data.mantra}"</div>
     <div class="brief">
-      <div class="brief-section" style="border-left:6px solid ${lightColor(effectiveLight())};">
-        <strong>🏊 ${poolText} · ${effectiveLight().toUpperCase()} light</strong>
+      <div class="brief-section full-width" style="border-left:6px solid ${lightColor(effectiveLight())};">
+        <div class="block-head">
+          <span class="wc-bubble" style="background:${lightColor(effectiveLight())}33;color:${lightColor(effectiveLight())};">🏊</span>
+          <strong class="block-title">${poolText} · ${effectiveLight().toUpperCase()} light</strong>
+        </div>
         ${ropeNote}
       </div>
-      ${showAm ? `<div class="brief-section block-card" style="border-left:6px solid ${blockColor("amActivation")}"><strong>🌅 AM Micro-Activation</strong> · ~4–5 min, at home before the pool
+      ${showAm ? `<div class="brief-section block-card" style="border-left:6px solid ${blockColor("amActivation")}">
+        <div class="block-head">
+          <span class="wc-bubble" style="background:${blockColor("amActivation")}33;color:${blockColor("amActivation")};">🌅</span>
+          <strong class="block-title">AM Micro-Activation</strong>
+          <span class="wc-pill duration">~5 min</span>
+        </div>
         <div class="caveat-note" style="margin:0.2rem 0 0;">Wakes the system — not a workout. Optional, run it standalone.</div></div>` : ""}
       ${eqHtml}
       ${resumeHtml}
       ${circuitsHtml}
-      ${grownupHtml}
+      <div class="full-width">${grownupHtml}</div>
     </div>
     <div class="caveat-note" style="text-align:center;">
       📱 Put your phone on the floor where you can see it — then leave it there.
@@ -4499,15 +4696,15 @@ function openReadiness() {
 }
 
 function renderRecoveryOnly() {
+  document.body.classList.add("in-brief");
   document.getElementById("main-card").innerHTML = `
-    <div class="day-header">
-      <span class="day-badge">🛟</span>
-      <h2 class="day-title">Recovery Only Today</h2>
-      <div class="day-subtitle">Any pain, dizziness, or a rough day — that's a STOP.</div>
-    </div>
+    ${briefTopIllustration("Recovery Only Today", ["🛟", "Any pain, dizziness, or a rough day — that's a STOP."])}
     <div class="brief">
-      <div class="brief-section">
-        <strong>What to do now</strong>
+      <div class="brief-section full-width">
+        <div class="block-head">
+          <span class="wc-bubble peach">🛟</span>
+          <strong class="block-title">What to do now</strong>
+        </div>
         <ul>
           <li>Stop — no main circuit today.</li>
           <li>Tell a parent how you feel.</li>
@@ -4633,6 +4830,7 @@ function celebrate(emojis) {
 }
 
 function renderSessionShell(data) {
+  document.body.classList.remove("in-brief");
   const card = document.getElementById("main-card");
   card.classList.add("session-active");
   const isEvening = selectedSession === "evening";
@@ -5025,8 +5223,10 @@ function saveSkipHistory() {
   writeStorage(SKIP_HISTORY_KEY, skipHistory);
 }
 function nextEncouragement() {
-  const options = ENCOURAGEMENTS.filter(msg => msg !== lastEncouragement);
-  const chosen = options[Math.floor(Math.random() * options.length)] || ENCOURAGEMENTS[0];
+  const style = (appSettings && appSettings.voiceStyle) || "classic";
+  const pool  = ENCOURAGEMENTS_BY_STYLE[style] || ENCOURAGEMENTS_BY_STYLE.classic;
+  const options = pool.filter(msg => msg !== lastEncouragement);
+  const chosen = options[Math.floor(Math.random() * options.length)] || pool[0];
   lastEncouragement = chosen;
   return chosen;
 }
