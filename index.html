@@ -781,6 +781,40 @@
   .modal-secondary-btns {
     display: flex; gap: 0.5rem; margin-top: 0.6rem;
   }
+  .subview-tabs {
+    display: flex; gap: 0.4rem; margin: 0 0 0.8rem;
+    flex-wrap: wrap;
+  }
+  .subview-tabs button {
+    flex: 1; min-width: 80px;
+    font-family: 'Patrick Hand', sans-serif; font-size: 0.95rem;
+    padding: 0.45rem 0.4rem;
+    border: 2px solid var(--ink); border-radius: var(--radius-sm);
+    background: var(--paper); color: var(--ink);
+    box-shadow: 2px 2px 0 var(--ink); cursor: pointer;
+  }
+  .subview-tabs button:hover {
+    background: var(--bg2);
+    transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink);
+  }
+  .subview-tabs button.active {
+    background: var(--jess); color: white; font-weight: 700;
+    cursor: default;
+  }
+  .subview-tabs button.active:hover {
+    transform: none; box-shadow: 2px 2px 0 var(--ink);
+  }
+  .subview-footer {
+    display: flex; justify-content: center; margin-top: 0.8rem;
+  }
+  .link-btn {
+    background: none; border: none; box-shadow: none;
+    padding: 0.3rem 0.5rem;
+    font-family: 'Caveat', cursive; font-size: 1.05rem;
+    color: var(--jess-deep); cursor: pointer;
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+  .link-btn:hover { color: var(--ink); }
   .modal-secondary-btns button {
     flex: 1; font-family: 'Patrick Hand', sans-serif; font-size: 1rem;
     padding: 0.5rem 0.4rem; border: 2px solid var(--ink);
@@ -1248,17 +1282,18 @@
     </button>
 
     <div class="modal-secondary-btns">
-      <button id="btn-open-wins">🌟 My Wins</button>
-      <button id="btn-open-tracker">📊 4-Week Progress</button>
-      <button id="btn-open-history">📅 Last 7 Sessions</button>
-      <button id="btn-open-achievements">🏅 Achievements</button>
-      <button id="btn-open-insights">📈 Coach Insights</button>
-      <button id="btn-reset-week" title="Clear this week's session times">🔄 Reset Week</button>
+      <button id="btn-open-progress">📈 Progress</button>
+      <button id="btn-open-winsgroup">🏆 Wins</button>
     </div>
   </div>
 
   <!-- Tracker view -->
   <div class="modal" id="modal-tracker" role="dialog" aria-modal="true" aria-labelledby="modal-tracker-title" style="display:none; max-width: 560px;">
+    <nav class="subview-tabs" aria-label="Progress sections">
+      <button class="active" data-tab="tracker">📊 4-Week</button>
+      <button data-tab="history">📅 Last 7</button>
+      <button data-tab="insights">📈 Insights</button>
+    </nav>
     <h2 id="modal-tracker-title">📊 PR Board — 4 Weeks</h2>
     <p>Beat last week. Same metric, same day — numbers only, no judgment.</p>
 
@@ -1274,10 +1309,18 @@
       <button id="btn-tracker-back">← Back</button>
       <button id="btn-tracker-save" class="btn-evening">Save</button>
     </div>
+    <div class="subview-footer">
+      <button class="link-btn" id="btn-reset-week" title="Clear this week's session times">↺ Reset this week's times</button>
+    </div>
   </div>
 
   <!-- History view: last 7 sessions from Firestore -->
   <div class="modal" id="modal-history" role="dialog" aria-modal="true" aria-labelledby="modal-history-title" style="display:none; max-width: 540px;">
+    <nav class="subview-tabs" aria-label="Progress sections">
+      <button data-tab="tracker">📊 4-Week</button>
+      <button class="active" data-tab="history">📅 Last 7</button>
+      <button data-tab="insights">📈 Insights</button>
+    </nav>
     <h2 id="modal-history-title">📅 Last 7 Sessions</h2>
     <p>Your recent training, pulled from the cloud.</p>
     <div id="history-list-slot"><div class="history-empty">Loading…</div></div>
@@ -1288,6 +1331,10 @@
 
   <!-- Achievements view -->
   <div class="modal" id="modal-achievements" role="dialog" aria-modal="true" aria-labelledby="modal-ach-title" style="display:none; max-width: 580px; overflow-y: auto; max-height: 90vh;">
+    <nav class="subview-tabs" aria-label="Wins sections">
+      <button data-tab="wins">🌟 My Wins</button>
+      <button class="active" data-tab="achievements">🏅 Achievements</button>
+    </nav>
     <h2 id="modal-ach-title">🏅 Achievements</h2>
     <p>Keep going — every session counts!</p>
     <div id="ach-content"><div class="history-empty">Loading…</div></div>
@@ -1298,6 +1345,10 @@
 
   <!-- Athlete motivational view: My Wins -->
   <div class="modal" id="modal-wins" role="dialog" aria-modal="true" aria-labelledby="modal-wins-title" style="display:none; max-width: 560px; overflow-y: auto; max-height: 90vh;">
+    <nav class="subview-tabs" aria-label="Wins sections">
+      <button class="active" data-tab="wins">🌟 My Wins</button>
+      <button data-tab="achievements">🏅 Achievements</button>
+    </nav>
     <h2 id="modal-wins-title">🌟 My Wins</h2>
     <p>Look how far you've come, Jess!</p>
     <div id="wins-content"><div class="history-empty">Loading…</div></div>
@@ -1308,6 +1359,11 @@
 
   <!-- Coach/parent diagnostic view: Insights -->
   <div class="modal" id="modal-insights" role="dialog" aria-modal="true" aria-labelledby="modal-insights-title" style="display:none; max-width: 620px; overflow-y: auto; max-height: 92vh;">
+    <nav class="subview-tabs" aria-label="Progress sections">
+      <button data-tab="tracker">📊 4-Week</button>
+      <button data-tab="history">📅 Last 7</button>
+      <button class="active" data-tab="insights">📈 Insights</button>
+    </nav>
     <h2 id="modal-insights-title">📈 Coach Insights</h2>
     <p>Diagnostics from logged training data — for the grown-ups.</p>
     <div id="insights-content"><div class="history-empty">Crunching the numbers…</div></div>
@@ -2649,17 +2705,29 @@ function initModal() {
   renderModalWeekSummary();
   renderModalTrackerReminder();
 
-  // Wire secondary buttons
-  document.getElementById("btn-open-wins").onclick        = openWinsView;
-  document.getElementById("btn-open-tracker").onclick     = openTrackerView;
-  document.getElementById("btn-open-history").onclick     = openHistoryView;
-  document.getElementById("btn-open-achievements").onclick = openAchievementsView;
-  document.getElementById("btn-open-insights").onclick    = openInsightsView;
+  // Wire consolidated secondary buttons
+  document.getElementById("btn-open-progress").onclick   = openTrackerView;
+  document.getElementById("btn-open-winsgroup").onclick  = openWinsView;
   document.getElementById("btn-reset-week").onclick = () => {
     if (!confirm("Reset this week's session times? (Tracker data is kept.)")) return;
     clearThisWeekSessions();
     renderModalWeekSummary();
   };
+  // Wire subview tabs — each .subview-tabs button[data-tab] opens its matching view
+  const TAB_OPENERS = {
+    tracker: openTrackerView,
+    history: openHistoryView,
+    insights: openInsightsView,
+    wins: openWinsView,
+    achievements: openAchievementsView
+  };
+  document.querySelectorAll(".subview-tabs button[data-tab]").forEach(btn => {
+    btn.onclick = () => {
+      if (btn.classList.contains("active")) return;
+      const fn = TAB_OPENERS[btn.dataset.tab];
+      if (fn) fn();
+    };
+  });
   document.getElementById("btn-tracker-back").onclick = closeAllSubViews;
   document.getElementById("btn-tracker-save").onclick = saveTrackerFromUI;
   document.getElementById("btn-history-back").onclick = closeAllSubViews;
@@ -2732,7 +2800,7 @@ function renderModalTrackerReminder() {
   if (missing.length > 0 && week > 0) {
     reminderBody += `
       <div class="tr-body" style="margin-top: 0.4rem;">
-        💡 Week ${week} still needs: <strong>${missing.join(", ")}</strong>. Tap "📊 Progress" to log.
+        💡 Week ${week} still needs: <strong>${missing.join(", ")}</strong>. Tap "📈 Progress" to log.
       </div>`;
   }
   document.getElementById("tracker-reminder").innerHTML =
