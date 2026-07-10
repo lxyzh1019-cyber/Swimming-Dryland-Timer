@@ -6,11 +6,13 @@
    delegated click listener below.
    ============================================================ */
 
-import { migrate, settings, updateSettings } from "./store.js";
+import { migrate, settings, updateSettings, saveReadiness } from "./store.js";
 import { edmontonDayKey } from "./util.js";
 import { buildTodayVM, journeyPathScrollIntoView } from "./vm/today.js";
 import { todayWide, todayNarrow } from "./screens/today.js";
 import { page, shellWithRail, bottomNav } from "./screens/shell.js";
+import { newReadinessFlow, answerQuestion, sameAsYesterday, setZoneSev, resetBodyCheck, buildReadinessVM } from "./vm/readiness.js";
+import { readinessScreen } from "./screens/readiness.js";
 
 export const state = {
   nav: "today",                 // 'today' | 'progress' | 'grownup'
@@ -63,10 +65,19 @@ function renderPlaceholder(title) {
     : `<div style="background:var(--surface);border-radius:24px;box-shadow:0 14px 34px rgba(20,59,74,0.16);display:flex;">${inner}</div>` + bottomNav(vm));
 }
 
+function renderReadiness() {
+  const vm = buildReadinessVM(state.readiness, state.isWide);
+  root.innerHTML = page(readinessScreen(vm));
+}
+
 export function render() {
   state.isWide = computeIsWide();
-  if (state.readiness) { renderPlaceholder("Readiness check"); return; }
-  if (state.inSession) { renderPlaceholder("Session"); return; }
+  if (state.readiness) { renderReadiness(); return; }
+  if (state.inSession) {
+    const p = state.pendingSession || {};
+    renderPlaceholder(`Session — ${p.dayKey || ""} · ${p.light || "green"}${p.mini ? " · mini" : ""}${p.practice ? " · try-it" : ""}`);
+    return;
+  }
   if (state.nav === "progress") { renderPlaceholder("Progress"); return; }
   if (state.nav === "grownup") { renderPlaceholder("Grown-up zone"); return; }
   renderToday();
@@ -81,26 +92,66 @@ const actions = {
   toggleCoachVoice() { updateSettings({ coachVoiceOn: !settings.coachVoiceOn }); render(); },
   togglePractice() { state.practiceMode = !state.practiceMode; render(); },
   goSession(arg) {
-    state.readiness = { dayKey: arg || state.selectedDay || edmontonDayKey(), practice: state.practiceMode };
+    state.readiness = newReadinessFlow(arg || state.selectedDay || edmontonDayKey(), state.practiceMode);
     render();
   },
   goSessionPractice(arg) {
-    state.readiness = { dayKey: arg || state.selectedDay || edmontonDayKey(), practice: true };
+    state.readiness = newReadinessFlow(arg || state.selectedDay || edmontonDayKey(), true);
     render();
   },
   startMini(arg) {
-    state.pendingSession = { light: "green", dayKey: arg || state.selectedDay, mini: true, practice: state.practiceMode };
-    render();
+    startPendingSession({ light: "green", dayKey: arg || state.selectedDay, mini: true, practice: state.practiceMode });
   },
   startQuizDeck() {
     state.quizDeck = { pending: true };   // built out in Phase 4
     render();
+  },
+
+  /* ---- readiness flow ---- */
+  rAnswer(arg) {
+    const [id, val] = arg.split("|");
+    answerQuestion(state.readiness, id, val);
+    render();
+  },
+  rSameYesterday() { sameAsYesterday(state.readiness); render(); },
+  rPickZone(arg) { state.readiness.pendingZone = Number(arg); render(); },
+  rSetZoneSev(arg) {
+    const [num, level] = arg.split("|").map(Number);
+    setZoneSev(state.readiness, num, level);
+    render();
+  },
+  rClosePopup() { state.readiness.pendingZone = null; render(); },
+  rGoBack() { state.readiness.step = "questions"; render(); },
+  rPickLight(arg) { state.readiness.light = arg; state.readiness.overridden = true; render(); },
+  rExit() { state.readiness = null; render(); },
+  rResultCta(arg) {
+    const r = state.readiness;
+    if (arg === "back") { state.readiness = null; render(); return; }
+    if (arg === "retry") { resetBodyCheck(r); render(); return; }
+    // continue: persist the check, then hand the resolved light to the session
+    saveReadiness({ answers: r.answers, zoneSev: r.zoneSev, light: r.light, overridden: r.overridden });
+    startPendingSession({ light: r.light || "green", dayKey: r.dayKey, practice: r.practice });
+  },
+  rResultSecondary(arg) {
+    if (arg === "retry") { resetBodyCheck(state.readiness); render(); }
+    else { state.readiness = null; render(); }
   }
 };
+
+function startPendingSession(pending) {
+  state.readiness = null;
+  state.pendingSession = pending;
+  state.inSession = true;   // Phase 3 replaces the placeholder with the real engine
+  render();
+}
 
 root.addEventListener("click", e => {
   const el = e.target.closest("[data-action]");
   if (!el || !root.contains(el)) return;
+  // A data-stop-propagation wrapper (e.g. a modal card inside a click-to-close
+  // overlay) swallows clicks that would otherwise trigger its ancestor's action.
+  const stopEl = e.target.closest("[data-stop-propagation]");
+  if (stopEl && el.contains(stopEl) && el !== stopEl) return;
   const fn = actions[el.dataset.action];
   if (fn) { e.preventDefault(); fn(el.dataset.arg, el); }
 });
