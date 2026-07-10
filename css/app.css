@@ -1,0 +1,63 @@
+/* ============================================================
+   Splash app chrome — everything the inline-styled screens can't
+   carry themselves: page reset, scrollbars, shared keyframes,
+   candy buttons, and the reduced-motion reset.
+   Design tokens live in css/tokens/ (authoritative, verbatim).
+   ============================================================ */
+
+html, body { margin: 0; padding: 0; background: var(--bg, #E2F8FE); }
+body { font-family: var(--font-ui); color: var(--ink); -webkit-font-smoothing: antialiased; }
+* { box-sizing: border-box; }
+button { font-family: inherit; }
+img { max-width: 100%; }
+
+/* Journey rail scrollbar — thin + translucent so it doesn't fight the map art */
+[data-journey-rail]::-webkit-scrollbar { width: 6px; }
+[data-journey-rail]::-webkit-scrollbar-track { background: transparent; }
+[data-journey-rail]::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.35); border-radius: 6px; }
+[data-tab-scroll]::-webkit-scrollbar { display: none; }
+
+/* Blended horizontal rail scrollbar — subtle aqua thumb on a transparent track */
+[data-rail] { scrollbar-width: thin; scrollbar-color: rgba(6,182,212,0.32) transparent; scroll-behavior: smooth; }
+[data-rail]::-webkit-scrollbar { height: 8px; }
+[data-rail]::-webkit-scrollbar-track { background: transparent; margin: 0 8px; }
+[data-rail]::-webkit-scrollbar-thumb { background: rgba(6,182,212,0.28); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+[data-rail]:hover::-webkit-scrollbar-thumb { background: rgba(6,182,212,0.45); background-clip: padding-box; }
+.rail-wrap { position: relative; }
+.rail-wrap::after { content: ""; position: absolute; top: 0; right: 0; bottom: 10px; width: 44px; pointer-events: none; background: linear-gradient(to right, transparent, var(--surface)); border-radius: 0 var(--radius-xl) var(--radius-xl) 0; }
+
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes mapPulse { 0%, 100% { box-shadow: 0 0 0 5px rgba(255,255,255,0.25); } 50% { box-shadow: 0 0 0 10px rgba(255,255,255,0.08); } }
+
+/* Candy button — solid bottom edge in the color's deep shade; hover lifts,
+   press sinks onto the edge. Colors come via CSS vars set inline per button:
+   --candy-bg / --candy-deep / --candy-text. */
+.candy {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--tap-min, 56px);
+  padding: 0 26px;
+  background: var(--candy-bg, var(--action-bg));
+  color: var(--candy-text, var(--text-on-aqua));
+  border: none; border-radius: var(--radius-pill, 999px);
+  font-family: var(--font-ui); font-weight: 900; font-size: 18px;
+  cursor: pointer;
+  box-shadow: 0 var(--edge-depth, 4px) 0 var(--candy-deep, var(--action-deep));
+  transition: transform var(--dur-fast, 140ms) var(--ease-out, ease-out),
+              box-shadow var(--dur-fast, 140ms) var(--ease-out, ease-out);
+}
+.candy:hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--candy-deep, var(--action-deep)); }
+.candy:active { transform: translateY(2px); box-shadow: 0 var(--edge-press, 2px) 0 var(--candy-deep, var(--action-deep)); }
+.candy:disabled { opacity: 0.55; cursor: default; transform: none; }
+
+/* Ghost/utility buttons reset */
+.bare-btn { background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; color: inherit; }
+
+/* All motion off under prefers-reduced-motion (token file also resets its keyframes) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
