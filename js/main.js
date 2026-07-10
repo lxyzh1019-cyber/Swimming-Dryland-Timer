@@ -13,6 +13,9 @@ import { todayWide, todayNarrow } from "./screens/today.js";
 import { page, shellWithRail, bottomNav } from "./screens/shell.js";
 import { newReadinessFlow, answerQuestion, sameAsYesterday, setZoneSev, resetBodyCheck, buildReadinessVM } from "./vm/readiness.js";
 import { readinessScreen } from "./screens/readiness.js";
+import * as engine from "./engine.js";
+import { buildSessionVM } from "./vm/session.js";
+import { sessionScreen, updateSessionTick } from "./screens/session.js";
 
 export const state = {
   nav: "today",                 // 'today' | 'progress' | 'grownup'
@@ -70,14 +73,21 @@ function renderReadiness() {
   root.innerHTML = page(readinessScreen(vm));
 }
 
+function renderSession() {
+  const vm = buildSessionVM(state);
+  root.innerHTML = page(sessionScreen(vm));
+}
+
+engine.onSessionUpdate(kind => {
+  if (!state.inSession) return;
+  if (kind === "tick") updateSessionTick(buildSessionVM(state));
+  else renderSession();
+});
+
 export function render() {
   state.isWide = computeIsWide();
   if (state.readiness) { renderReadiness(); return; }
-  if (state.inSession) {
-    const p = state.pendingSession || {};
-    renderPlaceholder(`Session — ${p.dayKey || ""} · ${p.light || "green"}${p.mini ? " · mini" : ""}${p.practice ? " · try-it" : ""}`);
-    return;
-  }
+  if (state.inSession) { renderSession(); return; }
   if (state.nav === "progress") { renderPlaceholder("Progress"); return; }
   if (state.nav === "grownup") { renderPlaceholder("Grown-up zone"); return; }
   renderToday();
@@ -135,14 +145,51 @@ const actions = {
   rResultSecondary(arg) {
     if (arg === "retry") { resetBodyCheck(state.readiness); render(); }
     else { state.readiness = null; render(); }
+  },
+
+  /* ---- session controls (delegate to the engine) ---- */
+  advance() { engine.advance(); },
+  pauseTimer() { engine.togglePause(); },
+  skipEx() { engine.skipCurrentExercise(); },
+  stopNow() { engine.openStopOverlay(); },
+  resumeFromStop() { engine.resumeFromStop(); },
+  endFromStop() { engine.endFromStop(); },
+  askEnd() { engine.sess.confirmEnd = true; render(); },
+  cancelEnd() { engine.sess.confirmEnd = false; render(); },
+  confirmEndEarly() { engine.endEarly(); },
+  pickIntent(arg) { engine.pickIntentWord(arg); },
+  answerMicro(arg) { engine.answerMicroLoop(arg); },
+  pickClean() { engine.pickClean(); },
+  pickWobbly() { engine.pickWobbly(); },
+  pickMood(arg) { const [key, emoji] = arg.split("|"); engine.setMood(key, emoji); },
+  reflectWell(arg) { engine.setReflect("wentWell", arg); },
+  reflectNext(arg) { engine.setReflect("nextTime", arg); },
+  quizPick(arg) { engine.setQuizPick(Number(arg)); },
+  openDetailCur() { state.detailEx = engine.sess.currentEx; state.detailOverlay = true; render(); },
+  openDetailAt(arg) {
+    const [ci, ei] = arg.split("|").map(Number);
+    const c = engine.sess.circuits[ci];
+    if (c && c.exercises[ei]) { state.detailEx = c.exercises[ei]; state.detailOverlay = true; render(); }
+  },
+  closeDetail() { state.detailOverlay = false; state.detailEx = null; render(); },
+  openPrizeDraw() { state.prizeDraw = { pending: true }; render(); },  // built out in Phase 4
+  exitSession() {
+    engine.exitSession();
+    state.inSession = false;
+    state.pendingSession = null;
+    state.detailOverlay = false;
+    state.nav = "today";
+    state.selectedDay = edmontonDayKey();
+    render();
   }
 };
 
 function startPendingSession(pending) {
   state.readiness = null;
   state.pendingSession = pending;
-  state.inSession = true;   // Phase 3 replaces the placeholder with the real engine
+  state.inSession = true;
   render();
+  engine.startSession(pending);
 }
 
 root.addEventListener("click", e => {
