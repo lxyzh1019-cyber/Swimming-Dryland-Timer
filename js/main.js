@@ -17,6 +17,8 @@ import * as engine from "./engine.js";
 import { buildSessionVM } from "./vm/session.js";
 import { sessionScreen, updateSessionTick } from "./screens/session.js";
 import { buildQuizDeck, answerQuizDeck, finishQuizDeck, quizDeckHtml, newPrizeDraw, claimPrize, prizeDrawHtml } from "./screens/overlays.js";
+import { buildProgressVM, toggleRedeem } from "./vm/progress.js";
+import { progressScreen } from "./screens/progress.js";
 
 export const state = {
   nav: "today",                 // 'today' | 'progress' | 'grownup'
@@ -96,7 +98,13 @@ export function render() {
   state.isWide = computeIsWide();
   if (state.readiness) { renderReadiness(); }
   else if (state.inSession) { renderSession(); }
-  else if (state.nav === "progress") { renderPlaceholder("Progress"); }
+  else if (state.nav === "progress") {
+    const railVm = buildTodayVM(state);
+    const pvm = buildProgressVM(state);
+    root.innerHTML = page(state.isWide
+      ? shellWithRail(railVm, progressScreen(pvm))
+      : `<div style="display:flex;background:var(--surface);border-radius:24px;box-shadow:0 14px 34px rgba(20,59,74,0.16);overflow:hidden;">${progressScreen(pvm)}</div>` + bottomNav(railVm));
+  }
   else if (state.nav === "grownup") { renderPlaceholder("Grown-up zone"); }
   else { renderToday(); }
   const ov = overlaysHtml();
@@ -203,6 +211,8 @@ const actions = {
   },
   closeDetail() { state.detailOverlay = false; state.detailEx = null; render(); },
   openPrizeDraw() { state.prizeDraw = newPrizeDraw(); render(); },
+  redeemPrize(arg) { toggleRedeem(arg); render(); },
+  logScope(arg) { state.logScope = arg; render(); },
   exitSession() {
     engine.exitSession();
     state.inSession = false;
