@@ -59,21 +59,6 @@ function renderToday() {
   journeyPathScrollIntoView(root);
 }
 
-function renderPlaceholder(title) {
-  const vm = buildTodayVM(state);   // for the rail
-  const inner = `
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:40px;">
-      <div style="text-align:center;">
-        <img src="assets/poses/think.png" alt="" aria-hidden="true" style="height:120px;object-fit:contain;">
-        <div style="font-family:var(--font-display);font-weight:600;font-size:30px;color:var(--ink);margin-top:12px;">${title}</div>
-        <div style="font-size:15px;font-weight:700;color:var(--ink-soft);margin-top:6px;">Coming in the next build phase.</div>
-      </div>
-    </div>`;
-  root.innerHTML = page(state.isWide
-    ? shellWithRail(vm, inner)
-    : `<div style="background:var(--surface);border-radius:24px;box-shadow:0 14px 34px rgba(20,59,74,0.16);display:flex;">${inner}</div>` + bottomNav(vm));
-}
-
 function renderReadiness() {
   const vm = buildReadinessVM(state.readiness, state.isWide);
   root.innerHTML = page(readinessScreen(vm));
