@@ -1,0 +1,329 @@
+/* ============================================================
+   MAIN — app state, render dispatcher, event delegation, boot.
+   Screens are innerHTML render functions in js/screens/*; their
+   dynamic values come from pure view-model builders in js/vm/*.
+   Buttons carry data-action / data-arg attributes handled by one
+   delegated click listener below.
+   ============================================================ */
+
+import { migrate, settings, updateSettings, saveReadiness } from "./store.js";
+import { edmontonDayKey } from "./util.js";
+import { buildTodayVM, journeyPathScrollIntoView } from "./vm/today.js";
+import { todayWide, todayNarrow } from "./screens/today.js";
+import { page, shellWithRail, bottomNav } from "./screens/shell.js";
+import { newReadinessFlow, answerQuestion, sameAsYesterday, setZoneSev, resetBodyCheck, buildReadinessVM } from "./vm/readiness.js";
+import { readinessScreen } from "./screens/readiness.js";
+import * as engine from "./engine.js";
+import { buildSessionVM } from "./vm/session.js";
+import { sessionScreen, updateSessionTick } from "./screens/session.js";
+import { buildQuizDeck, answerQuizDeck, finishQuizDeck, quizDeckHtml, newPrizeDraw, claimPrize, prizeDrawHtml } from "./screens/overlays.js";
+import { buildProgressVM, toggleRedeem } from "./vm/progress.js";
+import { progressScreen } from "./screens/progress.js";
+import { buildGrownupVM, exportCsv } from "./vm/grownup.js";
+import { grownupScreen } from "./screens/grownup.js";
+import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick } from "./store.js";
+
+export const state = {
+  nav: "today",                 // 'today' | 'progress' | 'grownup'
+  grownupTab: "overview",       // 'overview' | 'analytics' | 'library' | 'settings' | 'coaching'
+  gsScope: "week",
+  logScope: "week",
+  expanded: {},                 // day-card block expansion
+  selectedDay: null,            // monday..sunday
+  practiceMode: false,
+  inSession: false,
+  readiness: null,              // active readiness-check flow state (null = not in flow)
+  pendingSession: null,         // { light, dayKey, mini?, practice? } — readiness → session handoff
+  quizDeck: null,
+  prizeDraw: null,
+  detailOverlay: false,
+  detailEx: null,
+  weather: null,                // { icon, temp, caption } once fetched
+  isWide: true
+};
+
+const root = document.getElementById("app");
+
+function computeIsWide() {
+  return window.innerWidth >= 900 && window.innerWidth > window.innerHeight;
+}
+
+/* ---- screen renderers (filled in phase by phase) ---- */
+
+function renderToday() {
+  const vm = buildTodayVM(state);
+  const inner = state.isWide
+    ? shellWithRail(vm, todayWide(vm))
+    : todayNarrow(vm) + bottomNav(vm);
+  root.innerHTML = page(inner);
+  journeyPathScrollIntoView(root);
+}
+
+function renderReadiness() {
+  const vm = buildReadinessVM(state.readiness, state.isWide);
+  root.innerHTML = page(readinessScreen(vm));
+}
+
+function renderSession() {
+  const vm = buildSessionVM(state);
+  root.innerHTML = page(sessionScreen(vm));
+}
+
+engine.onSessionUpdate(kind => {
+  if (!state.inSession) return;
+  if (kind === "tick") updateSessionTick(buildSessionVM(state));
+  else renderSession();
+});
+
+function overlaysHtml() {
+  let html = "";
+  if (state.quizDeck) html += quizDeckHtml(state.quizDeck);
+  if (state.prizeDraw) html += prizeDrawHtml(state.prizeDraw);
+  return html;
+}
+
+export function render() {
+  state.isWide = computeIsWide();
+  if (state.readiness) { renderReadiness(); }
+  else if (state.inSession) { renderSession(); }
+  else if (state.nav === "progress") {
+    const railVm = buildTodayVM(state);
+    const pvm = buildProgressVM(state);
+    root.innerHTML = page(state.isWide
+      ? shellWithRail(railVm, progressScreen(pvm))
+      : `<div style="display:flex;background:var(--surface);border-radius:24px;box-shadow:0 14px 34px rgba(20,59,74,0.16);overflow:hidden;">${progressScreen(pvm)}</div>` + bottomNav(railVm));
+  }
+  else if (state.nav === "grownup") {
+    const railVm = buildTodayVM(state);
+    const gvm = buildGrownupVM(state);
+    root.innerHTML = page(state.isWide
+      ? shellWithRail(railVm, grownupScreen(gvm))
+      : `<div style="display:flex;background:var(--surface);border-radius:24px;box-shadow:0 14px 34px rgba(20,59,74,0.16);overflow:hidden;">${grownupScreen(gvm)}</div>` + bottomNav(railVm));
+  }
+  else { renderToday(); }
+  const ov = overlaysHtml();
+  if (ov) root.insertAdjacentHTML("beforeend", ov);
+}
+
+/* ---- delegated actions ---- */
+
+const actions = {
+  nav(arg) { state.nav = arg; render(); },
+  selectDay(arg) { state.selectedDay = arg; state.expanded = {}; render(); },
+  toggleBlock(arg) { state.expanded[arg] = !state.expanded[arg]; render(); },
+  toggleCoachVoice() { updateSettings({ coachVoiceOn: !settings.coachVoiceOn }); render(); },
+  togglePractice() { state.practiceMode = !state.practiceMode; render(); },
+  goSession(arg) {
+    state.readiness = newReadinessFlow(arg || state.selectedDay || edmontonDayKey(), state.practiceMode);
+    render();
+  },
+  goSessionPractice(arg) {
+    state.readiness = newReadinessFlow(arg || state.selectedDay || edmontonDayKey(), true);
+    render();
+  },
+  startMini(arg) {
+    startPendingSession({ light: "green", dayKey: arg || state.selectedDay, mini: true, practice: state.practiceMode });
+  },
+  startQuizDeck() {
+    state.quizDeck = buildQuizDeck(8);
+    render();
+  },
+  answerQuizDeck(arg) {
+    answerQuizDeck(state.quizDeck, Number(arg));
+    render();
+  },
+  nextQuizDeck() {
+    const qd = state.quizDeck;
+    if (!qd) return;
+    if (qd.idx >= qd.qs.length - 1) { qd.done = true; finishQuizDeck(qd); }
+    else qd.idx += 1;
+    render();
+  },
+  exitQuizDeck() { state.quizDeck = null; render(); },
+  pickPrize(arg) {
+    if (state.prizeDraw && state.prizeDraw.picked == null) { state.prizeDraw.picked = Number(arg); render(); }
+  },
+  claimPrize() {
+    claimPrize(state.prizeDraw);
+    state.prizeDraw = null;
+    render();
+  },
+
+  /* ---- readiness flow ---- */
+  rAnswer(arg) {
+    const [id, val] = arg.split("|");
+    answerQuestion(state.readiness, id, val);
+    render();
+  },
+  rSameYesterday() { sameAsYesterday(state.readiness); render(); },
+  rPickZone(arg) { state.readiness.pendingZone = Number(arg); render(); },
+  rSetZoneSev(arg) {
+    const [num, level] = arg.split("|").map(Number);
+    setZoneSev(state.readiness, num, level);
+    render();
+  },
+  rClosePopup() { state.readiness.pendingZone = null; render(); },
+  rGoBack() { state.readiness.step = "questions"; render(); },
+  rPickLight(arg) { state.readiness.light = arg; state.readiness.overridden = true; render(); },
+  rExit() { state.readiness = null; render(); },
+  rResultCta(arg) {
+    const r = state.readiness;
+    if (arg === "back") { state.readiness = null; render(); return; }
+    if (arg === "retry") { resetBodyCheck(r); render(); return; }
+    // continue: persist the check, then hand the resolved light to the session
+    saveReadiness({ answers: r.answers, zoneSev: r.zoneSev, light: r.light, overridden: r.overridden });
+    startPendingSession({ light: r.light || "green", dayKey: r.dayKey, practice: r.practice });
+  },
+  rResultSecondary(arg) {
+    if (arg === "retry") { resetBodyCheck(state.readiness); render(); }
+    else { state.readiness = null; render(); }
+  },
+
+  /* ---- session controls (delegate to the engine) ---- */
+  advance() { engine.advance(); },
+  pauseTimer() { engine.togglePause(); },
+  skipEx() { engine.skipCurrentExercise(); },
+  stopNow() { engine.openStopOverlay(); },
+  resumeFromStop() { engine.resumeFromStop(); },
+  endFromStop() { engine.endFromStop(); },
+  askEnd() { engine.sess.confirmEnd = true; render(); },
+  cancelEnd() { engine.sess.confirmEnd = false; render(); },
+  confirmEndEarly() { engine.endEarly(); },
+  pickIntent(arg) { engine.pickIntentWord(arg); },
+  answerMicro(arg) { engine.answerMicroLoop(arg); },
+  pickClean() { engine.pickClean(); },
+  pickWobbly() { engine.pickWobbly(); },
+  pickMood(arg) { const [key, emoji] = arg.split("|"); engine.setMood(key, emoji); },
+  reflectWell(arg) { engine.setReflect("wentWell", arg); },
+  reflectNext(arg) { engine.setReflect("nextTime", arg); },
+  quizPick(arg) { engine.setQuizPick(Number(arg)); },
+  openDetailCur() { state.detailEx = engine.sess.currentEx; state.detailOverlay = true; render(); },
+  openDetailAt(arg) {
+    const [ci, ei] = arg.split("|").map(Number);
+    const c = engine.sess.circuits[ci];
+    if (c && c.exercises[ei]) { state.detailEx = c.exercises[ei]; state.detailOverlay = true; render(); }
+  },
+  closeDetail() { state.detailOverlay = false; state.detailEx = null; render(); },
+  openPrizeDraw() { state.prizeDraw = newPrizeDraw(); render(); },
+  redeemPrize(arg) { toggleRedeem(arg); render(); },
+  logScope(arg) { state.logScope = arg; render(); },
+
+  /* ---- grown-up zone ---- */
+  setGuTab(arg) { state.grownupTab = arg; render(); },
+  setGsScope(arg) { state.gsScope = arg; render(); },
+  setVoiceStyle(arg) { updateSettings({ voiceStyle: arg }); render(); },
+  bumpRest(arg) {
+    const [key, step, min, max] = arg.split("|");
+    const next = Math.min(Number(max), Math.max(Number(min), (settings[key] || 0) + Number(step)));
+    updateSettings({ [key]: next });
+    render();
+  },
+  exportCsv() { exportCsv(); },
+  toggleGate() {
+    const g = loadGate();
+    g.unlocked = !g.unlocked;
+    saveGate(g);
+    render();
+  },
+  setLadderRung(arg) {
+    const [name, lvl] = arg.split("|");
+    const rungs = loadLadderRungs();
+    rungs[name] = Number(lvl);
+    saveLadderRungs(rungs);
+    render();
+  },
+  saveTrackerWeek() {
+    const t = loadTracker();
+    const wk = "week" + getCurrentTrackerWeek();
+    t[wk] = t[wk] || {};
+    root.querySelectorAll('[data-input="pr"]').forEach(inp => {
+      if (inp.value !== "") t[wk][inp.dataset.key] = Number(inp.value);
+      else delete t[wk][inp.dataset.key];
+    });
+    saveTracker(t);
+    render();
+  },
+  pickEngagement(arg) { setEngagementPick(arg); render(); },
+  addPrizePoolItem() {
+    const inp = root.querySelector('[data-input="newPrize"]');
+    const text = (inp && inp.value || "").trim();
+    if (!text) return;
+    const m = text.match(/^(\p{Extended_Pictographic}(?:️)?)\s*(.*)$/u);
+    const item = m && m[2] ? { icon: m[1], label: m[2] } : { icon: "🎁", label: text };
+    const pool = (Array.isArray(settings.prizePool) && settings.prizePool.length)
+      ? settings.prizePool.slice() : buildGrownupVM(state).prizePool.slice();
+    pool.push(item);
+    updateSettings({ prizePool: pool });
+    render();
+  },
+  removePrizePoolItem(arg) {
+    const pool = buildGrownupVM(state).prizePool.slice();
+    pool.splice(Number(arg), 1);
+    updateSettings({ prizePool: pool });
+    render();
+  },
+  resetPrizePool() { updateSettings({ prizePool: null }); render(); },
+  exitSession() {
+    engine.exitSession();
+    state.inSession = false;
+    state.pendingSession = null;
+    state.detailOverlay = false;
+    state.nav = "today";
+    state.selectedDay = edmontonDayKey();
+    render();
+  }
+};
+
+function startPendingSession(pending) {
+  state.readiness = null;
+  state.pendingSession = pending;
+  state.inSession = true;
+  render();
+  engine.startSession(pending);
+}
+
+root.addEventListener("click", e => {
+  const el = e.target.closest("[data-action]");
+  if (!el || !root.contains(el)) return;
+  // A data-stop-propagation wrapper (e.g. a modal card inside a click-to-close
+  // overlay) swallows clicks that would otherwise trigger its ancestor's action.
+  const stopEl = e.target.closest("[data-stop-propagation]");
+  if (stopEl && el.contains(stopEl) && el !== stopEl) return;
+  const fn = actions[el.dataset.action];
+  if (fn) { e.preventDefault(); fn(el.dataset.arg, el); }
+});
+
+// Settings name edits flow straight back into the greeting. Saved on every
+// keystroke; the greeting picks it up on the next render (no re-render here —
+// replacing the DOM mid-blur would swallow the tap that moved focus away).
+root.addEventListener("input", e => {
+  if (e.target.matches && e.target.matches('[data-input="athleteName"]')) {
+    updateSettings({ athleteName: e.target.value.trim() || "Jess" });
+  }
+});
+
+window.addEventListener("resize", () => {
+  const wide = computeIsWide();
+  if (wide !== state.isWide) render();
+});
+
+/* Weather chip (Red Deer, same source as the old app) — cosmetic, fails silently. */
+async function fetchWeather() {
+  try {
+    const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=52.1833&longitude=-113.8&current=temperature_2m,weather_code&timezone=America/Edmonton");
+    const data = await r.json();
+    const code = data.current.weather_code;
+    const icon = code <= 1 ? "☀️" : code <= 3 ? "⛅" : code <= 48 ? "🌤" : code <= 67 ? "🌧" : code <= 86 ? "🌨" : "🌦";
+    state.weather = { icon, temp: Math.round(data.current.temperature_2m), caption: "Pool day!" };
+    if (!state.inSession) render();
+  } catch { /* keep the placeholder chip */ }
+}
+
+function boot() {
+  migrate();
+  if (!state.selectedDay) state.selectedDay = edmontonDayKey();
+  render();
+  fetchWeather();
+}
+
+boot();

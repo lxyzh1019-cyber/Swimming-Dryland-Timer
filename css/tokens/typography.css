@@ -1,0 +1,54 @@
+/* ============================================================
+   Splash — Typography tokens
+   Fredoka  : rounded, bubbly display — headings, timers, big numbers
+   Nunito   : friendly rounded sans — UI labels, body, buttons
+   Caveat   : handwriting — the coach's encouraging voice / mantras
+   Fonts are loaded from Google Fonts CDN (substitution note in README).
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&family=Caveat:wght@400;500;600;700&display=swap');
+
+:root {
+  /* ---- Families ---- */
+  --font-display: 'Fredoka', 'Nunito', system-ui, sans-serif;  /* headings, hero numbers */
+  --font-ui:      'Nunito', system-ui, -apple-system, sans-serif; /* UI, body, buttons */
+  --font-hand:    'Caveat', 'Nunito', cursive;                  /* coach voice, mantras */
+
+  /* ---- Type scale (rem) ---- */
+  --fs-3xl: 3.25rem;   /* 52px — hero timer / big number */
+  --fs-2xl: 2.5rem;    /* 40px — screen titles */
+  --fs-xl:  2rem;      /* 32px — section headings */
+  --fs-lg:  1.5rem;    /* 24px — card titles, exercise name */
+  --fs-md:  1.25rem;   /* 20px — emphasised body */
+  --fs-base:1.0625rem; /* 17px — body (kid-readable minimum on screen) */
+  --fs-sm:  0.9375rem; /* 15px — captions */
+  --fs-xs:  0.8125rem; /* 13px — tiny labels (use sparingly) */
+
+  /* ---- Weights ---- */
+  --fw-regular: 400;   /* @kind font */
+  --fw-medium:  600;   /* @kind font */
+  --fw-bold:    700;   /* @kind font */
+  --fw-black:   900;   /* @kind font */
+
+  /* ---- Line heights ---- */
+  --lh-tight:  1.05;   /* @kind font */
+  --lh-snug:   1.2;    /* @kind font */
+  --lh-body:   1.5;    /* @kind font */
+
+  /* ---- Letter spacing ---- */
+  --ls-tight:  -0.01em; /* @kind font */
+  --ls-normal: 0;       /* @kind font */
+  --ls-label:  0.04em;  /* @kind font */
+  --ls-loud:   0.08em;  /* @kind font */
+
+  /* ============================================================
+     SEMANTIC TYPE ROLES
+     ============================================================ */
+  --type-timer:    var(--fw-bold) var(--fs-3xl)/var(--lh-tight) var(--font-display);
+  --type-title:    var(--fw-medium) var(--fs-2xl)/var(--lh-snug) var(--font-display);
+  --type-heading:  var(--fw-medium) var(--fs-xl)/var(--lh-snug) var(--font-display);
+  --type-card:     var(--fw-medium) var(--fs-lg)/var(--lh-snug) var(--font-display);
+  --type-body:     var(--fw-bold) var(--fs-base)/var(--lh-body) var(--font-ui);
+  --type-label:    var(--fw-black) var(--fs-sm)/1 var(--font-ui);
+  --type-coach:    var(--fw-bold) var(--fs-md)/1.35 var(--font-hand);
+}
