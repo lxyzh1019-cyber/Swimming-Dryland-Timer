@@ -16,6 +16,7 @@ import { readinessScreen } from "./screens/readiness.js";
 import * as engine from "./engine.js";
 import { buildSessionVM } from "./vm/session.js";
 import { sessionScreen, updateSessionTick } from "./screens/session.js";
+import { buildQuizDeck, answerQuizDeck, finishQuizDeck, quizDeckHtml, newPrizeDraw, claimPrize, prizeDrawHtml } from "./screens/overlays.js";
 
 export const state = {
   nav: "today",                 // 'today' | 'progress' | 'grownup'
@@ -84,13 +85,22 @@ engine.onSessionUpdate(kind => {
   else renderSession();
 });
 
+function overlaysHtml() {
+  let html = "";
+  if (state.quizDeck) html += quizDeckHtml(state.quizDeck);
+  if (state.prizeDraw) html += prizeDrawHtml(state.prizeDraw);
+  return html;
+}
+
 export function render() {
   state.isWide = computeIsWide();
-  if (state.readiness) { renderReadiness(); return; }
-  if (state.inSession) { renderSession(); return; }
-  if (state.nav === "progress") { renderPlaceholder("Progress"); return; }
-  if (state.nav === "grownup") { renderPlaceholder("Grown-up zone"); return; }
-  renderToday();
+  if (state.readiness) { renderReadiness(); }
+  else if (state.inSession) { renderSession(); }
+  else if (state.nav === "progress") { renderPlaceholder("Progress"); }
+  else if (state.nav === "grownup") { renderPlaceholder("Grown-up zone"); }
+  else { renderToday(); }
+  const ov = overlaysHtml();
+  if (ov) root.insertAdjacentHTML("beforeend", ov);
 }
 
 /* ---- delegated actions ---- */
@@ -113,7 +123,27 @@ const actions = {
     startPendingSession({ light: "green", dayKey: arg || state.selectedDay, mini: true, practice: state.practiceMode });
   },
   startQuizDeck() {
-    state.quizDeck = { pending: true };   // built out in Phase 4
+    state.quizDeck = buildQuizDeck(8);
+    render();
+  },
+  answerQuizDeck(arg) {
+    answerQuizDeck(state.quizDeck, Number(arg));
+    render();
+  },
+  nextQuizDeck() {
+    const qd = state.quizDeck;
+    if (!qd) return;
+    if (qd.idx >= qd.qs.length - 1) { qd.done = true; finishQuizDeck(qd); }
+    else qd.idx += 1;
+    render();
+  },
+  exitQuizDeck() { state.quizDeck = null; render(); },
+  pickPrize(arg) {
+    if (state.prizeDraw && state.prizeDraw.picked == null) { state.prizeDraw.picked = Number(arg); render(); }
+  },
+  claimPrize() {
+    claimPrize(state.prizeDraw);
+    state.prizeDraw = null;
     render();
   },
 
@@ -172,7 +202,7 @@ const actions = {
     if (c && c.exercises[ei]) { state.detailEx = c.exercises[ei]; state.detailOverlay = true; render(); }
   },
   closeDetail() { state.detailOverlay = false; state.detailEx = null; render(); },
-  openPrizeDraw() { state.prizeDraw = { pending: true }; render(); },  // built out in Phase 4
+  openPrizeDraw() { state.prizeDraw = newPrizeDraw(); render(); },
   exitSession() {
     engine.exitSession();
     state.inSession = false;
