@@ -19,6 +19,9 @@ import { sessionScreen, updateSessionTick } from "./screens/session.js";
 import { buildQuizDeck, answerQuizDeck, finishQuizDeck, quizDeckHtml, newPrizeDraw, claimPrize, prizeDrawHtml } from "./screens/overlays.js";
 import { buildProgressVM, toggleRedeem } from "./vm/progress.js";
 import { progressScreen } from "./screens/progress.js";
+import { buildGrownupVM, exportCsv } from "./vm/grownup.js";
+import { grownupScreen } from "./screens/grownup.js";
+import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick } from "./store.js";
 
 export const state = {
   nav: "today",                 // 'today' | 'progress' | 'grownup'
@@ -105,7 +108,13 @@ export function render() {
       ? shellWithRail(railVm, progressScreen(pvm))
       : `<div style="display:flex;background:var(--surface);border-radius:24px;box-shadow:0 14px 34px rgba(20,59,74,0.16);overflow:hidden;">${progressScreen(pvm)}</div>` + bottomNav(railVm));
   }
-  else if (state.nav === "grownup") { renderPlaceholder("Grown-up zone"); }
+  else if (state.nav === "grownup") {
+    const railVm = buildTodayVM(state);
+    const gvm = buildGrownupVM(state);
+    root.innerHTML = page(state.isWide
+      ? shellWithRail(railVm, grownupScreen(gvm))
+      : `<div style="display:flex;background:var(--surface);border-radius:24px;box-shadow:0 14px 34px rgba(20,59,74,0.16);overflow:hidden;">${grownupScreen(gvm)}</div>` + bottomNav(railVm));
+  }
   else { renderToday(); }
   const ov = overlaysHtml();
   if (ov) root.insertAdjacentHTML("beforeend", ov);
@@ -213,6 +222,62 @@ const actions = {
   openPrizeDraw() { state.prizeDraw = newPrizeDraw(); render(); },
   redeemPrize(arg) { toggleRedeem(arg); render(); },
   logScope(arg) { state.logScope = arg; render(); },
+
+  /* ---- grown-up zone ---- */
+  setGuTab(arg) { state.grownupTab = arg; render(); },
+  setGsScope(arg) { state.gsScope = arg; render(); },
+  setVoiceStyle(arg) { updateSettings({ voiceStyle: arg }); render(); },
+  bumpRest(arg) {
+    const [key, step, min, max] = arg.split("|");
+    const next = Math.min(Number(max), Math.max(Number(min), (settings[key] || 0) + Number(step)));
+    updateSettings({ [key]: next });
+    render();
+  },
+  exportCsv() { exportCsv(); },
+  toggleGate() {
+    const g = loadGate();
+    g.unlocked = !g.unlocked;
+    saveGate(g);
+    render();
+  },
+  setLadderRung(arg) {
+    const [name, lvl] = arg.split("|");
+    const rungs = loadLadderRungs();
+    rungs[name] = Number(lvl);
+    saveLadderRungs(rungs);
+    render();
+  },
+  saveTrackerWeek() {
+    const t = loadTracker();
+    const wk = "week" + getCurrentTrackerWeek();
+    t[wk] = t[wk] || {};
+    root.querySelectorAll('[data-input="pr"]').forEach(inp => {
+      if (inp.value !== "") t[wk][inp.dataset.key] = Number(inp.value);
+      else delete t[wk][inp.dataset.key];
+    });
+    saveTracker(t);
+    render();
+  },
+  pickEngagement(arg) { setEngagementPick(arg); render(); },
+  addPrizePoolItem() {
+    const inp = root.querySelector('[data-input="newPrize"]');
+    const text = (inp && inp.value || "").trim();
+    if (!text) return;
+    const m = text.match(/^(\p{Extended_Pictographic}(?:️)?)\s*(.*)$/u);
+    const item = m && m[2] ? { icon: m[1], label: m[2] } : { icon: "🎁", label: text };
+    const pool = (Array.isArray(settings.prizePool) && settings.prizePool.length)
+      ? settings.prizePool.slice() : buildGrownupVM(state).prizePool.slice();
+    pool.push(item);
+    updateSettings({ prizePool: pool });
+    render();
+  },
+  removePrizePoolItem(arg) {
+    const pool = buildGrownupVM(state).prizePool.slice();
+    pool.splice(Number(arg), 1);
+    updateSettings({ prizePool: pool });
+    render();
+  },
+  resetPrizePool() { updateSettings({ prizePool: null }); render(); },
   exitSession() {
     engine.exitSession();
     state.inSession = false;
@@ -241,6 +306,15 @@ root.addEventListener("click", e => {
   if (stopEl && el.contains(stopEl) && el !== stopEl) return;
   const fn = actions[el.dataset.action];
   if (fn) { e.preventDefault(); fn(el.dataset.arg, el); }
+});
+
+// Settings name edits flow straight back into the greeting. Saved on every
+// keystroke; the greeting picks it up on the next render (no re-render here —
+// replacing the DOM mid-blur would swallow the tap that moved focus away).
+root.addEventListener("input", e => {
+  if (e.target.matches && e.target.matches('[data-input="athleteName"]')) {
+    updateSettings({ athleteName: e.target.value.trim() || "Jess" });
+  }
 });
 
 window.addEventListener("resize", () => {
