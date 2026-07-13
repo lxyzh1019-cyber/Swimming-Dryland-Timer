@@ -46,6 +46,15 @@ Any static host (e.g. GitHub Pages) works as-is.
 ## Exercise photos
 
 Photo slots are intentionally empty until real photos land in
-`assets/exercises/` named `<slug>.jpg` (lowercase, non-alphanumerics → `-`,
-e.g. `hollow-tuck-flutter.jpg`). Portrait ≥720×960 serves the in-session
-view; the same file is cover-cropped for library cards.
+`assets/exercises/`, one file per exercise per purpose:
+
+- `<Exercise Name> - Timer Image.png` — shown in the in-session photo slot
+  while that exercise is running. Portrait ≥720×960.
+- `<Exercise Name> - Demo Image.png` — shown in the Move Library card and
+  the session detail overlay (the ⓘ "Watch the move" popup). Cover-cropped,
+  so any aspect ratio works.
+
+`<Exercise Name>` is the exercise's `name` from `js/data.js`, spaces and all
+(e.g. `Hollow Tuck Flutter - Timer Image.png`). A `/` in a name becomes `-`
+since it can't appear in a filename. Get the spelling exactly right — a
+typo means that photo silently falls back to the placeholder.

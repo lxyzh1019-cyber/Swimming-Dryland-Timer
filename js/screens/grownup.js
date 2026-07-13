@@ -371,7 +371,7 @@ function libraryTab(vm) {
           <div style="width:100%;height:180px;position:relative;overflow:hidden;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
             <span style="font-size:44px;" aria-hidden="true">🏊</span>
             <span style="font-size:12px;font-weight:800;color:var(--aqua-ink);opacity:0.75;">Demo photo coming soon</span>
-            <img src="assets/exercises/${lib.slug}.jpg" alt="" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+            <img src="${lib.photoUrl}" alt="" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
           </div>
           <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
             <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;">

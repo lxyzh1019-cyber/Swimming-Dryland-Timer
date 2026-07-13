@@ -94,10 +94,14 @@ export function escapeHtml(text) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-/* Matches the design prototype's _slugify so exercise photos named
-   assets/exercises/<slug>.jpg drop in with no code change. */
-export function slugify(name) {
-  return String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+/* Exercise photos live in assets/exercises/ named "<Exercise Name> - Timer
+   Image.png" (in-session photo slot) or "<Exercise Name> - Demo Image.png"
+   (move-library / detail-overlay photo). "/" can't appear in a filename, so
+   it's swapped for "-"; stray whitespace is collapsed before matching. */
+export function exercisePhotoUrl(name, kind) {
+  const clean = String(name || "").replace(/\//g, "-").replace(/\s+/g, " ").trim();
+  if (!clean) return "";
+  return "assets/exercises/" + encodeURIComponent(clean + " - " + kind + " Image.png");
 }
 
 /* Parse a recovery dose string ("60s/side", "2 min", "30–45s/muscle") to seconds. */
