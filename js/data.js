@@ -223,8 +223,77 @@ export const EXERCISE_HOWTO = {
   "Side-Lying Hip-Drive Kick": {
     text: "Lie on your side, body in a long line. Drive the top leg up and slightly forward with the hip (not the knee) — like the strong kick used to balance freestyle/back.",
     search: "side lying hip abduction kick swimmer"
-  }
+  },
+  // — warm-up / mobility (biased toward Tom Merrick's clean mobility demos) —
+  "Jump Rope": { search: "jump rope basic bounce technique tutorial" },
+  "Band Pass-Through": { search: "resistance band pass through shoulder mobility drill Tom Merrick" },
+  "Cat-Camel": { search: "cat camel spine mobility exercise tutorial" },
+  "90/90 Hip Switch": { search: "90 90 hip switch mobility drill Tom Merrick" },
+  "Leg Swings": { search: "leg swings dynamic warm up drill tutorial" },
+  "Wall Slides": { search: "wall slides shoulder mobility exercise tutorial" },
+  "Open-Book / T-Rotation": { search: "open book thoracic rotation stretch tutorial" },
+  "Knee-to-Wall Ankle": { search: "knee to wall ankle mobility drill tutorial" },
+  "Short-Foot": { search: "short foot exercise arch activation tutorial" },
+  "Shoulder CARs": { search: "shoulder CARs controlled articular rotations tutorial" },
+  "Hip Circles": { search: "standing hip circles mobility drill tutorial" },
+  "Band Ankle 4-Way": { search: "resistance band ankle four way mobility drill" },
+  "World's Greatest Stretch": { search: "world's greatest stretch full body warm up tutorial" },
+  // — coordination / running mechanics (biased toward Chari Hawkins' drill demos) —
+  "A-March": { search: "A march running drill technique Chari Hawkins" },
+  "A-Skip": { search: "A skip running drill technique Chari Hawkins" },
+  "Carioca": { search: "carioca drill running technique Chari Hawkins" },
+  "Butt Kicks": { search: "butt kicks running drill technique Chari Hawkins" },
+  "Ankle Dribbles": { search: "ankle dribbles quick feet running drill" },
+  "C-Skip": { search: "C skip running drill technique Chari Hawkins" },
+  "Fast Leg": { search: "fast leg cyclic recovery running drill technique" },
+  "Straight-Leg Bound": { search: "straight leg bound running drill technique" },
+  "Wall Drive": { search: "wall drill sprint knee drive technique" },
+  "Falling Start → 3m": { search: "falling start sprint acceleration drill technique" },
+  "Lateral Shuffle": { search: "lateral shuffle agility drill technique" },
+  // — main / finisher / prep strength & core (biased toward The Prehab Guys' short form demos) —
+  "Hollow Tuck Flutter": { search: "hollow body hold flutter kick exercise tutorial" },
+  "Clean Pull-Ups": { search: "strict pull up correct form tutorial" },
+  "Dead Bug": { search: "dead bug exercise correct form The Prehab Guys" },
+  "Glute Bridge March": { search: "glute bridge march exercise The Prehab Guys" },
+  "Single-Leg Balance Reach": { search: "single leg balance reach exercise The Prehab Guys" },
+  "Band Row": { search: "resistance band row exercise form tutorial" },
+  "Bird Dog": { search: "bird dog exercise correct form The Prehab Guys" },
+  "Hip Hinge": { search: "hip hinge dowel drill exercise tutorial" },
+  "Superman": { search: "superman exercise back extension correct form" },
+  "Drop-and-Stick": { search: "depth drop soft landing mechanics drill" },
+  "Single-Arm Band Row": { search: "single arm resistance band row exercise tutorial" },
+  "Band External Rotation": { search: "band external rotation shoulder exercise The Prehab Guys" },
+  "Side-Lying ER": { search: "side lying external rotation shoulder exercise The Prehab Guys" },
+  "Pallof Press": { search: "pallof press anti rotation exercise The Prehab Guys" },
+  "Side Plank Reach": { search: "side plank reach under exercise tutorial" },
+  "Partner Ball Toss": { search: "rotational medicine ball throw exercise tutorial" },
+  "Half-Kneeling Chop/Lift": { search: "half kneeling cable chop lift exercise tutorial" },
+  "Scap Pull-Up + Dead Hang": { search: "scapular pull up dead hang exercise swimmers shoulder" },
+  // — recovery (foam rolling / breathing) —
+  "Calves — foam roller": { search: "foam rolling calves technique tutorial" },
+  "Quads — roller or gun": { search: "foam rolling quads technique tutorial" },
+  "Lats / upper back — roller, arms overhead": { search: "foam rolling lats upper back technique tutorial" },
+  "Glutes — foam roller": { search: "foam rolling glutes technique tutorial" },
+  "Touch-up — massage gun (parent)": { search: "massage gun technique legs safe use tutorial" },
+  "Wind-down — Crocodile / 90-90 breathing": { search: "crocodile breathing 90 90 breathing exercise tutorial" },
+  "Forearm Plank Dolphin Undulation": { search: "forearm plank dolphin kick undulation core exercise" },
+  "Light Streamline Hold": { search: "swimming streamline position dryland hold" },
+  "Easy Single-Leg Balance": { search: "single leg balance exercise The Prehab Guys" }
 };
+
+/* Best available YouTube search query for an exercise: a hand-picked
+   query (biased toward a specific, kid-appropriate demo source) when
+   one exists in EXERCISE_HOWTO, else a generic fallback. */
+export function videoSearchQuery(ex) {
+  if (!ex || !ex.name) return "";
+  const howto = EXERCISE_HOWTO[ex.name];
+  if (howto && howto.search) return howto.search;
+  return (ex.searchableName || ex.name) + " exercise tutorial correct form";
+}
+export function videoSearchUrl(ex) {
+  const q = videoSearchQuery(ex);
+  return q ? "https://www.youtube.com/results?search_query=" + encodeURIComponent(q) : "#";
+}
 
 /* ------------------------------------------------------------
    X() — exercise factory. Returns an object compatible with the

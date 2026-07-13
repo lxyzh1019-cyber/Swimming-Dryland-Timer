@@ -5,9 +5,9 @@
    thin history gets honest empty/partial states, never mock data.
    ============================================================ */
 
-import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL } from "../data.js";
+import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl } from "../data.js";
 import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool } from "../store.js";
-import { edmontonWeekISODates, edmontonDayKey, fmtHHMM, slugify, DAY_MS } from "../util.js";
+import { edmontonWeekISODates, edmontonDayKey, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
 
 const LIGHT_COLORS = { green: "var(--mint)", yellow: "var(--sun)", red: "var(--stop)", recovery: "var(--grape)" };
 const MOOD_EMOJI = { great: "😀", okay: "🙂", tired: "😴" };
@@ -338,8 +338,8 @@ export function buildGrownupVM(state) {
       libraryList.push({
         name: ex.name, dose: ex.dose || "", cue: ex.cue || "",
         parentWatch: ex.parentWatch || "", fix: ex.redFlag || "", swim: ex.swimTransfer || "",
-        slug: slugify(ex.name),
-        videoUrl: "https://www.youtube.com/results?search_query=" + encodeURIComponent((ex.searchableName || ex.name) + " exercise form swim dryland training")
+        photoUrl: exercisePhotoUrl(ex.name, "Demo"),
+        videoUrl: videoSearchUrl(ex)
       });
     });
   });

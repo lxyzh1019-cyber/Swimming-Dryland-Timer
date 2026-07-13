@@ -4,8 +4,8 @@
    ============================================================ */
 
 import { sess, refTime, screenRepsDetail } from "../engine.js";
-import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork } from "../data.js";
-import { fmtMMSS, slugify } from "../util.js";
+import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork, videoSearchUrl } from "../data.js";
+import { fmtMMSS, exercisePhotoUrl } from "../util.js";
 
 const MOOD_DEFS = [
   { key: "great", emoji: "😀", label: "Great" },
@@ -138,8 +138,8 @@ export function buildSessionVM(state) {
     detailName: de.name || "", detailDose: de.dose || "", detailCue: de.cue || "",
     detailWatchFor: de.parentWatch || "", detailFix: de.redFlag || de.fix || "",
     detailSwim: de.swimTransfer || "",
-    detailImgSlug: slugify(de.name || ""),
-    detailVideoUrl: de.name ? ("https://www.youtube.com/results?search_query=" + encodeURIComponent((de.searchableName || de.name) + " exercise form swim dryland training")) : "#",
+    detailPhotoUrl: exercisePhotoUrl(de.name, "Demo"),
+    detailVideoUrl: videoSearchUrl(de),
 
     sessionDayTitle: day.title || "",
     elapsedDisplay: fmtMMSS(sess.elapsed),
@@ -159,7 +159,7 @@ export function buildSessionVM(state) {
     curExCue: isResting ? sess.restCue : (ex.cue || ""),
     curExWatchFor: ex.parentWatch || "", curExFix: ex.redFlag || "",
     curExSwim: ex.swimTransfer || "",
-    curExImgSlug: slugify(ex.name || "rest"),
+    curExPhotoUrl: exercisePhotoUrl(ex.name || "rest", "Timer"),
     exActualDisplay: fmtMMSS(curActual), exPlannedDisplay: fmtMMSS(curPlanned),
     exPacePct: Math.round((curPlanned > 0 ? Math.min(1, curActual / curPlanned) : 0) * 100),
     paceColor, overNudge: !!(exOver && timerIsReps),

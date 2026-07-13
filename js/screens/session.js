@@ -93,14 +93,14 @@ function badge(variant, label) {
   return `<span style="display:inline-flex;align-items:center;background:${bg};color:${ink};border-radius:var(--radius-pill);padding:4px 12px;font-size:12px;font-weight:900;letter-spacing:0.04em;">${label}</span>`;
 }
 
-/* Exercise photo slot — photos land later at assets/exercises/<slug>.jpg;
+/* Exercise photo slot — photos land at assets/exercises/<name> - Timer Image.png;
    until then a watercolor-wash placeholder shows through. */
-function photoSlot(slug, w, h, radius) {
+function photoSlot(photoUrl, w, h, radius) {
   return `
   <div style="width:${w}px;height:${h}px;flex-shrink:0;border-radius:${radius}px;overflow:hidden;position:relative;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
     <span style="font-size:${Math.round(w / 6)}px;" aria-hidden="true">🏊</span>
     <span style="font-size:12px;font-weight:800;color:var(--aqua-ink);opacity:0.75;text-align:center;padding:0 14px;">Form photo coming soon</span>
-    <img src="assets/exercises/${slug}.jpg" alt="" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+    <img src="${photoUrl}" alt="" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
   </div>`;
 }
 
@@ -125,7 +125,7 @@ export function detailOverlayHtml(vm) {
         <div style="width:100%;height:330px;position:relative;overflow:hidden;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
           <span style="font-size:60px;" aria-hidden="true">🏊</span>
           <span style="font-size:13px;font-weight:800;color:var(--aqua-ink);opacity:0.75;">Demo photo coming soon</span>
-          <img src="assets/exercises/${vm.detailImgSlug}.jpg" alt="" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+          <img src="${vm.detailPhotoUrl}" alt="" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
         </div>
         <button type="button" data-action="closeDetail" style="position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;border:none;background:rgba(20,59,74,0.55);color:#fff;font-size:16px;font-weight:900;cursor:pointer;">✕</button>
       </div>
@@ -229,7 +229,7 @@ function centerStack(vm, wide) {
     : timerRing(vm, ringSize);
   return `
   <div style="display:flex;gap:${wide ? 24 : 16}px;align-items:center;justify-content:center;width:100%;flex-shrink:0;flex-wrap:wrap;">
-    ${vm.notResting && !vm.isPrompt ? photoSlot(vm.curExImgSlug, wide ? 360 : 210, wide ? 480 : 280, wide ? 20 : 16) : ""}
+    ${vm.notResting && !vm.isPrompt ? photoSlot(vm.curExPhotoUrl, wide ? 360 : 210, wide ? 480 : 280, wide ? 20 : 16) : ""}
     ${ring}
   </div>
 
