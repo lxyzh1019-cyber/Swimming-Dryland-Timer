@@ -4,7 +4,7 @@
    ============================================================ */
 
 import { sess, refTime, screenRepsDetail } from "../engine.js";
-import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork } from "../data.js";
+import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork, videoSearchUrl } from "../data.js";
 import { fmtMMSS, slugify } from "../util.js";
 
 const MOOD_DEFS = [
@@ -139,7 +139,7 @@ export function buildSessionVM(state) {
     detailWatchFor: de.parentWatch || "", detailFix: de.redFlag || de.fix || "",
     detailSwim: de.swimTransfer || "",
     detailImgSlug: slugify(de.name || ""),
-    detailVideoUrl: de.name ? ("https://www.youtube.com/results?search_query=" + encodeURIComponent((de.searchableName || de.name) + " exercise form swim dryland training")) : "#",
+    detailVideoUrl: videoSearchUrl(de),
 
     sessionDayTitle: day.title || "",
     elapsedDisplay: fmtMMSS(sess.elapsed),
