@@ -29,7 +29,7 @@ function blankSession() {
     byRepsResolver: null, intentResolver: null, microResolver: null,
     currentEx: null, skipped: [], perExercise: [], justSkipped: false,
     phase: "greeting",           // greeting|getready|work|reps|sideswitch|rest|roundRest|sectionRest|intent|microloop|breath|done
-    circuits: [], ci: 0, ei: 0, round: 1,
+    circuits: [], ci: 0, ei: 0, round: 1, exDone: 0,
     timerSecs: 0, timerMax: 0, urgent: false,
     exElapsed: 0, elapsed: 0, pausedSecs: 0, plannedSecs: 0,
     upNextName: "", upNextDose: "", restCue: "",
@@ -155,6 +155,7 @@ function sleep(ms) {
     const start = Date.now();
     const id = setInterval(() => {
       if (sess.abort)        { clearInterval(id); resolve("abort"); return; }
+      if (sess.forceDone)    { sess.forceDone = false; clearInterval(id); resolve("done"); return; }
       if (sess.skipExercise) { clearInterval(id); resolve("skip");  return; }
       if (sess.paused) return;
       if (Date.now() - start >= ms) { clearInterval(id); resolve("done"); }
@@ -329,13 +330,15 @@ function intentWordPrompt() {
     setPhase("intent");
     speakIfIdle("After round one — pick one word to fix what you felt. Say it out loud.");
     const watchdog = setInterval(() => {
-      if (sess.abort) { clearInterval(watchdog); sess.intentResolver = null; resolve("abort"); }
+      if (sess.abort) { clearInterval(watchdog); clearTimeout(timeout); sess.intentResolver = null; resolve("abort"); }
     }, 200);
     const timeout = setTimeout(() => { clearInterval(watchdog); sess.intentResolver = null; resolve("done"); }, 20000);
+    // resolver(null) = dismissed (Done button / session end) — no word recorded
     sess.intentResolver = (word) => {
       clearInterval(watchdog); clearTimeout(timeout);
-      sess.intentWord = word;
       sess.intentResolver = null;
+      if (!word) { resolve(sess.abort ? "abort" : "done"); return; }
+      sess.intentWord = word;
       speakIfIdle(word + "! Carry it into the next rounds.");
       setTimeout(() => resolve("done"), 700);
     };
@@ -346,12 +349,16 @@ function microLoopPrompt() {
   return new Promise(resolve => {
     setPhase("microloop");
     speakIfIdle(MICRO_LOOP.q);
-    const timeout = setTimeout(() => { sess.microResolver = null; resolve(); }, 15000);
+    const watchdog = setInterval(() => {
+      if (sess.abort) { clearInterval(watchdog); clearTimeout(timeout); sess.microResolver = null; resolve(); }
+    }, 200);
+    const timeout = setTimeout(() => { clearInterval(watchdog); sess.microResolver = null; resolve(); }, 15000);
     sess.microResolver = (answer) => {
-      clearTimeout(timeout);
+      clearInterval(watchdog); clearTimeout(timeout);
+      sess.microResolver = null;
+      if (answer == null) { resolve(); return; }   // dismissed without answering
       const ok = answer === MICRO_LOOP.a;
       sess.microLoop = { answer, correct: ok };
-      sess.microResolver = null;
       speakIfIdle(ok ? "Yes — the hips!" : "It's the hips.");
       notify("phase");
       setTimeout(resolve, 900);
@@ -464,7 +471,13 @@ export async function startSession({ dayKey, light = "green", practice = false, 
         }
 
         const key = ci + "-" + ei;
-        if (sess.skipExercise) sess.exStatus[key] = "skipped";
+        // Clear the skip flag BEFORE the rest phase — leaving it set makes the
+        // rest countdown resolve "skip" instantly, so a skipped exercise used
+        // to also swallow its rest (and the justSkipped minimum below).
+        const wasSkipped = sess.skipExercise;
+        sess.skipExercise = false;
+        sess.exDone += 1;
+        if (wasSkipped) sess.exStatus[key] = "skipped";
         else if (r === circuit.rounds) sess.exStatus[key] = "done";
         if (r === 1) {
           sess.perExercise.push({
@@ -473,11 +486,11 @@ export async function startSession({ dayKey, light = "green", practice = false, 
             driver: ex.driver || (ex.byReps ? "reps" : "time"),
             dose: ex.dose || ex.repsDetail || "",
             gate: ex.gate || null,
-            skipped: !!sess.skipExercise
+            skipped: !!wasSkipped
           });
         }
         // Design's clean/wobbly self-check after main-block work, answered during rest.
-        if ((circuit.block === "main" || circuit.block === "prep") && !sess.skipExercise) {
+        if ((circuit.block === "main" || circuit.block === "prep") && !wasSkipped) {
           sess.pendingCleanCheck = true;
         }
 
@@ -671,15 +684,21 @@ export function togglePause() {
 
 export function advance() {
   // Tap the ring / Done: finishes a reps exercise early, ends a timed exercise
-  // early (counts as done, not skipped), or skips the current rest.
+  // early (counts as done, not skipped), skips the current rest, or dismisses
+  // an in-session prompt.
   if (sess.phase === "reps" && sess.byRepsResolver) { sess.byRepsResolver("done"); return; }
-  if (["work", "rest", "roundRest", "sectionRest", "sideswitch", "getready"].includes(sess.phase)) {
-    sess.forceDone = true;   // running countdown resolves as "done" within 1s
+  if (sess.phase === "intent" && sess.intentResolver) { sess.intentResolver(null); return; }
+  if (sess.phase === "microloop" && sess.microResolver) { sess.microResolver(null); return; }
+  if (["work", "rest", "roundRest", "sectionRest", "sideswitch", "getready", "greeting", "breath"].includes(sess.phase)) {
+    sess.forceDone = true;   // running countdown/sleep resolves as "done" within 1s
     setTimeout(() => { sess.forceDone = false; }, 1200);
   }
 }
 
 export function skipCurrentExercise() {
+  // During rests and prompts no exercise is underway — Skip there means
+  // "skip the wait", not "log the exercise that just finished as skipped".
+  if (!["work", "reps", "sideswitch"].includes(sess.phase)) { advance(); return; }
   if (sess.currentEx) {
     sess.skipped.push({ name: sess.currentEx.name, round: `R${sess.round}`, at: Date.now() });
     if (!sess.practice) logEvent("skip", { ex: sess.currentEx.name, block: sess.currentEx.block || null });
@@ -710,7 +729,8 @@ export function endEarly() {
   sess.confirmEnd = false;
   sess.abort = true;
   if (sess.byRepsResolver) sess.byRepsResolver("abort");
-  if (sess.intentResolver) { const r = sess.intentResolver; sess.intentResolver = null; r("abort"); }
+  if (sess.intentResolver) sess.intentResolver(null);
+  if (sess.microResolver) sess.microResolver(null);
   interruptSpeech("Session stopped.");
 }
 

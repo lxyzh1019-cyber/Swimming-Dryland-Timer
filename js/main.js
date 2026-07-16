@@ -6,7 +6,7 @@
    delegated click listener below.
    ============================================================ */
 
-import { migrate, settings, updateSettings, saveReadiness } from "./store.js";
+import { migrate, settings, updateSettings, saveReadiness, addXp, patchLastSession, pendingDrawCount } from "./store.js";
 import { edmontonDayKey } from "./util.js";
 import { buildTodayVM, journeyPathScrollIntoView } from "./vm/today.js";
 import { todayWide, todayNarrow } from "./screens/today.js";
@@ -14,7 +14,7 @@ import { page, shellWithRail, bottomNav } from "./screens/shell.js";
 import { newReadinessFlow, answerQuestion, sameAsYesterday, setZoneSev, resetBodyCheck, buildReadinessVM } from "./vm/readiness.js";
 import { readinessScreen } from "./screens/readiness.js";
 import * as engine from "./engine.js";
-import { buildSessionVM } from "./vm/session.js";
+import { buildSessionVM, sessionQuizFor } from "./vm/session.js";
 import { sessionScreen, updateSessionTick } from "./screens/session.js";
 import { buildQuizDeck, answerQuizDeck, finishQuizDeck, quizDeckHtml, newPrizeDraw, claimPrize, prizeDrawHtml } from "./screens/overlays.js";
 import { buildProgressVM, toggleRedeem } from "./vm/progress.js";
@@ -146,6 +146,12 @@ const actions = {
   claimPrize() {
     claimPrize(state.prizeDraw);
     state.prizeDraw = null;
+    // One prize per level gained: once every pending draw is claimed, retire
+    // the "Pick your prize" buttons so the draw can't be re-farmed.
+    if (pendingDrawCount() < 1) {
+      engine.sess.leveledUp = false;
+      if (state.quizDeck) state.quizDeck.leveledUp = false;
+    }
     render();
   },
 
@@ -170,8 +176,9 @@ const actions = {
     const r = state.readiness;
     if (arg === "back") { state.readiness = null; render(); return; }
     if (arg === "retry") { resetBodyCheck(r); render(); return; }
-    // continue: persist the check, then hand the resolved light to the session
-    saveReadiness({ answers: r.answers, zoneSev: r.zoneSev, light: r.light, overridden: r.overridden });
+    // continue: persist the check (try-it runs don't overwrite the real day's
+    // check), then hand the resolved light to the session
+    if (!r.practice) saveReadiness({ answers: r.answers, zoneSev: r.zoneSev, light: r.light, overridden: r.overridden });
     startPendingSession({ light: r.light || "green", dayKey: r.dayKey, practice: r.practice });
   },
   rResultSecondary(arg) {
@@ -196,7 +203,20 @@ const actions = {
   pickMood(arg) { const [key, emoji] = arg.split("|"); engine.setMood(key, emoji); },
   reflectWell(arg) { engine.setReflect("wentWell", arg); },
   reflectNext(arg) { engine.setReflect("nextTime", arg); },
-  quizPick(arg) { engine.setQuizPick(Number(arg)); },
+  quizPick(arg) {
+    const i = Number(arg);
+    const first = engine.sess.quizPick == null;
+    engine.setQuizPick(i);
+    // The feedback copy promises +25/+10 XP — actually grant it (once).
+    if (first && !engine.sess.practice && engine.sess.savedEntry) {
+      const q = sessionQuizFor(engine.sess.dayKey);
+      const xp = q.opts[i] && q.opts[i].ok ? 25 : 10;
+      engine.sess.xpEarned = (engine.sess.xpEarned || 0) + xp;
+      if (addXp(xp).leveledUp) engine.sess.leveledUp = true;
+      patchLastSession({ xpEarned: engine.sess.xpEarned });
+      render();
+    }
+  },
   openDetailCur() { state.detailEx = engine.sess.currentEx; state.detailOverlay = true; render(); },
   openDetailAt(arg) {
     const [ci, ei] = arg.split("|").map(Number);
@@ -204,7 +224,11 @@ const actions = {
     if (c && c.exercises[ei]) { state.detailEx = c.exercises[ei]; state.detailOverlay = true; render(); }
   },
   closeDetail() { state.detailOverlay = false; state.detailEx = null; render(); },
-  openPrizeDraw() { state.prizeDraw = newPrizeDraw(); render(); },
+  openPrizeDraw() {
+    if (pendingDrawCount() < 1) return;
+    state.prizeDraw = newPrizeDraw();
+    render();
+  },
   redeemPrize(arg) { toggleRedeem(arg); render(); },
   logScope(arg) { state.logScope = arg; render(); },
 

@@ -4,7 +4,7 @@
    Local-first; Firestore mirroring happens in the engine.
    ============================================================ */
 
-import { DAY_MS, mondayOfThisWeek, todayISODate } from "./util.js";
+import { DAY_MS, mondayOfThisWeek, todayISODate, edmontonISO } from "./util.js";
 import { PRIZE_POOL, levelCost } from "./data.js";
 
 /* ---- keys (unchanged from the old app unless noted) ---- */
@@ -107,7 +107,7 @@ export function sumSecs(sessions) { return sessions.reduce((a, s) => a + (s.dura
 
 // Longest run of consecutive calendar days with ≥1 completed session.
 export function longestStreak(sessions) {
-  const days = [...new Set(sessions.map(s => (s.isoDate || "").slice(0, 10)).filter(Boolean))].sort();
+  const days = [...new Set(sessions.map(s => edmontonISO(s.isoDate)).filter(Boolean))].sort();
   let best = 0, run = 0, prev = null;
   days.forEach(d => {
     if (prev && Math.round((new Date(d) - new Date(prev)) / DAY_MS) === 1) run++;
@@ -116,17 +116,22 @@ export function longestStreak(sessions) {
   });
   return best;
 }
-// Current streak anchored to today/yesterday (Edmonton).
+// Current streak anchored to today/yesterday (Edmonton). Compares date
+// STRINGS — Date objects here would mix UTC-parsed and local clocks and
+// break the streak every morning.
 export function currentStreak(sessions) {
-  const days = [...new Set(sessions.map(s => (s.isoDate || "").slice(0, 10)).filter(Boolean))].sort();
+  const days = [...new Set(sessions.map(s => edmontonISO(s.isoDate)).filter(Boolean))].sort();
   if (!days.length) return 0;
-  let cur = new Date(days[days.length - 1]);
-  const today = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Edmonton" }));
-  const anchor = new Date(today); anchor.setDate(anchor.getDate() - 1);
-  if (cur < anchor) return 0;
+  const today = todayISODate();
+  const y = new Date(today + "T12:00:00Z");
+  y.setUTCDate(y.getUTCDate() - 1);
+  const yesterday = y.toISOString().slice(0, 10);
+  const last = days[days.length - 1];
+  if (last !== today && last !== yesterday) return 0;
   let streak = 1;
+  let cur = new Date(last + "T12:00:00Z");
   for (let i = days.length - 2; i >= 0; i--) {
-    const prev = new Date(days[i]);
+    const prev = new Date(days[i] + "T12:00:00Z");
     if (Math.round((cur - prev) / DAY_MS) === 1) { streak++; cur = prev; } else break;
   }
   return streak;
@@ -289,6 +294,11 @@ export function addXp(amount) {
   if (gained > 0) j.pendingDraws = (j.pendingDraws || 0) + gained;
   saveJourney(j);
   return { journey: j, leveledUp: gained > 0, levelsGained: gained };
+}
+
+export function pendingDrawCount() {
+  const j = loadJourney();
+  return j ? Math.max(0, j.pendingDraws || 0) : 0;
 }
 
 export function addPrize(prize) {

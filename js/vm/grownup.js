@@ -7,7 +7,7 @@
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl } from "../data.js";
 import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool } from "../store.js";
-import { edmontonWeekISODates, edmontonDayKey, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
+import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
 
 const LIGHT_COLORS = { green: "var(--mint)", yellow: "var(--sun)", red: "var(--stop)", recovery: "var(--grape)" };
 const MOOD_EMOJI = { great: "😀", okay: "🙂", tired: "😴" };
@@ -18,7 +18,7 @@ function scopeFilter(scope) {
   const now = Date.now();
   if (scope === "week") {
     const isoDates = Object.values(edmontonWeekISODates());
-    return s => isoDates.includes((s.isoDate || "").slice(0, 10));
+    return s => isoDates.includes(edmontonISO(s.isoDate));
   }
   if (scope === "month") return s => now - new Date(s.isoDate).getTime() < 30 * DAY_MS;
   return () => true;
@@ -43,7 +43,7 @@ export function buildGrownupVM(state) {
   const events = loadEvents();
   const eventInScope = e => scopeFilter(scope)({ isoDate: e.iso });
 
-  const dstr = iso => new Date(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const dstr = iso => new Date(iso).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/Edmonton" });
   const mins = s => Math.round((s.durationSecs || 0) / 60);
 
   /* ---- tabs / scope chrome ---- */
@@ -95,7 +95,7 @@ export function buildGrownupVM(state) {
   /* ---- consistency cells ---- */
   const byIso = {};
   all.forEach(s => {
-    const k = (s.isoDate || "").slice(0, 10);
+    const k = edmontonISO(s.isoDate);
     const st = s.completedFully ? "done" : "partial";
     if (byIso[k] !== "done") byIso[k] = st;
   });
@@ -115,9 +115,9 @@ export function buildGrownupVM(state) {
     const cells = [];
     for (let i = n - 1; i >= 0; i--) {
       const d = new Date(Date.now() - i * DAY_MS);
-      const iso = d.toISOString().slice(0, 10);
-      const dow = d.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
-      cells.push({ s: byIso[iso] || (DAYS[dow] && DAYS[dow].spa ? "rest" : "missed"), label: String(d.getDate()) });
+      const iso = edmontonISO(d);
+      const dow = d.toLocaleDateString("en-US", { weekday: "long", timeZone: "America/Edmonton" }).toLowerCase();
+      cells.push({ s: byIso[iso] || (DAYS[dow] && DAYS[dow].spa ? "rest" : "missed"), label: String(Number(iso.slice(8))) });
     }
     consistency = { subtitle: "Last 28 days (newest bottom-right).", showDows: true, cols: 7, cells };
   }
@@ -278,7 +278,7 @@ export function buildGrownupVM(state) {
   if (scope === "week") {
     const isoDates = edmontonWeekISODates();
     byWeekday = WEEK_ORDER.map(k => {
-      const s = all.find(x => (x.isoDate || "").slice(0, 10) === isoDates[k]);
+      const s = all.find(x => edmontonISO(x.isoDate) === isoDates[k]);
       return {
         k: DAY_SHORT[k], topic: DAYS[k].theme || DAYS[k].title,
         mood: s && s.mood ? MOOD_EMOJI[s.mood] : "·",
@@ -431,7 +431,7 @@ export function exportCsv() {
   const rows = [["date", "day", "title", "type", "light", "minutes", "completedFully", "endedEarly", "pain", "skips", "pauses", "clean", "wobbly", "mood", "intentWord", "xpEarned"]];
   loadSessions().forEach(s => {
     rows.push([
-      (s.isoDate || "").slice(0, 10), s.dayKey || "", s.dayTitle || "", s.sessionType || "",
+      edmontonISO(s.isoDate), s.dayKey || "", s.dayTitle || "", s.sessionType || "",
       s.lightResult || "", Math.round((s.durationSecs || 0) / 60),
       s.completedFully ? 1 : 0, s.endedEarly ? 1 : 0, s.pain ? 1 : 0,
       s.skippedCount || 0, s.pauseCount || 0, s.clean || 0, s.wobbly || 0,
