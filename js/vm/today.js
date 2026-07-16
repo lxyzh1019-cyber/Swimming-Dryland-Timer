@@ -6,7 +6,7 @@
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overloadWeek } from "../data.js";
 import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress } from "../store.js";
-import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, plural } from "../util.js";
+import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural } from "../util.js";
 
 /* Planning estimate for one exercise (design's _refTime). */
 export function refTime(ex) {
@@ -40,21 +40,21 @@ export function planStats(day) {
    done (a completed record exists for that date) / today / missed / upcoming / rest. */
 export function weekStatuses() {
   const isoDates = edmontonWeekISODates();
+  const weekIsoSet = new Set(Object.values(isoDates));
   const todayKey = edmontonDayKey();
-  const sessions = loadSessions();
-  const doneDates = new Set(
-    sessions.filter(s => s.completedFully !== false || s.endedEarly)  // any recorded attempt counts as done-ish; full-complete drives ✓
-      .filter(s => s.completedFully)
-      .map(s => (s.isoDate || "").slice(0, 10))
-  );
-  const attemptDates = new Set(sessions.map(s => (s.isoDate || "").slice(0, 10)));
+  // This week's sessions, bucketed by the day they were FOR (dayKey) — so a
+  // Monday catch-up done on Wednesday checks off Monday, matching the CTA
+  // copy ("starting now still counts for Monday"), and an evening session
+  // never drifts onto tomorrow's card.
+  const sessions = loadSessions().filter(s => weekIsoSet.has(edmontonISO(s.isoDate)));
+  const doneKeys = new Set(sessions.filter(s => s.completedFully).map(s => s.dayKey).filter(Boolean));
+  const attemptKeys = new Set(sessions.map(s => s.dayKey).filter(Boolean));
   const todayIdx = WEEK_ORDER.indexOf(todayKey);
   const out = {};
   WEEK_ORDER.forEach((k, i) => {
-    const iso = isoDates[k];
-    if (doneDates.has(iso)) out[k] = "done";
+    if (doneKeys.has(k)) out[k] = "done";
     else if (k === todayKey) out[k] = "today";
-    else if (i < todayIdx) out[k] = attemptDates.has(iso) ? "done" : (DAYS[k].spa ? "rest" : "missed");
+    else if (i < todayIdx) out[k] = attemptKeys.has(k) ? "done" : (DAYS[k].spa ? "rest" : "missed");
     else out[k] = DAYS[k].spa ? "rest" : "future";
   });
   return out;

@@ -6,7 +6,7 @@
 
 import { LADDER, RANK_LORE, RANK_TEASE, fmtXp } from "../data.js";
 import { loadSessions, loadJourney, currentStreak, redeemPrize } from "../store.js";
-import { edmontonWeekISODates } from "../util.js";
+import { edmontonWeekISODates, edmontonISO } from "../util.js";
 import { buildJourney } from "./today.js";
 
 const LIGHT_CHIP = {
@@ -34,7 +34,7 @@ export function logEntryView(s) {
   return {
     moodEmoji: MOOD_EMOJI[s.mood] || "🙂",
     dayTitle: s.dayTitle || s.dayKey || "Session",
-    dateStr: d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
+    dateStr: d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/Edmonton" }),
     duration: Math.max(1, Math.round((s.durationSecs || 0) / 60)) + " min",
     lightLabel, note,
     lightChipStyle: "font-size:10px;font-weight:900;letter-spacing:0.04em;border-radius:var(--radius-pill);padding:4px 9px;white-space:nowrap;background:" + (LIGHT_CHIP[lightLabel] || LIGHT_CHIP.GREEN) + ";"
@@ -83,7 +83,7 @@ export function buildProgressVM(state) {
   const shorts = { monday: "Mon", tuesday: "Tue", wednesday: "Wed", thursday: "Thu", friday: "Fri", saturday: "Sat", sunday: "Sun" };
   const minsByIso = {};
   sessions.forEach(s => {
-    const key = (s.isoDate || "").slice(0, 10);
+    const key = edmontonISO(s.isoDate);
     minsByIso[key] = (minsByIso[key] || 0) + Math.round((s.durationSecs || 0) / 60);
   });
   const wk = order.map(k => ({ short: shorts[k], mins: minsByIso[isoDates[k]] || 0 }));
@@ -95,10 +95,7 @@ export function buildProgressVM(state) {
       + (d.mins === 0 ? "opacity:0.35;" : "")
   }));
 
-  const weekSessions = sessions.filter(s => {
-    const key = (s.isoDate || "").slice(0, 10);
-    return Object.values(isoDates).includes(key);
-  });
+  const weekSessions = sessions.filter(s => Object.values(isoDates).includes(edmontonISO(s.isoDate)));
   const streak = currentStreak(sessions.filter(s => s.completedFully));
   const avgMins = weekSessions.length ? Math.round(weekSessions.reduce((a, s) => a + (s.durationSecs || 0), 0) / weekSessions.length / 60) : 0;
 

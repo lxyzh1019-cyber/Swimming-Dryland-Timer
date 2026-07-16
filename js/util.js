@@ -4,7 +4,17 @@
 
 export const DAY_MS = 86400000;
 
-export function todayISODate() { return new Date().toISOString().slice(0, 10); }
+/* Edmonton calendar date (YYYY-MM-DD) for a Date or ISO timestamp. Sessions
+   store full UTC timestamps; slicing the UTC date shifts any evening session
+   (after ~6 pm local) onto the NEXT day, so every calendar-day grouping —
+   week strip, streaks, day-progress keys, analytics — must go through here. */
+export function edmontonISO(d) {
+  const dt = d instanceof Date ? d : new Date(d);
+  if (isNaN(dt)) return "";
+  return dt.toLocaleDateString("en-CA", { timeZone: "America/Edmonton" });
+}
+
+export function todayISODate() { return edmontonISO(new Date()); }
 
 export function edmontonDayKey() {
   return new Date().toLocaleString("en-US", {

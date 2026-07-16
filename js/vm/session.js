@@ -31,6 +31,11 @@ const QUIZ = [
     { t: "So the timer lasts longer", ok: false } ] }
 ];
 
+/* The day's Coach's Quiz question (also used by main.js to award its XP). */
+export function sessionQuizFor(dayKey) {
+  return QUIZ[(dayKey ? String(dayKey).length : 0) % QUIZ.length];
+}
+
 export function buildSessionVM(state) {
   const circuits = sess.circuits || [];
   const circuit = circuits[sess.ci] || { exercises: [], rounds: 1, name: "", block: "main" };
@@ -73,9 +78,11 @@ export function buildSessionVM(state) {
   const exOver = curActual > curPlanned + 2;
   const paceColor = exOver ? "var(--sun-ink)" : "var(--aqua)";
 
-  // Per-section progress + whole-session pacing
+  // Per-section progress + whole-session pacing. exDone counts every
+  // completed exercise in every round, so the bar actually reaches 100%
+  // (exStatus keys are per-exercise and top out below rounds × exercises).
   const totalExCount = circuits.reduce((acc, c) => acc + c.exercises.length * c.rounds, 0);
-  const doneCount = Object.keys(sess.exStatus).length;
+  const doneCount = sess.exDone || 0;
   const secNames = { warmup: "Warm-Up", coordination: "Coordination", main: "Main", prep: "Prep", finisher: "Finisher", swimskill: "Swim-Skill", recovery: "Recovery" };
   const progressLabel = (secNames[circuit.block] || "") + " · " + Math.min(sess.ei + 1, circuit.exercises.length) + " of " + circuit.exercises.length;
   const sessionTimePct = Math.min(100, Math.round(sess.elapsed / Math.max(1, sess.plannedSecs) * 100));
@@ -117,7 +124,7 @@ export function buildSessionVM(state) {
   const reflectWellOpts = REFLECT_WELL.map(t => ({ label: t, style: rChip(sess.wentWell === t) }));
   const reflectNextOpts = REFLECT_NEXT.map(t => ({ label: t, style: rChip(sess.nextTime === t) }));
 
-  const QZ = QUIZ[(sess.dayKey ? String(sess.dayKey).length : 0) % QUIZ.length];
+  const QZ = sessionQuizFor(sess.dayKey);
   const quizAnswered = sess.quizPick != null;
   const quizOpts = QZ.opts.map((o, i) => ({
     label: o.t, idx: i,
