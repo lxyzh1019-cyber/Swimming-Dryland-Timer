@@ -178,6 +178,7 @@ function completeScreen(vm) {
             <span style="font-size:13px;font-weight:900;color:var(--ink);">${mo.label}</span>
           </button>`).join("")}
       </div>
+      ${vm.moodAck ? `<div style="font-family:var(--font-hand);font-size:18px;font-weight:700;color:var(--aqua-ink);line-height:1.3;max-width:420px;text-align:center;">${vm.moodAck}</div>` : ""}
     </div>
     ${vm.showReflection ? `
     <div style="display:flex;flex-direction:column;gap:14px;background:var(--surface);border-radius:20px;padding:16px 22px;box-shadow:var(--shadow-soft);max-width:600px;">

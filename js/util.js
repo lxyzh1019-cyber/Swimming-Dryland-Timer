@@ -114,6 +114,20 @@ export function exercisePhotoUrl(name, kind) {
   return "assets/exercises/" + encodeURIComponent(clean + " - " + kind + " Image.png");
 }
 
+/* Planning-estimate seconds for one exercise (time-driver → work seconds;
+   rep/hold → dose heuristic). Single source shared by the engine estimate and
+   the Today/plan view-models — previously duplicated verbatim in both. */
+export function refTime(ex) {
+  if (!ex) return 30;
+  if (ex.driver === "time") return ex.work || 30;
+  const d = (ex.dose || "").toLowerCase();
+  let base = 30;
+  if (/\/side|\/leg|\/dir/.test(d)) base = 40;
+  if (/2×|2x/.test(d)) base = 45;
+  if (/hold/.test(d)) base = 25;
+  return base;
+}
+
 /* Parse a recovery dose string ("60s/side", "2 min", "30–45s/muscle") to seconds. */
 export function recoveryDoseSecs(dose) {
   const m = String(dose).match(/(\d+)\s*(?:–\s*\d+)?\s*(min|s)?/i);

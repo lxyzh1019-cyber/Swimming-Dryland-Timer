@@ -11,7 +11,7 @@ import { edmontonDayKey } from "./util.js";
 import { buildTodayVM, journeyPathScrollIntoView } from "./vm/today.js";
 import { todayWide, todayNarrow } from "./screens/today.js";
 import { page, shellWithRail, bottomNav } from "./screens/shell.js";
-import { newReadinessFlow, answerQuestion, sameAsYesterday, setZoneSev, resetBodyCheck, buildReadinessVM } from "./vm/readiness.js";
+import { newReadinessFlow, answerQuestion, sameAsYesterday, setZoneSev, resetBodyCheck, confirmGrownup, buildReadinessVM } from "./vm/readiness.js";
 import { readinessScreen } from "./screens/readiness.js";
 import * as engine from "./engine.js";
 import { buildSessionVM, sessionQuizFor } from "./vm/session.js";
@@ -170,6 +170,7 @@ const actions = {
   },
   rClosePopup() { state.readiness.pendingZone = null; render(); },
   rGoBack() { state.readiness.step = "questions"; render(); },
+  rGrownupOk() { confirmGrownup(state.readiness); render(); },
   rPickLight(arg) { state.readiness.light = arg; state.readiness.overridden = true; render(); },
   rExit() { state.readiness = null; render(); },
   rResultCta(arg) {

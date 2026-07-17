@@ -52,6 +52,19 @@ img { max-width: 100%; }
 /* Ghost/utility buttons reset */
 .bare-btn { background: none; border: none; cursor: pointer; padding: 0; font-family: inherit; color: inherit; }
 
+/* Visible keyboard focus. The screens are inline-styled, which can't express
+   :focus-visible, so keyboard/switch users depend on this single global rule.
+   Pointer users don't see the ring (:focus-visible, not :focus). */
+:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+[data-action]:focus-visible {
+  outline: 3px solid var(--sea, #2393E0);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 /* All motion off under prefers-reduced-motion (token file also resets its keyframes) */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

@@ -888,15 +888,19 @@ export const RANK_TEASE = {
 };
 
 // Level-up prize pool — a grown-up curates this in Settings.
+// Default rewards lean on experiences, privileges, and autonomy rather than food
+// or screen time — linking a child's training to food ("earn dessert") or iPad
+// bargaining is a pattern child-sport psychologists caution against. Grown-ups
+// can still add whatever they like in Settings; this is only the starting pool.
 export const PRIZE_POOL = [
-  { icon: "🍜", label: "Pick tonight’s dinner" },
   { icon: "🎡", label: "Plan a weekend outing" },
   { icon: "✨", label: "Skip one chore" },
   { icon: "⚽", label: "+30 min play time" },
-  { icon: "📱", label: "+20 min iPad time" },
   { icon: "🎬", label: "Family movie pick" },
-  { icon: "🍦", label: "Dessert of choice" },
-  { icon: "🛌", label: "Stay up 20 min later" }
+  { icon: "🛌", label: "Stay up 20 min later" },
+  { icon: "🎯", label: "Choose the next family activity" },
+  { icon: "🏊", label: "Pick a fun game at practice" },
+  { icon: "🎨", label: "One-on-one time with a grown-up" }
 ];
 
 /* XP cost of going from level n to n+1 (design curve). */
@@ -957,17 +961,21 @@ export const SEVERITY_LEVELS = [
   { level: 4, emoji: "🥺", label: "Pain / Stop",          color: "var(--stop)",  desc: "Pain, sharp pain, swelling, numbness, tingling, or affects normal activity. Stop now." }
 ];
 
+// Unified colored-circle icon set (🟢🟡🔴🟣) instead of the old mixed
+// hearts/circle/ice. The CTA now carries the light's OWN color — a red-light day
+// shows a warm caution button, not the same yellow as a green day — so the
+// safety signal survives all the way to the action.
 export const LIGHT_META = {
-  green:    { emoji: "💚", color: "var(--mint)",  btnColor: "var(--sun)", btnDeep: "var(--sun-deep)", btnText: "var(--sun-ink)", btnIcon: "💪", label: "Green Light — Full power!",  btnLabel: "Start Training!", desc: "You're good to go! Full 3 rounds. Focus on quality." },
-  yellow:   { emoji: "💛", color: "var(--sun)",   btnColor: "var(--sun)", btnDeep: "var(--sun-deep)", btnText: "var(--sun-ink)", btnIcon: "🌊", label: "Yellow Light — Go easy",     btnLabel: "Start Training!", desc: "2 rounds max. Listen to your body — clean form over effort." },
-  red:      { emoji: "🔴", color: "var(--stop)",  btnColor: "var(--sun)", btnDeep: "var(--sun-deep)", btnText: "var(--sun-ink)", btnIcon: "💙", label: "Red Light — Light day",      btnLabel: "Start Training!", desc: "1 round only. Something feels off — take it easy today." },
-  recovery: { emoji: "🧊", color: "var(--grape)", btnColor: "var(--sun)", btnDeep: "var(--sun-deep)", btnText: "var(--sun-ink)", btnIcon: "🧊", label: "Recovery — Rest is training", btnLabel: "Start Recovery",  desc: "Rest day. Tell a grown-up, then stretch and hydrate." }
+  green:    { emoji: "🟢", color: "var(--mint)",  btnColor: "var(--mint)",  btnDeep: "var(--mint-deep)",  btnText: "#fff",           btnIcon: "💪", label: "Green Light — Full power!",  btnLabel: "Start Training!", desc: "You're good to go! Full 3 rounds. Focus on quality." },
+  yellow:   { emoji: "🟡", color: "var(--sun)",   btnColor: "var(--sun)",   btnDeep: "var(--sun-deep)",   btnText: "var(--sun-ink)", btnIcon: "🌊", label: "Yellow Light — Go easy",     btnLabel: "Start Training!", desc: "2 rounds max. Listen to your body — clean form over effort." },
+  red:      { emoji: "🔴", color: "var(--stop)",  btnColor: "var(--coral)", btnDeep: "var(--coral-deep)", btnText: "#fff",           btnIcon: "💙", label: "Red Light — Light day",      btnLabel: "Start easy day",  desc: "1 round only. Something feels off — take it easy today." },
+  recovery: { emoji: "🟣", color: "var(--grape)", btnColor: "var(--grape)", btnDeep: "var(--grape-deep)", btnText: "#fff",           btnIcon: "🧊", label: "Recovery — Rest is training", btnLabel: "Start Recovery",  desc: "Rest day. Tell a grown-up, then stretch and hydrate." }
 };
 
 export const BODY_RESULTS = {
-  1: { emoji: "✅", color: "var(--mint)",  desc: "You are OK. Keep moving with control.",          cta: "Continue to Training",    ctaIcon: "💪", ctaColor: "var(--sun)", ctaDeep: "var(--sun-deep)", ctaText: "var(--sun-ink)", action: "continue" },
+  1: { emoji: "✅", color: "var(--mint)",  desc: "You are OK. Keep moving with control.",          cta: "Continue to Training",    ctaIcon: "💪", ctaColor: "var(--mint)", ctaDeep: "var(--mint-deep)", ctaText: "#fff", action: "continue" },
   2: { emoji: "⏱️", color: "var(--sun)",   desc: "Take 1–2 minutes rest, then go easy — 2 rounds max, clean form.", cta: "Start easy — Yellow light", ctaIcon: "💛", ctaColor: "var(--sun)", ctaDeep: "var(--sun-deep)", ctaText: "var(--sun-ink)", action: "continue", secondary: "retry", secondaryLabel: "Rest 1–2 min, then re-check" },
-  3: { emoji: "🗣️", color: "var(--coral)", desc: "Tell your coach or parent first. If they say OK — light day only, 1 easy round.", cta: "Start light day — Red light", ctaIcon: "💙", ctaColor: "var(--sun)", ctaDeep: "var(--sun-deep)", ctaText: "var(--sun-ink)", action: "continue", secondary: "back", secondaryLabel: "Stop — back to Today" },
+  3: { emoji: "🗣️", color: "var(--coral)", desc: "Tell your coach or parent first. If they say OK — light day only, 1 easy round.", cta: "Start light day — Red light", ctaIcon: "💙", ctaColor: "var(--coral)", ctaDeep: "var(--coral-deep)", ctaText: "#fff", action: "continue", secondary: "back", secondaryLabel: "Stop — back to Today", needsGrownup: true },
   4: { emoji: "🛑", color: "var(--stop)",  desc: "Stop now. Tell your coach or parent right away.",   cta: "Stop — back to Today",    ctaIcon: "🛑", ctaColor: "var(--stop)", ctaDeep: "var(--stop-deep)", ctaText: "#fff", action: "back" }
 };
 

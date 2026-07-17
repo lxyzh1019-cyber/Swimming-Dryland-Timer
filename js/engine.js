@@ -12,12 +12,14 @@ import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTEN
 import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, patchLastSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, xpForSession } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
-import { recoveryDoseSecs } from "./util.js";
+import { recoveryDoseSecs, refTime } from "./util.js";
 
+// Moves that deserve a longer "get ready" lead-in before they start. Kept in
+// sync with the names that actually appear in the 2026.2 content (js/data.js);
+// stale entries were pruned so the lead-time branch fires when it should.
 const HARD_EXERCISES = new Set([
-  "Box Jump", "Squat Jump", "Lateral Bound", "Bosu Squat",
-  "Wide-Grip Pull-Up", "Wide Pull-Up", "Box Jump-Down",
-  "Box Jump / Lateral Bound", "Jump Rope Simulation", "Squat Jump (light)"
+  "Box Jump", "Box Jump-Down", "Bosu Squat", "Drop-and-Stick",
+  "Clean Pull-Ups", "Scap Pull-Up + Dead Hang"
 ]);
 
 /* ---- session view-state (the single source the UI renders from) ---- */
@@ -25,7 +27,7 @@ export const sess = blankSession();
 
 function blankSession() {
   return {
-    running: false, paused: false, abort: false, skipExercise: false, forceDone: false,
+    running: false, paused: false, abort: false, skipExercise: false, forceDone: false, forceDoneAt: 0,
     byRepsResolver: null, intentResolver: null, microResolver: null,
     currentEx: null, skipped: [], perExercise: [], justSkipped: false,
     phase: "greeting",           // greeting|getready|work|reps|sideswitch|rest|roundRest|sectionRest|intent|microloop|breath|done
@@ -112,53 +114,62 @@ export function estimateSessionSecs(circuits) {
   return Math.round(total);
 }
 
-/* Planning-estimate per exercise (matches vm/today refTime). */
-export function refTime(ex) {
-  if (!ex) return 30;
-  if (ex.driver === "time") return ex.work || 30;
-  const d = (ex.dose || "").toLowerCase();
-  let base = 30;
-  if (/\/side|\/leg|\/dir/.test(d)) base = 40;
-  if (/2×|2x/.test(d)) base = 45;
-  if (/hold/.test(d)) base = 25;
-  return base;
-}
+/* Planning-estimate per exercise — re-exported from util so session VM imports
+   (import { refTime } from "../engine.js") keep working from one definition. */
+export { refTime };
 
 /* ---- primitives (ported: abort/skip aware, pause-respecting) ---- */
 
 function countdown(seconds, opts = {}) {
+  // Timestamp-based: remaining is derived from a real deadline, so a throttled
+  // background tab (or a slow tick) can't make the clock drift — it self-corrects
+  // to wall-clock time. While paused the deadline is pushed forward so no time
+  // is lost. Per-second side effects (beeps/onTick/notify) fire once per whole
+  // second actually crossed.
   return new Promise(resolve => {
-    let remaining = seconds;
-    sess.timerSecs = remaining; sess.timerMax = seconds; sess.urgent = false;
+    sess.timerSecs = seconds; sess.timerMax = seconds; sess.urgent = false;
     notify("tick");
+    const started = Date.now();
+    let deadline = started + seconds * 1000;
+    let lastWhole = seconds;
     const id = setInterval(() => {
       if (sess.abort)        { clearInterval(id); resolve("abort"); return; }
-      if (sess.forceDone)    { sess.forceDone = false; clearInterval(id); endBeep(); resolve("done"); return; }
+      // Honor a Done-tap only if it landed AFTER this countdown began — a stale
+      // flag from the previous phase must not skip a freshly-started one.
+      if (sess.forceDone && sess.forceDoneAt >= started) { sess.forceDone = false; clearInterval(id); endBeep(); resolve("done"); return; }
+      if (sess.forceDone && sess.forceDoneAt < started) sess.forceDone = false;   // drop the stale flag
       if (sess.skipExercise) { clearInterval(id); resolve("skip");  return; }
-      if (sess.paused) return;
+      if (sess.paused) { deadline = Date.now() + lastWhole * 1000; return; }
 
-      remaining--;
-      sess.timerSecs = Math.max(remaining, 0);
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      if (remaining === lastWhole) return;   // still inside the same whole second
+      lastWhole = remaining;
+      sess.timerSecs = remaining;
       sess.urgent = remaining <= 3 && remaining > 0;
       if (opts.onTick) opts.onTick(remaining);
       if (remaining <= 3 && remaining > 0) beep(remaining === 1 ? 880 : 440, 0.1);
       else if (remaining > 3) playCue(sess.phase === "work" ? "tickSoft" : "tickRest");
-      if (remaining === 0) endBeep();
+      if (remaining <= 0) { endBeep(); notify("tick"); clearInterval(id); resolve("done"); return; }
       notify("tick");
-      if (remaining <= 0) { clearInterval(id); resolve("done"); }
-    }, 1000);
+    }, 200);
   });
 }
 
 function sleep(ms) {
   return new Promise(resolve => {
-    const start = Date.now();
+    const started = Date.now();
+    let elapsed = 0, last = started;
     const id = setInterval(() => {
       if (sess.abort)        { clearInterval(id); resolve("abort"); return; }
-      if (sess.forceDone)    { sess.forceDone = false; clearInterval(id); resolve("done"); return; }
+      if (sess.forceDone && sess.forceDoneAt >= started) { sess.forceDone = false; clearInterval(id); resolve("done"); return; }
+      if (sess.forceDone && sess.forceDoneAt < started) sess.forceDone = false;
       if (sess.skipExercise) { clearInterval(id); resolve("skip");  return; }
-      if (sess.paused) return;
-      if (Date.now() - start >= ms) { clearInterval(id); resolve("done"); }
+      const now = Date.now();
+      // Accumulate only unpaused time — a pause mid-sleep must not swallow the
+      // remainder when resumed (raw now-start would already exceed ms).
+      if (!sess.paused) elapsed += now - last;
+      last = now;
+      if (elapsed >= ms) { clearInterval(id); resolve("done"); }
     }, 100);
   });
 }
@@ -662,7 +673,8 @@ export function finalize(completed) {
   }
 
   // Cloud mirror — keep the doc ID so mood/reflection can patch it later.
-  fsAddSession(entry).then(id => { sess.fsId = id; });
+  // Opt-out via Grown-up settings (privacy): when off, data stays on-device only.
+  if (settings.cloudMirror !== false) fsAddSession(entry).then(id => { sess.fsId = id; });
 
   if (completed) {
     playCue("done");
@@ -691,6 +703,7 @@ export function advance() {
   if (sess.phase === "microloop" && sess.microResolver) { sess.microResolver(null); return; }
   if (["work", "rest", "roundRest", "sectionRest", "sideswitch", "getready", "greeting", "breath"].includes(sess.phase)) {
     sess.forceDone = true;   // running countdown/sleep resolves as "done" within 1s
+    sess.forceDoneAt = Date.now();
     setTimeout(() => { sess.forceDone = false; }, 1200);
   }
 }

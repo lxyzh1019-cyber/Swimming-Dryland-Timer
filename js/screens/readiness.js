@@ -100,7 +100,12 @@ function resultCard(vm, { areaLabel = "" } = {}) {
           </button>`).join("")}
       </div>
     </div>
-    <button type="button" data-action="rResultCta" data-arg="${c.action}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:${c.color};color:${c.text};border:none;border-radius:var(--radius-pill);padding:18px;font-family:var(--font-display);font-weight:600;font-size:22px;cursor:pointer;box-shadow:0 5px 0 ${c.deep};">
+    ${vm.needsGrownupConfirm ? `
+    <button type="button" data-action="rGrownupOk" style="width:100%;display:flex;align-items:center;gap:12px;background:${vm.grownupConfirmed ? "var(--mint-wash)" : "var(--surface-2)"};border:2px solid ${vm.grownupConfirmed ? "var(--mint)" : "var(--hairline)"};border-radius:var(--radius-lg);padding:14px 16px;cursor:pointer;text-align:left;margin-bottom:14px;min-height:56px;">
+      <span style="font-size:24px;flex-shrink:0;">${vm.grownupConfirmed ? "☑️" : "⬜"}</span>
+      <span style="font-weight:800;font-size:15px;color:var(--ink);line-height:1.35;">A grown-up said it's OK to do a light day. <span style="color:var(--ink-soft);font-weight:700;">Tap after you've checked in.</span></span>
+    </button>` : ""}
+    <button type="button" ${vm.needsGrownupConfirm && !vm.grownupConfirmed ? "disabled" : `data-action="rResultCta" data-arg="${c.action}"`} style="width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:${c.color};color:${c.text};border:none;border-radius:var(--radius-pill);padding:18px;font-family:var(--font-display);font-weight:600;font-size:22px;${vm.needsGrownupConfirm && !vm.grownupConfirmed ? "opacity:0.45;cursor:default;" : "cursor:pointer;box-shadow:0 5px 0 " + c.deep + ";"}">
       <span style="font-size:22px;">${c.icon}</span> ${c.label}
     </button>
     ${c.secondaryLabel ? `<button type="button" data-action="rResultSecondary" data-arg="${c.secondaryAction}" style="width:100%;background:none;border:none;cursor:pointer;font-weight:800;font-size:14px;color:var(--ink-soft);text-decoration:underline;padding:12px 6px 2px;min-height:44px;">${c.secondaryLabel}</button>` : ""}
