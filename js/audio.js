@@ -100,7 +100,10 @@ export function speakAndWait(msg) {
     const u = createCoachUtterance(msg);
     let settled = false;
     let failsafe = null;
-    const startFailsafe = setTimeout(done, Math.max(msg.length * 100 + 10000, 15000));
+    // If `onstart` never fires (flaky mobile speechSynthesis), don't strand the
+    // session in silence — proceed after a short grace so the timer starts and
+    // the voice can catch up, rather than the old ~15s hang.
+    const startFailsafe = setTimeout(done, 4000);
     function done() {
       if (settled) return;
       settled = true;

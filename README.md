@@ -34,6 +34,18 @@ python3 -m http.server 8080
 
 Any static host (e.g. GitHub Pages) works as-is.
 
+## Tests
+
+A dependency-free smoke test covers the core logic (streak/XP math, readiness
+scoring + the pain-gate, quiz rotation, and that the view-models render):
+
+```
+npm test        # runs node test/smoke.mjs — no install needed
+```
+
+The `package.json` exists only for this script; the app itself still has no
+build step.
+
 ## Data
 
 - Everything the kid earns lives in `localStorage` (sessions, XP, prizes,

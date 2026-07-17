@@ -38,14 +38,17 @@ export function writeStorage(key, value) {
 
 /* ---- settings ---- */
 export const DEFAULT_SETTINGS = {
-  voiceStyle: "fun",
+  // Default to effort/process praise (Dweck-aligned) rather than trait hype;
+  // the louder "fun" persona stays available as an opt-in in Grown-up settings.
+  voiceStyle: "encouraging",
   exerciseRestSeconds: 5,
   roundRestSeconds: 25,
   sectionRestSeconds: 30,   // NEW (block break; old app hardcoded 8s)
   secondsPerRep: 3,
   coachVoiceOn: true,       // NEW: design's 🎧 toggle gates ALL coach audio
   athleteName: "Jess",      // NEW: editable in Grown-up Settings
-  prizePool: null           // NEW: null = default PRIZE_POOL
+  prizePool: null,          // NEW: null = default PRIZE_POOL
+  cloudMirror: true         // NEW: privacy — mirror completed sessions to Firestore
 };
 
 export let settings = loadSettings();
@@ -128,11 +131,16 @@ export function currentStreak(sessions) {
   const yesterday = y.toISOString().slice(0, 10);
   const last = days[days.length - 1];
   if (last !== today && last !== yesterday) return 0;
+  // Streak "freeze": a single rest/missed day between active days does NOT break
+  // the run (a gap of 1 or 2 calendar days both continue it). This stops the
+  // streak from punishing a recovery day — which would otherwise pressure a kid
+  // to train while sore just to keep the flame, defeating the readiness system.
   let streak = 1;
   let cur = new Date(last + "T12:00:00Z");
   for (let i = days.length - 2; i >= 0; i--) {
     const prev = new Date(days[i] + "T12:00:00Z");
-    if (Math.round((cur - prev) / DAY_MS) === 1) { streak++; cur = prev; } else break;
+    const gap = Math.round((cur - prev) / DAY_MS);
+    if (gap >= 1 && gap <= 2) { streak++; cur = prev; } else break;
   }
   return streak;
 }

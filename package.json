@@ -1,0 +1,10 @@
+{
+  "name": "splash-swim-dryland-timer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Static, no-build ES-module app. package.json exists only for `npm test`.",
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  }
+}

@@ -13,9 +13,12 @@ export function newReadinessFlow(dayKey, practice) {
     dayKey, practice: !!practice,
     answers: {}, step: "questions", zoneSev: {}, pendingZone: null,
     severity: null, light: "green", overridden: false,
-    resultSource: "readiness", readinessDone: false
+    resultSource: "readiness", readinessDone: false, grownupOk: false
   };
 }
+
+/* Toggle the "a grown-up said it's OK" confirmation (pain severity 3 gate). */
+export function confirmGrownup(r) { r.grownupOk = !r.grownupOk; }
 
 /* ---- flow transitions (called from main.js actions) ---- */
 
@@ -61,11 +64,12 @@ export function setZoneSev(r, num, level) {
   r.severity = worst || null;
   r.light = worst ? map[worst] : "green";
   r.resultSource = worst ? "bodycheck" : "readiness";
+  r.grownupOk = false;   // any change re-requires the grown-up confirm
 }
 
 export function resetBodyCheck(r) {
   // "Rest 1–2 min, then re-check": clear the marks so she can redo the body check.
-  r.severity = null; r.zoneSev = {}; r.resultSource = "readiness"; r.light = "green";
+  r.severity = null; r.zoneSev = {}; r.resultSource = "readiness"; r.light = "green"; r.grownupOk = false;
 }
 
 /* ---- view-model ---- */
@@ -90,7 +94,7 @@ export function buildReadinessVM(r, isWide) {
   const zoneSev = r.zoneSev || {};
   const selectedNums = Object.keys(zoneSev).map(Number);
   const SEV_COLOR = { 2: "var(--sun)", 3: "var(--coral)", 4: "var(--stop)" };
-  const SEV_SHORT = { 2: "Tired", 3: "Changed", 4: "Pain" };
+  const SEV_SHORT = { 2: "Tired", 3: "Not right", 4: "Pain" };
   const zoneHighlight = {}, zoneBadge = {}, zoneBadgeBg = {};
   BODY_ZONES.forEach(z => {
     const key = "n" + z.n;
@@ -129,10 +133,10 @@ export function buildReadinessVM(r, isWide) {
   const L = LIGHT_META[lightKey];
   const light = { ...L };
   const LIGHT_OPTS = [
-    { key: "green", emoji: "💚", label: "Green" },
-    { key: "yellow", emoji: "💛", label: "Yellow" },
+    { key: "green", emoji: "🟢", label: "Green" },
+    { key: "yellow", emoji: "🟡", label: "Yellow" },
     { key: "red", emoji: "🔴", label: "Red" },
-    { key: "recovery", emoji: "🧊", label: "Recovery" }
+    { key: "recovery", emoji: "🟣", label: "Recovery" }
   ];
   const lightOptions = LIGHT_OPTS.map(o => ({
     ...o,
@@ -195,6 +199,10 @@ export function buildReadinessVM(r, isWide) {
     showInlineReadinessResult, showInlineBodyResult,
     noZonesYet: step === "bodyArea" && selectedNums.length === 0,
     isBodyResultPath, resultDesc, resultCta,
+    // Pain severity 3 ("changed movement") must not be self-cleared: require an
+    // explicit grown-up confirmation before the Continue button is enabled.
+    needsGrownupConfirm: isBodyResultPath && !!BR.needsGrownup,
+    grownupConfirmed: !!r.grownupOk,
     questions,
     hasYesterday: !!(prev && prev.answers) && step === "questions" && !showInlineReadinessResult,
     areaLabel: BODY_ZONES.filter(z => zoneSev[z.n]).map(z => z.label + " — " + SEV_SHORT[zoneSev[z.n]]).join(" · "),

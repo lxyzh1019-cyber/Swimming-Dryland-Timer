@@ -6,12 +6,20 @@
 import { sess, refTime, screenRepsDetail } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork, videoSearchUrl } from "../data.js";
 import { fmtMMSS, exercisePhotoUrl } from "../util.js";
+import { loadSessions } from "../store.js";
 
 const MOOD_DEFS = [
   { key: "great", emoji: "😀", label: "Great" },
   { key: "okay",  emoji: "🙂", label: "Okay" },
   { key: "tired", emoji: "😴", label: "Tired" }
 ];
+// Acknowledge the reported mood instead of silently recording it — especially a
+// tired day, which deserves a caring, regulation-modeling response.
+const MOOD_ACK = {
+  great: "Love that energy! 💙 Remember this feeling.",
+  okay:  "Showing up on an okay day still counts. Nice.",
+  tired: "Thanks for telling me — tired is real. Rest well, drink water, and tell a grown-up if it sticks around. 💙"
+};
 const REFLECT_WELL = ["My breathing", "Strong holds", "Clean form", "Staying focused"];
 const REFLECT_NEXT = ["Slow down", "Breathe out loud", "Point my toes", "Keep core tight"];
 
@@ -28,12 +36,28 @@ const QUIZ = [
   { q: "Why does Coach say “slow and clean beats fast and sloppy”?", why: "Your body learns the shape you practice — so practice the good one.", opts: [
     { t: "Because slow is easier", ok: false },
     { t: "Clean shapes on land become clean strokes in the water", ok: true },
-    { t: "So the timer lasts longer", ok: false } ] }
+    { t: "So the timer lasts longer", ok: false } ] },
+  { q: "Why do we brace our core (like a strong tube) during land work?", why: "A braced core stops your middle from bending, so your push and pull don't leak power.", opts: [
+    { t: "So you can hold your breath longer", ok: false },
+    { t: "A stiff middle sends leg and arm power straight down the pool", ok: true },
+    { t: "To look tough", ok: false } ] },
+  { q: "Balance moves (like Single-Leg Balance) — what do they build for swimming?", why: "Steady hips and ankles keep your body straight and long instead of wobbling and slowing down.", opts: [
+    { t: "A stable, straight body line that glides instead of wobbles", ok: true },
+    { t: "Bigger splashes", ok: false },
+    { t: "Faster blinking", ok: false } ] },
+  { q: "Why do we point our toes in kicking-shape drills on land?", why: "Pointed toes make your foot a longer paddle, so each kick pushes more water.", opts: [
+    { t: "It looks like ballet", ok: false },
+    { t: "Pointed feet act like paddles — more push per kick", ok: true },
+    { t: "It keeps your socks on", ok: false } ] }
 ];
 
-/* The day's Coach's Quiz question (also used by main.js to award its XP). */
+/* The day's Coach's Quiz question. Rotates as the training log grows (not fixed
+   per weekday), so the completion quiz stays fresh instead of repeating. Both
+   this VM and main.js call it with the same dayKey during the done screen, so
+   the displayed question and the XP-awarding question always match. */
 export function sessionQuizFor(dayKey) {
-  return QUIZ[(dayKey ? String(dayKey).length : 0) % QUIZ.length];
+  const n = (dayKey ? String(dayKey).length : 0) + loadSessions().length;
+  return QUIZ[n % QUIZ.length];
 }
 
 export function buildSessionVM(state) {
@@ -188,7 +212,7 @@ export function buildSessionVM(state) {
     sessionMinutes: Math.round(sess.elapsed / 60),
     roundsCompleted: sess.roundsCompleted || 0,
     xpEarned: sess.xpEarned, leveledUp: sess.leveledUp,
-    moodOpts, showReflection: sessionDone && !!sess.mood, reflectWellOpts, reflectNextOpts,
+    moodOpts, moodAck: sess.mood ? MOOD_ACK[sess.mood] : "", showReflection: sessionDone && !!sess.mood, reflectWellOpts, reflectNextOpts,
     quizQuestion: QZ.q, quizOpts, quizAnswered, quizWhy: QZ.why,
     quizFeedback: quizCorrect ? "Nailed it! +25 XP ⭐" : "Good try! The best answer is highlighted — now you know it. +10 XP for thinking 💭",
     quizFeedbackColor: quizCorrect ? "var(--mint-ink)" : "var(--coral)"

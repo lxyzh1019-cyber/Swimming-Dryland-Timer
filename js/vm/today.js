@@ -6,19 +6,7 @@
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overloadWeek } from "../data.js";
 import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress } from "../store.js";
-import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural } from "../util.js";
-
-/* Planning estimate for one exercise (design's _refTime). */
-export function refTime(ex) {
-  if (!ex) return 30;
-  if (ex.driver === "time") return ex.work || 30;
-  const d = (ex.dose || "").toLowerCase();
-  let base = 30;
-  if (/\/side|\/leg|\/dir/.test(d)) base = 40;
-  if (/2×|2x/.test(d)) base = 45;
-  if (/hold/.test(d)) base = 25;
-  return base;
-}
+import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
 
 /* Whole-plan stats (design's _planStats). */
 export function planStats(day) {
@@ -47,14 +35,16 @@ export function weekStatuses() {
   // copy ("starting now still counts for Monday"), and an evening session
   // never drifts onto tomorrow's card.
   const sessions = loadSessions().filter(s => weekIsoSet.has(edmontonISO(s.isoDate)));
+  // "done" means a FULLY completed session exists — the same bar streaks and
+  // adherence use, so the week strip and the stats can't disagree. A past day
+  // with only an aborted attempt reads as "catch up", not a false checkmark.
   const doneKeys = new Set(sessions.filter(s => s.completedFully).map(s => s.dayKey).filter(Boolean));
-  const attemptKeys = new Set(sessions.map(s => s.dayKey).filter(Boolean));
   const todayIdx = WEEK_ORDER.indexOf(todayKey);
   const out = {};
   WEEK_ORDER.forEach((k, i) => {
     if (doneKeys.has(k)) out[k] = "done";
     else if (k === todayKey) out[k] = "today";
-    else if (i < todayIdx) out[k] = attemptKeys.has(k) ? "done" : (DAYS[k].spa ? "rest" : "missed");
+    else if (i < todayIdx) out[k] = DAYS[k].spa ? "rest" : "missed";
     else out[k] = DAYS[k].spa ? "rest" : "future";
   });
   return out;
@@ -200,7 +190,9 @@ export function buildJourney() {
 const STATUS = {
   done:     { bg: "var(--mint-wash)",  border: "transparent", icon: "✓", iconBg: "var(--mint)", iconColor: "#fff", label: "var(--ink-soft)" },
   today:    { bg: "var(--sun-wash)",   border: "var(--sun)",  icon: "⭐", iconBg: "var(--sun)",  iconColor: "#fff", label: "var(--sun-ink)" },
-  missed:   { bg: "var(--coral-wash)", border: "transparent", icon: "✕", iconBg: "var(--coral-light)", iconColor: "#fff", label: "var(--coral-ink)" },
+  // Reframed from a red ✕ (shame) to a gentle amber "catch up" nudge — a wall of
+  // red X's discourages a kid; a forward-looking prompt invites them back.
+  missed:   { bg: "var(--sun-wash)", border: "transparent", icon: "↺", iconBg: "var(--sun)", iconColor: "#fff", label: "var(--sun-ink)" },
   upcoming: { bg: "var(--aqua-wash)",  border: "transparent", icon: "📋", iconBg: "transparent", iconColor: "var(--aqua-ink)", label: "var(--aqua-ink)" }
 };
 
@@ -277,7 +269,7 @@ export function buildTodayVM(state) {
     { icon: "✓", iconStyle: legendCircle("var(--mint)"), label: "Done" },
     { icon: "⭐", iconStyle: legendCircle("var(--sun)") + "font-size:10px;", label: "Today" },
     { icon: "📋", iconStyle: "font-size:14px;", label: "Upcoming" },
-    { icon: "✕", iconStyle: legendCircle("var(--coral-light)"), label: "Missed" }
+    { icon: "↺", iconStyle: legendCircle("var(--sun)"), label: "Catch up" }
   ];
 
   // ---- Right-pane day view ----
@@ -325,7 +317,7 @@ export function buildTodayVM(state) {
       showSettings: false
     };
   } else if (status === "missed") {
-    dayView = { badgeLabel: shortU + " · MISSED", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"), showChips: true, isMissed: true, showCta: true, ctaLabel: "Catch Up Now", ctaIcon: "↺", showSettings: false, ctaAction: "goSession" };
+    dayView = { badgeLabel: shortU + " · CATCH UP", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"), showChips: true, isMissed: true, showCta: true, ctaLabel: "Catch Up Now", ctaIcon: "↺", showSettings: false, ctaAction: "goSession" };
   } else if (status === "rest") {
     const recov = (fullDay && fullDay.recovery) || [];
     dayView = {
@@ -358,7 +350,7 @@ export function buildTodayVM(state) {
     dayView.showMini = true;
   }
   dayView.showBlocksList = !!(dayView.isActive || dayView.isDone || dayView.isPreview || dayView.isMissed) && !isSpaDay;
-  dayView.blocksHint = dayView.isDone ? "REVIEW WHAT YOU DID 👀" : dayView.isPreview ? "PEEK AT WHAT'S COMING 👀" : dayView.isMissed ? "PEEK AT WHAT YOU MISSED 👀" : "TAP A BLOCK TO PEEK INSIDE 👀";
+  dayView.blocksHint = dayView.isDone ? "REVIEW WHAT YOU DID 👀" : dayView.isPreview ? "PEEK AT WHAT'S COMING 👀" : dayView.isMissed ? "READY WHEN YOU ARE — PEEK INSIDE 👀" : "TAP A BLOCK TO PEEK INSIDE 👀";
   dayView.showFocus = !!(dayView.isActive || dayView.isPreview) && !isSpaDay;
   dayView.ctaButtonStyle = dayView.ctaVariant === "secondary"
     ? "width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:rgba(255,255,255,0.16);color:#fff;border:2px solid rgba(255,255,255,0.55);border-radius:var(--radius-pill);padding:14px;font-family:var(--font-display);font-weight:600;font-size:18px;cursor:pointer;"
