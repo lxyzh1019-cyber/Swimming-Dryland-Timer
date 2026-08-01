@@ -68,6 +68,21 @@ export function activePrizePool() {
   return Array.isArray(pool) && pool.length ? pool : PRIZE_POOL;
 }
 
+/* The athlete a record belongs to. Storage is still one bucket per browser, but
+   the cloud mirror is shared, so every mirrored record is tagged and a restore
+   only pulls back this athlete's own sessions. Records written before tagging
+   existed belong to the original athlete — the mirror collection is literally
+   named after her. */
+export const LEGACY_ATHLETE = "Jess";
+export function athleteId() {
+  return String(settings.athleteName || LEGACY_ATHLETE).trim().toLowerCase();
+}
+export function belongsToAthlete(record) {
+  const tag = record && record.athlete;
+  if (!tag) return athleteId() === LEGACY_ATHLETE.toLowerCase();
+  return String(tag).trim().toLowerCase() === athleteId();
+}
+
 export const MIN_REST = 3;
 export function configuredExerciseRest() {
   const v = Number(settings.exerciseRestSeconds);
@@ -102,45 +117,73 @@ export function thisWeekSessions() {
   return loadSessions().filter(s => new Date(s.isoDate) >= monday);
 }
 
+/* Did this record earn the kid a day of training?
+   Fully completed sessions always count. A session ENDED EARLY counts too, as
+   long as real work happened (at least one non-skipped exercise) — the complete
+   screen already promises "your progress is saved" and pays half XP, so the
+   week strip and the streak must not then render the day as untouched.
+   Records from before the flags existed are treated as done, matching the old
+   app's `completedFully !== false` reading. */
+export function countsAsTrained(s) {
+  if (!s || s.practice) return false;
+  if (s.completedFully) return true;
+  if (s.completedFully === undefined && s.endedEarly === undefined) return true;
+  return !!s.endedEarly && (s.perExercise || []).some(p => p && !p.skipped);
+}
+/* Trained, but not all the way through — rendered as a softer ✓. */
+export function isPartialSession(s) { return countsAsTrained(s) && !s.completedFully; }
+
 export function daysAgoCount(sessions, days) {
   const cutoff = Date.now() - days * DAY_MS;
   return sessions.filter(s => s.isoDate && new Date(s.isoDate).getTime() >= cutoff);
 }
 export function sumSecs(sessions) { return sessions.reduce((a, s) => a + (s.durationSecs || 0), 0); }
 
-// Longest run of consecutive calendar days with ≥1 completed session.
+/* Streak "freeze": a single rest/missed day between active days does NOT break
+   the run (a gap of 1 or 2 calendar days both continue it). This stops the
+   streak from punishing a recovery day — which would otherwise pressure a kid
+   to train while sore just to keep the flame, defeating the readiness system.
+   ONE constant drives every streak rule: the gap between two active days, AND
+   the gap between today and the most recent day. They used to disagree, so a
+   Mon/Wed/Fri kid saw 🔥3 on Saturday and 🔥0 on Sunday — the same 2-day gap
+   the freeze forgives everywhere else. */
+export const STREAK_MAX_GAP = 2;
+
+// Whole days between two Edmonton date strings (YYYY-MM-DD). Anchored at UTC
+// noon so DST can never round a gap to the wrong integer.
+function dayGap(fromISO, toISO) {
+  return Math.round((new Date(toISO + "T12:00:00Z") - new Date(fromISO + "T12:00:00Z")) / DAY_MS);
+}
+// Unique active days, oldest first.
+function activeDays(sessions) {
+  return [...new Set(sessions.map(s => edmontonISO(s.isoDate)).filter(Boolean))].sort();
+}
+
+// Longest run of active days under the same freeze rule as currentStreak —
+// otherwise "best" can read lower than the streak the kid is standing on.
 export function longestStreak(sessions) {
-  const days = [...new Set(sessions.map(s => edmontonISO(s.isoDate)).filter(Boolean))].sort();
+  const days = activeDays(sessions);
   let best = 0, run = 0, prev = null;
   days.forEach(d => {
-    if (prev && Math.round((new Date(d) - new Date(prev)) / DAY_MS) === 1) run++;
-    else run = 1;
+    const gap = prev ? dayGap(prev, d) : null;
+    run = (gap !== null && gap >= 1 && gap <= STREAK_MAX_GAP) ? run + 1 : 1;
     prev = d; if (run > best) best = run;
   });
   return best;
 }
-// Current streak anchored to today/yesterday (Edmonton). Compares date
-// STRINGS — Date objects here would mix UTC-parsed and local clocks and
-// break the streak every morning.
+// Current streak (Edmonton). Compares date STRINGS — Date objects here would
+// mix UTC-parsed and local clocks and break the streak every morning.
 export function currentStreak(sessions) {
-  const days = [...new Set(sessions.map(s => edmontonISO(s.isoDate)).filter(Boolean))].sort();
+  const days = activeDays(sessions);
   if (!days.length) return 0;
-  const today = todayISODate();
-  const y = new Date(today + "T12:00:00Z");
-  y.setUTCDate(y.getUTCDate() - 1);
-  const yesterday = y.toISOString().slice(0, 10);
   const last = days[days.length - 1];
-  if (last !== today && last !== yesterday) return 0;
-  // Streak "freeze": a single rest/missed day between active days does NOT break
-  // the run (a gap of 1 or 2 calendar days both continue it). This stops the
-  // streak from punishing a recovery day — which would otherwise pressure a kid
-  // to train while sore just to keep the flame, defeating the readiness system.
+  // A rest day today is still inside the freeze — same gap rule as below.
+  if (dayGap(last, todayISODate()) > STREAK_MAX_GAP) return 0;
   let streak = 1;
-  let cur = new Date(last + "T12:00:00Z");
+  let cur = last;
   for (let i = days.length - 2; i >= 0; i--) {
-    const prev = new Date(days[i] + "T12:00:00Z");
-    const gap = Math.round((cur - prev) / DAY_MS);
-    if (gap >= 1 && gap <= 2) { streak++; cur = prev; } else break;
+    const gap = dayGap(days[i], cur);
+    if (gap >= 1 && gap <= STREAK_MAX_GAP) { streak++; cur = days[i]; } else break;
   }
   return streak;
 }
@@ -278,6 +321,16 @@ export function loadJourney() {
 }
 export function saveJourney(j) { writeStorage(LS_JOURNEY, j); }
 
+/* XP a stored record is worth. Prefers what was actually awarded at the time;
+   falls back to the formula (halved for an ended-early session, matching
+   finalize()) for records restored from the cloud or written before xpEarned
+   existed. */
+export function sessionXp(entry) {
+  if (Number.isFinite(entry && entry.xpEarned)) return Math.max(0, entry.xpEarned);
+  const full = xpForSession(entry || {});
+  return entry && entry.completedFully === false ? Math.round(full / 2) : full;
+}
+
 export function xpForSession(entry) {
   if (entry.sessionType === "spa" || entry.session === "spa" || entry.spa) return 0;
   const moves = (entry.perExercise && entry.perExercise.length) ||
@@ -304,6 +357,17 @@ export function addXp(amount) {
   return { journey: j, leveledUp: gained > 0, levelsGained: gained };
 }
 
+/* Record that XP already granted through addXp() came from a session record
+   (finalize, or the in-session quiz that patches xpEarned onto it). Keeps the
+   reconcile baseline honest — without this, the next cloud restore would see
+   the session log grow and award the same XP a second time. */
+export function noteSessionXpAwarded(amount) {
+  if (!amount) return;
+  const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
+  j.sessionXp = (Number.isFinite(j.sessionXp) ? j.sessionXp : 0) + amount;
+  saveJourney(j);
+}
+
 export function pendingDrawCount() {
   const j = loadJourney();
   return j ? Math.max(0, j.pendingDraws || 0) : 0;
@@ -324,6 +388,69 @@ export function redeemPrize(id) {
   return j;
 }
 
+/* ============================================================
+   RESTORE — merging a session history back in (from the Firestore
+   mirror, or any other source). Local-first: nothing is ever
+   overwritten, only missing records are added.
+   ============================================================ */
+
+/* Identity of a session record. isoDate is a full timestamp written once at
+   finalize(), so it is unique per session in practice; dayKey guards the
+   pathological case of two devices finalizing in the same millisecond. */
+export function sessionKey(s) {
+  return String(s && s.isoDate || "") + "|" + String(s && s.dayKey || "");
+}
+
+/* Fields that belong to the cloud copy, not to a local record. */
+function stripCloudFields(doc) {
+  const { id, createdAt, ...entry } = doc || {};
+  return entry;
+}
+
+/* Add any incoming records the local log doesn't already have.
+   Returns how many were added. */
+export function mergeSessions(incoming) {
+  const local = loadSessions();
+  const seen = new Set(local.map(sessionKey));
+  let added = 0;
+  (incoming || []).forEach(doc => {
+    const entry = stripCloudFields(doc);
+    if (!entry.isoDate) return;
+    const key = sessionKey(entry);
+    if (seen.has(key)) return;
+    seen.add(key);
+    local.push(entry);
+    added++;
+  });
+  if (added) {
+    local.sort((a, b) => String(a.isoDate).localeCompare(String(b.isoDate)));
+    writeStorage(LS_SESSIONS, local);
+  }
+  return added;
+}
+
+/* Keep the XP total consistent with the session log without double-counting
+   quiz XP (which has no session record). The journey remembers how much of its
+   XP came from sessions; when the log grows behind its back — a cloud restore —
+   only the difference is awarded, and level-ups grant their prize draws as
+   usual. First call just establishes the baseline and awards nothing.
+   Returns the XP added. */
+export function reconcileJourneyWithSessions() {
+  const total = loadSessions().reduce((sum, s) => sum + sessionXp(s), 0);
+  const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
+  if (!Number.isFinite(j.sessionXp)) {
+    j.sessionXp = total;
+    saveJourney(j);
+    return 0;
+  }
+  const delta = total - j.sessionXp;
+  if (delta <= 0) return 0;
+  j.sessionXp = total;
+  saveJourney(j);          // record the new baseline before awarding
+  addXp(delta);            // re-reads the journey, so it keeps sessionXp
+  return delta;
+}
+
 /* One-time idempotent seeding: if the journey key is absent, walk the
    existing session history and award XP retroactively — nothing the kid
    earned ever vanishes. */
@@ -332,7 +459,10 @@ export function migrate() {
   settings = loadSettings();
   saveSettings();
   if (loadJourney() == null) {
-    const xp = loadSessions().reduce((sum, s) => sum + xpForSession(s), 0);
+    const xp = loadSessions().reduce((sum, s) => sum + sessionXp(s), 0);
     saveJourney({ xp, prizesWon: [], pendingDraws: 0, seededAt: Date.now() });
   }
+  // Establish the session-XP baseline BEFORE any cloud restore runs, so a
+  // restore awards exactly the XP of the records it actually brings back.
+  reconcileJourneyWithSessions();
 }

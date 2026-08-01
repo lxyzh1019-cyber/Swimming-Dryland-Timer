@@ -9,7 +9,7 @@
    ============================================================ */
 
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA, exWork, exRepsDetail } from "./data.js";
-import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, patchLastSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, xpForSession } from "./store.js";
+import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, patchLastSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, xpForSession, athleteId, noteSessionXpAwarded } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
 import { recoveryDoseSecs, refTime } from "./util.js";
@@ -617,6 +617,7 @@ export function finalize(completed) {
 
   const entry = {
     app: "swimming",
+    athlete: athleteId(),      // the cloud mirror is shared; a restore filters on this
     dayKey: sess.dayKey,
     dayTitle: day.title || sess.dayKey,
     isoDate: new Date().toISOString(),
@@ -669,6 +670,7 @@ export function finalize(completed) {
   if (sess.xpEarned > 0) {
     const { leveledUp } = addXp(sess.xpEarned);
     sess.leveledUp = leveledUp;
+    noteSessionXpAwarded(sess.xpEarned);
     patchLastSession({ xpEarned: sess.xpEarned });
   }
 

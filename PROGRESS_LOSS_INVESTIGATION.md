@@ -8,6 +8,19 @@ Verdict: the claim is real. There are **five ways data is genuinely destroyed
 or never written**, and **two ways intact data is displayed as zero**. Nothing
 in the app can restore any of it.
 
+## Status
+
+| # | Finding | Status |
+|---|---|---|
+| 1 | Cloud backup is write-only | **fixed** — `js/sync.js` restores on boot |
+| 2 | Safari evicts localStorage after ~7 idle days | **mitigated** by the restore; the eviction itself is Safari's |
+| 3 | Both kids share one store | **partly** — records are athlete-tagged so a restore can't mix them; local storage is still one bucket per browser |
+| 4 | Failed writes are swallowed | open |
+| 5 | Partials keyed to the calendar date | open (partly by design) |
+| 6 | Streak resets after a rest day | **fixed** — one freeze rule for every streak check |
+| 7 | Ending early erases the day | **fixed** — counts as a day trained, shown as a softer ✓ |
+| 8 | Minor (patch target, week boundary) | open |
+
 ---
 
 ## 1. The cloud backup is write-only — nothing can ever be restored

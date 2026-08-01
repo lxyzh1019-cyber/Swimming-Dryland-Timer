@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { LADDER, RANK_LORE, RANK_TEASE, fmtXp } from "../data.js";
-import { loadSessions, loadJourney, currentStreak, redeemPrize } from "../store.js";
+import { loadSessions, loadJourney, currentStreak, redeemPrize, countsAsTrained } from "../store.js";
 import { edmontonWeekISODates, edmontonISO } from "../util.js";
 import { buildJourney } from "./today.js";
 
@@ -96,7 +96,7 @@ export function buildProgressVM(state) {
   }));
 
   const weekSessions = sessions.filter(s => Object.values(isoDates).includes(edmontonISO(s.isoDate)));
-  const streak = currentStreak(sessions.filter(s => s.completedFully));
+  const streak = currentStreak(sessions.filter(countsAsTrained));
   const avgMins = weekSessions.length ? Math.round(weekSessions.reduce((a, s) => a + (s.durationSecs || 0), 0) / weekSessions.length / 60) : 0;
 
   // Milestones — real, honest chips (only what's actually been earned).

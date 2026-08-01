@@ -52,6 +52,12 @@ build step.
   quiz mastery, trackers) — nothing earned ever vanishes on reload.
 - Completed sessions are also mirrored to Firebase Firestore when online
   (`js/firebase.js`); the app works fully offline.
+- That mirror is **read back on every boot** (`js/sync.js`): any session this
+  browser is missing is merged into the local log and its XP re-awarded, so a
+  cleared or brand-new browser recovers the history instead of starting over.
+  The merge is additive and idempotent — local records are never overwritten.
+  Mirrored records are tagged with the athlete, and a restore only pulls back
+  that athlete's own sessions.
 - Workout content lives in `js/data.js` (`DAYS`). Progressive overload
   machinery is present but **paused** (`OVERLOAD_PAUSED` in `js/data.js`).
 

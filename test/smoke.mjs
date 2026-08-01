@@ -49,6 +49,39 @@ const d5 = new Date(Date.now() - 5 * 86400000).toISOString();
 ok(store.currentStreak([s(d2), s(d0)]) === 2, "1-day gap keeps the streak (grace)");
 ok(store.currentStreak([s(d5), s(d0)]) === 1, "a 4-day gap breaks the streak");
 
+/* The freeze applies to TODAY's gap too — a Mon/Wed/Fri kid used to see the
+   streak survive Saturday and collapse to 0 on Sunday. */
+const ago = n => new Date(Date.now() - n * 86400000).toISOString();
+ok(store.currentStreak([s(ago(5)), s(ago(3)), s(ago(1))]) === 3, "Mon/Wed/Fri, last was yesterday");
+ok(store.currentStreak([s(ago(6)), s(ago(4)), s(ago(2))]) === 3, "same run a day later still holds (rest day inside the freeze)");
+ok(store.currentStreak([s(ago(3))]) === 0, "a 3-day gap does end the streak");
+/* "Best" must never read lower than the streak the kid is standing on. */
+ok(store.longestStreak([s(ago(6)), s(ago(4)), s(ago(2))]) === 3, "longestStreak uses the same freeze");
+
+/* --- ended-early sessions count as a day trained --- */
+const early = ex => ({ isoDate: d0, completedFully: false, endedEarly: true, perExercise: ex });
+ok(store.countsAsTrained({ completedFully: true }), "completed session counts");
+ok(store.countsAsTrained(early([{ name: "Superman" }])), "ended early after real work counts");
+ok(!store.countsAsTrained(early([{ name: "Superman", skipped: true }])), "ended early with everything skipped does not");
+ok(!store.countsAsTrained(early([])), "GO-then-quit does not count");
+ok(store.countsAsTrained({ isoDate: d0 }), "pre-flag legacy records count (old app's !== false rule)");
+ok(store.isPartialSession(early([{ name: "Superman" }])), "ended-early reads as partial");
+
+/* --- cloud restore: merge is additive and idempotent, XP is awarded once --- */
+localStorage.clear();
+const rec = (iso, day) => ({ isoDate: iso, dayKey: day, perExercise: [1,2,3,4,5,6], completedFully: true, xpEarned: 100 });
+const cloud = [{ id: "abc", createdAt: { seconds: 1 }, ...rec(d2, "monday") }, rec(d0, "tuesday")];
+store.migrate();                                   // fresh device: baseline 0
+ok(store.loadJourney().xp === 0, "wiped device starts at 0 XP");
+ok(store.mergeSessions(cloud) === 2, "restore adds both cloud sessions");
+ok(store.loadSessions()[0].id === undefined, "cloud-only fields are stripped");
+ok(store.reconcileJourneyWithSessions() === 200, "restored sessions re-award their XP");
+ok(store.loadJourney().xp === 200, "XP is back after the restore");
+ok(store.mergeSessions(cloud) === 0, "re-running the restore adds nothing");
+ok(store.reconcileJourneyWithSessions() === 0, "and awards no XP a second time");
+ok(store.currentStreak(store.loadSessions().filter(store.countsAsTrained)) === 2, "the restored streak is back");
+localStorage.clear();
+
 /* --- XP --- */
 ok(store.xpForSession({ perExercise: [1,2,3,4,5,6] }) === 100, "6 moves = 100 XP");
 ok(store.xpForSession({ sessionType: "spa" }) === 0, "spa earns no XP");

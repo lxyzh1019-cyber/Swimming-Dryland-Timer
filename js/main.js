@@ -6,8 +6,9 @@
    delegated click listener below.
    ============================================================ */
 
-import { migrate, settings, updateSettings, saveReadiness, addXp, patchLastSession, pendingDrawCount } from "./store.js";
+import { migrate, settings, updateSettings, saveReadiness, addXp, patchLastSession, pendingDrawCount, noteSessionXpAwarded } from "./store.js";
 import { edmontonDayKey } from "./util.js";
+import { restoreFromCloud } from "./sync.js";
 import { buildTodayVM, journeyPathScrollIntoView } from "./vm/today.js";
 import { todayWide, todayNarrow } from "./screens/today.js";
 import { page, shellWithRail, bottomNav } from "./screens/shell.js";
@@ -214,6 +215,7 @@ const actions = {
       const xp = q.opts[i] && q.opts[i].ok ? 25 : 10;
       engine.sess.xpEarned = (engine.sess.xpEarned || 0) + xp;
       if (addXp(xp).leveledUp) engine.sess.leveledUp = true;
+      noteSessionXpAwarded(xp);   // it lands on the session record via xpEarned below
       patchLastSession({ xpEarned: engine.sess.xpEarned });
       render();
     }
@@ -349,6 +351,12 @@ function boot() {
   if (!state.selectedDay) state.selectedDay = edmontonDayKey();
   render();
   fetchWeather();
+  // Pull anything this device is missing back out of the cloud mirror (a wiped
+  // or brand-new browser starts empty, but the history is still up there), then
+  // repaint so the restored streak / XP / log show up straight away.
+  restoreFromCloud().then(({ added }) => {
+    if (added && !state.inSession) render();
+  });
 }
 
 boot();
