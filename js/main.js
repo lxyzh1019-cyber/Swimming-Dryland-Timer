@@ -9,6 +9,7 @@
 import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, noteSessionXpAwarded, onStorageError } from "./store.js";
 import { edmontonDayKey, escapeHtml } from "./util.js";
 import { restoreFromCloud } from "./sync.js";
+import { downloadBackup, restoreBackupFile } from "./backup.js";
 import { buildTodayVM, journeyPathScrollIntoView } from "./vm/today.js";
 import { todayWide, todayNarrow } from "./screens/today.js";
 import { page, shellWithRail, bottomNav } from "./screens/shell.js";
@@ -22,7 +23,7 @@ import { buildProgressVM, toggleRedeem } from "./vm/progress.js";
 import { progressScreen } from "./screens/progress.js";
 import { buildGrownupVM, exportCsv } from "./vm/grownup.js";
 import { grownupScreen } from "./screens/grownup.js";
-import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId } from "./store.js";
+import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS } from "./store.js";
 
 export const state = {
   nav: "today",                 // 'today' | 'progress' | 'grownup'
@@ -40,6 +41,7 @@ export const state = {
   detailOverlay: false,
   detailEx: null,
   weather: null,                // { icon, temp, caption } once fetched
+  backupNote: "", backupNoteOk: false,   // result line under Backup & restore
   storageError: null,           // { name } — set when a write is rejected (disk full)
   isWide: true
 };
@@ -270,6 +272,13 @@ const actions = {
     render();
   },
   exportCsv() { exportCsv(); },
+  downloadBackup() {
+    const p = downloadBackup();
+    const n = (p.data[LS_SESSIONS] || []).length;
+    state.backupNote = `Backup downloaded — ${n} session${n === 1 ? "" : "s"} and everything ${p.profile.name} has earned.`;
+    state.backupNoteOk = true;
+    render();
+  },
   toggleGate() {
     const g = loadGate();
     g.unlocked = !g.unlocked;
@@ -353,6 +362,24 @@ root.addEventListener("input", e => {
     updateSettings({ athleteName: name });
     renameProfile(activeProfileId(), name);
   }
+});
+
+/* Restoring a backup rewrites storage under the app's feet — settings and the
+   engine hold module-level copies — so the page reloads once the merge lands. */
+root.addEventListener("change", e => {
+  if (!(e.target.matches && e.target.matches('[data-input="restoreBackup"]'))) return;
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  restoreBackupFile(file).then(res => {
+    state.backupNote = res.message;
+    state.backupNoteOk = true;
+    render();
+    if (res.sessionsAdded || res.filled.length) setTimeout(() => location.reload(), 1200);
+  }).catch(err => {
+    state.backupNote = err.message || "That restore didn't work.";
+    state.backupNoteOk = false;
+    render();
+  });
 });
 
 window.addEventListener("resize", () => {

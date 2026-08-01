@@ -13,7 +13,7 @@ in the app can restore any of it.
 | # | Finding | Status |
 |---|---|---|
 | 1 | Cloud backup is write-only | **fixed** — `js/sync.js` restores on boot |
-| 2 | Safari evicts localStorage after ~7 idle days | **mitigated** by the restore; the eviction itself is Safari's |
+| 2 | Safari evicts localStorage after ~7 idle days | **mitigated** — cloud restore on boot, plus a manual JSON backup/restore; the eviction itself is Safari's |
 | 3 | Both kids share one store | **fixed** — one storage namespace per athlete, switchable in the Grown-up Zone |
 | 4 | Failed writes are swallowed | **fixed** — retried after freeing analytics, then reported in the UI |
 | 5 | Partials keyed to the calendar date | **fixed** — a partial also survives 6h, so one bout can cross midnight |
@@ -167,4 +167,5 @@ profiles given the *same* name would share restored records.
    "partial ✓") so the promise on the complete screen matches the week strip.
 6. **Surface write failures** instead of `catch {}` — cap/trim the session log
    and tell the parent when a save fails.
-7. **JSON export/import** in the Grown-up Zone as a manual escape hatch.
+7. **JSON export/import** in the Grown-up Zone as a manual escape hatch. ✅
+   Shipped: `js/backup.js` + `exportProfileData` / `importProfileData`.

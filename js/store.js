@@ -601,6 +601,100 @@ export function reconcileJourneyWithSessions() {
   return delta;
 }
 
+/* ============================================================
+   BACKUP — a plain-JSON escape hatch for one athlete.
+
+   The cloud mirror only carries sessions. This carries everything
+   she owns (XP, prizes, quiz mastery, trackers, settings), so a
+   grown-up can move a kid to a new device or keep a copy that no
+   browser eviction can touch.
+   ============================================================ */
+export const BACKUP_APP = "splash-swim-dryland";
+export const BACKUP_SCHEMA = 1;
+
+/* Every key that belongs to an athlete. */
+export const PROFILE_KEYS = [
+  SETTINGS_KEY, PROGRESS_KEY, SKIP_HISTORY_KEY, ENGAGE_KEY, LS_READINESS, LS_DAYPROG,
+  LS_LEARNING, LS_LADDER, LS_QUIZ, LS_GATE, LS_SESSIONS, LS_TRACKER, LS_EVENTS,
+  LS_PRLOG, LS_JOURNEY
+];
+
+/* True when nothing in the saved settings differs from the shipped defaults. */
+function isDefaultSettings(saved) {
+  if (!saved || typeof saved !== "object") return true;
+  return Object.keys(DEFAULT_SETTINGS).every(k =>
+    saved[k] === undefined || JSON.stringify(saved[k]) === JSON.stringify(DEFAULT_SETTINGS[k]));
+}
+
+export function exportProfileData() {
+  const data = {};
+  PROFILE_KEYS.forEach(k => {
+    const v = readStorage(k, undefined);
+    if (v !== undefined) data[k] = v;
+  });
+  return {
+    app: BACKUP_APP, schema: BACKUP_SCHEMA,
+    exportedAt: new Date().toISOString(),
+    profile: { id: activeProfileId(), name: settings.athleteName || LEGACY_ATHLETE },
+    data
+  };
+}
+
+/* Restore INTO the active athlete. Additive by design — a backup can only add
+   to what's here, never delete or overwrite it:
+     · sessions  — merged, deduped (same rule as the cloud restore)
+     · journey   — higher XP total wins, prize wallets are unioned by id
+     · the rest  — filled in only where this device has nothing
+   Returns { sessionsAdded, xpAdded, filled: [keys] }. Throws on a file that
+   isn't a Splash backup. */
+export function importProfileData(payload) {
+  if (!payload || payload.app !== BACKUP_APP || !payload.data || typeof payload.data !== "object") {
+    throw new Error("That file isn't a Splash backup.");
+  }
+  if (Number(payload.schema) > BACKUP_SCHEMA) {
+    throw new Error("That backup was made by a newer version of the app.");
+  }
+  const d = payload.data;
+  const result = { sessionsAdded: 0, xpAdded: 0, filled: [] };
+
+  if (Array.isArray(d[LS_SESSIONS])) result.sessionsAdded = mergeSessions(d[LS_SESSIONS]);
+
+  const inc = d[LS_JOURNEY];
+  if (inc && typeof inc === "object") {
+    const local = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
+    const wallet = new Map();
+    [...(local.prizesWon || []), ...(inc.prizesWon || [])].forEach(p => {
+      if (p && !wallet.has(p.id)) wallet.set(p.id, p);
+    });
+    saveJourney({
+      ...inc, ...local,
+      xp: Math.max(local.xp || 0, inc.xp || 0),
+      pendingDraws: Math.max(local.pendingDraws || 0, inc.pendingDraws || 0),
+      sessionXp: Math.max(
+        Number.isFinite(local.sessionXp) ? local.sessionXp : 0,
+        Number.isFinite(inc.sessionXp) ? inc.sessionXp : 0
+      ),
+      prizesWon: [...wallet.values()].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+    });
+  }
+
+  PROFILE_KEYS.forEach(k => {
+    if (k === LS_SESSIONS || k === LS_JOURNEY || d[k] === undefined) return;
+    // Settings are the exception to "fill only what's missing": migrate() always
+    // writes them, so they'd never look missing. Untouched defaults count as
+    // empty — a fresh device gets her name, rest times and prize pool back, and
+    // anything a grown-up has actually changed here still wins.
+    if (k === SETTINGS_KEY) {
+      if (isDefaultSettings(readStorage(k, null))) { writeStorage(k, d[k]); result.filled.push(k); }
+      return;
+    }
+    if (readStorage(k, null) === null) { writeStorage(k, d[k]); result.filled.push(k); }
+  });
+
+  result.xpAdded = reconcileJourneyWithSessions();
+  return result;
+}
+
 /* One-time idempotent seeding: if the journey key is absent, walk the
    existing session history and award XP retroactively — nothing the kid
    earned ever vanishes. */

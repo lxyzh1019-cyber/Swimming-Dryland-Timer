@@ -190,4 +190,44 @@ ok(store.loadSessions().length === 1, "switching back restores the first athlete
 ok(store.belongsToAthlete({ isoDate: "x" }), "untagged cloud records belong to the athlete who was here first");
 localStorage.clear();
 
+/* --- backup: a full copy of one athlete, restored additively --- */
+localStorage.clear();
+store.migrate();
+store.saveSession({ isoDate: "2026-03-01T10:00:00.000Z", dayKey: "monday", perExercise: [1,2,3,4,5,6], completedFully: true, xpEarned: 100 });
+store.reconcileJourneyWithSessions();
+store.addXp(100);
+store.addPrize({ icon: "🎁", label: "Movie night" });
+store.saveQuiz({ items: { a: 1 }, results: [1], streak: 3 });
+const backup = store.exportProfileData();
+ok(backup.app === "splash-swim-dryland" && backup.schema === 1, "backup is stamped");
+ok(backup.data[store.LS_SESSIONS].length === 1, "the session log is in the file");
+ok(backup.data[store.LS_JOURNEY].prizesWon.length === 1, "so is the prize wallet");
+ok(backup.data[store.LS_QUIZ].streak === 3, "and quiz mastery");
+
+localStorage.clear();                       // the Safari-eviction case
+store.migrate();
+ok(store.loadSessions().length === 0 && store.loadJourney().xp === 0, "device is empty");
+const restored = store.importProfileData(backup);
+ok(restored.sessionsAdded === 1, "the session comes back");
+ok(store.loadJourney().xp === 200, "XP comes back");
+ok(store.loadJourney().prizesWon.length === 1, "the prize wallet comes back");
+ok(store.loadQuiz().streak === 3, "quiz mastery comes back");
+ok(store.loadSettings().athleteName === backup.data[store.SETTINGS_KEY].athleteName, "her settings come back onto a fresh device");
+const again = store.importProfileData(backup);
+ok(again.sessionsAdded === 0 && again.xpAdded === 0, "restoring the same file twice changes nothing");
+ok(store.loadJourney().xp === 200, "and cannot inflate XP");
+
+/* Additive: a record only on the device survives a restore. */
+store.saveSession({ isoDate: "2026-03-05T10:00:00.000Z", dayKey: "friday", completedFully: true, xpEarned: 100 });
+store.importProfileData(backup);
+ok(store.loadSessions().length === 2, "a newer local session is not wiped by an older backup");
+/* ...but settings a grown-up actually changed on THIS device still win. */
+store.updateSettings({ roundRestSeconds: 45 });
+store.importProfileData(backup);
+ok(store.loadSettings().roundRestSeconds === 45, "a changed setting is not overwritten by a restore");
+let threw = "";
+try { store.importProfileData({ app: "something-else", data: {} }); } catch (e) { threw = e.message; }
+ok(/isn't a Splash backup/.test(threw), "a foreign file is rejected");
+localStorage.clear();
+
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

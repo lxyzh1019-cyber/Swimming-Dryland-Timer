@@ -64,6 +64,13 @@ build step.
 - Writes that localStorage rejects (full device) are retried after dropping the
   expendable analytics keys, and if they still fail the app says so — a session
   that wasn't recorded never reads as saved.
+- **Backup & restore** (Grown-up Zone → Settings): downloads one athlete's
+  whole namespace as JSON — sessions, XP, prizes, quiz mastery, trackers,
+  settings — and restores it into the active athlete. Restoring is additive:
+  sessions are merged and deduped, the higher XP total wins, prize wallets are
+  unioned, and other records fill in only where the device has nothing.
+  Settings are the one exception — untouched defaults are replaced, anything a
+  grown-up has actually changed here wins.
 - Workout content lives in `js/data.js` (`DAYS`). Progressive overload
   machinery is present but **paused** (`OVERLOAD_PAUSED` in `js/data.js`).
 

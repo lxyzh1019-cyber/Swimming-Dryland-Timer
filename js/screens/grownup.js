@@ -454,6 +454,17 @@ function settingsTab(vm) {
       ${!vm.isDefaultPool ? `<button type="button" data-action="resetPrizePool" style="margin-top:8px;border:none;background:none;color:var(--ink-soft);font-weight:800;font-size:13px;text-decoration:underline;cursor:pointer;font-family:inherit;">Reset to default pool</button>` : ""}
     </div>
     <div style="border-top:1.5px solid var(--hairline);padding-top:16px;">
+      <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Backup &amp; restore 💾</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:9px;line-height:1.5;">A full copy of <strong>${escapeHtml(vm.settingsName)}</strong>'s data — sessions, XP, prizes, quiz mastery, trackers. Restoring only adds; nothing already on this device is overwritten. Each athlete backs up separately.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button type="button" data-action="downloadBackup" style="min-height:44px;border:2px solid var(--aqua);background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">⬇︎ Download backup</button>
+        <label style="min-height:44px;display:inline-flex;align-items:center;border:2px solid var(--hairline);background:var(--surface-2);color:var(--ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;">⬆︎ Restore from file
+          <input type="file" accept="application/json,.json" data-input="restoreBackup" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+        </label>
+      </div>
+      ${vm.backupNote ? `<div role="status" style="margin-top:10px;font-size:13px;font-weight:800;line-height:1.5;color:${vm.backupNoteOk ? "var(--mint-ink)" : "var(--stop-ink)"};background:${vm.backupNoteOk ? "var(--mint-wash)" : "var(--stop-wash)"};border-radius:12px;padding:9px 12px;">${escapeHtml(vm.backupNote)}</div>` : ""}
+    </div>
+    <div style="border-top:1.5px solid var(--hairline);padding-top:16px;">
       <div style="font-size:15px;color:var(--stop);line-height:1.5;font-weight:700;">🔴 Sharp pain, pinching, or numbness → STOP immediately and tell a grown-up.</div>
     </div>
   </div>`;
