@@ -52,6 +52,25 @@ build step.
   quiz mastery, trackers) — nothing earned ever vanishes on reload.
 - Completed sessions are also mirrored to Firebase Firestore when online
   (`js/firebase.js`); the app works fully offline.
+- That mirror is **read back on every boot** (`js/sync.js`): any session this
+  browser is missing is merged into the local log and its XP re-awarded, so a
+  cleared or brand-new browser recovers the history instead of starting over.
+  The merge is additive and idempotent — local records are never overwritten.
+  Mirrored records are tagged with the athlete, and a restore only pulls back
+  that athlete's own sessions.
+- **One storage namespace per athlete.** The first athlete uses the bare keys;
+  additional ones get `<key>::<profileId>`. Add or switch athletes in
+  Grown-up Zone → Settings (switching reloads the app).
+- Writes that localStorage rejects (full device) are retried after dropping the
+  expendable analytics keys, and if they still fail the app says so — a session
+  that wasn't recorded never reads as saved.
+- **Backup & restore** (Grown-up Zone → Settings): downloads one athlete's
+  whole namespace as JSON — sessions, XP, prizes, quiz mastery, trackers,
+  settings — and restores it into the active athlete. Restoring is additive:
+  sessions are merged and deduped, the higher XP total wins, prize wallets are
+  unioned, and other records fill in only where the device has nothing.
+  Settings are the one exception — untouched defaults are replaced, anything a
+  grown-up has actually changed here wins.
 - Workout content lives in `js/data.js` (`DAYS`). Progressive overload
   machinery is present but **paused** (`OVERLOAD_PAUSED` in `js/data.js`).
 

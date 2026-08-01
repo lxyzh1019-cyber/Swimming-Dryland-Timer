@@ -6,8 +6,10 @@
    delegated click listener below.
    ============================================================ */
 
-import { migrate, settings, updateSettings, saveReadiness, addXp, patchLastSession, pendingDrawCount } from "./store.js";
-import { edmontonDayKey } from "./util.js";
+import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, noteSessionXpAwarded, onStorageError } from "./store.js";
+import { edmontonDayKey, escapeHtml } from "./util.js";
+import { restoreFromCloud } from "./sync.js";
+import { downloadBackup, restoreBackupFile } from "./backup.js";
 import { buildTodayVM, journeyPathScrollIntoView } from "./vm/today.js";
 import { todayWide, todayNarrow } from "./screens/today.js";
 import { page, shellWithRail, bottomNav } from "./screens/shell.js";
@@ -21,7 +23,7 @@ import { buildProgressVM, toggleRedeem } from "./vm/progress.js";
 import { progressScreen } from "./screens/progress.js";
 import { buildGrownupVM, exportCsv } from "./vm/grownup.js";
 import { grownupScreen } from "./screens/grownup.js";
-import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick } from "./store.js";
+import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS } from "./store.js";
 
 export const state = {
   nav: "today",                 // 'today' | 'progress' | 'grownup'
@@ -39,6 +41,8 @@ export const state = {
   detailOverlay: false,
   detailEx: null,
   weather: null,                // { icon, temp, caption } once fetched
+  backupNote: "", backupNoteOk: false,   // result line under Backup & restore
+  storageError: null,           // { name } — set when a write is rejected (disk full)
   isWide: true
 };
 
@@ -75,8 +79,20 @@ engine.onSessionUpdate(kind => {
   else renderSession();
 });
 
+/* A write that never reached storage used to be invisible. It now surfaces
+   here until the app is reloaded, so nobody keeps training into a full disk
+   believing it's being recorded. */
+function storageBannerHtml() {
+  if (!state.storageError) return "";
+  return `<div role="alert" style="position:fixed;left:0;right:0;bottom:0;z-index:200;background:var(--stop-wash);border-top:3px solid var(--stop);padding:12px 16px;display:flex;align-items:center;gap:12px;justify-content:center;font-family:var(--font-ui);">
+    <span style="font-size:20px;">⚠️</span>
+    <span style="font-weight:800;font-size:14px;color:var(--stop-ink);line-height:1.4;max-width:640px;">This device's storage is full, so the last thing ${escapeHtml(state.storageError.name)} did wasn't saved. Free up space on the device (or clear other sites' data) — sessions won't be recorded until then.</span>
+    <button type="button" data-action="dismissStorageError" style="min-height:36px;border:none;background:var(--stop);color:#fff;border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 14px;cursor:pointer;font-family:inherit;">Dismiss</button>
+  </div>`;
+}
+
 function overlaysHtml() {
-  let html = "";
+  let html = storageBannerHtml();
   if (state.quizDeck) html += quizDeckHtml(state.quizDeck);
   if (state.prizeDraw) html += prizeDrawHtml(state.prizeDraw);
   return html;
@@ -109,6 +125,17 @@ export function render() {
 
 const actions = {
   nav(arg) { state.nav = arg; render(); },
+  dismissStorageError() { state.storageError = null; render(); },
+  // Switching athlete swaps every storage namespace; a reload is the only way
+  // to be sure no module is still holding the previous kid's data.
+  pickAthlete(arg) { if (arg !== activeProfileId() && switchProfile(arg)) location.reload(); },
+  addAthlete() {
+    const inp = root.querySelector('[data-input="newProfile"]');
+    const name = (inp && inp.value || "").trim();
+    if (!name) return;
+    const id = addProfile(name);
+    if (id && switchProfile(id)) location.reload();
+  },
   selectDay(arg) { state.selectedDay = arg; state.expanded = {}; render(); },
   toggleBlock(arg) { state.expanded[arg] = !state.expanded[arg]; render(); },
   toggleCoachVoice() { updateSettings({ coachVoiceOn: !settings.coachVoiceOn }); render(); },
@@ -214,7 +241,8 @@ const actions = {
       const xp = q.opts[i] && q.opts[i].ok ? 25 : 10;
       engine.sess.xpEarned = (engine.sess.xpEarned || 0) + xp;
       if (addXp(xp).leveledUp) engine.sess.leveledUp = true;
-      patchLastSession({ xpEarned: engine.sess.xpEarned });
+      noteSessionXpAwarded(xp);   // it lands on the session record via xpEarned below
+      patchSession(engine.sess.savedKey, { xpEarned: engine.sess.xpEarned });
       render();
     }
   },
@@ -244,6 +272,13 @@ const actions = {
     render();
   },
   exportCsv() { exportCsv(); },
+  downloadBackup() {
+    const p = downloadBackup();
+    const n = (p.data[LS_SESSIONS] || []).length;
+    state.backupNote = `Backup downloaded — ${n} session${n === 1 ? "" : "s"} and everything ${p.profile.name} has earned.`;
+    state.backupNoteOk = true;
+    render();
+  },
   toggleGate() {
     const g = loadGate();
     g.unlocked = !g.unlocked;
@@ -323,8 +358,28 @@ root.addEventListener("click", e => {
 // replacing the DOM mid-blur would swallow the tap that moved focus away).
 root.addEventListener("input", e => {
   if (e.target.matches && e.target.matches('[data-input="athleteName"]')) {
-    updateSettings({ athleteName: e.target.value.trim() || "Jess" });
+    const name = e.target.value.trim() || "Jess";
+    updateSettings({ athleteName: name });
+    renameProfile(activeProfileId(), name);
   }
+});
+
+/* Restoring a backup rewrites storage under the app's feet — settings and the
+   engine hold module-level copies — so the page reloads once the merge lands. */
+root.addEventListener("change", e => {
+  if (!(e.target.matches && e.target.matches('[data-input="restoreBackup"]'))) return;
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  restoreBackupFile(file).then(res => {
+    state.backupNote = res.message;
+    state.backupNoteOk = true;
+    render();
+    if (res.sessionsAdded || res.filled.length) setTimeout(() => location.reload(), 1200);
+  }).catch(err => {
+    state.backupNote = err.message || "That restore didn't work.";
+    state.backupNoteOk = false;
+    render();
+  });
 });
 
 window.addEventListener("resize", () => {
@@ -345,10 +400,20 @@ async function fetchWeather() {
 }
 
 function boot() {
+  onStorageError(() => {
+    state.storageError = { name: settings.athleteName || "your athlete" };
+    if (!state.inSession) render();
+  });
   migrate();
   if (!state.selectedDay) state.selectedDay = edmontonDayKey();
   render();
   fetchWeather();
+  // Pull anything this device is missing back out of the cloud mirror (a wiped
+  // or brand-new browser starts empty, but the history is still up there), then
+  // repaint so the restored streak / XP / log show up straight away.
+  restoreFromCloud().then(({ added }) => {
+    if (added && !state.inSession) render();
+  });
 }
 
 boot();

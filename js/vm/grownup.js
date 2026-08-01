@@ -6,7 +6,7 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl } from "../data.js";
-import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool } from "../store.js";
+import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId } from "../store.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
 
 const LIGHT_COLORS = { green: "var(--mint)", yellow: "var(--sun)", red: "var(--stop)", recovery: "var(--grape)" };
@@ -406,6 +406,13 @@ export function buildGrownupVM(state) {
     standingRules: STANDING_RULES,
     libraryList,
     settingsName: settings.athleteName || "Jess",
+    profiles: profileList().map(p => ({
+      id: p.id, name: p.name, active: p.id === activeProfileId(),
+      style: "min-height:40px;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:14px;padding:0 16px;font-family:inherit;border:2px solid "
+        + (p.id === activeProfileId() ? "var(--aqua);background:var(--aqua);color:#fff;" : "var(--hairline);background:var(--surface-2);color:var(--ink);")
+    })),
+    multiProfile: profileList().length > 1,
+    backupNote: state.backupNote || "", backupNoteOk: !!state.backupNoteOk,
     settingsExRest: settings.exerciseRestSeconds, settingsRndRest: settings.roundRestSeconds, settingsSecRest: settings.sectionRestSeconds,
     stepperBtn: "width:44px;height:44px;border-radius:50%;background:var(--surface-2);border:2px solid var(--hairline);font-size:22px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;",
     voiceStyleOpts,

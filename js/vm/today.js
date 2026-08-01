@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overloadWeek } from "../data.js";
-import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress } from "../store.js";
+import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress, countsAsTrained } from "../store.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
 
 /* Whole-plan stats (design's _planStats). */
@@ -25,24 +25,35 @@ export function planStats(day) {
 }
 
 /* Real per-day status for the current week, derived from the session log:
-   done (a completed record exists for that date) / today / missed / upcoming / rest. */
+   done / partial (trained but ended early) / today / missed / upcoming / rest. */
+
+/* This week's records (Mon–Sun, Edmonton). Shared so the week strip, the stat
+   chips and the day card can't disagree about what happened. */
+export function currentWeekSessions() {
+  const weekIsoSet = new Set(Object.values(edmontonWeekISODates()));
+  return loadSessions().filter(s => weekIsoSet.has(edmontonISO(s.isoDate)));
+}
+
 export function weekStatuses() {
-  const isoDates = edmontonWeekISODates();
-  const weekIsoSet = new Set(Object.values(isoDates));
   const todayKey = edmontonDayKey();
   // This week's sessions, bucketed by the day they were FOR (dayKey) — so a
   // Monday catch-up done on Wednesday checks off Monday, matching the CTA
   // copy ("starting now still counts for Monday"), and an evening session
   // never drifts onto tomorrow's card.
-  const sessions = loadSessions().filter(s => weekIsoSet.has(edmontonISO(s.isoDate)));
-  // "done" means a FULLY completed session exists — the same bar streaks and
-  // adherence use, so the week strip and the stats can't disagree. A past day
-  // with only an aborted attempt reads as "catch up", not a false checkmark.
-  const doneKeys = new Set(sessions.filter(s => s.completedFully).map(s => s.dayKey).filter(Boolean));
+  const sessions = currentWeekSessions();
+  // A day is checked off when the kid actually trained it — fully completed, or
+  // ended early after real work (countsAsTrained). Ending early used to leave the
+  // day looking untouched even though the complete screen said "progress saved"
+  // and paid half XP; it now shows a softer ✓ so the app stops contradicting
+  // itself. A GO-then-quit with nothing done still reads as "catch up".
+  const trained = sessions.filter(countsAsTrained);
+  const doneKeys = new Set(trained.filter(s => s.completedFully).map(s => s.dayKey).filter(Boolean));
+  const partialKeys = new Set(trained.filter(s => !s.completedFully).map(s => s.dayKey).filter(Boolean));
   const todayIdx = WEEK_ORDER.indexOf(todayKey);
   const out = {};
   WEEK_ORDER.forEach((k, i) => {
     if (doneKeys.has(k)) out[k] = "done";
+    else if (partialKeys.has(k)) out[k] = "partial";
     else if (k === todayKey) out[k] = "today";
     else if (i < todayIdx) out[k] = DAYS[k].spa ? "rest" : "missed";
     else out[k] = DAYS[k].spa ? "rest" : "future";
@@ -193,6 +204,8 @@ const STATUS = {
   // Reframed from a red ✕ (shame) to a gentle amber "catch up" nudge — a wall of
   // red X's discourages a kid; a forward-looking prompt invites them back.
   missed:   { bg: "var(--sun-wash)", border: "transparent", icon: "↺", iconBg: "var(--sun)", iconColor: "#fff", label: "var(--sun-ink)" },
+  // Trained, but ended early — a real ✓, visually softer than a full one.
+  partial:  { bg: "var(--mint-wash)", border: "transparent", icon: "✓", iconBg: "color-mix(in srgb, var(--mint) 55%, #fff)", iconColor: "#fff", label: "var(--ink-soft)" },
   upcoming: { bg: "var(--aqua-wash)",  border: "transparent", icon: "📋", iconBg: "transparent", iconColor: "var(--aqua-ink)", label: "var(--aqua-ink)" }
 };
 
@@ -203,9 +216,9 @@ export function buildTodayVM(state) {
   const sessions = loadSessions();
   const selectedKey = state.selectedDay || todayKey;
 
-  const weekDoneCount = WEEK_ORDER.filter(k => statuses[k] === "done").length;
+  const weekDoneCount = WEEK_ORDER.filter(k => statuses[k] === "done" || statuses[k] === "partial").length;
   const statChips = [
-    { icon: "🔥", value: String(currentStreak(sessions.filter(s => s.completedFully))), label: "day streak", color: "var(--ink)" },
+    { icon: "🔥", value: String(currentStreak(sessions.filter(countsAsTrained))), label: "day streak", color: "var(--ink)" },
     { icon: "✅", value: weekDoneCount + "/7", label: "this week", color: "var(--mint-ink)" },
     { icon: "🏊", value: String(sessions.length), label: "sessions", color: "var(--sea)" }
   ];
@@ -268,6 +281,7 @@ export function buildTodayVM(state) {
   const legend = [
     { icon: "✓", iconStyle: legendCircle("var(--mint)"), label: "Done" },
     { icon: "⭐", iconStyle: legendCircle("var(--sun)") + "font-size:10px;", label: "Today" },
+    { icon: "✓", iconStyle: legendCircle("color-mix(in srgb, var(--mint) 55%, #fff)"), label: "Partly done" },
     { icon: "📋", iconStyle: "font-size:14px;", label: "Upcoming" },
     { icon: "↺", iconStyle: legendCircle("var(--sun)"), label: "Catch up" }
   ];
@@ -283,6 +297,9 @@ export function buildTodayVM(state) {
   const isSpaDay = !!(fullDay && fullDay.spa);
   let status = statuses[selectedKey];
   if (status === "rest" || status === "future") status = isSpaDay ? "rest" : "future";
+  // A partly-done day shares the "done" card, with copy that names what's left.
+  const isPartial = status === "partial";
+  if (isPartial) status = "done";
   const shortU = DAY_SHORT[selectedKey].toUpperCase();
   const tag = (fullDay && fullDay.tag) || "";
   let dayView;
@@ -300,14 +317,27 @@ export function buildTodayVM(state) {
       dayView.recoveryItems = (fullDay.recovery || []).slice(0, 3).map(r => ({ text: r.name + (r.dose ? " · " + r.dose : "") })); }
   } else if (status === "done") {
     const remaining = blocks.filter(b => !b.isBlockDone).map(b => b.name);
-    const allDone = remaining.length === 0 || !doneBlocks.length;  // no per-block record ⇒ treat as fully done
-    const remainingLabel = remaining.join(" & ");
+    // An ended-early day is never "all done", even once its per-block record has
+    // aged out (day progress only survives the calendar day it was written).
+    const allDone = !isPartial && (remaining.length === 0 || !doneBlocks.length);
+    const remainingLabel = remaining.join(", ");
+    const partialRecord = isPartial
+      ? currentWeekSessions().filter(s => s.dayKey === selectedKey && countsAsTrained(s)).pop()
+      : null;
+    const partialXp = partialRecord && Number.isFinite(partialRecord.xpEarned) ? partialRecord.xpEarned : 0;
     dayView = {
-      badgeLabel: shortU + " · COMPLETED ✓", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"),
-      earnedXpLabel: isSpaDay ? "" : "+" + (stats.moves * 10 + 40) + " XP earned",
+      badgeLabel: shortU + (isPartial ? " · PARTLY DONE ✓" : " · COMPLETED ✓"),
+      title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"),
+      earnedXpLabel: isSpaDay ? "" : "+" + (isPartial ? partialXp : stats.moves * 10 + 40) + " XP earned",
       showChips: true, isDone: true,
-      doneHeadline: isSpaDay ? "Nice reset — recovery complete!" : (allDone ? "Nice work — you crushed this one!" : "You got through most of it!"),
-      doneSub: isSpaDay ? "No XP today — rest is part of the plan." : (allDone ? "Every block is checked off. Want extra reps?" : ("You skipped " + remainingLabel + " — finish up for XP.")),
+      doneHeadline: isSpaDay ? "Nice reset — recovery complete!"
+        : isPartial ? "You showed up — that counts!"
+        : (allDone ? "Nice work — you crushed this one!" : "You got through most of it!"),
+      doneSub: isSpaDay ? "No XP today — rest is part of the plan."
+        // Per-block records only survive the calendar day they were written, so
+        // name what's left only when we actually still know.
+        : isPartial ? ("This day counts toward your streak." + (doneBlocks.length && remainingLabel ? " Still open: " + remainingLabel + "." : ""))
+        : (allDone ? "Every block is checked off. Want extra reps?" : ("You skipped " + remainingLabel + " — finish up for XP.")),
       showCta: true,
       ctaLabel: isSpaDay ? "Do it again" : (allDone ? "Practice again" : "Finish remaining moves"),
       ctaIcon: isSpaDay ? "🧘" : (allDone ? "🧪" : "▶️"),
