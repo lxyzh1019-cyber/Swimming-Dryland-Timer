@@ -14,12 +14,12 @@ in the app can restore any of it.
 |---|---|---|
 | 1 | Cloud backup is write-only | **fixed** — `js/sync.js` restores on boot |
 | 2 | Safari evicts localStorage after ~7 idle days | **mitigated** by the restore; the eviction itself is Safari's |
-| 3 | Both kids share one store | **partly** — records are athlete-tagged so a restore can't mix them; local storage is still one bucket per browser |
-| 4 | Failed writes are swallowed | open |
-| 5 | Partials keyed to the calendar date | open (partly by design) |
+| 3 | Both kids share one store | **fixed** — one storage namespace per athlete, switchable in the Grown-up Zone |
+| 4 | Failed writes are swallowed | **fixed** — retried after freeing analytics, then reported in the UI |
+| 5 | Partials keyed to the calendar date | **fixed** — a partial also survives 6h, so one bout can cross midnight |
 | 6 | Streak resets after a rest day | **fixed** — one freeze rule for every streak check |
 | 7 | Ending early erases the day | **fixed** — counts as a day trained, shown as a softer ✓ |
-| 8 | Minor (patch target, week boundary) | open |
+| 8 | Minor (patch target, week boundary) | **fixed** — patches target their own record; the week is Edmonton's |
 
 ---
 
@@ -142,6 +142,15 @@ truthy, so any record lacking the field is now dropped too.)
   `edmontonISO()` — week boundaries can disagree by a day when travelling.
 
 ---
+
+### Notes on the profile fix
+
+The first athlete keeps the bare storage keys (`swim_sessions_v2`, …), so
+nothing already on a device moves or is orphaned; each additional athlete gets
+`<key>::<profileId>`. Switching reloads the page — module-level caches
+(`settings`, the session engine) would otherwise still hold the previous kid's
+data. The cloud mirror stays one shared collection, tagged per athlete; two
+profiles given the *same* name would share restored records.
 
 ## Recommended fixes, in order
 

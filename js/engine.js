@@ -9,7 +9,7 @@
    ============================================================ */
 
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA, exWork, exRepsDetail } from "./data.js";
-import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, patchLastSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, xpForSession, athleteId, noteSessionXpAwarded } from "./store.js";
+import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, xpForSession, athleteId, noteSessionXpAwarded, patchSession, sessionKey } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
 import { recoveryDoseSecs, refTime } from "./util.js";
@@ -43,7 +43,7 @@ function blankSession() {
     dayKey: null, light: "green", practice: false, mini: false, spa: false,
     endedEarly: false, xpEarned: 0, leveledUp: false,
     mood: null, wentWell: null, nextTime: null, quizPick: null,
-    savedEntry: false, fsId: null
+    savedEntry: false, saveFailed: false, savedKey: null, fsId: null
   };
 }
 
@@ -641,8 +641,10 @@ export function finalize(completed) {
     endedEarly: !completed,
     completedFully: !!completed
   };
-  saveSession(entry);
-  sess.savedEntry = true;
+  const saved = saveSession(entry);
+  sess.savedEntry = saved;
+  sess.saveFailed = !saved;   // the complete screen must not claim a save that didn't happen
+  sess.savedKey = saved ? sessionKey(entry) : null;
   logEvent(completed ? "session_complete" : "session_abort", {
     day: sess.dayKey, durationSecs: elapsedSecs,
     skipped: sess.skipped.length, pauses: sess.pauseCount || 0,
@@ -671,7 +673,7 @@ export function finalize(completed) {
     const { leveledUp } = addXp(sess.xpEarned);
     sess.leveledUp = leveledUp;
     noteSessionXpAwarded(sess.xpEarned);
-    patchLastSession({ xpEarned: sess.xpEarned });
+    patchSession(sess.savedKey, { xpEarned: sess.xpEarned });
   }
 
   // Cloud mirror — keep the doc ID so mood/reflection can patch it later.
@@ -758,7 +760,7 @@ export function pickWobbly() { sess.pendingCleanCheck = false; sess.wobblyCount 
 export function setMood(key, emoji) {
   sess.mood = key;
   if (!sess.practice && sess.savedEntry) {
-    patchLastSession({ mood: key });
+    patchSession(sess.savedKey, { mood: key });
     if (sess.fsId) import("./firebase.js").then(m => m.fsUpdateSession(sess.fsId, { mood: key }));
   }
   notify("phase");
@@ -767,7 +769,7 @@ export function setReflect(field, label) {
   sess[field] = sess[field] === label ? null : label;
   if (!sess.practice && sess.savedEntry) {
     const patch = field === "wentWell" ? { wentWell: sess.wentWell } : { nextTime: sess.nextTime };
-    patchLastSession(patch);
+    patchSession(sess.savedKey, patch);
     if (sess.fsId) import("./firebase.js").then(m => m.fsUpdateSession(sess.fsId, patch));
   }
   notify("phase");

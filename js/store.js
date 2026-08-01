@@ -4,7 +4,7 @@
    Local-first; Firestore mirroring happens in the engine.
    ============================================================ */
 
-import { DAY_MS, mondayOfThisWeek, todayISODate, edmontonISO } from "./util.js";
+import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
 import { PRIZE_POOL, levelCost } from "./data.js";
 
 /* ---- keys (unchanged from the old app unless noted) ---- */
@@ -28,12 +28,131 @@ const SKIP_RETENTION_MS  = 7 * 24 * 60 * 60 * 1000;
 const EVENT_RETENTION_MS = 120 * 24 * 60 * 60 * 1000; // 120 days
 const EVENT_CAP = 1500;
 
-export function readStorage(key, fallback) {
+/* ============================================================
+   PROFILES — one storage namespace per kid.
+
+   Every key above is a BASE name. The first athlete keeps the bare
+   keys, so nothing that already exists on a device moves or is
+   orphaned; each additional athlete gets "<key>::<profileId>".
+   The profile registry itself is never namespaced.
+   ============================================================ */
+export const PROFILES_KEY = "swim_profiles_v1";
+export const LEGACY_PROFILE_ID = "legacy";
+
+function readRaw(key, fallback) {
   try { const v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : fallback; }
   catch { return fallback; }
 }
+function writeRaw(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+  catch (e) { reportStorageError(key, e); return false; }
+}
+
+/* Registry: { active, list: [{ id, name }] }. Absent on an existing device —
+   synthesized from whatever athlete name is already in settings. */
+export function loadProfiles() {
+  const p = readRaw(PROFILES_KEY, null);
+  if (p && Array.isArray(p.list) && p.list.length) {
+    const active = p.list.some(x => x.id === p.active) ? p.active : p.list[0].id;
+    return { active, list: p.list };
+  }
+  // Literal rather than DEFAULT_SETTINGS: this runs at module init, before the
+  // settings block below has been evaluated.
+  const name = (readRaw(SETTINGS_KEY, {}) || {}).athleteName || "Jess";
+  return { active: LEGACY_PROFILE_ID, list: [{ id: LEGACY_PROFILE_ID, name }] };
+}
+let _profiles = loadProfiles();
+
+export function profileList() { return _profiles.list.slice(); }
+export function activeProfileId() { return _profiles.active; }
+export function activeProfile() {
+  return _profiles.list.find(p => p.id === _profiles.active) || _profiles.list[0];
+}
+
+/* Storage key for the active profile (or an explicit one). */
+function nsKey(key, profileId) {
+  const id = profileId || _profiles.active;
+  return id === LEGACY_PROFILE_ID ? key : key + "::" + id;
+}
+
+export function addProfile(name) {
+  const clean = String(name || "").trim();
+  if (!clean) return null;
+  const id = clean.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 20)
+    + "-" + Date.now().toString(36).slice(-4);
+  _profiles = { active: _profiles.active, list: [..._profiles.list, { id, name: clean }] };
+  writeRaw(PROFILES_KEY, _profiles);
+  // Seed the new athlete's settings so the greeting is right from the first paint.
+  writeRaw(nsKey(SETTINGS_KEY, id), { ...DEFAULT_SETTINGS, athleteName: clean });
+  return id;
+}
+/* Switching swaps every storage namespace at once. Callers reload the page
+   afterwards — module-level caches (settings, the session engine) all read
+   from the old namespace otherwise. */
+export function switchProfile(id) {
+  if (!_profiles.list.some(p => p.id === id)) return false;
+  _profiles = { ..._profiles, active: id };
+  return writeRaw(PROFILES_KEY, _profiles);
+}
+export function renameProfile(id, name) {
+  const clean = String(name || "").trim();
+  if (!clean) return false;
+  _profiles = { ..._profiles, list: _profiles.list.map(p => p.id === id ? { ...p, name: clean } : p) };
+  return writeRaw(PROFILES_KEY, _profiles);
+}
+
+/* ============================================================
+   READ / WRITE — namespaced, and loud when a write fails.
+   ============================================================ */
+
+/* A full localStorage is silent by default: setItem throws, the old empty
+   catch dropped it, and the app happily said "Training complete" over a
+   session that was never recorded. Now a failed write frees the expendable
+   analytics blobs, retries once, and — if it still fails — tells the app so a
+   grown-up sees a banner instead of losing work invisibly. */
+const EXPENDABLE_KEYS = [LS_EVENTS, SKIP_HISTORY_KEY, LS_PRLOG];
+let _storageErrorHandler = null;
+let _lastStorageError = null;
+export function onStorageError(fn) { _storageErrorHandler = fn; }
+export function lastStorageError() { return _lastStorageError; }
+
+function reportStorageError(key, error) {
+  _lastStorageError = { key, message: String(error && error.message || error), at: Date.now() };
+  console.error("Storage write failed:", key, error);
+  try { if (_storageErrorHandler) _storageErrorHandler(_lastStorageError); } catch {}
+}
+
+/* Drop analytics-only keys to make room. Never touches sessions, XP or prizes.
+   Returns true only if something was actually removed. */
+function freeSpace(protectKey) {
+  let freed = false;
+  EXPENDABLE_KEYS.forEach(base => {
+    if (base === protectKey) return;
+    const k = nsKey(base);
+    try {
+      if (localStorage.getItem(k) !== null) { localStorage.removeItem(k); freed = true; }
+    } catch {}
+  });
+  return freed;
+}
+
+export function readStorage(key, fallback) {
+  return readRaw(nsKey(key), fallback);
+}
+/* Returns whether the value actually reached storage. */
 export function writeStorage(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  const k = nsKey(key);
+  let str;
+  try { str = JSON.stringify(value); }
+  catch (e) { reportStorageError(key, e); return false; }
+  try { localStorage.setItem(k, str); return true; }
+  catch (e) {
+    if (freeSpace(key)) {
+      try { localStorage.setItem(k, str); return true; } catch { /* still full */ }
+    }
+    reportStorageError(key, e);
+    return false;
+  }
 }
 
 /* ---- settings ---- */
@@ -79,7 +198,9 @@ export function athleteId() {
 }
 export function belongsToAthlete(record) {
   const tag = record && record.athlete;
-  if (!tag) return athleteId() === LEGACY_ATHLETE.toLowerCase();
+  // Untagged records predate profiles; they belong to the athlete who was here
+  // first — the one still on the bare storage keys.
+  if (!tag) return activeProfileId() === LEGACY_PROFILE_ID;
   return String(tag).trim().toLowerCase() === athleteId();
 }
 
@@ -99,22 +220,31 @@ export function configuredSectionRest() {
 
 /* ---- sessions log (source of truth for streaks/progress/analytics) ---- */
 export function loadSessions() { return readStorage(LS_SESSIONS, []); }
+/* Returns whether the record actually reached storage — a full quota must not
+   look like a saved session. */
 export function saveSession(entry) {
   const all = loadSessions();
   all.push(entry);
-  writeStorage(LS_SESSIONS, all);
+  return writeStorage(LS_SESSIONS, all);
 }
-/* Patch the most recent session record (mood / reflection / pr live
-   alongside lightResult — closes the readiness→outcome gap). */
-export function patchLastSession(patch) {
+/* Patch a specific session record (mood / reflection / pr live alongside
+   lightResult — closes the readiness→outcome gap). Identified by sessionKey
+   rather than array position: "the last one" is the wrong record as soon as a
+   second session lands in between, which two kids on one device manage easily. */
+export function patchSession(key, patch) {
   const all = loadSessions();
-  if (!all.length) return;
-  all[all.length - 1] = { ...all[all.length - 1], ...patch };
-  writeStorage(LS_SESSIONS, all);
+  if (!all.length) return false;
+  const found = key ? all.findIndex(s => sessionKey(s) === key) : -1;
+  const idx = found >= 0 ? found : all.length - 1;
+  all[idx] = { ...all[idx], ...patch };
+  return writeStorage(LS_SESSIONS, all);
 }
+export function patchLastSession(patch) { return patchSession(null, patch); }
+
 export function thisWeekSessions() {
-  const monday = mondayOfThisWeek();
-  return loadSessions().filter(s => new Date(s.isoDate) >= monday);
+  // Edmonton's Mon–Sun week, like every other calendar grouping in the app.
+  const weekIsoSet = new Set(Object.values(edmontonWeekISODates()));
+  return loadSessions().filter(s => weekIsoSet.has(edmontonISO(s.isoDate)));
 }
 
 /* Did this record earn the kid a day of training?
@@ -226,22 +356,42 @@ export function saveReadiness(check) {
   writeStorage(LS_READINESS, { version: 2, when: Date.now(), ...check });
 }
 
-/* ---- day progress (same-day resume; No-Debt: partials never carry over) ---- */
+/* ---- day progress (same-day resume; No-Debt: partials never carry over) ----
+   The No-Debt rule drops a partial when a NEW training day starts — but the
+   calendar date alone can't tell those apart: a session begun at 23:40 and
+   resumed at 00:10 is one bout, and keying purely on today's date threw the
+   finished blocks away at midnight. A partial therefore also survives while
+   it's still this fresh, whatever the date says. */
+const DAY_PROGRESS_GRACE_MS = 6 * 60 * 60 * 1000;
 function dayProgressKey(dayKey) { return `${dayKey}|${todayISODate()}`; }
+function isFreshProgress(p, now) {
+  return !!(p && p.savedAt && now - p.savedAt <= DAY_PROGRESS_GRACE_MS);
+}
 export function loadDayProgress(dayKey) {
   const all = readStorage(LS_DAYPROG, {});
-  return all[dayProgressKey(dayKey)] || null;
+  const exact = all[dayProgressKey(dayKey)];
+  if (exact) return exact;
+  const now = Date.now();
+  let carried = null;
+  Object.keys(all).forEach(k => {
+    if (k.startsWith(dayKey + "|") && isFreshProgress(all[k], now)) carried = all[k];
+  });
+  return carried;
 }
 export function saveDayProgress(dayKey, p) {
   const all = readStorage(LS_DAYPROG, {});
   const today = todayISODate();
-  Object.keys(all).forEach(k => { if (!k.endsWith("|" + today)) delete all[k]; });
-  all[dayProgressKey(dayKey)] = p;
+  const now = Date.now();
+  Object.keys(all).forEach(k => {
+    if (!k.endsWith("|" + today) && !isFreshProgress(all[k], now)) delete all[k];
+  });
+  all[dayProgressKey(dayKey)] = { ...p, savedAt: now };
   writeStorage(LS_DAYPROG, all);
 }
 export function clearDayProgress(dayKey) {
   const all = readStorage(LS_DAYPROG, {});
-  delete all[dayProgressKey(dayKey)];
+  // Every date bucket for this day — a bout that crossed midnight has two.
+  Object.keys(all).forEach(k => { if (k.startsWith(dayKey + "|")) delete all[k]; });
   writeStorage(LS_DAYPROG, all);
 }
 

@@ -396,6 +396,17 @@ function settingsTab(vm) {
       <input type="text" value="${escapeHtml(vm.settingsName)}" data-input="athleteName" style="width:100%;padding:13px 15px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:16px;font-weight:700;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">
     </div>
     <div>
+      <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Who's training 🧑‍🤝‍🧑</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:9px;line-height:1.5;">Each athlete keeps her own sessions, XP, streak and prizes. Switching reloads the app.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${vm.profiles.map(p => `<button type="button" data-action="pickAthlete" data-arg="${escapeHtml(p.id)}" style="${p.style}">${p.active ? "✓ " : ""}${escapeHtml(p.name)}</button>`).join("")}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <input type="text" placeholder="Add another athlete…" data-input="newProfile" style="flex:1;padding:10px 13px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:14px;font-weight:700;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">
+        <button type="button" data-action="addAthlete" style="min-height:44px;border:none;background:var(--aqua);color:#fff;border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">Add</button>
+      </div>
+    </div>
+    <div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Coach voice 🎧</div>
         <button type="button" data-action="toggleCoachVoice" aria-label="Toggle coach voice" style="${vm.coachTrack}"><span style="${vm.coachKnob}"></span></button>

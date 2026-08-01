@@ -127,4 +127,67 @@ const state = { selectedDay: null, expanded: {}, practiceMode: false, nav: "toda
 ok(typeof tvm.buildTodayVM(state).dayView === "object", "today VM builds");
 ok(typeof sscreen.sessionScreen(svm.buildSessionVM(state)) === "string", "session screen renders");
 
+/* --- day progress survives midnight (one bout, two calendar dates) --- */
+localStorage.clear();
+store.saveDayProgress("monday", { done: ["warmup"], light: "green" });
+const dp = JSON.parse(localStorage.getItem(store.LS_DAYPROG));
+const [onlyKey] = Object.keys(dp);
+// Re-file it under yesterday, as if the blocks were finished before midnight.
+dp["monday|2000-01-01"] = { ...dp[onlyKey], savedAt: Date.now() - 60 * 60 * 1000 };
+delete dp[onlyKey];
+localStorage.setItem(store.LS_DAYPROG, JSON.stringify(dp));
+ok(store.loadDayProgress("monday").done[0] === "warmup", "a partial from an hour ago carries across midnight");
+dp["monday|2000-01-01"].savedAt = Date.now() - 20 * 60 * 60 * 1000;
+localStorage.setItem(store.LS_DAYPROG, JSON.stringify(dp));
+ok(store.loadDayProgress("monday") === null, "a stale partial still does not carry over (No-Debt)");
+store.clearDayProgress("monday");
+ok(Object.keys(JSON.parse(localStorage.getItem(store.LS_DAYPROG))).length === 0, "clear removes every date bucket");
+
+/* --- patches land on their own record, not on whatever finished last --- */
+localStorage.clear();
+const a = { isoDate: "2026-01-01T10:00:00.000Z", dayKey: "monday" };
+const b = { isoDate: "2026-01-01T18:00:00.000Z", dayKey: "tuesday" };
+store.saveSession(a); store.saveSession(b);
+store.patchSession(store.sessionKey(a), { mood: "great" });
+ok(store.loadSessions()[0].mood === "great", "patch finds the right record");
+ok(store.loadSessions()[1].mood === undefined, "the later session is untouched");
+
+/* --- a full disk is reported, not swallowed --- */
+localStorage.clear();
+let seen = null;
+store.onStorageError(e => { seen = e; });
+store.logEvent("noise", { pad: "x".repeat(50) });          // something expendable to drop
+const realSet = localStorage.setItem;
+const realErr = console.error; console.error = () => {};   // the reported failure is the point
+let full = true;
+localStorage.setItem = (k, v) => { if (full) { const e = new Error("QuotaExceededError"); e.name = "QuotaExceededError"; throw e; } realSet(k, v); };
+ok(store.saveSession({ isoDate: "2026-01-02T10:00:00.000Z" }) === false, "a rejected write reports failure");
+ok(seen && /Quota/.test(seen.message), "the app is told about it");
+ok(localStorage.getItem(store.LS_EVENTS) === null, "expendable analytics were dropped to make room");
+full = false;
+seen = null;
+ok(store.saveSession({ isoDate: "2026-01-02T10:00:00.000Z" }) === true, "writes succeed again once there is room");
+ok(seen === null, "and no error is reported then");
+localStorage.setItem = realSet;
+console.error = realErr;
+store.onStorageError(null);
+
+/* --- profiles: one storage namespace per kid, first kid keeps the bare keys --- */
+localStorage.clear();
+ok(store.activeProfileId() === store.LEGACY_PROFILE_ID, "the existing athlete stays on the legacy profile");
+store.saveSession({ isoDate: "2026-02-01T10:00:00.000Z", dayKey: "monday", completedFully: true });
+ok(localStorage.getItem(store.LS_SESSIONS) !== null, "her sessions stay on the unsuffixed key");
+const jenn = store.addProfile("Jenn");
+ok(store.profileList().length === 2, "a second athlete is registered");
+ok(store.loadSessions().length === 1, "adding one doesn't disturb the active athlete");
+store.switchProfile(jenn);
+ok(store.loadSessions().length === 0, "the new athlete starts with her own empty log");
+store.saveSession({ isoDate: "2026-02-02T10:00:00.000Z", dayKey: "tuesday", completedFully: true });
+ok(localStorage.getItem(store.LS_SESSIONS + "::" + jenn) !== null, "and writes to her own namespace");
+ok(!store.belongsToAthlete({ isoDate: "x" }), "untagged cloud records are not hers");
+store.switchProfile(store.LEGACY_PROFILE_ID);
+ok(store.loadSessions().length === 1, "switching back restores the first athlete's log intact");
+ok(store.belongsToAthlete({ isoDate: "x" }), "untagged cloud records belong to the athlete who was here first");
+localStorage.clear();
+
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

@@ -208,6 +208,7 @@ export function buildSessionVM(state) {
 
     // complete screen
     practice: sess.practice, endedEarly: sess.endedEarly, painFlag: sess.painFlag,
+    saveFailed: !!sess.saveFailed,
     sessionMantra: day.mantra || "",
     sessionMinutes: Math.round(sess.elapsed / 60),
     roundsCompleted: sess.roundsCompleted || 0,
