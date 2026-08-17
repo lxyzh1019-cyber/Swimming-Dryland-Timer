@@ -439,7 +439,7 @@ export function saveQuiz(q) { writeStorage(LS_QUIZ, q); }
       seen and missed still pays its +25 later, when it is finally learned.
    3. A daily ceiling (`QXP_DAILY_CAP`) across ALL quiz XP — the deck and the
       Coach's Quiz share it — so even a day full of brand-new questions stays
-      well under one training session. Questions are paid whole or not at all:
+      far under the LIGHTEST training day, not just under a full one. Questions are paid whole or not at all:
       once the day's budget can't cover the next one, its ledger entry is left
       untouched and it is still worth full value tomorrow.
 
@@ -456,9 +456,12 @@ export function saveQuiz(q) { writeStorage(LS_QUIZ, q); }
    Training stays the only open-ended way up the ladder. */
 export const QXP_ATTEMPT = 10;   // once per question, first time attempted
 export const QXP_CORRECT = 25;   // once per question, first time correct
-/* Three brand-new questions a day (3 × 35). A full training day pays 240–520,
-   so the quiz can never out-earn getting on the mat. */
-export const QXP_DAILY_CAP = 105;
+/* One brand-new question a day (10 + 25). The lightest real training day —
+   a 1-round red-light Monday — pays 220 XP, so the day's whole quiz budget is
+   under a sixth of it. The cap is deliberately measured against the EASY day,
+   not the full one: those are the days a kid is most tempted to tap through a
+   quiz instead of training, and they must still be worth far more than it. */
+export const QXP_DAILY_CAP = 35;
 
 export function quizQuestionKey(move, kind) { return move + "|" + kind; }
 

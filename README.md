@@ -33,7 +33,8 @@ the **Splash — Kids Swim Training** design system.
   deck pays at all; each question pays at most once *ever* (+10 the first time
   it is attempted, +25 the first time it is answered right — a question missed
   the first time still pays its +25 when it is finally learned); and all quiz
-  XP shares a daily ceiling of 105 XP, about three brand-new questions.
+  XP shares a daily ceiling of 35 XP — one brand-new question, against 220+
+  for even the lightest training day.
   Questions are paid whole or not at all, so one the cap skipped is still worth
   full value tomorrow. Replays are free practice worth 0 XP, and the Coach's
   Quiz at the end of a session prices off the same ledger. The question bank is
