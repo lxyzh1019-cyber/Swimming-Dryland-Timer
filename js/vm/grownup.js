@@ -6,7 +6,7 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl, fmtXp } from "../data.js";
-import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday } from "../store.js";
+import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP } from "../store.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
 
 const LIGHT_COLORS = { green: "var(--mint)", yellow: "var(--sun)", red: "var(--stop)", recovery: "var(--grape)" };
@@ -320,9 +320,11 @@ export function buildGrownupVM(state) {
     mastered: qBank.mastered, total: qBank.total,
     xpSpent: fmtXp(qBank.xpTotal - qBank.xpLeft), xpTotal: fmtXp(qBank.xpTotal),
     paidToday: quizPaidToday(quiz),
+    todayXp: quizXpToday(quiz), dailyCap: QXP_DAILY_CAP,
     barStyle: "height:10px;border-radius:10px;background:var(--grape);width:" + Math.round((qBank.mastered / Math.max(1, qBank.total)) * 100) + "%;",
     note: "Quiz XP is capped at " + fmtXp(qBank.xpTotal) + " for the whole program (" + qBank.total
-      + " questions, paid once each) and one paying deck per day. Replays are free practice worth 0 XP. "
+      + " questions, paid once each), at " + QXP_DAILY_CAP + " XP a day, and at one paying deck per day. "
+      + "Replays are free practice worth 0 XP. "
       + (qBank.left ? qBank.left + " questions still hold XP." : "All questions are mastered — the quiz pays nothing further.")
   };
 

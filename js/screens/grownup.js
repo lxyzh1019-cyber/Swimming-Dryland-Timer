@@ -351,6 +351,7 @@ function analyticsTab(vm) {
         </div>
         <div style="font-size:12px;font-weight:700;color:var(--ink-faint);line-height:1.4;">${a.quizBudget.note}</div>
         <div style="font-size:12px;font-weight:800;color:${a.quizBudget.paidToday ? "var(--ink-faint)" : "var(--mint-ink)"};margin-top:6px;">${a.quizBudget.paidToday ? "✓ Today’s paying deck is already used — further runs are free practice." : "○ Today’s paying deck is still available."}</div>
+        <div style="font-size:12px;font-weight:800;color:var(--ink-faint);margin-top:3px;">Quiz XP banked today: ${a.quizBudget.todayXp} / ${a.quizBudget.dailyCap}</div>
       </div>`)}
 
     <div style="${vm.grid2}">

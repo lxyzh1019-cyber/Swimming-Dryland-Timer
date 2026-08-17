@@ -87,6 +87,17 @@ localStorage.clear();
 ok(store.xpForSession({ perExercise: [1,2,3,4,5,6] }) === 100, "6 moves = 100 XP");
 ok(store.xpForSession({ sessionType: "spa" }) === 0, "spa earns no XP");
 
+/* Rounds trained scale the session's XP — a 1-round day is worth half a
+   3-round day. Legacy rows (no xpVersion) keep the flat value they were
+   awarded, so a cloud restore can't retroactively double old sessions. */
+const sixMoves = rounds => ({ perExercise: [1,2,3,4,5,6], roundsDone: rounds, xpVersion: store.XP_VERSION });
+ok(store.xpForSession(sixMoves(1)) === 100, "1 round pays the old flat value");
+ok(store.xpForSession(sixMoves(2)) === 150, "2 rounds pay 1.5x");
+ok(store.xpForSession(sixMoves(3)) === 200, "3 rounds pay 2x — a 1-round day is half of it");
+ok(store.xpForSession({ perExercise: [1,2,3,4,5,6], roundsDone: 3 }) === 100,
+   "a legacy 3-round row is NOT rescaled");
+ok(store.xpForSession({ ...sixMoves(3), sessionType: "spa" }) === 0, "spa still earns nothing");
+
 /* --- defaults --- */
 ok(store.DEFAULT_SETTINGS.voiceStyle === "encouraging", "default voice is process-praise");
 ok(store.DEFAULT_SETTINGS.cloudMirror === true, "cloudMirror default on");
@@ -162,16 +173,28 @@ ok(bank0.total === 83 && bank0.mastered === 0, "question bank is 83 questions, n
 ok(bank0.xpTotal === 83 * 35, "lifetime quiz XP budget is bank x 35");
 
 const firstDeck = playPerfect();
-ok(firstDeck.wasPaidRound === true && firstDeck.xpEarned === 8 * 35, "first deck of the day pays full");
+ok(firstDeck.wasPaidRound === true && firstDeck.xpEarned === store.QXP_DAILY_CAP,
+   "the day's paying deck stops at the daily cap");
+ok(firstDeck.hitDailyCap === true && firstDeck.newlyMastered === 3,
+   "only the questions the cap paid for are marked mastered");
+ok(store.quizXpLeftToday() === 0, "the daily quiz budget is spent");
 let sameDay = 0;
 for (let i = 0; i < 12; i++) sameDay += playPerfect().xpEarned;
 ok(sameDay === 0, "every later deck the same day pays 0 (one paying deck per day)");
 ok(store.quizPaidToday() === true, "quizPaidToday flips after the paying deck");
-ok(store.quizBankStatus().mastered === 8, "practice replays never advance the mastery ledger");
+ok(store.quizBankStatus().mastered === 3, "practice replays never advance the mastery ledger");
+
+// A fresh day restores the budget; the questions the cap skipped kept full value.
+const nextDay = store.loadQuiz();
+nextDay.lastPaidISO = null; nextDay.dayISO = "2020-01-01"; store.saveQuiz(nextDay);
+ok(store.quizXpLeftToday() === store.QXP_DAILY_CAP, "the daily budget resets with the date");
+const day2 = playPerfect();
+ok(day2.xpEarned === store.QXP_DAILY_CAP && store.quizBankStatus().mastered === 6,
+   "the next day pays another capped round of brand-new questions");
 
 // New day, but the same questions: already-mastered questions must not re-pay.
 const qz = store.loadQuiz();
-qz.lastPaidISO = null;
+qz.lastPaidISO = null; qz.dayISO = null; qz.dayXp = 0;
 qz.qLedger = Object.fromEntries(store.questionBank()
   .map(([m, k]) => [store.quizQuestionKey(m.name, k), { attempted: true, mastered: true }]));
 store.saveQuiz(qz);
@@ -180,7 +203,7 @@ ok(playPerfect().xpEarned === 0, "a fully-mastered bank pays nothing, even on a 
 // Wrong answers earn the attempt credit but never the correct credit — and the
 // question stays claimable, so the XP arrives when it is finally learned.
 const qz2 = store.loadQuiz();
-qz2.lastPaidISO = null; qz2.qLedger = {}; store.saveQuiz(qz2);
+qz2.lastPaidISO = null; qz2.dayISO = null; qz2.dayXp = 0; qz2.qLedger = {}; store.saveQuiz(qz2);
 const wrongDeck = overlays.buildQuizDeck(8);
 wrongDeck.qs.forEach((qq, i) => { wrongDeck.idx = i; overlays.answerQuizDeck(wrongDeck, qq.opts.findIndex(o => !o.ok)); });
 overlays.finishQuizDeck(wrongDeck);
@@ -188,7 +211,8 @@ ok(wrongDeck.xpEarned === 8 * 10 && wrongDeck.newlyMastered === 0,
    "all-wrong deck pays attempt credit only and masters nothing");
 ok(store.quizBankStatus().left === 83, "wrong answers leave every question still claimable");
 
-// The Coach's Quiz at the end of a session prices off the same ledger.
+// The Coach's Quiz at the end of a session prices off the same ledger and
+// shares the same daily ceiling.
 localStorage.removeItem(store.LS_QUIZ);
 const coachKey = store.quizQuestionKey("coach", q.id);
 ok(store.payQuizQuestion(coachKey, true).xp === 35, "a new Coach's Quiz answer pays attempt + correct");
@@ -196,6 +220,13 @@ ok(store.payQuizQuestion(coachKey, true).xp === 0, "answering it again pays noth
 localStorage.removeItem(store.LS_QUIZ);
 ok(store.payQuizQuestion(coachKey, false).xp === 10, "a missed question pays the attempt credit only");
 ok(store.payQuizQuestion(coachKey, true).xp === 25, "and pays the rest when it is finally learned");
+const spent = store.loadQuiz();
+spent.dayISO = new Date().toLocaleDateString("en-CA", { timeZone: "America/Edmonton" });
+spent.dayXp = store.QXP_DAILY_CAP; store.saveQuiz(spent);
+const capped = store.payQuizQuestion(store.quizQuestionKey("coach", "another"), true);
+ok(capped.xp === 0 && capped.capped === true, "the Coach's Quiz respects the shared daily cap");
+ok(!store.loadQuiz().qLedger[store.quizQuestionKey("coach", "another")],
+   "a capped question is left unspent, worth full value tomorrow");
 localStorage.removeItem(store.LS_QUIZ);
 localStorage.removeItem(store.LS_JOURNEY);
 

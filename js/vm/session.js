@@ -166,6 +166,7 @@ export function buildSessionVM(state) {
   // distrust the numbers.
   const quizXp = sess.quizXp || 0;
   const quizXpLine = quizXp ? " +" + quizXp + " XP"
+    : sess.quizCapped ? " That’s today’s quiz XP maxed out — this one still counts tomorrow."
     : quizAnswered ? " You already learned this one — no XP, but it’s still true."
     : "";
   const quizFeedback = quizCorrect

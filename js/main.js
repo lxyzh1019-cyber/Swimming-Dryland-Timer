@@ -243,8 +243,9 @@ const actions = {
     if (first && !engine.sess.practice && engine.sess.savedEntry) {
       const q = sessionQuizFor(engine.sess.dayKey);
       const correct = !!(q.opts[i] && q.opts[i].ok);
-      const { xp } = payQuizQuestion(quizQuestionKey("coach", q.id), correct);
+      const { xp, capped } = payQuizQuestion(quizQuestionKey("coach", q.id), correct);
       engine.sess.quizXp = xp;    // the done screen quotes what was actually banked
+      engine.sess.quizCapped = capped;
       if (xp > 0) {
         engine.sess.xpEarned = (engine.sess.xpEarned || 0) + xp;
         if (addXp(xp).leveledUp) engine.sess.leveledUp = true;

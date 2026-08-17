@@ -73,7 +73,7 @@ export function finishQuizDeck(qd) {
 
   // Only the day's first completed deck pays, and only for first-time learning.
   const paid = !quizPaidToday(quiz);
-  let xp = 0, firstSeen = 0, newlyMastered = 0;
+  let xp = 0, firstSeen = 0, newlyMastered = 0, capped = false;
   if (paid) {
     qd.qs.forEach((q, ix) => {
       const pick = qd.picks[ix];
@@ -83,6 +83,7 @@ export function finishQuizDeck(qd) {
       xp += res.xp;
       if (res.firstSeen) firstSeen++;
       if (res.newlyMastered) newlyMastered++;
+      if (res.capped) capped = true;                  // rest keep their value for tomorrow
     });
     quiz.lastPaidISO = todayISODate();
   }
@@ -93,6 +94,7 @@ export function finishQuizDeck(qd) {
   qd.wasPaidRound = paid;
   qd.firstSeen = firstSeen;
   qd.newlyMastered = newlyMastered;
+  qd.hitDailyCap = capped;
   qd.bank = quizBankStatus(quiz);
   if (xp > 0) qd.leveledUp = addXp(xp).leveledUp;
 }
@@ -115,7 +117,10 @@ export function quizDeckHtml(qd) {
     // silently gets 0 XP learns that the app is broken or unfair; a kid who is
     // told it's a free practice round keeps playing for the right reason.
     const noteBox = (bg, ink, text) => `<div style="width:100%;background:${bg};border-radius:14px;padding:11px 14px;box-sizing:border-box;font-size:13px;font-weight:800;color:${ink};line-height:1.4;text-align:left;">${text}</div>`;
-    const xpNote = qd.xpEarned ? ""
+    const capNote = qd.hitDailyCap
+      ? noteBox("var(--grape-wash,#EFE9FB)", "var(--grape-ink,#4B3A78)", "🎯 <b>That’s today’s quiz XP maxed out.</b> The other new moves in this deck kept their full value — come back tomorrow and they’ll pay in full.")
+      : "";
+    const xpNote = qd.xpEarned || qd.hitDailyCap ? ""
       : !qd.wasPaidRound
         ? noteBox("var(--aqua-wash)", "var(--aqua-ink)", "🧠 <b>Practice round — no XP.</b> You already earned today’s quiz XP. Play as many rounds as you like to get sharper, and the next paying round unlocks tomorrow.")
         : qd.bank && !qd.bank.left
@@ -133,7 +138,7 @@ export function quizDeckHtml(qd) {
           <div style="font-family:var(--font-display);font-weight:600;font-size:48px;color:var(--aqua);line-height:1;">${score} / ${qd.qs.length} correct</div>
           <div style="font-family:var(--font-hand);font-size:22px;font-weight:700;color:var(--aqua-ink);">${scoreVerdict}</div>
           ${qd.xpEarned ? `<div style="font-size:15px;font-weight:900;color:var(--sun-ink);background:var(--sun-wash);border-radius:var(--radius-pill);padding:7px 16px;">⭐ +${qd.xpEarned} XP${qd.newlyMastered ? ` · ${qd.newlyMastered} new move${qd.newlyMastered === 1 ? "" : "s"} learned` : ""}</div>` : ""}
-          ${xpNote}
+          ${xpNote}${capNote}
           ${qd.bank ? `
           <div style="width:100%;background:var(--surface-2);border-radius:14px;padding:12px 14px;box-sizing:border-box;">
             <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:7px;">
