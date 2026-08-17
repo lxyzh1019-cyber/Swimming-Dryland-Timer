@@ -49,7 +49,8 @@ export function buildProgressVM(state) {
 
   const level = {
     levelNum: j.level, rankName: j.rankName, rankIcon: curRank.icon || "🌊",
-    nextRank: j.nextRankName, xp: fmtXp(journeyStore.xp || 0), xpToNext: j.xpToNextRank, levelPct: j.levelPct
+    nextRank: j.nextRankName, atSummit: j.atSummit,
+    xp: fmtXp(journeyStore.xp || 0), xpToNext: j.xpToNextRank, levelPct: j.levelPct
   };
 
   // Ocean Story — future ranks stay locked as mystery cards.

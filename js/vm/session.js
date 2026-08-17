@@ -25,27 +25,27 @@ const REFLECT_NEXT = ["Slow down", "Breathe out loud", "Point my toes", "Keep co
 
 // Coach's Quiz — connects today's land work to the pool.
 const QUIZ = [
-  { q: "Why do we practice Superman holds on land?", why: "A strong Superman hold = a strong streamline off every wall.", opts: [
+  { id: "superman", q: "Why do we practice Superman holds on land?", why: "A strong Superman hold = a strong streamline off every wall.", opts: [
     { t: "To get better at flying", ok: false },
     { t: "To build a long, tight streamline for push-offs", ok: true },
     { t: "To make our arms tired", ok: false } ] },
-  { q: "Squats make your legs stronger. Where does that power show up in the pool?", why: "Every start and turn is a jump — leg power is pool speed.", opts: [
+  { id: "squat", q: "Squats make your legs stronger. Where does that power show up in the pool?", why: "Every start and turn is a jump — leg power is pool speed.", opts: [
     { t: "Faster starts and turns off the block and wall", ok: true },
     { t: "Comfier goggles", ok: false },
     { t: "Louder splashing", ok: false } ] },
-  { q: "Why does Coach say “slow and clean beats fast and sloppy”?", why: "Your body learns the shape you practice — so practice the good one.", opts: [
+  { id: "clean", q: "Why does Coach say “slow and clean beats fast and sloppy”?", why: "Your body learns the shape you practice — so practice the good one.", opts: [
     { t: "Because slow is easier", ok: false },
     { t: "Clean shapes on land become clean strokes in the water", ok: true },
     { t: "So the timer lasts longer", ok: false } ] },
-  { q: "Why do we brace our core (like a strong tube) during land work?", why: "A braced core stops your middle from bending, so your push and pull don't leak power.", opts: [
+  { id: "core", q: "Why do we brace our core (like a strong tube) during land work?", why: "A braced core stops your middle from bending, so your push and pull don't leak power.", opts: [
     { t: "So you can hold your breath longer", ok: false },
     { t: "A stiff middle sends leg and arm power straight down the pool", ok: true },
     { t: "To look tough", ok: false } ] },
-  { q: "Balance moves (like Single-Leg Balance) — what do they build for swimming?", why: "Steady hips and ankles keep your body straight and long instead of wobbling and slowing down.", opts: [
+  { id: "balance", q: "Balance moves (like Single-Leg Balance) — what do they build for swimming?", why: "Steady hips and ankles keep your body straight and long instead of wobbling and slowing down.", opts: [
     { t: "A stable, straight body line that glides instead of wobbles", ok: true },
     { t: "Bigger splashes", ok: false },
     { t: "Faster blinking", ok: false } ] },
-  { q: "Why do we point our toes in kicking-shape drills on land?", why: "Pointed toes make your foot a longer paddle, so each kick pushes more water.", opts: [
+  { id: "toes", q: "Why do we point our toes in kicking-shape drills on land?", why: "Pointed toes make your foot a longer paddle, so each kick pushes more water.", opts: [
     { t: "It looks like ballet", ok: false },
     { t: "Pointed feet act like paddles — more push per kick", ok: true },
     { t: "It keeps your socks on", ok: false } ] }
@@ -160,6 +160,18 @@ export function buildSessionVM(state) {
         : "border-color:var(--hairline);background:var(--surface);color:var(--ink-faint);")
   }));
   const quizCorrect = quizAnswered && !!(QZ.opts[sess.quizPick] && QZ.opts[sess.quizPick].ok);
+  // The XP line quotes what was ACTUALLY banked (main.js prices the answer off
+  // the quiz ledger, so a question already learned pays nothing). Promising
+  // "+25 XP" for a repeat and then not paying it is how a kid learns to
+  // distrust the numbers.
+  const quizXp = sess.quizXp || 0;
+  const quizXpLine = quizXp ? " +" + quizXp + " XP"
+    : sess.quizCapped ? " That’s today’s quiz XP maxed out — this one still counts tomorrow."
+    : quizAnswered ? " You already learned this one — no XP, but it’s still true."
+    : "";
+  const quizFeedback = quizCorrect
+    ? "Nailed it!" + quizXpLine + (quizXp ? " ⭐" : "")
+    : "Good try! The best answer is highlighted — now you know it." + quizXpLine + (quizXp ? " 💭" : "");
 
   return {
     isWide: state.isWide, isNarrow: !state.isWide,
@@ -215,7 +227,7 @@ export function buildSessionVM(state) {
     xpEarned: sess.xpEarned, leveledUp: sess.leveledUp,
     moodOpts, moodAck: sess.mood ? MOOD_ACK[sess.mood] : "", showReflection: sessionDone && !!sess.mood, reflectWellOpts, reflectNextOpts,
     quizQuestion: QZ.q, quizOpts, quizAnswered, quizWhy: QZ.why,
-    quizFeedback: quizCorrect ? "Nailed it! +25 XP ⭐" : "Good try! The best answer is highlighted — now you know it. +10 XP for thinking 💭",
+    quizFeedback,
     quizFeedbackColor: quizCorrect ? "var(--mint-ink)" : "var(--coral)"
   };
 }

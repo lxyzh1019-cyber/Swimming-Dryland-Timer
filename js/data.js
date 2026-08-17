@@ -852,18 +852,37 @@ export const CHEERS = [
   "You stayed steady. Nice! 🌊", "Clean round — power and calm! 🏊"
 ];
 
+/* Rank ladder — every original rank AND its level threshold is untouched, so
+   a rank that has been earned can never move backwards. levelCost() below is
+   likewise frozen for the same reason.
+
+   The top eight ranks (29 → 50) extend the summit past Marlin. Raising the
+   ceiling — rather than re-pricing levels or clawing XP back — is the only
+   lever that adds a real climb ahead WITHOUT moving an already-earned level. */
 export const LADDER = [
-  { level: 1,  name: "Seahorse",   icon: "🌊", habitat: "#FF9B7A" },
-  { level: 3,  name: "Sea Turtle", icon: "🐢", habitat: "#4FAE7A" },
-  { level: 6,  name: "Penguin",    icon: "🐧", habitat: "#BFE3F5" },
-  { level: 9,  name: "Sea Otter",  icon: "🦦", habitat: "#2F8F5B" },
-  { level: 12, name: "Stingray",   icon: "🌊", habitat: "#E7C486" },
-  { level: 15, name: "Dolphin",    icon: "🐬", habitat: "#5FD1E0" },
-  { level: 18, name: "Shark",      icon: "🦈", habitat: "#1E6E82" },
-  { level: 21, name: "Orca",       icon: "🐋", habitat: "#9FD8EA" },
-  { level: 24, name: "Sailfish",   icon: "🌊", habitat: "#3FC7D9" },
-  { level: 26, name: "Marlin",     icon: "🏆", habitat: "#F2C14E" }
+  { level: 1,  name: "Seahorse",       icon: "🌊", habitat: "#FF9B7A" },
+  { level: 3,  name: "Sea Turtle",     icon: "🐢", habitat: "#4FAE7A" },
+  { level: 6,  name: "Penguin",        icon: "🐧", habitat: "#BFE3F5" },
+  { level: 9,  name: "Sea Otter",      icon: "🦦", habitat: "#2F8F5B" },
+  { level: 12, name: "Stingray",       icon: "🌊", habitat: "#E7C486" },
+  { level: 15, name: "Dolphin",        icon: "🐬", habitat: "#5FD1E0" },
+  { level: 18, name: "Shark",          icon: "🦈", habitat: "#1E6E82" },
+  { level: 21, name: "Orca",           icon: "🐋", habitat: "#9FD8EA" },
+  { level: 24, name: "Sailfish",       icon: "🌊", habitat: "#3FC7D9" },
+  { level: 26, name: "Marlin",         icon: "🏆", habitat: "#F2C14E" },
+  { level: 29, name: "Sea Lion",       icon: "🦭", habitat: "#C9A227" },
+  { level: 32, name: "Octopus",        icon: "🐙", habitat: "#B5646F" },
+  { level: 35, name: "Giant Squid",    icon: "🦑", habitat: "#6E5A8E" },
+  { level: 38, name: "Humpback Whale", icon: "🐳", habitat: "#3C7E9C" },
+  { level: 41, name: "Blue Whale",     icon: "🐋", habitat: "#2B5F86" },
+  { level: 44, name: "Storm Rider",    icon: "🌩️", habitat: "#4C5C78" },
+  { level: 47, name: "Ocean Guardian", icon: "🔱", habitat: "#1F8A70" },
+  { level: 50, name: "Ocean Legend",   icon: "👑", habitat: "#F2A65A" }
 ];
+
+/* The final rung — nothing above this level changes rank, so the UI can
+   honestly say "you're at the summit" instead of teasing a next rank. */
+export const MAX_LEVEL = LADDER[LADDER.length - 1].level;
 
 // Each rank gets a rich story chapter + a swim tie-in + a real marine fact.
 // Future ranks stay locked (mystery cards) so there's always something to discover.
@@ -877,14 +896,30 @@ export const RANK_LORE = {
   "Shark":      { chapter: "Chapter 4 · The Blue", story: "Deep in the open blue, the shark rules. Its secret is streamline: every part of its body is shaped to slide through water with zero drag, always moving forward. You’ve learned to make yourself long, tight, and unstoppable.", swim: "Perfect streamline off every wall is your free speed — no strokes needed.", fact: "Many sharks have to keep swimming to breathe, so they never fully stop — for them, motion really is life." },
   "Orca":       { chapter: "Chapter 4 · The Blue", story: "The orca is the smartest hunter in the sea — and it never trains alone. Orca pods learn moves from each other and practice them together for years. You’re strong on your own now, but you’ve learned you’re even stronger with your team.", swim: "Training with your squad and racing relays — strong alone, stronger together.", fact: "Orcas are actually the largest kind of dolphin, and each family has its own set of calls, like a secret language." },
   "Sailfish":   { chapter: "Chapter 5 · The Championship Current", story: "You’re almost at the top. The sailfish is pure, blazing speed — but it’s fast because its form is flawless, folding its huge sail away to become a perfect arrow. Speed with perfect shape: the champion’s combination.", swim: "Full power with zero wasted motion — racing speed, held together.", fact: "Sailfish are the fastest fish in the ocean, hitting bursts up to 68 mph — faster than a car on the motorway!" },
-  "Marlin":     { chapter: "Chapter 5 · The Championship Current", story: "Marli’s crown — the legend of the whole ocean. The marlin is the ruler of the open sea: fast, fearless, and unbeatable, because it did the work every single day. You made it to the very top of the ocean class.", swim: "Everything you built — hold, glide, core, streamline, speed — all in one swimmer.", fact: "Marlins can outswim almost anything in the sea and use their long bill to slice through the water like a sword." }
+  "Marlin":     { chapter: "Chapter 5 · The Championship Current", story: "Marli’s crown — the legend of the whole ocean. The marlin is the ruler of the open sea: fast, fearless, and unbeatable, because it did the work every single day. You made it to the top of the ocean class — and past it, the water gets deeper still.", swim: "Everything you built — hold, glide, core, streamline, speed — all in one swimmer.", fact: "Marlins can outswim almost anything in the sea and use their long bill to slice through the water like a sword." },
+  "Sea Lion":       { chapter: "Chapter 6 · Past the Blue", story: "Out past the championship current, the water gets colder and the swimmers get tougher. A sea lion plays in surf that would knock anyone else over — not because it’s fearless, but because it has practised in rough water so many times that rough water feels like home. You’ve started training on the days that aren’t fun.", swim: "Turning up on the tired days is its own skill, and it’s the one that separates swimmers.", fact: "Sea lions can hold their breath for about 10 minutes and dive deeper than 270 m — and they steer with their front flippers like wings." },
+  "Octopus":        { chapter: "Chapter 6 · Past the Blue", story: "The cleverest problem-solver in the sea. An octopus doesn’t out-muscle anything — it studies the problem, tries something, and if that fails it tries a completely different way. That’s what you do now with a move that won’t click: you don’t quit, you change the plan.", swim: "Fixing your own stroke mid-set — noticing, adjusting, re-testing — is coaching yourself.", fact: "An octopus has three hearts, blue blood, and can unscrew a jar lid from the inside to get at the snack in it." },
+  "Giant Squid":    { chapter: "Chapter 6 · Past the Blue", story: "Down where the sunlight gives up, the giant squid keeps going. Almost nobody has ever seen one train — it does the work in the dark, unwatched, for years. This rank belongs to the swimmer who does the session when no one is clapping.", swim: "Quiet weekday drylands nobody sees are what makes race day loud.", fact: "The giant squid has the largest eyes of any animal on Earth — about the size of a dinner plate — to catch the tiniest glimmer of light in the deep." },
+  "Humpback Whale": { chapter: "Chapter 7 · The Long Migration", story: "The humpback swims further than almost anything alive — thousands of kilometres, every year, without ever making a fuss about it. It doesn’t sprint. It just never stops. You’ve built the rarest thing in sport: a habit that outlasts moods.", swim: "Season-long endurance — the base that makes every hard set possible.", fact: "Humpbacks migrate up to 8,000 km each year, and the males sing long songs that whole ocean populations learn and change together." },
+  "Blue Whale":     { chapter: "Chapter 7 · The Long Migration", story: "The biggest animal that has ever lived — bigger than any dinosaur — and it got that way one quiet mouthful at a time. Nothing about a blue whale happened fast. Everything about it happened relentlessly. That’s your training log now: enormous, built out of ordinary days.", swim: "Power that comes from volume — months of work stacked into one body.", fact: "A blue whale’s heart is about the size of a small car, and its call is louder than a jet engine and can carry for hundreds of kilometres." },
+  "Storm Rider":    { chapter: "Chapter 8 · The Summit Current", story: "Some swimmers wait for calm water. You stopped waiting. A storm rider reads the swell, picks the line, and uses the rough water to go faster — hard practices, tough meets, bad days all become fuel instead of excuses.", swim: "Racing well when conditions are wrong: cold pool, early heat, tired legs, no problem.", fact: "The Gulf Stream carries more water than every river on Earth combined, and swimmers and sailors have used its push for centuries." },
+  "Ocean Guardian": { chapter: "Chapter 8 · The Summit Current", story: "At this height the ocean stops being something you conquer and becomes something you look after. A guardian is the swimmer younger kids copy — first in, encouraging in the next lane, honest about form. You’re not just strong now. You’re the reason someone else keeps going.", swim: "Leading a warm-up, spotting a teammate’s catch, setting the tone on the deck.", fact: "The ocean makes more than half of the oxygen we breathe — most of it from plankton too small to see." },
+  "Ocean Legend":   { chapter: "Chapter 9 · The Summit", story: "You reached the top of the ladder — and here’s the secret it was keeping: the ocean never actually ends. There’s no rank above this one because there’s nothing left to unlock. From here it isn’t about earning anything. It’s just you, the water, and the swimmer you decided to become. Go swim for the love of it.", swim: "Nothing left to prove on this ladder. Every session from here is yours to spend how you like.", fact: "More than 80% of the ocean has never been mapped or explored — even at the summit, most of it is still waiting." }
 };
 export const RANK_TEASE = {
   "Sea Turtle": "A patient traveller waits ahead…", "Penguin": "Something quick and tidy is coming…",
   "Sea Otter": "A strong, bendy friend is near…", "Stingray": "A smooth glider hides in the reef…",
   "Dolphin": "A playful speedster is coming…", "Shark": "A powerful ruler waits in the blue…",
   "Orca": "A clever team-hunter lies ahead…", "Sailfish": "Pure speed is almost within reach…",
-  "Marlin": "The legend of the ocean awaits at the top…"
+  "Marlin": "The ruler of the open sea waits at the top of the ocean class…",
+  "Sea Lion": "Something that plays in rough water is waiting past the blue…",
+  "Octopus": "The cleverest problem-solver in the sea is out there…",
+  "Giant Squid": "Something enormous trains in the dark where nobody watches…",
+  "Humpback Whale": "A traveller who never stops is somewhere ahead…",
+  "Blue Whale": "The biggest heart in the ocean is still out of sight…",
+  "Storm Rider": "Something that races the storm instead of hiding from it…",
+  "Ocean Guardian": "The one the whole ocean looks up to is nearly here…",
+  "Ocean Legend": "The very summit. No one has told you what’s up there yet…"
 };
 
 // Level-up prize pool — a grown-up curates this in Settings.
@@ -903,7 +938,10 @@ export const PRIZE_POOL = [
   { icon: "🎨", label: "One-on-one time with a grown-up" }
 ];
 
-/* XP cost of going from level n to n+1 (design curve). */
+/* XP cost of going from level n to n+1 (design curve).
+   FROZEN: re-pricing a level silently moves the athlete's current level (the
+   same XP total would resolve to a different level), so this curve must not
+   change. New ranks are added to LADDER above instead. */
 export function levelCost(n) {
   if (n <= 8) return 500 + (n - 1) * 30;
   if (n <= 17) return 1000 + (n - 9) * 45;

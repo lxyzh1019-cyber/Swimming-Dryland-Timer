@@ -9,7 +9,7 @@
    ============================================================ */
 
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA, exWork, exRepsDetail } from "./data.js";
-import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, xpForSession, athleteId, noteSessionXpAwarded, patchSession, sessionKey } from "./store.js";
+import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, xpForSession, athleteId, noteSessionXpAwarded, patchSession, sessionKey, XP_VERSION } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
 import { recoveryDoseSecs, refTime } from "./util.js";
@@ -42,7 +42,7 @@ function blankSession() {
     roundsCompleted: 0, sideLabel: "",
     dayKey: null, light: "green", practice: false, mini: false, spa: false,
     endedEarly: false, xpEarned: 0, leveledUp: false,
-    mood: null, wentWell: null, nextTime: null, quizPick: null,
+    mood: null, wentWell: null, nextTime: null, quizPick: null, quizXp: 0,
     savedEntry: false, saveFailed: false, savedKey: null, fsId: null
   };
 }
@@ -624,6 +624,7 @@ export function finalize(completed) {
     durationSecs: elapsedSecs,
     session: "morning",
     planVersion: "2026.2",
+    xpVersion: XP_VERSION,     // marks a row whose XP counted the rounds trained
     sessionType: sess.spa ? "spa" : "main",
     lightResult: sess.spa ? "recovery" : sess.light,
     roundsDone: sess.spa ? 0 : Math.max(1, LIGHT_ROUNDS[sess.light] || 1),

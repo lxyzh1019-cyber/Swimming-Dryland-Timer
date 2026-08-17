@@ -84,7 +84,7 @@ export function progressScreen(vm) {
           </div>
           <div style="flex:1;min-width:200px;">
             <div style="font-family:var(--font-display);font-size:24px;font-weight:600;line-height:1.1;">${vm.level.rankIcon} ${vm.level.rankName}</div>
-            <div style="font-size:14px;opacity:0.9;margin:3px 0 9px;font-weight:700;">${vm.level.xp} XP · ${vm.level.xpToNext} XP to ${vm.level.nextRank} →</div>
+            <div style="font-size:14px;opacity:0.9;margin:3px 0 9px;font-weight:700;">${vm.level.xp} XP${vm.level.atSummit ? " · top of the ladder 🏔️" : ` · ${vm.level.xpToNext} XP to ${vm.level.nextRank} →`}</div>
             <div style="height:10px;background:rgba(255,255,255,0.22);border-radius:10px;overflow:hidden;">
               <div style="width:${vm.level.levelPct}%;height:100%;background:#fff;border-radius:10px;transition:width 0.5s;"></div>
             </div>

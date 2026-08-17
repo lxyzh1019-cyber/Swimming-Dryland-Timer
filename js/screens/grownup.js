@@ -340,7 +340,19 @@ function analyticsTab(vm) {
             <div style="${qt.barStyle}"></div>
             <span style="font-size:10px;font-weight:900;color:var(--ink-faint);">${qt.k}</span>
           </div>`).join("")}
-      </div>` : `<div style="font-size:14px;font-weight:700;color:var(--ink-faint);">No Quiz Deck runs yet — scores land here after the first one.</div>`}`)}
+      </div>` : `<div style="font-size:14px;font-weight:700;color:var(--ink-faint);">No Quiz Deck runs yet — scores land here after the first one.</div>`}
+      <div style="margin-top:16px;padding-top:14px;border-top:2px solid var(--hairline);">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:12px;font-weight:900;letter-spacing:0.05em;color:var(--ink-soft);">QUIZ XP BUDGET</span>
+          <span style="font-size:13px;font-weight:900;color:var(--grape-ink);">${a.quizBudget.xpSpent} / ${a.quizBudget.xpTotal} XP · ${a.quizBudget.mastered}/${a.quizBudget.total} mastered</span>
+        </div>
+        <div style="height:10px;background:var(--surface-2);border-radius:10px;overflow:hidden;margin:8px 0 8px;">
+          <div style="${a.quizBudget.barStyle}"></div>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--ink-faint);line-height:1.4;">${a.quizBudget.note}</div>
+        <div style="font-size:12px;font-weight:800;color:${a.quizBudget.paidToday ? "var(--ink-faint)" : "var(--mint-ink)"};margin-top:6px;">${a.quizBudget.paidToday ? "✓ Today’s paying deck is already used — further runs are free practice." : "○ Today’s paying deck is still available."}</div>
+        <div style="font-size:12px;font-weight:800;color:var(--ink-faint);margin-top:3px;">Quiz XP banked today: ${a.quizBudget.todayXp} / ${a.quizBudget.dailyCap}</div>
+      </div>`)}
 
     <div style="${vm.grid2}">
       <div style="background:var(--aqua-wash);border-radius:var(--radius-xl);padding:16px 18px;display:flex;gap:12px;align-items:flex-start;">
