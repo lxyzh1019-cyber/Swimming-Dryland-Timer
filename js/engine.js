@@ -42,7 +42,7 @@ function blankSession() {
     roundsCompleted: 0, sideLabel: "",
     dayKey: null, light: "green", practice: false, mini: false, spa: false,
     endedEarly: false, xpEarned: 0, leveledUp: false,
-    mood: null, wentWell: null, nextTime: null, quizPick: null,
+    mood: null, wentWell: null, nextTime: null, quizPick: null, quizXp: 0,
     savedEntry: false, saveFailed: false, savedKey: null, fsId: null
   };
 }

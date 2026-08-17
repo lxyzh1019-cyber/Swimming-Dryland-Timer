@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
-import { PRIZE_POOL, levelCost } from "./data.js";
+import { DAYS, PRIZE_POOL, levelCost } from "./data.js";
 
 /* ---- keys (unchanged from the old app unless noted) ---- */
 export const SETTINGS_KEY     = "swimTrainingSettingsV2";
@@ -407,8 +407,111 @@ export function saveLadderRungs(r) { writeStorage(LS_LADDER, r); }
 /* ---- learning records + quiz ---- */
 export function loadLearning() { return readStorage(LS_LEARNING, []); }
 export function saveLearning(l) { writeStorage(LS_LEARNING, l); }
-export function loadQuiz() { return readStorage(LS_QUIZ, { items: {}, results: [], streak: 0 }); }
+
+/* Quiz blob. `items` is the per-MOVE mastery record the grown-up analytics
+   reads. `qLedger` is the per-QUESTION XP ledger added alongside it: a move
+   can be asked three ways (cue / watch-out / fix), so per-move records cannot
+   tell "knows the cue" from "knows the fix" and are too coarse to price XP.
+   `lastPaidISO` marks the day's one XP-paying deck. Old blobs are normalized
+   on read, so existing mastery history survives untouched. */
+export function loadQuiz() {
+  const q = readStorage(LS_QUIZ, null) || {};
+  return {
+    items: q.items || {},
+    results: q.results || [],
+    streak: q.streak || 0,
+    qLedger: q.qLedger || {},
+    lastPaidISO: q.lastPaidISO || null
+  };
+}
 export function saveQuiz(q) { writeStorage(LS_QUIZ, q); }
+
+/* ---- quiz XP economy ----------------------------------------------------
+   XP pays for LEARNING, not for repetition. Two rules together:
+
+   1. One paying deck per calendar day (`lastPaidISO`). Every later deck the
+      same day is free practice worth 0 XP — still fully playable, and it never
+      touches the ledger, so practising can't spend tomorrow's budget.
+   2. Each QUESTION pays at most once, ever: +10 the first time it is
+      attempted, +25 the first time it is answered correctly. A question first
+      seen and missed still pays its +25 later, when it is finally learned.
+
+   Why: the old rule was `score*25 + answered*10` per deck, with no cap, no
+   cooldown and no memory. Because the deck reveals the correct answer after
+   every pick, one honest pass taught the answers and every replay after that
+   was a guaranteed 8/8 = 280 XP — a level's worth of XP in a few minutes of
+   tapping, more than a whole training session. Worse, `answered*10` paid out
+   even when every answer was wrong, so it rewarded tapping rather than
+   knowing.
+
+   Because the bank is finite, these rules make the quiz's LIFETIME yield
+   finite and knowable, spread over at least (bank ÷ deck size) days by rule 1.
+   Training stays the only open-ended way up the ladder. */
+export const QXP_ATTEMPT = 10;   // once per question, first time attempted
+export const QXP_CORRECT = 25;   // once per question, first time correct
+
+export function quizQuestionKey(move, kind) { return move + "|" + kind; }
+
+/* Every move the app can ask about, de-duplicated across the week. */
+let _movePoolCache = null;
+export function movePool() {
+  if (_movePoolCache) return _movePoolCache;
+  const seen = {}, pool = [];
+  Object.values(DAYS).forEach(day => {
+    const blocks = day.blocks || {}; const rec = day.recovery || [];
+    [].concat(...Object.values(blocks), day.prepMenu || [], rec).forEach(ex => {
+      if (!ex || !ex.name || seen[ex.name]) return; seen[ex.name] = true;
+      pool.push({ name: ex.name, cue: ex.cue || "", watch: ex.parentWatch || "", fix: ex.redFlag || "", block: ex.block || "" });
+    });
+  });
+  _movePoolCache = pool; return pool;
+}
+
+/* Every askable question: one per (move, kind) that actually has content. */
+export function questionBank() {
+  const bank = [];
+  movePool().forEach(m => {
+    if (m.cue) bank.push([m, "cue"]);
+    if (m.watch) bank.push([m, "watch"]);
+    if (m.fix) bank.push([m, "fix"]);
+  });
+  return bank;
+}
+
+/* Has today's one paying deck already been completed? */
+export function quizPaidToday(quiz) {
+  return (quiz || loadQuiz()).lastPaidISO === todayISODate();
+}
+
+/* Price one answered question against the ledger and bank the XP it earns.
+   Returns what it paid and why, so the caller can say so on screen. Callers
+   are responsible for the once-a-day rule; the ledger itself only ever pays
+   for something new. */
+export function payQuizQuestion(key, correct, quiz) {
+  const q = quiz || loadQuiz();
+  const rec = q.qLedger[key] || { attempted: false, mastered: false };
+  let xp = 0, firstSeen = false, newlyMastered = false;
+  if (!rec.attempted) { rec.attempted = true; firstSeen = true; xp += QXP_ATTEMPT; }
+  if (!rec.mastered && correct) { rec.mastered = true; newlyMastered = true; xp += QXP_CORRECT; }
+  q.qLedger[key] = rec;
+  if (!quiz) saveQuiz(q);        // caller-owned blobs are saved by the caller
+  return { xp, firstSeen, newlyMastered };
+}
+
+/* Mastery + remaining-XP snapshot over the whole bank. Feeds the kid's
+   "moves mastered" line and the grown-up's quiz card. */
+export function quizBankStatus(quiz) {
+  const led = (quiz || loadQuiz()).qLedger || {};
+  const bank = questionBank();
+  let mastered = 0, xpLeft = 0;
+  bank.forEach(([m, k]) => {
+    const rec = led[quizQuestionKey(m.name, k)] || {};
+    if (rec.mastered) mastered++; else xpLeft += QXP_CORRECT;
+    if (!rec.attempted) xpLeft += QXP_ATTEMPT;
+  });
+  return { total: bank.length, mastered, left: bank.length - mastered, xpLeft,
+           xpTotal: bank.length * (QXP_ATTEMPT + QXP_CORRECT) };
+}
 
 /* ---- PR log ---- */
 export function loadPrLog() { return readStorage(LS_PRLOG, []); }
@@ -462,8 +565,8 @@ export function setEngagementPick(systemKey) {
 
 /* ============================================================
    JOURNEY — XP, level, rank, prizes. New with the Splash UI.
-   XP rules (design spec): session complete = moves×10 + 40
-   (spa = 0); quiz: +25 per correct, +10 per attempted question.
+   XP rules: session complete = moves×10 + 40 (spa = 0); quiz pays
+   for first-time learning only — see the quiz XP economy above.
    ============================================================ */
 
 export function loadJourney() {

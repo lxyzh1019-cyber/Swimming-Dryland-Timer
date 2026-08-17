@@ -6,7 +6,7 @@
    delegated click listener below.
    ============================================================ */
 
-import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, noteSessionXpAwarded, onStorageError } from "./store.js";
+import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, noteSessionXpAwarded, onStorageError, payQuizQuestion, quizQuestionKey } from "./store.js";
 import { edmontonDayKey, escapeHtml } from "./util.js";
 import { restoreFromCloud } from "./sync.js";
 import { downloadBackup, restoreBackupFile } from "./backup.js";
@@ -235,14 +235,22 @@ const actions = {
     const i = Number(arg);
     const first = engine.sess.quizPick == null;
     engine.setQuizPick(i);
-    // The feedback copy promises +25/+10 XP — actually grant it (once).
+    // Priced off the same ledger as the Quiz Deck: a question pays +10 the
+    // first time it's attempted and +25 the first time it's answered right,
+    // and never again. The Coach's Quiz question rotates but the bank is only
+    // six deep, so without the ledger this paid 25 XP a session forever for
+    // re-answering questions the kid already knew.
     if (first && !engine.sess.practice && engine.sess.savedEntry) {
       const q = sessionQuizFor(engine.sess.dayKey);
-      const xp = q.opts[i] && q.opts[i].ok ? 25 : 10;
-      engine.sess.xpEarned = (engine.sess.xpEarned || 0) + xp;
-      if (addXp(xp).leveledUp) engine.sess.leveledUp = true;
-      noteSessionXpAwarded(xp);   // it lands on the session record via xpEarned below
-      patchSession(engine.sess.savedKey, { xpEarned: engine.sess.xpEarned });
+      const correct = !!(q.opts[i] && q.opts[i].ok);
+      const { xp } = payQuizQuestion(quizQuestionKey("coach", q.id), correct);
+      engine.sess.quizXp = xp;    // the done screen quotes what was actually banked
+      if (xp > 0) {
+        engine.sess.xpEarned = (engine.sess.xpEarned || 0) + xp;
+        if (addXp(xp).leveledUp) engine.sess.leveledUp = true;
+        noteSessionXpAwarded(xp);   // it lands on the session record via xpEarned below
+        patchSession(engine.sess.savedKey, { xpEarned: engine.sess.xpEarned });
+      }
       render();
     }
   },

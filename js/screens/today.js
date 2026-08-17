@@ -117,7 +117,7 @@ function journeyMapWide(vm) {
     <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,62,99,0.55) 0%,rgba(10,62,99,0.15) 32%,transparent 55%);pointer-events:none;"></div>
     <div style="position:relative;z-index:2;padding:18px 22px 10px;color:#fff;">
       <div style="font-size:12px;font-weight:900;letter-spacing:0.08em;opacity:0.9;">${j.chapter}</div>
-      <div style="font-family:var(--font-display);font-weight:600;font-size:22px;line-height:1.2;margin:4px 0 8px;">LVL ${j.level} · ${j.rankName} — ${j.xpToNextRank} XP to ${j.nextRankName}</div>
+      <div style="font-family:var(--font-display);font-weight:600;font-size:22px;line-height:1.2;margin:4px 0 8px;">LVL ${j.level} · ${j.rankName}${j.atSummit ? " — top of the ladder 🏔️" : ` — ${j.xpToNextRank} XP to ${j.nextRankName}`}</div>
       <div style="height:9px;background:rgba(255,255,255,0.28);border-radius:9px;overflow:hidden;">
         <div style="width:${j.levelPct}%;height:100%;background:#fff;border-radius:9px;"></div>
       </div>
@@ -135,7 +135,7 @@ function journeyMapNarrow(vm) {
     <div style="position:relative;z-index:2;padding:16px 18px 8px;color:#fff;">
       <div style="font-size:11px;font-weight:900;letter-spacing:0.08em;opacity:0.9;">${j.chapter}</div>
       <div style="font-family:var(--font-display);font-weight:600;font-size:17px;line-height:1.2;margin:4px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">LVL ${j.level} · ${j.rankName}</div>
-      <div style="font-size:12px;font-weight:800;opacity:0.9;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${j.xpToNextRank} XP to ${j.nextRankName}</div>
+      <div style="font-size:12px;font-weight:800;opacity:0.9;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${j.atSummit ? "Top of the ladder 🏔️ swim for the love of it" : `${j.xpToNextRank} XP to ${j.nextRankName}`}</div>
       <div style="height:8px;background:rgba(255,255,255,0.28);border-radius:9px;overflow:hidden;">
         <div style="width:${j.levelPct}%;height:100%;background:#fff;border-radius:9px;"></div>
       </div>

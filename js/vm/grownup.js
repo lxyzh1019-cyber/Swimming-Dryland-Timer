@@ -5,8 +5,8 @@
    thin history gets honest empty/partial states, never mock data.
    ============================================================ */
 
-import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl } from "../data.js";
-import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId } from "../store.js";
+import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl, fmtXp } from "../data.js";
+import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday } from "../store.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
 
 const LIGHT_COLORS = { green: "var(--mint)", yellow: "var(--sun)", red: "var(--stop)", recovery: "var(--grape)" };
@@ -313,6 +313,18 @@ export function buildGrownupVM(state) {
     return { k: "Q" + (i + 1), pctLabel: pct + "%",
       barStyle: "width:100%;height:" + Math.max(6, Math.round(pct * 0.8)) + "px;border-radius:6px 6px 0 0;background:" + (i === arr.length - 1 ? "var(--grape)" : "color-mix(in srgb, var(--grape) 45%, #fff)") + ";" };
   });
+  // Quiz XP is capped and finite by design — show how much of it is spent so a
+  // grown-up can see at a glance whether XP is coming from training or tapping.
+  const qBank = quizBankStatus(quiz);
+  const quizBudget = {
+    mastered: qBank.mastered, total: qBank.total,
+    xpSpent: fmtXp(qBank.xpTotal - qBank.xpLeft), xpTotal: fmtXp(qBank.xpTotal),
+    paidToday: quizPaidToday(quiz),
+    barStyle: "height:10px;border-radius:10px;background:var(--grape);width:" + Math.round((qBank.mastered / Math.max(1, qBank.total)) * 100) + "%;",
+    note: "Quiz XP is capped at " + fmtXp(qBank.xpTotal) + " for the whole program (" + qBank.total
+      + " questions, paid once each) and one paying deck per day. Replays are free practice worth 0 XP. "
+      + (qBank.left ? qBank.left + " questions still hold XP." : "All questions are mastered — the quiz pays nothing further.")
+  };
 
   /* ---- coach narrative (one honest story per scope) ---- */
   const read = !sessions.length
@@ -398,7 +410,7 @@ export function buildGrownupVM(state) {
       rounds, roundsDonePct: Math.round((rounds.done / Math.max(1, rounds.planned)) * 100),
       mood: moodRows, hasMood: moodRows.length > 0, moodUpPct,
       byWeekday, byTopic,
-      quizTrend, hasQuiz: quizTrend.length > 0,
+      quizTrend, hasQuiz: quizTrend.length > 0, quizBudget,
       quizSubtitle: "Quiz Deck score per run.",
       read, suggest
     },

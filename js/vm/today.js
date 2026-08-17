@@ -191,7 +191,11 @@ export function buildJourney() {
   })[currentRank.name] || "CHAPTER 1 · THE SHALLOWS";
 
   return {
-    level, rankName: currentRank.name, nextRankName: nextRank ? nextRank.name : "Marlin",
+    // At the summit there is no next rank. Naming the current rank as the
+    // "next" one would tell a kid who already IS Ocean Legend that they're
+    // still chasing it.
+    level, rankName: currentRank.name, atSummit: !nextRank,
+    nextRankName: nextRank ? nextRank.name : null,
     xpToNextRank: fmtXp(xpToNextRank), levelPct, waypoints, levelPips, habitats,
     pathHeight, solidPathD: curvePath(solidPts), dashedPathD: curvePath(dashedPts),
     chapter, xp: j.xp || 0

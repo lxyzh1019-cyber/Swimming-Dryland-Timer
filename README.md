@@ -22,6 +22,22 @@ the **Splash — Kids Swim Training** design system.
 - **Quiz Deck & Prize Draw** — questions generated from the plan's own
   cues/watch-outs/fixes; level-ups earn a prize envelope
 
+## XP rules
+
+- **Training** is the open-ended way up: a finished session pays
+  `moves × 10 + 40` XP (half for one ended early, nothing for a spa day).
+- **Quiz XP pays for learning, not repetition.** Only the day's first completed
+  deck pays at all, and inside it each question pays at most once *ever* — +10
+  the first time it is attempted, +25 the first time it is answered right (a
+  question missed the first time still pays its +25 when it is finally
+  learned). Replays are free practice worth 0 XP, and the Coach's Quiz at the
+  end of a session prices off the same ledger. The whole question bank is
+  finite, so lifetime quiz XP is capped — the Grown-up Zone's Analytics tab
+  shows how much of that budget is spent.
+- **The rank ladder runs to level 50** (Seahorse → Ocean Legend). Rank
+  thresholds and `levelCost()` are frozen: re-pricing a level would silently
+  move a level that has already been earned.
+
 ## Running it
 
 Static files, no build step — but the app uses ES modules, so serve over HTTP
