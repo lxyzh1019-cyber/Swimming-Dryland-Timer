@@ -79,12 +79,23 @@ build step.
   quiz mastery, trackers) — nothing earned ever vanishes on reload.
 - Completed sessions are also mirrored to Firebase Firestore when online
   (`js/firebase.js`); the app works fully offline.
-- That mirror is **read back on every boot** (`js/sync.js`): any session this
-  browser is missing is merged into the local log and its XP re-awarded, so a
-  cleared or brand-new browser recovers the history instead of starting over.
-  The merge is additive and idempotent — local records are never overwritten.
+- **The mirror syncs both ways on every boot** (`js/sync.js`), all of it
+  additive — nothing is overwritten or deleted on either side:
+  1. *pull* — any session this browser is missing is merged into the local log,
+     so a cleared or brand-new browser recovers the history instead of starting
+     over;
+  2. *push* — any session the cloud is missing (logged offline, or before the
+     mirror existed) is backfilled up;
+  3. *journey* — the quiz ledger, prize wallet and pending draws ride in one
+     `kind: "journey"` doc per athlete in the same collection, merged upward and
+     republished.
   Mirrored records are tagged with the athlete, and a restore only pulls back
   that athlete's own sessions.
+- **XP is derived, not accumulated**: `xp = what the training log is worth +
+  what the quiz ledger is worth`. Both halves sync, so every device computes the
+  same number — without this, two devices showed two different levels for the
+  same kid (26 on one, 18 on the other). It is idempotent and un-farmable: the
+  ledger already pays each question exactly once.
 - **One storage namespace per athlete.** The first athlete uses the bare keys;
   additional ones get `<key>::<profileId>`. Add or switch athletes in
   Grown-up Zone → Settings (switching reloads the app).

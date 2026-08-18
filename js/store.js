@@ -767,6 +767,108 @@ export function mergeSessions(incoming) {
   return added;
 }
 
+/* ---- journey convergence across devices ---------------------------------
+   The skate app hit this first: the same kid read level 26 on the iPad and 18
+   on the desktop. Both were honest — only SESSIONS were mirrored, so a wiped
+   device rebuilt the training XP and nothing else, while the original still
+   held quiz XP earned under the old uncapped rules on top of it.
+
+   The fix, ported here so both sisters' apps behave identically, is to stop
+   treating XP as a running total each device accumulates privately and treat
+   it as DERIVED state:
+
+       xp  =  what the training log is worth  +  what the quiz ledger is worth
+
+   Both halves are mirrored, so every device computes the same number without
+   anyone having to win an argument about whose total is right. It is also
+   idempotent — rebuilding twice changes nothing — and un-farmable, because the
+   ledger already pays each question exactly once. */
+
+/* What the quiz ledger is worth, priced at the current rates. */
+export function quizXpFromLedger(quiz) {
+  const q = quiz || loadQuiz();
+  let xp = 0;
+  Object.values(q.qLedger || {}).forEach(rec => {
+    if (!rec) return;
+    if (rec.attempted) xp += QXP_ATTEMPT;
+    if (rec.mastered) xp += QXP_CORRECT;
+  });
+  return xp;
+}
+
+/* Recompute the journey total from its two sources. Prizes already won are
+   never touched, and a level gained still grants its draw. Returns the total. */
+export function rebuildJourneyXp() {
+  const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
+  const fromSessions = loadSessions().reduce((sum, s) => sum + sessionXp(s), 0);
+  const fromQuiz = quizXpFromLedger();
+  const before = levelFromXp(j.xp || 0).level;
+  j.sessionXp = fromSessions;
+  j.xp = fromSessions + fromQuiz;
+  const after = levelFromXp(j.xp).level;
+  if (after > before) j.pendingDraws = (j.pendingDraws || 0) + (after - before);
+  saveJourney(j);
+  return j.xp;
+}
+
+/* The half of the journey the session log cannot re-derive: the quiz ledger
+   (which prices itself), the prize wallet and the pending draws. */
+export function journeySnapshot() {
+  const j = loadJourney() || {};
+  const q = loadQuiz();
+  return {
+    kind: "journey",
+    prizesWon: j.prizesWon || [],
+    pendingDraws: j.pendingDraws || 0,
+    qLedger: q.qLedger || {},
+    quizItems: q.items || {},
+    updatedAt: Date.now()
+  };
+}
+
+/* Merge a cloud journey snapshot into this device. Everything moves UP: prize
+   wallets union by id, and a question mastered anywhere counts as mastered
+   everywhere, so the same learning can never be paid for twice. Returns true
+   when something changed. */
+export function mergeCloudJourney(snap) {
+  if (!snap || snap.kind !== "journey") return false;
+  let changed = false;
+
+  const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
+  const wallet = new Map();
+  [...(j.prizesWon || []), ...(snap.prizesWon || [])].forEach(p => {
+    if (p && p.id != null && !wallet.has(p.id)) wallet.set(p.id, p);
+  });
+  if (wallet.size !== (j.prizesWon || []).length) changed = true;
+  const draws = Math.max(j.pendingDraws || 0, snap.pendingDraws || 0);
+  if (draws !== (j.pendingDraws || 0)) changed = true;
+  j.pendingDraws = draws;
+  j.prizesWon = [...wallet.values()]
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  saveJourney(j);
+
+  const q = loadQuiz();
+  Object.entries(snap.qLedger || {}).forEach(([k, rec]) => {
+    const cur = q.qLedger[k] || { attempted: false, mastered: false };
+    const next = {
+      attempted: !!(cur.attempted || (rec && rec.attempted)),
+      mastered: !!(cur.mastered || (rec && rec.mastered))
+    };
+    if (next.attempted !== cur.attempted || next.mastered !== cur.mastered) changed = true;
+    q.qLedger[k] = next;
+  });
+  Object.entries(snap.quizItems || {}).forEach(([move, rec]) => {
+    const cur = q.items[move] || { right: 0, wrong: 0, seen: 0 };
+    q.items[move] = {
+      right: Math.max(cur.right || 0, (rec && rec.right) || 0),
+      wrong: Math.max(cur.wrong || 0, (rec && rec.wrong) || 0),
+      seen:  Math.max(cur.seen  || 0, (rec && rec.seen)  || 0)
+    };
+  });
+  saveQuiz(q);
+  return changed;
+}
+
 /* Keep the XP total consistent with the session log without double-counting
    quiz XP (which has no session record). The journey remembers how much of its
    XP came from sessions; when the log grows behind its back — a cloud restore —
