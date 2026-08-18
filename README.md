@@ -24,20 +24,26 @@ the **Splash — Kids Swim Training** design system.
 
 ## XP rules
 
-- **Training** is the open-ended way up: a finished session pays
-  `(moves × 10 + 40) × roundsFactor` (half for one ended early, nothing for a
-  spa day). Rounds count — 1 round ×1.0, 2 rounds ×1.5, 3 rounds ×2.0 — so a
-  1-round easy day is worth half a full 3-round day instead of the same.
-  Sessions logged before this rule keep the flat value they were awarded.
+- **Training** is the open-ended way up: a finished session pays a flat rate
+  for the rounds trained — **1 round 180, 2 rounds 270, 3 rounds 360** (half for
+  one ended early, nothing for a spa day). An easy day is worth half a full one,
+  and the number no longer wobbles with the move count of that weekday. A mini
+  is priced as a 1-round day however the light was set. Sessions logged before
+  this rule keep the value they were awarded.
 - **Quiz XP pays for learning, not repetition.** Only the day's first completed
-  deck pays at all; each question pays at most once *ever* (+10 the first time
-  it is attempted, +25 the first time it is answered right — a question missed
-  the first time still pays its +25 when it is finally learned); and all quiz
-  XP shares a daily ceiling of 105 XP, about three brand-new questions.
+  deck pays at all; each question pays at most once *ever* (+5 the first time it
+  is attempted, +25 the first time it is answered right — a question missed the
+  first time still pays its +25 when it is finally learned); and all quiz XP
+  shares a daily ceiling of 30 XP — exactly one brand-new question, a sixth of
+  even the lightest training day.
   Questions are paid whole or not at all, so one the cap skipped is still worth
   full value tomorrow. Replays are free practice worth 0 XP, and the Coach's
-  Quiz at the end of a session prices off the same ledger. The question bank is
-  finite, so lifetime quiz XP is capped — the Grown-up Zone's Analytics tab
+  Quiz at the end of a session prices off the same ledger. The bank asks about
+  every move three ways (cue / watch-out / fix) **and about every ocean rank she
+  has unlocked two ways** — what that rank taught her, and its one true marine
+  fact — so the pool grows as she climbs. Locked ranks are never asked: that
+  would spoil the mystery card and quiz her on a chapter she has not been shown.
+  The bank is finite, so lifetime quiz XP is capped — the Grown-up Zone's Analytics tab
   shows how much of that budget is spent.
 - **The rank ladder runs to level 50** (Seahorse → Ocean Legend). Rank
   thresholds and `levelCost()` are frozen: re-pricing a level would silently

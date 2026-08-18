@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
-import { DAYS, PRIZE_POOL, levelCost } from "./data.js";
+import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE } from "./data.js";
 
 /* ---- keys (unchanged from the old app unless noted) ---- */
 export const SETTINGS_KEY     = "swimTrainingSettingsV2";
@@ -434,12 +434,14 @@ export function saveQuiz(q) { writeStorage(LS_QUIZ, q); }
    1. One paying deck per calendar day (`lastPaidISO`). Every later deck the
       same day is free practice worth 0 XP — still fully playable, and it never
       touches the ledger, so practising can't spend tomorrow's budget.
-   2. Each QUESTION pays at most once, ever: +10 the first time it is
-      attempted, +25 the first time it is answered correctly. A question first
-      seen and missed still pays its +25 later, when it is finally learned.
+   2. Each QUESTION pays at most once, ever: +5 the first time it is attempted,
+      +25 the first time it is answered correctly. A question first seen and
+      missed still pays its +25 later, when it is finally learned. The two
+      together are exactly one day's budget, so a brand-new question answered
+      right pays in full in one go.
    3. A daily ceiling (`QXP_DAILY_CAP`) across ALL quiz XP — the deck and the
       Coach's Quiz share it — so even a day full of brand-new questions stays
-      well under one training session. Questions are paid whole or not at all:
+      far under the LIGHTEST training day, not just under a full one. Questions are paid whole or not at all:
       once the day's budget can't cover the next one, its ledger entry is left
       untouched and it is still worth full value tomorrow.
 
@@ -454,11 +456,14 @@ export function saveQuiz(q) { writeStorage(LS_QUIZ, q); }
    Because the bank is finite, these rules make the quiz's LIFETIME yield
    finite and knowable, spread over at least (bank ÷ deck size) days by rule 1.
    Training stays the only open-ended way up the ladder. */
-export const QXP_ATTEMPT = 10;   // once per question, first time attempted
+export const QXP_ATTEMPT = 5;    // once per question, first time attempted
 export const QXP_CORRECT = 25;   // once per question, first time correct
-/* Three brand-new questions a day (3 × 35). A full training day pays 240–520,
-   so the quiz can never out-earn getting on the mat. */
-export const QXP_DAILY_CAP = 105;
+/* One brand-new question a day (5 + 25). The lightest real training day — one
+   round, or a mini — pays 180 XP, so the day's whole quiz budget is a sixth of
+   it. The cap is deliberately measured against the EASY day, not the full one:
+   those are the days a kid is most tempted to tap through a quiz instead of
+   training, and they must still be worth far more than it. */
+export const QXP_DAILY_CAP = 30;
 
 export function quizQuestionKey(move, kind) { return move + "|" + kind; }
 
@@ -486,13 +491,36 @@ export function movePool() {
   _movePoolCache = pool; return pool;
 }
 
-/* Every askable question: one per (move, kind) that actually has content. */
-export function questionBank() {
+/* Ranks the swimmer has actually reached, as quiz topics. The Ocean Story is
+   the best-read text in the app and nothing ever asked her about it; now the
+   ladder itself teaches. Locked ranks are excluded on purpose — asking about a
+   chapter she hasn't unlocked would spoil the mystery card AND quiz her on
+   something she has never been shown. The pool therefore GROWS as she climbs,
+   which is the point. */
+export function rankPool(level) {
+  const lvl = Number.isFinite(level) ? level : levelFromXp((loadJourney() || {}).xp || 0).level;
+  return LADDER.filter(r => r.level <= lvl).map(r => {
+    const lore = RANK_LORE[r.name] || {};
+    return {
+      name: "Rank: " + r.name,      // ledger key space of its own, never a move
+      rank: r.name, icon: r.icon, block: "story",
+      skill: lore.swim || "", fact: lore.fact || "", chapter: lore.chapter || ""
+    };
+  });
+}
+
+/* Every askable question: one per (topic, kind) that actually has content —
+   the moves asked three ways, plus the unlocked ocean chapters asked two. */
+export function questionBank(level) {
   const bank = [];
   movePool().forEach(m => {
     if (m.cue) bank.push([m, "cue"]);
     if (m.watch) bank.push([m, "watch"]);
     if (m.fix) bank.push([m, "fix"]);
+  });
+  rankPool(level).forEach(r => {
+    if (r.skill) bank.push([r, "story"]);
+    if (r.fact) bank.push([r, "fact"]);
   });
   return bank;
 }
@@ -532,7 +560,7 @@ export function payQuizQuestion(key, correct, quiz) {
    "moves mastered" line and the grown-up's quiz card. */
 export function quizBankStatus(quiz) {
   const led = (quiz || loadQuiz()).qLedger || {};
-  const bank = questionBank();
+  const bank = questionBank();   // unlocked ranks only, so this grows with her
   let mastered = 0, xpLeft = 0;
   bank.forEach(([m, k]) => {
     const rec = led[quizQuestionKey(m.name, k)] || {};
@@ -595,8 +623,9 @@ export function setEngagementPick(systemKey) {
 
 /* ============================================================
    JOURNEY — XP, level, rank, prizes. New with the Splash UI.
-   XP rules: session complete = moves×10 + 40 (spa = 0); quiz pays
-   for first-time learning only — see the quiz XP economy above.
+   XP rules: a session pays a flat rate for the rounds trained
+   (spa = 0); quiz pays for first-time learning only — see the
+   quiz XP economy above.
    ============================================================ */
 
 export function loadJourney() {
@@ -614,28 +643,37 @@ export function sessionXp(entry) {
   return entry && entry.completedFully === false ? Math.round(full / 2) : full;
 }
 
-/* Effort multiplier for the rounds actually trained. A red-light day and a
-   full green day used to pay exactly the same — the round count never reached
-   the XP at all — so showing up paid as well as working. A 1-round day is now
-   worth half a 3-round day:
+/* A session pays a flat rate for the rounds actually trained. The old rule
+   (moves × 10 + 40, ignoring rounds) meant a red-light 1-round day paid the
+   same as a full green 3-round day — showing up paid as well as working — and
+   made the day's XP wobble with the move count of that weekday for no reason a
+   kid could see. A 1-round day is worth half a 3-round day:
 
-     1 round ×1.0 (unchanged)   2 rounds ×1.5   3 rounds ×2.0
+     1 round 180 XP   2 rounds 270 XP   3 rounds 360 XP
 
-   Only records written by this version (xpVersion 3) are scaled. Legacy rows
-   keep the flat value they were awarded, so a cloud restore of an old 3-round
-   session re-awards what it originally paid instead of doubling it. */
-export const XP_VERSION = 3;
-export function roundsFactor(entry) {
-  if (!entry || entry.xpVersion !== XP_VERSION) return 1;
-  const rounds = Math.min(3, Math.max(1, entry.roundsDone || 1));
-  return (rounds + 1) / 2;
+   A mini session is one shortened round, so it is priced as a 1-round day
+   however the traffic light was set — otherwise "mini on a green day" would be
+   the cheapest full-price session in the app.
+
+   Only records written by this version are priced this way. Legacy rows keep
+   the old formula, so a cloud restore re-awards what a session originally paid
+   instead of re-pricing history. */
+export const XP_VERSION = 4;
+export const SESSION_XP = { 1: 180, 2: 270, 3: 360 };
+
+export function sessionRounds(entry) {
+  if (entry && entry.mini) return 1;
+  return Math.min(3, Math.max(1, (entry && entry.roundsDone) || 1));
 }
 
 export function xpForSession(entry) {
   if (entry.sessionType === "spa" || entry.session === "spa" || entry.spa) return 0;
-  const moves = (entry.perExercise && entry.perExercise.length) ||
-                entry.movesDone || entry.moves || 6;
-  return Math.round((moves * 10 + 40) * roundsFactor(entry));
+  if (entry.xpVersion !== XP_VERSION) {
+    const moves = (entry.perExercise && entry.perExercise.length) ||
+                  entry.movesDone || entry.moves || 6;
+    return moves * 10 + 40;                       // legacy rows, unchanged
+  }
+  return SESSION_XP[sessionRounds(entry)];
 }
 
 /* Level for a cumulative XP total, plus progress into the current level. */

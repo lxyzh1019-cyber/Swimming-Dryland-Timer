@@ -323,7 +323,7 @@ export function buildGrownupVM(state) {
     todayXp: quizXpToday(quiz), dailyCap: QXP_DAILY_CAP,
     barStyle: "height:10px;border-radius:10px;background:var(--grape);width:" + Math.round((qBank.mastered / Math.max(1, qBank.total)) * 100) + "%;",
     note: "Quiz XP is capped at " + fmtXp(qBank.xpTotal) + " for the whole program (" + qBank.total
-      + " questions, paid once each), at " + QXP_DAILY_CAP + " XP a day, and at one paying deck per day. "
+      + " questions, paid once each), at " + QXP_DAILY_CAP + " XP a day (one new question), and at one paying deck per day. "
       + "Replays are free practice worth 0 XP. "
       + (qBank.left ? qBank.left + " questions still hold XP." : "All questions are mastered — the quiz pays nothing further.")
   };
