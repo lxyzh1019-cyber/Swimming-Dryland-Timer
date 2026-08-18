@@ -173,8 +173,20 @@ const playPerfect = () => {
 localStorage.removeItem(store.LS_QUIZ);
 localStorage.removeItem(store.LS_JOURNEY);
 const bank0 = store.quizBankStatus();
-ok(bank0.total === 83 && bank0.mastered === 0, "question bank is 83 questions, none mastered");
-ok(bank0.xpTotal === 83 * 30, "lifetime quiz XP budget is bank x 30");
+const BANK = store.questionBank().length;      // 83 move questions + the unlocked ranks
+ok(BANK === 83 + store.rankPool().length * 2, "the bank is the moves plus the unlocked ocean chapters");
+ok(bank0.total === BANK && bank0.mastered === 0, "nothing is mastered on a fresh device");
+ok(bank0.xpTotal === BANK * (store.QXP_ATTEMPT + store.QXP_CORRECT), "lifetime quiz XP budget is bank x question value");
+
+/* --- the ocean chapters are quiz material too, once unlocked --- */
+const swimBank1 = store.questionBank(1), swimBank26 = store.questionBank(26);
+ok(swimBank26.length > swimBank1.length, "the question pool grows as ranks unlock");
+ok(store.rankPool(1).length === 1 && store.rankPool(50).length === data.LADDER.length,
+   "only ranks she has reached are askable — locked chapters stay a mystery");
+ok(store.rankPool(26).every(r => r.name.startsWith("Rank: ")),
+   "rank topics have their own ledger key space, never colliding with a move");
+ok(swimBank26.filter(([, k]) => k === "story" || k === "fact").length === store.rankPool(26).length * 2,
+   "each unlocked rank is asked two ways");
 
 const firstDeck = playPerfect();
 ok(firstDeck.wasPaidRound === true && firstDeck.xpEarned === store.QXP_DAILY_CAP,
@@ -213,7 +225,10 @@ wrongDeck.qs.forEach((qq, i) => { wrongDeck.idx = i; overlays.answerQuizDeck(wro
 overlays.finishQuizDeck(wrongDeck);
 ok(wrongDeck.xpEarned === 30 && wrongDeck.newlyMastered === 0,
    "all-wrong deck pays attempt credit only (6 x 5, then the cap bites) and masters nothing");
-ok(store.quizBankStatus().left === 83, "wrong answers leave every question still claimable");
+// left vs total, not a captured number: the bank grows as ranks unlock, and
+// earlier tests move the level around.
+const afterWrong = store.quizBankStatus();
+ok(afterWrong.left === afterWrong.total, "wrong answers leave every question still claimable");
 
 // The Coach's Quiz at the end of a session prices off the same ledger and
 // shares the same daily ceiling.

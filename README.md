@@ -37,8 +37,12 @@ the **Splash — Kids Swim Training** design system.
   for even the lightest training day.
   Questions are paid whole or not at all, so one the cap skipped is still worth
   full value tomorrow. Replays are free practice worth 0 XP, and the Coach's
-  Quiz at the end of a session prices off the same ledger. The question bank is
-  finite, so lifetime quiz XP is capped — the Grown-up Zone's Analytics tab
+  Quiz at the end of a session prices off the same ledger. The bank asks about
+  every move three ways (cue / watch-out / fix) **and about every ocean rank she
+  has unlocked two ways** — what that rank taught her, and its one true marine
+  fact — so the pool grows as she climbs. Locked ranks are never asked: that
+  would spoil the mystery card and quiz her on a chapter she has not been shown.
+  The bank is finite, so lifetime quiz XP is capped — the Grown-up Zone's Analytics tab
   shows how much of that budget is spent.
 - **The rank ladder runs to level 50** (Seahorse → Ocean Legend). Rank
   thresholds and `levelCost()` are frozen: re-pricing a level would silently

@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
-import { DAYS, PRIZE_POOL, levelCost } from "./data.js";
+import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE } from "./data.js";
 
 /* ---- keys (unchanged from the old app unless noted) ---- */
 export const SETTINGS_KEY     = "swimTrainingSettingsV2";
@@ -491,13 +491,36 @@ export function movePool() {
   _movePoolCache = pool; return pool;
 }
 
-/* Every askable question: one per (move, kind) that actually has content. */
-export function questionBank() {
+/* Ranks the swimmer has actually reached, as quiz topics. The Ocean Story is
+   the best-read text in the app and nothing ever asked her about it; now the
+   ladder itself teaches. Locked ranks are excluded on purpose — asking about a
+   chapter she hasn't unlocked would spoil the mystery card AND quiz her on
+   something she has never been shown. The pool therefore GROWS as she climbs,
+   which is the point. */
+export function rankPool(level) {
+  const lvl = Number.isFinite(level) ? level : levelFromXp((loadJourney() || {}).xp || 0).level;
+  return LADDER.filter(r => r.level <= lvl).map(r => {
+    const lore = RANK_LORE[r.name] || {};
+    return {
+      name: "Rank: " + r.name,      // ledger key space of its own, never a move
+      rank: r.name, icon: r.icon, block: "story",
+      skill: lore.swim || "", fact: lore.fact || "", chapter: lore.chapter || ""
+    };
+  });
+}
+
+/* Every askable question: one per (topic, kind) that actually has content —
+   the moves asked three ways, plus the unlocked ocean chapters asked two. */
+export function questionBank(level) {
   const bank = [];
   movePool().forEach(m => {
     if (m.cue) bank.push([m, "cue"]);
     if (m.watch) bank.push([m, "watch"]);
     if (m.fix) bank.push([m, "fix"]);
+  });
+  rankPool(level).forEach(r => {
+    if (r.skill) bank.push([r, "story"]);
+    if (r.fact) bank.push([r, "fact"]);
   });
   return bank;
 }
@@ -537,7 +560,7 @@ export function payQuizQuestion(key, correct, quiz) {
    "moves mastered" line and the grown-up's quiz card. */
 export function quizBankStatus(quiz) {
   const led = (quiz || loadQuiz()).qLedger || {};
-  const bank = questionBank();
+  const bank = questionBank();   // unlocked ranks only, so this grows with her
   let mastered = 0, xpLeft = 0;
   bank.forEach(([m, k]) => {
     const rec = led[quizQuestionKey(m.name, k)] || {};

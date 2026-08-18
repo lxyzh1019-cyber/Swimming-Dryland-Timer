@@ -6,7 +6,7 @@
 
 import { PRIZE_POOL } from "../data.js";
 import { settings, loadQuiz, saveQuiz, logEvent, addXp, addPrize,
-         movePool, questionBank, quizPaidToday, quizBankStatus,
+         movePool, rankPool, questionBank, quizPaidToday, quizBankStatus,
          quizQuestionKey, payQuizQuestion } from "../store.js";
 import { todayISODate } from "../util.js";
 
@@ -14,7 +14,29 @@ import { todayISODate } from "../util.js";
    The move pool, the question bank and the XP ledger rules live in store.js
    so the grown-up view-model can read mastery without importing a screen. */
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+/* Ocean-chapter questions. The distractors come from OTHER ranks' stories, so
+   a wrong answer is still a real chapter she has read — the question tests
+   whether she knows which sea friend taught her what, not whether she can spot
+   the one made-up option. */
+function makeRankQ(rank, kind, ranks) {
+  const field = kind === "story" ? "skill" : "fact";
+  const others = ranks.filter(r => r.rank !== rank.rank && r[field]);
+  const distractors = shuffle(others).slice(0, 2).map(r => r[field]);
+  const correct = rank[field];
+  const opts = shuffle([{ t: correct, ok: true }, ...distractors.map(d => ({ t: d, ok: false }))]);
+  const prompt = kind === "story"
+    ? ("You earned " + rank.icon + " " + rank.rank + ". What does that rank teach you about swimming?")
+    : ("Every sea friend comes with one true fact. Which one belongs to " + rank.icon + " " + rank.rank + "?");
+  return {
+    move: rank.name, block: "story", kind,
+    tag: kind === "story" ? "YOUR RANK" : "TRUE STORY",
+    prompt, opts,
+    why: (kind === "story" ? rank.rank + " · " : "🌊 True · ") + correct
+  };
+}
+
 function makeQ(move, kind, pool) {
+  if (kind === "story" || kind === "fact") return makeRankQ(move, kind, pool);
   const field = kind === "cue" ? "cue" : kind === "watch" ? "watch" : "fix";
   const others = pool.filter(m => m.name !== move.name && m[field]);
   const distractors = shuffle(others).slice(0, 2).map(m => m[field]);
@@ -29,6 +51,7 @@ function makeQ(move, kind, pool) {
 }
 export function buildQuizDeck(n = 8) {
   const pool = movePool();
+  const ranks = rankPool();
   const bank = questionBank();
   const quiz = loadQuiz();
   const led = quiz.qLedger || {};
@@ -42,7 +65,7 @@ export function buildQuizDeck(n = 8) {
   });
   const picked = [...shuffle(fresh), ...shuffle(known)].slice(0, n);
   return {
-    qs: shuffle(picked).map(([m, k]) => makeQ(m, k, pool)),
+    qs: shuffle(picked).map(([m, k]) => makeQ(m, k, (k === "story" || k === "fact") ? ranks : pool)),
     idx: 0, picks: [], done: false, scored: false,
     // Preview only — the day is actually claimed in finishQuizDeck, so
     // abandoning a deck never burns the paying round.
