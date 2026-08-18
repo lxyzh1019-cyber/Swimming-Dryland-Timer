@@ -24,17 +24,18 @@ the **Splash — Kids Swim Training** design system.
 
 ## XP rules
 
-- **Training** is the open-ended way up: a finished session pays
-  `(moves × 10 + 40) × roundsFactor` (half for one ended early, nothing for a
-  spa day). Rounds count — 1 round ×1.0, 2 rounds ×1.5, 3 rounds ×2.0 — so a
-  1-round easy day is worth half a full 3-round day instead of the same.
-  Sessions logged before this rule keep the flat value they were awarded.
+- **Training** is the open-ended way up: a finished session pays a flat rate
+  for the rounds trained — **1 round 180, 2 rounds 270, 3 rounds 360** (half for
+  one ended early, nothing for a spa day). An easy day is worth half a full one,
+  and the number no longer wobbles with the move count of that weekday. A mini
+  is priced as a 1-round day however the light was set. Sessions logged before
+  this rule keep the value they were awarded.
 - **Quiz XP pays for learning, not repetition.** Only the day's first completed
-  deck pays at all; each question pays at most once *ever* (+10 the first time
-  it is attempted, +25 the first time it is answered right — a question missed
-  the first time still pays its +25 when it is finally learned); and all quiz
-  XP shares a daily ceiling of 35 XP — one brand-new question, against 220+
-  for even the lightest training day.
+  deck pays at all; each question pays at most once *ever* (+5 the first time it
+  is attempted, +25 the first time it is answered right — a question missed the
+  first time still pays its +25 when it is finally learned); and all quiz XP
+  shares a daily ceiling of 30 XP — exactly one brand-new question, a sixth of
+  even the lightest training day.
   Questions are paid whole or not at all, so one the cap skipped is still worth
   full value tomorrow. Replays are free practice worth 0 XP, and the Coach's
   Quiz at the end of a session prices off the same ledger. The bank asks about
