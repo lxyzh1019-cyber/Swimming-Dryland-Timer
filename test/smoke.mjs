@@ -83,6 +83,39 @@ ok(store.reconcileJourneyWithSessions() === 0, "and awards no XP a second time")
 ok(store.currentStreak(store.loadSessions().filter(store.countsAsTrained)) === 2, "the restored streak is back");
 localStorage.clear();
 
+/* --- two devices converge on one level ------------------------------------
+   The skate app read 26 on the iPad and 18 on the desktop, because only
+   sessions were mirrored. XP is now DERIVED from the two mirrored sources —
+   training log + quiz ledger — so every device computes the same number. */
+localStorage.clear();
+store.migrate();
+store.saveSession({ isoDate: "2026-04-01T10:00:00.000Z", dayKey: "monday", completedFully: true, xpEarned: 300 });
+store.addXp(4000);                                  // years of old, uncapped quiz XP
+ok(store.loadJourney().xp === 4000, "the device starts with an inflated private total");
+ok(store.rebuildJourneyXp() === 300, "rebuilding lands on the training log, not the old total");
+ok(store.loadJourney().sessionXp === 300, "and records what the log accounts for");
+
+const convKey = store.quizQuestionKey("Superman Hold", "cue");
+const oneQuestion = store.QXP_ATTEMPT + store.QXP_CORRECT;
+store.payQuizQuestion(convKey, true);
+ok(store.quizXpFromLedger() === oneQuestion, "the ledger prices itself at the current rates");
+ok(store.rebuildJourneyXp() === 300 + oneQuestion, "so quiz learning still counts, at its capped value");
+ok(store.rebuildJourneyXp() === 300 + oneQuestion, "and rebuilding twice changes nothing");
+
+const convSnap = store.journeySnapshot();
+ok(convSnap.kind === "journey" && convSnap.qLedger[convKey], "the snapshot carries the ledger");
+ok(convSnap.nonSessionXp === undefined, "no private XP total travels — XP is derived, not shipped");
+
+localStorage.clear();
+store.migrate();
+store.saveSession({ isoDate: "2026-04-01T10:00:00.000Z", dayKey: "monday", completedFully: true, xpEarned: 300 });
+ok(store.rebuildJourneyXp() === 300, "device 2 starts from the training log alone");
+store.mergeCloudJourney(convSnap);
+ok(store.rebuildJourneyXp() === 300 + oneQuestion, "after the merge both devices read the same total");
+ok(store.payQuizQuestion(convKey, true).xp === 0, "a question mastered elsewhere is already spent here");
+ok(store.mergeCloudJourney(convSnap) === false, "merging the same snapshot again changes nothing");
+localStorage.clear();
+
 /* --- XP --- */
 ok(store.xpForSession({ perExercise: [1,2,3,4,5,6] }) === 100, "6 moves = 100 XP");
 ok(store.xpForSession({ sessionType: "spa" }) === 0, "spa earns no XP");

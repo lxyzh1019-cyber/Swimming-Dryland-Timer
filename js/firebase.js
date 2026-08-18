@@ -59,6 +59,41 @@ export async function fsUpdateSession(fsId, patch) {
   }
 }
 
+/* ---- journey mirror --------------------------------------------------------
+   Sessions were the only thing ever mirrored, so a second device could rebuild
+   the training log but not the quiz ledger or the prize wallet — two devices
+   therefore showed two different levels for the same kid (the skate app hit
+   exactly this: 26 on the iPad, 18 on the desktop). This doc carries what the
+   session log cannot re-derive. It lives in the same collection so it needs no
+   new Firestore rule, is tagged kind:"journey" so the session readers skip it,
+   and is keyed per athlete because this collection is shared between them. */
+const journeyDocId = (athlete) => "journey-" + String(athlete || "legacy");
+
+export async function fsSaveJourney(athlete, snapshot) {
+  const f = await fb();
+  if (!f) return false;
+  try {
+    await f.setDoc(f.doc(f.db, SESSIONS_COL, journeyDocId(athlete)),
+                   { ...snapshot, athlete, savedAt: f.serverTimestamp() });
+    return true;
+  } catch (e) {
+    console.warn("Journey mirror write failed:", e);
+    return false;
+  }
+}
+
+export async function fsGetJourney(athlete) {
+  const f = await fb();
+  if (!f) return null;
+  try {
+    const snap = await f.getDoc(f.doc(f.db, SESSIONS_COL, journeyDocId(athlete)));
+    return snap.exists() ? snap.data() : null;
+  } catch (e) {
+    console.warn("Journey mirror read failed:", e);
+    return null;
+  }
+}
+
 export async function fsGetRecent(n = 7) {
   const f = await fb();
   if (!f) return [];
