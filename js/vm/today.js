@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overloadWeek } from "../data.js";
-import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress, countsAsTrained } from "../store.js";
+import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress, countsAsTrained, sessionXp } from "../store.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
 
 /* Whole-plan stats (design's _planStats). */
@@ -325,14 +325,18 @@ export function buildTodayVM(state) {
     // aged out (day progress only survives the calendar day it was written).
     const allDone = !isPartial && (remaining.length === 0 || !doneBlocks.length);
     const remainingLabel = remaining.join(", ");
-    const partialRecord = isPartial
-      ? currentWeekSessions().filter(s => s.dayKey === selectedKey && countsAsTrained(s)).pop()
-      : null;
-    const partialXp = partialRecord && Number.isFinite(partialRecord.xpEarned) ? partialRecord.xpEarned : 0;
+    // Read what the session ACTUALLY earned instead of recomputing it here.
+    // This line used to carry its own copy of the XP formula (moves × 10 + 40),
+    // so once a session started paying a flat rate for its rounds, the day card
+    // and the ladder disagreed about the same session — the card said +220
+    // while the journey banked 360.
+    const dayRecord = currentWeekSessions()
+      .filter(s => s.dayKey === selectedKey && countsAsTrained(s)).pop();
+    const earnedXp = dayRecord ? sessionXp(dayRecord) : 0;
     dayView = {
       badgeLabel: shortU + (isPartial ? " · PARTLY DONE ✓" : " · COMPLETED ✓"),
       title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"),
-      earnedXpLabel: isSpaDay ? "" : "+" + (isPartial ? partialXp : stats.moves * 10 + 40) + " XP earned",
+      earnedXpLabel: isSpaDay || !earnedXp ? "" : "+" + earnedXp + " XP earned",
       showChips: true, isDone: true,
       doneHeadline: isSpaDay ? "Nice reset — recovery complete!"
         : isPartial ? "You showed up — that counts!"
