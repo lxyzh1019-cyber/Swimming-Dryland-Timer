@@ -690,7 +690,7 @@ export function addXp(amount) {
   j.xp = Math.max(0, (j.xp || 0) + amount);
   const after = levelFromXp(j.xp).level;
   const gained = Math.max(0, after - before);
-  if (gained > 0) j.pendingDraws = (j.pendingDraws || 0) + gained;
+  syncPendingDraws(j);
   saveJourney(j);
   return { journey: j, leveledUp: gained > 0, levelsGained: gained };
 }
@@ -706,22 +706,76 @@ export function noteSessionXpAwarded(amount) {
   saveJourney(j);
 }
 
-export function pendingDrawCount() {
-  const j = loadJourney();
-  return j ? Math.max(0, j.pendingDraws || 0) : 0;
+/* ---- prize draws ----------------------------------------------------------
+   The rule the app promises a kid is "one prize per level you gain". That used
+   to be banked as a running counter that every level-up incremented and every
+   claim decremented — and a counter can be credited twice for the same level:
+
+     · a wiped or second device rebuilt its XP from the cloud, saw the level
+       climb from 1 to 17 in one boot, and credited 16 fresh draws for levels
+       that were earned — and already cashed — somewhere else;
+     · the counter travelled in the journey snapshot and merged with max(), so
+       a stale cloud copy handed a spent draw straight back;
+     · any downward XP correction (legacy re-pricing, a rebuild) let the same
+       levels be climbed — and paid for — a second time.
+
+   So a draw is no longer banked. It is DERIVED from two things that can only
+   move up and that merge cleanly across devices: the level reached, and the
+   prizes already in the wallet.
+
+       draws earned  = level - 1        (level 1 has gained nothing yet)
+       draws pending = earned - claimed
+
+   Replaying a level-up now yields the same answer instead of another prize,
+   and the wallet — which unions by id on every merge — is what says how many
+   have been spent. j.pendingDraws is still written so anything reading the raw
+   field (an older client reading our snapshot) sees the derived truth. */
+export function drawsEarned(j) {
+  return Math.max(0, levelFromXp((j && j.xp) || 0).level - 1);
+}
+export function drawsClaimed(j) {
+  return ((j && j.prizesWon) || []).length;
+}
+export function pendingDrawsFor(j) {
+  return Math.max(0, drawsEarned(j) - drawsClaimed(j));
+}
+/* Write the derived count onto the journey object (does not save). */
+function syncPendingDraws(j) {
+  j.pendingDraws = pendingDrawsFor(j);
+  return j;
 }
 
+export function pendingDrawCount() {
+  const j = loadJourney();
+  return j ? pendingDrawsFor(j) : 0;
+}
+
+/* Prize ids must be unique across devices: the cloud merge unions wallets by
+   id, so two prizes claimed in the same millisecond — or on two devices at
+   once — used to collapse into one and silently lose a prize she had won. */
+function prizeId() {
+  // The athlete name is grown-up-editable free text and the id is rendered into
+  // a data-arg attribute, so keep it to characters that can't break the markup.
+  const who = athleteId().replace(/[^a-z0-9]/g, "").slice(0, 12) || "athlete";
+  return [who, Date.now().toString(36), Math.random().toString(36).slice(2, 8)].join("-");
+}
+
+/* Claim one pending draw. Returns the journey unchanged when no draw is owed,
+   so a double-tap on "Add to my prizes" — or any other second call — cannot
+   turn one level-up into two prizes. */
 export function addPrize(prize) {
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
-  j.prizesWon = [{ ...prize, date: todayISODate(), redeemed: false, id: Date.now() }, ...(j.prizesWon || [])];
-  j.pendingDraws = Math.max(0, (j.pendingDraws || 0) - 1);
-  saveJourney(j);
+  if (pendingDrawsFor(j) < 1) { saveJourney(syncPendingDraws(j)); return j; }
+  j.prizesWon = [{ ...prize, date: todayISODate(), redeemed: false, id: prizeId() }, ...(j.prizesWon || [])];
+  saveJourney(syncPendingDraws(j));
   return j;
 }
 export function redeemPrize(id) {
   const j = loadJourney();
   if (!j) return null;
-  j.prizesWon = (j.prizesWon || []).map(p => p.id === id ? { ...p, redeemed: !p.redeemed } : p);
+  // Compare as strings: ids are strings now, but wallets written by earlier
+  // versions still hold the old numeric Date.now() ids.
+  j.prizesWon = (j.prizesWon || []).map(p => String(p.id) === String(id) ? { ...p, redeemed: !p.redeemed } : p);
   saveJourney(j);
   return j;
 }
@@ -797,29 +851,33 @@ export function quizXpFromLedger(quiz) {
 }
 
 /* Recompute the journey total from its two sources. Prizes already won are
-   never touched, and a level gained still grants its draw. Returns the total. */
+   never touched. A rebuild does NOT grant draws for the levels it discovers:
+   the same shared history rebuilds on every device, so crediting the climb
+   here handed a second device — or one whose storage had been evicted — a
+   fresh prize for every level the kid had already been paid for. Draws are
+   derived from the level and the wallet instead. Returns the total. */
 export function rebuildJourneyXp() {
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
   const fromSessions = loadSessions().reduce((sum, s) => sum + sessionXp(s), 0);
   const fromQuiz = quizXpFromLedger();
-  const before = levelFromXp(j.xp || 0).level;
   j.sessionXp = fromSessions;
   j.xp = fromSessions + fromQuiz;
-  const after = levelFromXp(j.xp).level;
-  if (after > before) j.pendingDraws = (j.pendingDraws || 0) + (after - before);
-  saveJourney(j);
+  saveJourney(syncPendingDraws(j));
   return j.xp;
 }
 
 /* The half of the journey the session log cannot re-derive: the quiz ledger
-   (which prices itself), the prize wallet and the pending draws. */
+   (which prices itself) and the prize wallet. pendingDraws travels for the
+   benefit of an older client still reading the raw field, but it is published
+   as the DERIVED count and ignored on the way back in — a banked number that
+   merges with max() is exactly how a spent draw used to come back to life. */
 export function journeySnapshot() {
   const j = loadJourney() || {};
   const q = loadQuiz();
   return {
     kind: "journey",
     prizesWon: j.prizesWon || [],
-    pendingDraws: j.pendingDraws || 0,
+    pendingDraws: pendingDrawsFor(j),
     qLedger: q.qLedger || {},
     quizItems: q.items || {},
     updatedAt: Date.now()
@@ -837,14 +895,16 @@ export function mergeCloudJourney(snap) {
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
   const wallet = new Map();
   [...(j.prizesWon || []), ...(snap.prizesWon || [])].forEach(p => {
-    if (p && p.id != null && !wallet.has(p.id)) wallet.set(p.id, p);
+    if (p && p.id != null && !wallet.has(String(p.id))) wallet.set(String(p.id), p);
   });
   if (wallet.size !== (j.prizesWon || []).length) changed = true;
-  const draws = Math.max(j.pendingDraws || 0, snap.pendingDraws || 0);
-  if (draws !== (j.pendingDraws || 0)) changed = true;
-  j.pendingDraws = draws;
+  const before = j.pendingDraws || 0;
   j.prizesWon = [...wallet.values()]
     .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  // Draws are derived, not merged: the unioned wallet already carries every
+  // prize claimed on any device, so the count falls out of it.
+  syncPendingDraws(j);
+  if (j.pendingDraws !== before) changed = true;
   saveJourney(j);
 
   const q = loadQuiz();
@@ -954,18 +1014,19 @@ export function importProfileData(payload) {
     const local = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
     const wallet = new Map();
     [...(local.prizesWon || []), ...(inc.prizesWon || [])].forEach(p => {
-      if (p && !wallet.has(p.id)) wallet.set(p.id, p);
+      if (p && p.id != null && !wallet.has(String(p.id))) wallet.set(String(p.id), p);
     });
-    saveJourney({
+    // pendingDraws is derived from the merged result, never max()'d in — a
+    // backup taken before a prize was claimed would otherwise hand it back.
+    saveJourney(syncPendingDraws({
       ...inc, ...local,
       xp: Math.max(local.xp || 0, inc.xp || 0),
-      pendingDraws: Math.max(local.pendingDraws || 0, inc.pendingDraws || 0),
       sessionXp: Math.max(
         Number.isFinite(local.sessionXp) ? local.sessionXp : 0,
         Number.isFinite(inc.sessionXp) ? inc.sessionXp : 0
       ),
       prizesWon: [...wallet.values()].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
-    });
+    }));
   }
 
   PROFILE_KEYS.forEach(k => {

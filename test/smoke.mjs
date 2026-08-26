@@ -116,6 +116,60 @@ ok(store.payQuizQuestion(convKey, true).xp === 0, "a question mastered elsewhere
 ok(store.mergeCloudJourney(convSnap) === false, "merging the same snapshot again changes nothing");
 localStorage.clear();
 
+/* --- prize draws: one prize per level gained, ever ------------------------
+   Draws used to be a banked counter, and every replay of a level-up credited
+   it again: a second device rebuilding the shared history, a stale cloud
+   snapshot merged with max(), an XP correction that let the same levels be
+   climbed twice. A draw is derived now — level reached minus prizes claimed —
+   so replaying a climb yields the same answer instead of another prize. */
+localStorage.clear();
+store.migrate();
+const lvlXp = n => { let x = 0; for (let i = 1; i < n; i++) x += data.levelCost(i); return x; };
+store.saveJourney({ xp: 0, sessionXp: 0, prizesWon: [], pendingDraws: 0 });
+ok(store.pendingDrawCount() === 0, "level 1 owes no prize");
+store.addXp(lvlXp(4));
+ok(store.levelFromXp(store.loadJourney().xp).level === 4, "climbed to level 4");
+ok(store.pendingDrawCount() === 3, "three levels gained, three draws owed");
+store.addPrize({ icon: "🎁", label: "one" });
+ok(store.pendingDrawCount() === 2, "claiming one spends one");
+
+/* A double-tap on "Add to my prizes" is one prize, not two. */
+const claimAll = () => { let n = 0; while (store.pendingDrawCount() > 0 && n < 99) { store.addPrize({ icon: "🎁", label: "p" }); n++; } return n; };
+ok(claimAll() === 2, "the rest of the draws are claimable");
+store.addPrize({ icon: "🎁", label: "extra" });
+ok(store.loadJourney().prizesWon.length === 3, "a claim with nothing pending is refused");
+
+/* Prize ids are unique, so the cloud merge can't fold two prizes into one. */
+const walletIds = store.loadJourney().prizesWon.map(p => p.id);
+ok(new Set(walletIds).size === 3, "every prize gets its own id");
+store.redeemPrize(walletIds[0]);
+ok(store.loadJourney().prizesWon.find(p => p.id === walletIds[0]).redeemed === true, "a prize redeems by its id");
+
+/* An XP dip and re-climb does not re-sell a level she already cashed. */
+const dipped = store.loadJourney(); dipped.xp = lvlXp(2); store.saveJourney(dipped);
+ok(store.pendingDrawCount() === 0, "a dip owes nothing");
+store.addXp(lvlXp(4) - lvlXp(2));
+ok(store.pendingDrawCount() === 0, "and re-climbing the same levels pays no second prize");
+
+/* A rebuild — which every device runs on every boot — grants nothing. */
+const spentSnap = store.journeySnapshot();
+ok(spentSnap.pendingDraws === 0, "the snapshot publishes the derived count, not a bankable one");
+store.rebuildJourneyXp();
+ok(store.pendingDrawCount() === 0, "a rebuild does not credit the levels it rediscovers");
+
+/* A second device: same shared history, same wallet, no fresh draws. */
+const wonWallet = store.loadJourney().prizesWon;
+const staleSnap = { ...spentSnap, prizesWon: [], pendingDraws: 3 };  // cloud copy from before she claimed
+localStorage.clear();
+store.migrate();
+store.saveJourney({ xp: lvlXp(4), sessionXp: lvlXp(4), prizesWon: [], pendingDraws: 0 });
+store.mergeCloudJourney({ ...spentSnap, prizesWon: wonWallet });
+ok(store.loadJourney().prizesWon.length === 3, "device 2 sees the prizes claimed on device 1");
+ok(store.pendingDrawCount() === 0, "so it owes her no second set");
+store.mergeCloudJourney(staleSnap);
+ok(store.pendingDrawCount() === 0, "and a stale cloud copy cannot resurrect a spent draw");
+localStorage.clear();
+
 /* --- XP --- */
 ok(store.xpForSession({ perExercise: [1,2,3,4,5,6] }) === 100, "6 moves = 100 XP");
 ok(store.xpForSession({ sessionType: "spa" }) === 0, "spa earns no XP");
@@ -366,10 +420,13 @@ localStorage.clear();
 /* --- backup: a full copy of one athlete, restored additively --- */
 localStorage.clear();
 store.migrate();
-store.saveSession({ isoDate: "2026-03-01T10:00:00.000Z", dayKey: "monday", perExercise: [1,2,3,4,5,6], completedFully: true, xpEarned: 100 });
+// 600 XP is past level 1's cost, so the prize below is one she actually owns —
+// addPrize refuses a claim with no draw pending.
+store.saveSession({ isoDate: "2026-03-01T10:00:00.000Z", dayKey: "monday", perExercise: [1,2,3,4,5,6], completedFully: true, xpEarned: 600 });
 store.reconcileJourneyWithSessions();
 store.addXp(100);
 store.addPrize({ icon: "🎁", label: "Movie night" });
+ok(store.loadJourney().prizesWon.length === 1, "a level-up buys a prize");
 store.saveQuiz({ items: { a: 1 }, results: [1], streak: 3 });
 const backup = store.exportProfileData();
 ok(backup.app === "splash-swim-dryland" && backup.schema === 1, "backup is stamped");
@@ -382,13 +439,13 @@ store.migrate();
 ok(store.loadSessions().length === 0 && store.loadJourney().xp === 0, "device is empty");
 const restored = store.importProfileData(backup);
 ok(restored.sessionsAdded === 1, "the session comes back");
-ok(store.loadJourney().xp === 200, "XP comes back");
+ok(store.loadJourney().xp === 700, "XP comes back");
 ok(store.loadJourney().prizesWon.length === 1, "the prize wallet comes back");
 ok(store.loadQuiz().streak === 3, "quiz mastery comes back");
 ok(store.loadSettings().athleteName === backup.data[store.SETTINGS_KEY].athleteName, "her settings come back onto a fresh device");
 const again = store.importProfileData(backup);
 ok(again.sessionsAdded === 0 && again.xpAdded === 0, "restoring the same file twice changes nothing");
-ok(store.loadJourney().xp === 200, "and cannot inflate XP");
+ok(store.loadJourney().xp === 700, "and cannot inflate XP");
 
 /* Additive: a record only on the device survives a restore. */
 store.saveSession({ isoDate: "2026-03-05T10:00:00.000Z", dayKey: "friday", completedFully: true, xpEarned: 100 });
