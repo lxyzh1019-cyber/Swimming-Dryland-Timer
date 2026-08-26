@@ -138,4 +138,7 @@ export function buildProgressVM(state) {
   };
 }
 
-export function toggleRedeem(id) { redeemPrize(Number(id)); }
+/* Ids are strings now (older wallets hold numbers); redeemPrize compares as
+   strings, so pass the data-arg through untouched — Number() turned the new
+   ids into NaN and quietly redeemed nothing. */
+export function toggleRedeem(id) { redeemPrize(id); }

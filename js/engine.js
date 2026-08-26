@@ -9,7 +9,7 @@
    ============================================================ */
 
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA, exWork, exRepsDetail } from "./data.js";
-import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, xpForSession, athleteId, noteSessionXpAwarded, patchSession, sessionKey, XP_VERSION } from "./store.js";
+import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, pendingDrawCount, xpForSession, athleteId, noteSessionXpAwarded, patchSession, sessionKey, XP_VERSION } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
 import { recoveryDoseSecs, refTime } from "./util.js";
@@ -672,7 +672,9 @@ export function finalize(completed) {
   sess.xpEarned = completed ? fullXp : Math.round(fullXp / 2);
   if (sess.xpEarned > 0) {
     const { leveledUp } = addXp(sess.xpEarned);
-    sess.leveledUp = leveledUp;
+    // Only celebrate a level-up that actually owes a prize, so the button can
+    // never be a dead tap (openPrizeDraw refuses when nothing is pending).
+    sess.leveledUp = leveledUp && pendingDrawCount() > 0;
     noteSessionXpAwarded(sess.xpEarned);
     patchSession(sess.savedKey, { xpEarned: sess.xpEarned });
   }

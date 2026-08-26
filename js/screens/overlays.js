@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { PRIZE_POOL } from "../data.js";
-import { settings, loadQuiz, saveQuiz, logEvent, addXp, addPrize,
+import { settings, loadQuiz, saveQuiz, logEvent, addXp, addPrize, pendingDrawCount,
          movePool, rankPool, questionBank, quizPaidToday, quizBankStatus,
          quizQuestionKey, payQuizQuestion } from "../store.js";
 import { todayISODate } from "../util.js";
@@ -119,7 +119,7 @@ export function finishQuizDeck(qd) {
   qd.newlyMastered = newlyMastered;
   qd.hitDailyCap = capped;
   qd.bank = quizBankStatus(quiz);
-  if (xp > 0) qd.leveledUp = addXp(xp).leveledUp;
+  if (xp > 0) qd.leveledUp = addXp(xp).leveledUp && pendingDrawCount() > 0;
 }
 
 /* ---- quiz deck view ---- */
@@ -244,7 +244,12 @@ export function newPrizeDraw() {
 }
 
 export function claimPrize(pd) {
-  if (!pd || pd.picked == null) return null;
+  if (!pd || pd.picked == null || pd.claimed) return null;
+  // Mark the draw spent on the object itself as well: the store refuses a
+  // claim with no draw pending, and this keeps a double-tap from logging a
+  // second "prize_won" the wallet never received.
+  if (pendingDrawCount() < 1) return null;
+  pd.claimed = true;
   const won = pd.cards[pd.picked];
   logEvent("prize_won", { label: won.label });
   return addPrize(won);

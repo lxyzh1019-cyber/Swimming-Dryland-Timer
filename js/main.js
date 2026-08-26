@@ -248,7 +248,7 @@ const actions = {
       engine.sess.quizCapped = capped;
       if (xp > 0) {
         engine.sess.xpEarned = (engine.sess.xpEarned || 0) + xp;
-        if (addXp(xp).leveledUp) engine.sess.leveledUp = true;
+        if (addXp(xp).leveledUp && pendingDrawCount() > 0) engine.sess.leveledUp = true;
         noteSessionXpAwarded(xp);   // it lands on the session record via xpEarned below
         patchSession(engine.sess.savedKey, { xpEarned: engine.sess.xpEarned });
       }
