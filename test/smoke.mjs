@@ -31,6 +31,7 @@ const svm    = await import(base + "vm/session.js");
 const tvm    = await import(base + "vm/today.js");
 const sscreen = await import(base + "screens/session.js");
 const tscreen = await import(base + "screens/today.js");
+const effort  = await import(base + "effort.js");
 const rscreen = await import(base + "screens/readiness.js");
 const overlays = await import(base + "screens/overlays.js");
 
@@ -248,6 +249,43 @@ ok(store.xpForSession({ ...sess3(3), sessionType: "spa" }) === 0, "spa still ear
 /* --- defaults --- */
 ok(store.DEFAULT_SETTINGS.voiceStyle === "encouraging", "default voice is process-praise");
 ok(store.DEFAULT_SETTINGS.cloudMirror === true, "cloudMirror default on");
+
+/* --- effort: scored on what she controls, normalised to the day -----------
+   Volume metrics reward an easy day. Effort has to reward the opposite: doing
+   the day's own target properly, especially on a day she felt bad. */
+const eSess = o => ({ perExercise: Array.from({ length: 6 }, (_, i) => ({ name: "m" + i, skipped: false })),
+                      completedFully: true, lightResult: "green", plannedSecs: 1200, durationSecs: 1200,
+                      formChecks: [{ clean: true }, { clean: true }, { clean: true }], ...o });
+const ePain = effort.sessionEffort(eSess({ pain: true, completedFully: false }));
+ok(ePain.counted === false && ePain.painStop === true, "a pain stop is excluded from effort, never penalised");
+ok(/right call/i.test(ePain.band), "and reads as the right call — the stop rule must never cost her");
+const eGreen = effort.sessionEffort(eSess({}));
+ok(effort.sessionEffort(eSess({ lightResult: "red" })).score > eGreen.score,
+   "a red-light day outscores the same work on a green one — showing up when it's hard is the point");
+ok(effort.sessionEffort(eSess({ formChecks: [{ clean: false }, { clean: false }, { clean: false }] })).score < eGreen.score,
+   "wobbly spot-checks cost form points");
+ok(effort.sessionEffort(eSess({ perExercise: [{ skipped: true }, { skipped: true }, { skipped: false }, { skipped: false }, { skipped: false }, { skipped: false }] })).score < eGreen.score,
+   "skipping moves costs effort");
+ok(effort.sessionEffort(eSess({ durationSecs: 400 })).score < eGreen.score, "rushing the clock costs effort");
+ok(effort.sessionEffort(eSess({ durationSecs: 2400 })).score === eGreen.score, "but running long is never penalised");
+const eSum = effort.effortSummary([eSess({}), eSess({ lightResult: "red" }), eSess({ pain: true })]);
+ok(eSum.sessions === 2 && eSum.painStops === 1, "pain stops are reported but kept out of the average");
+ok(eSum.toughDays === 1 && eSum.toughFinished === 1, "tough days shown up for are counted");
+ok(eSum.formPct === 100, "form % comes from the spot-checks, not a guess");
+
+/* The spot-check picker: 2–3 moves, main/prep only, different every run. */
+const spotCircuits = [{ block: "warmup", exercises: [{ name: "w1" }, { name: "w2" }] },
+                      { block: "main", exercises: [{ name: "a" }, { name: "b" }, { name: "c" }, { name: "d" }, { name: "e" }] },
+                      { block: "prep", exercises: [{ name: "p1" }] }];
+const spotSizes = new Set(); const spotSeen = new Set(); let spotWarmup = false;
+for (let i = 0; i < 300; i++) {
+  const pick = engine.pickSpotChecks(spotCircuits);
+  spotSizes.add(pick.length);
+  pick.forEach(n => { spotSeen.add(n); if (n[0] === "w") spotWarmup = true; });
+}
+ok([...spotSizes].every(n => n >= 2 && n <= 3), "the app watches 2–3 moves a run, not all twelve");
+ok(!spotWarmup, "and never a warm-up move — main and prep only");
+ok(spotSeen.size === 6, "the picks vary run to run, so she can't know which move is watched");
 
 /* --- try-it mode: a real control, one-shot, and pain still reports ---------
    The mode's isolation was already right; its control and lifecycle were not.

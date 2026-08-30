@@ -37,6 +37,7 @@ function blankSession() {
     upNextName: "", upNextDose: "", restCue: "",
     stopOverlay: false, confirmEnd: false, painFlag: false,
     pendingCleanCheck: false, cleanCount: 0, wobblyCount: 0, lastWobbly: false,
+    spotChecks: [], spotAsked: {}, cleanCheckMove: null, formChecks: [],
     intentWord: null, microLoop: null,
     exStatus: {},                // "ci-ei" -> done|skipped
     roundsCompleted: 0, sideLabel: "",
@@ -82,6 +83,34 @@ export function assembleCircuits(dayKey, light, opts = {}) {
     }
   });
   return circuits;
+}
+
+/* ---- form spot-checks -----------------------------------------------------
+   The clean/wobbly self-check used to fire after EVERY main and prep exercise —
+   a dozen taps a session. Tap fatigue makes the answers meaningless, and those
+   answers are the app's only read on technique.
+
+   So the app picks 2–3 moves at random at the start of the run and asks about
+   those alone. She doesn't know which are watched, so the only way to score
+   well is to do every move properly — and each prompt now gets a considered
+   answer instead of a reflex tap. */
+export const SPOT_CHECK_MIN = 2;
+export const SPOT_CHECK_MAX = 3;
+
+export function pickSpotChecks(circuits, rnd = Math.random) {
+  const names = [];
+  (circuits || []).forEach(c => {
+    if (c.block !== "main" && c.block !== "prep") return;
+    (c.exercises || []).forEach(ex => { if (ex && ex.name && !names.includes(ex.name)) names.push(ex.name); });
+  });
+  if (!names.length) return [];
+  const pool = names.slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const want = SPOT_CHECK_MIN + Math.floor(rnd() * (SPOT_CHECK_MAX - SPOT_CHECK_MIN + 1));
+  return pool.slice(0, Math.min(want, pool.length));
 }
 
 /* Estimated session length in seconds (rep-based ≈ secondsPerRep × reps). */
@@ -398,6 +427,7 @@ export async function startSession({ dayKey, light = "green", practice = false, 
   sess.circuits = assembleCircuits(dayKey, sess.light, { mini, skip: sess.spa ? [] : skipBlocks });
   if (!sess.circuits.length) { sess.running = false; return; }
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
+  sess.spotChecks = pickSpotChecks(sess.circuits);
 
   if (!practice) logEvent("session_start", { day: dayKey, light: sess.light });
 
@@ -500,8 +530,12 @@ export async function startSession({ dayKey, light = "green", practice = false, 
             skipped: !!wasSkipped
           });
         }
-        // Design's clean/wobbly self-check after main-block work, answered during rest.
-        if ((circuit.block === "main" || circuit.block === "prep") && !wasSkipped) {
+        // Self-check only the moves this run is watching (see pickSpotChecks),
+        // and only the first time each one comes round — main runs 2–3 rounds.
+        if ((circuit.block === "main" || circuit.block === "prep") && !wasSkipped
+            && sess.spotChecks.includes(ex.name) && !sess.spotAsked[ex.name]) {
+          sess.spotAsked[ex.name] = true;
+          sess.cleanCheckMove = ex.name;
           sess.pendingCleanCheck = true;
         }
 
@@ -653,6 +687,7 @@ export function finalize(completed) {
     pausedSecs: sess.pausedSecs,
     plannedSecs: sess.plannedSecs,
     clean: sess.cleanCount, wobbly: sess.wobblyCount,
+    formChecks: sess.formChecks || [],       // per-move verdicts from this run's spot-checks
     light: sess.light, mini: sess.mini,
     pain: !!sess.painFlag,
     endedEarly: !completed,
@@ -772,8 +807,12 @@ export function endEarly() {
 
 export function pickIntentWord(word) { if (sess.intentResolver) sess.intentResolver(word); }
 export function answerMicroLoop(answer) { if (sess.microResolver) sess.microResolver(answer); }
-export function pickClean() { sess.pendingCleanCheck = false; sess.cleanCount += 1; sess.lastWobbly = false; notify("phase"); }
-export function pickWobbly() { sess.pendingCleanCheck = false; sess.wobblyCount += 1; sess.lastWobbly = true; notify("phase"); }
+function recordFormCheck(clean) {
+  if (sess.cleanCheckMove) sess.formChecks.push({ name: sess.cleanCheckMove, clean });
+  sess.cleanCheckMove = null;
+}
+export function pickClean() { sess.pendingCleanCheck = false; sess.cleanCount += 1; sess.lastWobbly = false; recordFormCheck(true); notify("phase"); }
+export function pickWobbly() { sess.pendingCleanCheck = false; sess.wobblyCount += 1; sess.lastWobbly = true; recordFormCheck(false); notify("phase"); }
 
 /* Complete-screen interactions: patch the saved record + Firestore mirror. */
 export function setMood(key, emoji) {
