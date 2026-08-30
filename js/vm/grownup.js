@@ -6,7 +6,8 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl, fmtXp } from "../data.js";
-import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal } from "../store.js";
+import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal,
+         monthKeyOf, formVerdicts, latestFormVerdicts } from "../store.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
 import { sessionEffort, effortSummary } from "../effort.js";
 
@@ -385,9 +386,9 @@ export function buildGrownupVM(state) {
     const inWindow = sessions.reduce((a, s) => a + (s.xpEarned || 0), 0);
     return Math.max(0, levelFromXp(j.xp || 0).level - levelFromXp(Math.max(0, (j.xp || 0) - inWindow)).level);
   })();
-  const verified = sessions.reduce((a, s) => {
-    (s.parentChecks || []).forEach(c => { a.asked += 1; if (c.pass) a.pass += 1; });
-    return a;
+  const verifiedAll = latestFormVerdicts();
+  const verified = Object.values(verifiedAll).reduce((a, v) => {
+    a.asked += 1; if (v.pass) a.pass += 1; return a;
   }, { asked: 0, pass: 0 });
   const avg1 = (n, d, unit) => d > 0 ? (Math.round((n / d) * 10) / 10) + (unit ? " " + unit : "") : "—";
 
@@ -451,6 +452,95 @@ export function buildGrownupVM(state) {
     ? "Wobbly reps are creeping in — drop one round before dropping quality, and re-anchor the Parent Echo rule."
     : "Keep the current load — it's landing. Consider re-enabling progressive overload if the next two weeks stay green.";
 
+  /* ---- monthly parent form check ------------------------------------------
+     Her self-report can be confidently wrong: she says a move was clean, it
+     failed the written criteria, and nothing catches it. The criteria already
+     exist per move (parentWatch / redFlag); this puts them in your hand while
+     you watch her, on a handful of moves a month rather than all forty. */
+  const fcMonth = state.formCheckMonth || monthKeyOf();
+  const fcVerdicts = formVerdicts(fcMonth);
+  const fcLatest = latestFormVerdicts();
+
+  // What she has claimed per move, from the random spot-checks.
+  const selfByMove = {};
+  all.forEach(s => (s.formChecks || []).forEach(f => {
+    const m = selfByMove[f.name] || { asked: 0, clean: 0 };
+    m.asked += 1; if (f.clean) m.clean += 1;
+    selfByMove[f.name] = m;
+  }));
+  const usedByMove = {};
+  all.forEach(s => (s.perExercise || []).forEach(p => {
+    if (p && p.name) usedByMove[p.name] = (usedByMove[p.name] || 0) + 1;
+  }));
+
+  const moveMeta = {};
+  Object.values(DAYS).forEach(day => {
+    Object.values(day.blocks || {}).flat().concat(day.prepMenu || []).forEach(ex => {
+      if (ex && ex.name && !moveMeta[ex.name]) moveMeta[ex.name] = ex;
+    });
+  });
+
+  /* Priority: what failed last time, then the key moves, then whatever she uses
+     most and claims near-perfect but has never been verified. */
+  const fcCandidates = Object.keys(moveMeta).map(name => {
+    const self = selfByMove[name] || { asked: 0, clean: 0 };
+    const selfPct = self.asked ? Math.round((self.clean / self.asked) * 100) : null;
+    const last = fcLatest[name] || null;
+    const used = usedByMove[name] || 0;
+    let score = used;
+    let why = used + " session" + (used === 1 ? "" : "s");
+    if (last && last.pass === false) { score += 1000; why = "failed your last check — re-check it"; }
+    else if (TOP7.includes(name)) { score += 300; why = "one of the 7 key moves · " + why; }
+    if (selfPct === 100 && !last) { score += 200; why = "she reports 100% clean, never verified · " + why; }
+    if (last && last.pass === true) score -= 400;                 // recently confirmed, deprioritise
+    return {
+      name, score, why,
+      watch: moveMeta[name].parentWatch || "",
+      fix: moveMeta[name].redFlag || "",
+      cue: moveMeta[name].cue || "",
+      selfLabel: selfPct == null ? "no self-checks yet" : "she reports " + selfPct + "% clean (" + self.asked + ")",
+      verdict: fcVerdicts[name] ? (fcVerdicts[name].pass ? "pass" : "fail") : null,
+      lastVerdict: last ? { pass: last.pass, month: last.month } : null
+    };
+  }).filter(c => c.watch);                                        // only moves with written criteria
+
+  const fcQueue = fcCandidates.slice().sort((a, b) => b.score - a.score).slice(0, 5);
+  const fcDone = Object.keys(fcVerdicts).length;
+  const fcPassed = Object.values(fcVerdicts).filter(v => v.pass).length;
+  const fcSelfPct = (() => {
+    const t = Object.values(selfByMove).reduce((a, m) => { a.asked += m.asked; a.clean += m.clean; return a; }, { asked: 0, clean: 0 });
+    return t.asked ? Math.round((t.clean / t.asked) * 100) : null;
+  })();
+  const fcVerifiedPct = fcDone ? Math.round((fcPassed / fcDone) * 100) : null;
+
+  const formCheck = {
+    month: fcMonth,
+    monthLabel: new Date(fcMonth + "-15T12:00:00Z").toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "America/Edmonton" }),
+    prevMonth: (() => { const d = new Date(fcMonth + "-15T12:00:00Z"); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); })(),
+    nextMonth: (() => { const d = new Date(fcMonth + "-15T12:00:00Z"); d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 7); })(),
+    atCurrentMonth: fcMonth >= monthKeyOf(),
+    queue: fcQueue.map(c => ({
+      ...c,
+      cardStyle: "border:2px solid " + (c.verdict === "pass" ? "var(--mint)" : c.verdict === "fail" ? "var(--coral)" : "var(--hairline)")
+        + ";background:" + (c.verdict === "pass" ? "var(--mint-wash)" : c.verdict === "fail" ? "color-mix(in srgb, var(--coral) 10%, #fff)" : "var(--surface)")
+        + ";border-radius:var(--radius-lg);padding:15px 16px;display:flex;flex-direction:column;gap:9px;",
+      passStyle: "flex:1;min-height:46px;border-radius:var(--radius-pill);border:2px solid var(--mint);cursor:pointer;font-weight:900;font-size:14px;font-family:inherit;"
+        + (c.verdict === "pass" ? "background:var(--mint);color:#fff;" : "background:transparent;color:var(--mint-ink);"),
+      failStyle: "flex:1;min-height:46px;border-radius:var(--radius-pill);border:2px solid var(--coral);cursor:pointer;font-weight:900;font-size:14px;font-family:inherit;"
+        + (c.verdict === "fail" ? "background:var(--coral);color:#fff;" : "background:transparent;color:var(--coral);")
+    })),
+    doneCount: fcDone, total: fcQueue.length,
+    selfPct: fcSelfPct, verifiedPct: fcVerifiedPct,
+    gap: (fcSelfPct != null && fcVerifiedPct != null) ? fcVerifiedPct - fcSelfPct : null,
+    headline: fcVerifiedPct == null
+      ? "Nothing verified this month yet — watch her do these and mark what you actually see."
+      : fcSelfPct != null && fcVerifiedPct < fcSelfPct - 15
+        ? "She reports " + fcSelfPct + "% clean; you verified " + fcVerifiedPct + "%. That gap is the thing to work on."
+        : "She reports " + fcSelfPct + "% clean and you verified " + fcVerifiedPct + "% — the self-checks are holding up.",
+    flagged: Object.keys(fcLatest).filter(m => fcLatest[m].pass === false),
+    note: "A failed move resets what her self-checks claimed for it and goes to the front of the next run's random spot-checks. This is a conversation tool — it is deliberately not wired to XP or prizes."
+  };
+
   /* ---- library ---- */
   const seen = {};
   const libraryList = [];
@@ -492,6 +582,7 @@ export function buildGrownupVM(state) {
       { key: "overview", label: "Overview", style: tabStyle(gu === "overview") },
       { key: "analytics", label: "Analytics", style: tabStyle(gu === "analytics") },
       { key: "coaching", label: "Coaching", style: tabStyle(gu === "coaching") },
+      { key: "formcheck", label: "Form Check", style: tabStyle(gu === "formcheck") },
       { key: "library", label: "Move Library", style: tabStyle(gu === "library") },
       { key: "settings", label: "Settings", style: tabStyle(gu === "settings") }
     ],
@@ -526,6 +617,7 @@ export function buildGrownupVM(state) {
       read, suggest
     },
     guAlerts,
+    formCheck,
     standingRules: STANDING_RULES,
     libraryList,
     settingsName: settings.athleteName || "Jess",

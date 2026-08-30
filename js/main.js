@@ -23,7 +23,7 @@ import { buildProgressVM, toggleRedeem } from "./vm/progress.js";
 import { progressScreen } from "./screens/progress.js";
 import { buildGrownupVM, exportCsv } from "./vm/grownup.js";
 import { grownupScreen } from "./screens/grownup.js";
-import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS } from "./store.js";
+import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS, recordFormVerdict } from "./store.js";
 
 export const state = {
   nav: "today",                 // 'today' | 'progress' | 'grownup'
@@ -31,6 +31,7 @@ export const state = {
   gsScope: "week",
   logScope: "week",
   progressScope: "4w",          // '4w' | 'month' | 'quarter' — Progress period board
+  formCheckMonth: null,         // 'YYYY-MM' — Form Check month being reviewed (null = current)
   expanded: {},                 // day-card block expansion
   selectedDay: null,            // monday..sunday
   practiceMode: false,
@@ -290,6 +291,9 @@ const actions = {
   /* ---- grown-up zone ---- */
   setGuTab(arg) { state.grownupTab = arg; render(); },
   setGsScope(arg) { state.gsScope = arg; render(); },
+  formCheckMonth(arg) { state.formCheckMonth = arg; render(); },
+  formCheckPass(arg) { recordFormVerdict(arg, true, state.formCheckMonth); render(); },
+  formCheckFail(arg) { recordFormVerdict(arg, false, state.formCheckMonth); render(); },
   setVoiceStyle(arg) { updateSettings({ voiceStyle: arg }); render(); },
   bumpRest(arg) {
     const [key, step, min, max] = arg.split("|");

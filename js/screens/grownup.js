@@ -113,6 +113,70 @@ function overviewTab(vm) {
   </div>`;
 }
 
+function formCheckTab(vm) {
+  const f = vm.formCheck;
+  return `
+  <div style="display:flex;flex-direction:column;gap:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+      <span style="font-family:var(--font-display);font-weight:600;font-size:20px;color:var(--ink);">Form check</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button type="button" data-action="formCheckMonth" data-arg="${f.prevMonth}" style="min-height:38px;width:38px;border-radius:50%;border:2px solid var(--hairline);background:var(--surface);font-size:15px;font-weight:900;cursor:pointer;font-family:inherit;" aria-label="Previous month">◀</button>
+        <span style="font-weight:900;font-size:14px;color:var(--ink);min-width:120px;text-align:center;">${f.monthLabel}</span>
+        <button type="button" data-action="formCheckMonth" data-arg="${f.nextMonth}" ${f.atCurrentMonth ? "disabled" : ""} style="min-height:38px;width:38px;border-radius:50%;border:2px solid var(--hairline);background:var(--surface);font-size:15px;font-weight:900;cursor:${f.atCurrentMonth ? "default" : "pointer"};opacity:${f.atCurrentMonth ? "0.4" : "1"};font-family:inherit;" aria-label="Next month">▶</button>
+      </div>
+    </div>
+
+    ${card(`
+      ${secTitle("What she claims vs what you saw")}
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-top:10px;">
+        <div style="display:flex;flex-direction:column;align-items:center;background:var(--surface-2);border-radius:16px;padding:11px 18px;">
+          <span style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);line-height:1;">${f.selfPct == null ? "—" : f.selfPct + "%"}</span>
+          <span style="font-size:11px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;">she reports</span>
+        </div>
+        <span style="font-size:20px;color:var(--ink-faint);">vs</span>
+        <div style="display:flex;flex-direction:column;align-items:center;background:${f.gap != null && f.gap <= -15 ? "color-mix(in srgb, var(--coral) 12%, #fff)" : "var(--mint-wash)"};border-radius:16px;padding:11px 18px;">
+          <span style="font-family:var(--font-display);font-weight:600;font-size:28px;color:${f.gap != null && f.gap <= -15 ? "var(--coral)" : "var(--mint-ink)"};line-height:1;">${f.verifiedPct == null ? "—" : f.verifiedPct + "%"}</span>
+          <span style="font-size:11px;font-weight:900;color:${f.gap != null && f.gap <= -15 ? "var(--coral)" : "var(--mint-ink)"};text-transform:uppercase;letter-spacing:0.04em;">you verified</span>
+        </div>
+        <div style="flex:1;min-width:220px;font-size:14px;font-weight:800;color:var(--ink);line-height:1.45;">${f.headline}</div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--ink-faint);margin-top:12px;">${f.doneCount} of ${f.total} checked this month.</div>`)}
+
+    ${divider("👁 Watch these")}
+    ${f.queue.length ? f.queue.map(c => `
+      <div style="${c.cardStyle}">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          <span style="font-family:var(--font-display);font-weight:600;font-size:19px;color:var(--ink);">${escapeHtml(c.name)}</span>
+          <span style="font-size:12px;font-weight:800;color:var(--ink-soft);">${escapeHtml(c.selfLabel)}</span>
+        </div>
+        <div style="display:flex;gap:9px;align-items:flex-start;background:var(--surface-2);border-radius:12px;padding:10px 12px;">
+          <span style="font-size:15px;flex-shrink:0;">👁</span>
+          <div><span style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--ink-faint);text-transform:uppercase;">Watch for</span>
+          <div style="font-size:14px;font-weight:800;color:var(--ink);line-height:1.4;">${escapeHtml(c.watch)}</div></div>
+        </div>
+        ${c.fix ? `
+        <div style="display:flex;gap:9px;align-items:flex-start;background:var(--aqua-wash);border-radius:12px;padding:10px 12px;">
+          <span style="font-size:15px;flex-shrink:0;">🔧</span>
+          <div><span style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--aqua-ink);text-transform:uppercase;">The fix</span>
+          <div style="font-size:14px;font-weight:800;color:var(--aqua-ink);line-height:1.4;">${escapeHtml(c.fix)}</div></div>
+        </div>` : ""}
+        <div style="display:flex;gap:9px;">
+          <button type="button" data-action="formCheckPass" data-arg="${escapeHtml(c.name)}" style="${c.passStyle}">✓ Meets criteria</button>
+          <button type="button" data-action="formCheckFail" data-arg="${escapeHtml(c.name)}" style="${c.failStyle}">✗ Not yet</button>
+        </div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);">Picked because: ${escapeHtml(c.why)}</div>
+      </div>`).join("")
+      : `<div style="font-size:14px;font-weight:700;color:var(--ink-soft);line-height:1.5;">No moves with written criteria yet — once she has trained a few sessions they'll queue up here.</div>`}
+
+    ${f.flagged.length ? card(`
+      ${secTitle("⚠️ Flagged for re-teaching")}
+      <div style="font-size:14px;font-weight:800;color:var(--ink);line-height:1.5;margin-top:8px;">${f.flagged.map(escapeHtml).join(" · ")}</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.45;margin-top:6px;">These go to the front of the next session's random spot-checks.</div>`) : ""}
+
+    <div style="font-size:12px;font-weight:700;color:var(--ink-faint);line-height:1.5;background:var(--surface-2);border-radius:12px;padding:11px 13px;">${f.note}</div>
+  </div>`;
+}
+
 function analyticsTab(vm) {
   const a = vm.analytics;
   return `
@@ -592,6 +656,7 @@ export function grownupScreen(vm) {
       </div>
       ${tab === "overview" ? overviewTab(vm)
         : tab === "analytics" ? analyticsTab(vm)
+        : tab === "formcheck" ? formCheckTab(vm)
         : tab === "coaching" ? coachingTab(vm)
         : tab === "library" ? libraryTab(vm)
         : settingsTab(vm)}

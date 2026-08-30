@@ -9,7 +9,7 @@
    ============================================================ */
 
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA, exWork, exRepsDetail } from "./data.js";
-import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, pendingDrawCount, xpForSession, athleteId, noteSessionXpAwarded, patchSession, sessionKey, XP_VERSION, clearTryIt } from "./store.js";
+import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, pendingDrawCount, xpForSession, athleteId, noteSessionXpAwarded, patchSession, sessionKey, XP_VERSION, clearTryIt, flaggedMoves } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
 import { recoveryDoseSecs, refTime } from "./util.js";
@@ -97,20 +97,25 @@ export function assembleCircuits(dayKey, light, opts = {}) {
 export const SPOT_CHECK_MIN = 2;
 export const SPOT_CHECK_MAX = 3;
 
-export function pickSpotChecks(circuits, rnd = Math.random) {
+export function pickSpotChecks(circuits, rnd = Math.random, flagged = null) {
   const names = [];
   (circuits || []).forEach(c => {
     if (c.block !== "main" && c.block !== "prep") return;
     (c.exercises || []).forEach(ex => { if (ex && ex.name && !names.includes(ex.name)) names.push(ex.name); });
   });
   if (!names.length) return [];
-  const pool = names.slice();
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(rnd() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
+  const shuffle = arr => {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  };
+  // A move a grown-up verified as FAILING goes to the front of the queue: it is
+  // the one the app most needs a fresh read on, and re-teaching it is the point.
+  const flags = flagged || flaggedMoves();
+  const priority = shuffle(names.filter(n => flags.includes(n)));
+  const rest = shuffle(names.filter(n => !flags.includes(n)));
   const want = SPOT_CHECK_MIN + Math.floor(rnd() * (SPOT_CHECK_MAX - SPOT_CHECK_MIN + 1));
-  return pool.slice(0, Math.min(want, pool.length));
+  return [...priority, ...rest].slice(0, Math.min(want, names.length));
 }
 
 /* Estimated session length in seconds (rep-based ≈ secondsPerRep × reps). */

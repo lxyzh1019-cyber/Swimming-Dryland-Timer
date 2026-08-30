@@ -254,6 +254,45 @@ ok(store.xpForSession({ ...sess3(3), sessionType: "spa" }) === 0, "spa still ear
 ok(store.DEFAULT_SETTINGS.voiceStyle === "encouraging", "default voice is process-praise");
 ok(store.DEFAULT_SETTINGS.cloudMirror === true, "cloudMirror default on");
 
+/* --- parent form check: the ground truth under every quality number -------
+   Clean %, quiz mastery and the safety gate are all built on the kid's own
+   word, so the app can be confidently wrong about her technique. */
+localStorage.clear();
+store.migrate();
+for (let d = 40; d >= 1; d -= 2) {
+  store.saveSession({ isoDate: new Date(Date.now() - d * 86400000).toISOString(), dayKey: "monday",
+    completedFully: true, roundsDone: 3, xpVersion: store.XP_VERSION, durationSecs: 1400, xpEarned: 360,
+    plannedSecs: 1500, clean: 2, wobbly: 0,
+    formChecks: [{ name: "Glute Bridge March", clean: true }, { name: "Dead Bug", clean: true }],
+    perExercise: [{ name: "Glute Bridge March", skipped: false }, { name: "Dead Bug", skipped: false }, { name: "Superman", skipped: false }] });
+}
+const fcState = { grownupTab: "formcheck", gsScope: "month", isWide: true };
+let fc = gvm.buildGrownupVM(fcState).formCheck;
+ok(fc.queue.length === 5, "five moves a month are queued, not all forty");
+ok(fc.queue.every(c => c.watch), "each carries the written watch-for criteria the app already ships");
+ok(fc.queue.every(c => c.why), "and says why it was picked");
+ok(fc.selfPct === 100 && fc.verifiedPct === null, "she reports 100% clean and nothing is verified yet");
+store.recordFormVerdict("Glute Bridge March", false);
+fc = gvm.buildGrownupVM(fcState).formCheck;
+ok(fc.verifiedPct === 0 && fc.gap === -100, "a failed check surfaces the gap between what she claims and what you saw");
+ok(fc.flagged.includes("Glute Bridge March"), "and flags the move for re-teaching");
+const fcCircuits = [{ block: "main", exercises: [{ name: "Glute Bridge March" }, { name: "Dead Bug" }, { name: "Superman" }, { name: "Pallof Press" }, { name: "Hollow Tuck Flutter" }] }];
+let fcFront = 0;
+for (let i = 0; i < 200; i++) if (engine.pickSpotChecks(fcCircuits).includes("Glute Bridge March")) fcFront++;
+ok(fcFront === 200, "a failed move goes to the front of the next runs' random spot-checks");
+store.recordFormVerdict("Glute Bridge March", true);
+fc = gvm.buildGrownupVM(fcState).formCheck;
+ok(fc.verifiedPct === 100 && fc.flagged.length === 0, "re-verifying it clears the flag");
+const fcInd = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics", isWide: true })
+  .analytics.indicators.find(i => i.label === "Form · you verified");
+ok(fcInd.total === "1 of 1", "the indicator board reports verified form beside self-reported form");
+ok(fc.prevMonth < fc.month && fc.nextMonth > fc.month, "the month stepper moves in both directions");
+ok(/Form check/.test(gscreen.grownupScreen(gvm.buildGrownupVM(fcState))), "the Form Check tab renders");
+const fcXpBefore = store.loadJourney().xp;
+store.recordFormVerdict("Dead Bug", true);
+ok(store.loadJourney().xp === fcXpBefore, "recording a verdict never touches XP or prizes — it is a conversation tool, not a reward");
+localStorage.clear();
+
 /* --- Grown-up: the period toggle now moves every panel --------------------
    All-time used to look like Month: the consistency grid was hardcoded to 28
    days, the load trend capped at 8 weeks, and the quiz trend ignored the scope

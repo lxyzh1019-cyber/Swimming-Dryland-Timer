@@ -23,6 +23,7 @@ export const LS_TRACKER       = "swim_tracker_v2";
 export const LS_EVENTS        = "swim_events_v1";
 export const LS_PRLOG         = "swim_pr_log";
 export const LS_JOURNEY       = "swim_journey_v1";     // NEW: xp / level / prizes
+export const LS_FORMCHECK     = "swim_form_check_v1";  // NEW: parent-verified form
 
 const SKIP_RETENTION_MS  = 7 * 24 * 60 * 60 * 1000;
 const EVENT_RETENTION_MS = 120 * 24 * 60 * 60 * 1000; // 120 days
@@ -1084,6 +1085,66 @@ export function reconcileJourneyWithSessions() {
 }
 
 /* ============================================================
+   PARENT FORM CHECK — the ground truth under every quality number.
+
+   Clean %, quiz mastery and the Drop-and-Stick safety gate are all built
+   on the kid's own word. So the app can be confidently wrong about her
+   technique: she reports a move clean, it failed the written criteria,
+   and nothing catches it.
+
+   Every move already carries the exact fault to watch for and its fix
+   (parentWatch / redFlag in data.js, 41 of them). This records what a
+   grown-up actually SAW against those criteria, once a month, on a
+   handful of moves — and that verdict outranks the self-report.
+   ============================================================ */
+export function monthKeyOf(d = new Date()) { return edmontonISO(d).slice(0, 7); }
+
+export function loadFormChecks() {
+  const fc = readStorage(LS_FORMCHECK, null);
+  return fc && typeof fc === "object" ? { months: fc.months || {} } : { months: {} };
+}
+export function saveFormChecks(fc) { writeStorage(LS_FORMCHECK, fc); }
+
+/* Record a verdict for one move in one month. A later verdict replaces an
+   earlier one for the same move and month — you re-checked, that's the answer. */
+export function recordFormVerdict(move, pass, month = monthKeyOf()) {
+  if (!move) return null;
+  const fc = loadFormChecks();
+  const m = fc.months[month] || { moves: {} };
+  m.moves[move] = { pass: !!pass, at: Date.now() };
+  fc.months[month] = m;
+  saveFormChecks(fc);
+  logEvent("form_check", { move, pass: !!pass, month });
+  return fc;
+}
+export function clearFormVerdict(move, month = monthKeyOf()) {
+  const fc = loadFormChecks();
+  const m = fc.months[month];
+  if (!m || !m.moves[move]) return false;
+  delete m.moves[move];
+  saveFormChecks(fc);
+  return true;
+}
+export function formVerdicts(month = monthKeyOf()) {
+  return ((loadFormChecks().months[month] || {}).moves) || {};
+}
+/* Every verdict ever recorded, latest per move. */
+export function latestFormVerdicts() {
+  const fc = loadFormChecks();
+  const out = {};
+  Object.keys(fc.months).sort().forEach(mk => {
+    Object.entries(fc.months[mk].moves || {}).forEach(([move, v]) => { out[move] = { ...v, month: mk }; });
+  });
+  return out;
+}
+/* Moves whose most recent verdict was a fail — these get re-taught and are
+   pushed to the front of the next run's random spot-checks. */
+export function flaggedMoves() {
+  const latest = latestFormVerdicts();
+  return Object.keys(latest).filter(m => latest[m] && latest[m].pass === false);
+}
+
+/* ============================================================
    BACKUP — a plain-JSON escape hatch for one athlete.
 
    The cloud mirror only carries sessions. This carries everything
@@ -1098,7 +1159,7 @@ export const BACKUP_SCHEMA = 1;
 export const PROFILE_KEYS = [
   SETTINGS_KEY, PROGRESS_KEY, SKIP_HISTORY_KEY, ENGAGE_KEY, LS_READINESS, LS_DAYPROG,
   LS_LEARNING, LS_LADDER, LS_QUIZ, LS_GATE, LS_SESSIONS, LS_TRACKER, LS_EVENTS,
-  LS_PRLOG, LS_JOURNEY
+  LS_PRLOG, LS_JOURNEY, LS_FORMCHECK
 ];
 
 /* True when nothing in the saved settings differs from the shipped defaults. */
