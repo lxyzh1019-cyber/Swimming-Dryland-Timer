@@ -124,6 +124,38 @@ function analyticsTab(vm) {
       </div>
       <button type="button" data-action="exportCsv" style="min-height:40px;border:2px solid var(--aqua);background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">⬇︎ Export CSV</button>
     </div>
+    <div style="font-size:12px;font-weight:700;color:var(--ink-faint);margin-top:-6px;">${a.periodCovered}</div>
+
+    ${card(`
+      ${secTitle("At a glance · " + vm.scopeLabel)}
+      <div style="font-size:13px;color:var(--ink-faint);margin:4px 0 12px;line-height:1.3;">Every number here answers to the period toggle above.</div>
+      <div style="display:grid;grid-template-columns:1fr auto auto;gap:0 14px;align-items:baseline;">
+        <div></div>
+        <div style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--ink-faint);text-transform:uppercase;text-align:right;padding-bottom:6px;">Total</div>
+        <div style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--ink-faint);text-transform:uppercase;text-align:right;padding-bottom:6px;">Average</div>
+        ${a.indicators.map(ind => `
+          <div style="font-size:13px;font-weight:800;color:var(--ink-soft);padding:7px 0;border-top:1px solid var(--hairline);">${ind.label}</div>
+          <div style="font-size:15px;font-weight:900;color:var(--ink);text-align:right;padding:7px 0;border-top:1px solid var(--hairline);white-space:nowrap;">${ind.total}</div>
+          <div style="font-size:13px;font-weight:800;color:var(--aqua-ink);text-align:right;padding:7px 0;border-top:1px solid var(--hairline);white-space:nowrap;">${ind.avg}</div>`).join("")}
+      </div>`)}
+
+    ${card(`
+      ${secTitle("🧭 Is she trying?")}
+      <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:10px;">
+        <div style="display:flex;flex-direction:column;align-items:center;background:var(--aqua-wash);border-radius:18px;padding:12px 18px;flex-shrink:0;">
+          <span style="font-family:var(--font-display);font-weight:600;font-size:34px;color:var(--aqua-ink);line-height:1;">${a.isSheTrying.avg == null ? "—" : a.isSheTrying.avg}</span>
+          <span style="font-size:11px;font-weight:900;letter-spacing:0.04em;color:var(--aqua-ink);text-transform:uppercase;">${a.isSheTrying.band}</span>
+        </div>
+        ${a.isSheTrying.hasTrend ? `
+        <div style="display:flex;align-items:flex-end;gap:5px;height:74px;flex:1;min-width:120px;max-width:280px;">
+          ${a.isSheTrying.trend.map(t => `<div style="flex:1;display:flex;align-items:flex-end;height:100%;"><div style="${t.barStyle}"></div></div>`).join("")}
+        </div>` : ""}
+        <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:6px;">
+          ${a.isSheTrying.lines.map(l => `<div style="font-size:14px;font-weight:800;color:var(--ink);line-height:1.4;">${l}</div>`).join("")}
+          ${a.isSheTrying.gapNote ? `<div style="font-size:13px;font-weight:800;color:${a.isSheTrying.formGap != null && a.isSheTrying.formGap <= -15 ? "var(--coral)" : "var(--mint-ink)"};line-height:1.4;">${a.isSheTrying.gapNote}</div>` : ""}
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--ink-faint);line-height:1.45;margin-top:12px;background:var(--surface-2);border-radius:12px;padding:9px 12px;">${a.isSheTrying.note}</div>`)}
 
     ${divider("🚨 Safety &amp; flags")}
     ${flagsCard(a, vm.scopeLabel)}

@@ -6,8 +6,9 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl, fmtXp } from "../data.js";
-import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim } from "../store.js";
+import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal } from "../store.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
+import { sessionEffort, effortSummary } from "../effort.js";
 
 const LIGHT_COLORS = { green: "var(--mint)", yellow: "var(--sun)", red: "var(--stop)", recovery: "var(--grape)" };
 const MOOD_EMOJI = { great: "😀", okay: "🙂", tired: "😴" };
@@ -38,8 +39,13 @@ const alertRow = (tone) => "display:flex;align-items:flex-start;gap:10px;padding
 export function buildGrownupVM(state) {
   const scope = state.gsScope || "week";
   const scopeLabel = { week: "This week", month: "Last 30 days", all: "All-time" }[scope];
-  const all = loadSessions();
+  // Try-it rows exist only to carry a pain stop to this screen. They are not
+  // training, so they stay out of every training number — but they must still
+  // reach Safety & Flags below.
+  const allRows = loadSessions();
+  const all = allRows.filter(s => !s.practice);
   const sessions = all.filter(scopeFilter(scope));
+  const safetyRows = allRows.filter(scopeFilter(scope));
   const events = loadEvents();
   const eventInScope = e => scopeFilter(scope)({ isoDate: e.iso });
 
@@ -54,7 +60,7 @@ export function buildGrownupVM(state) {
     + (scope === v ? "background:var(--aqua);color:#fff;box-shadow:0 2px 6px rgba(6,182,212,0.35);" : "background:transparent;color:var(--ink-soft);");
 
   /* ---- safety & flags ---- */
-  const stops = sessions.filter(s => s.pain);
+  const stops = safetyRows.filter(s => s.pain);
   const stopEvents = stops.map(s => ({
     date: dstr(s.isoDate), move: s.dayTitle || s.dayKey,
     note: "Stopped for pain after " + mins(s) + " min — check in before the next session."
@@ -110,7 +116,7 @@ export function buildGrownupVM(state) {
         return { s: st, label: DAY_SHORT[k] };
       })
     };
-  } else {
+  } else if (scope === "month") {
     const n = 28;
     const cells = [];
     for (let i = n - 1; i >= 0; i--) {
@@ -120,6 +126,31 @@ export function buildGrownupVM(state) {
       cells.push({ s: byIso[iso] || (DAYS[dow] && DAYS[dow].spa ? "rest" : "missed"), label: String(Number(iso.slice(8))) });
     }
     consistency = { subtitle: "Last 28 days (newest bottom-right).", showDows: true, cols: 7, cells };
+  } else {
+    // All-time used to be hardcoded to the same 28 days as Month, so the toggle
+    // did nothing here. One cell per WEEK back to her first session instead,
+    // shaded by how much of that week she trained.
+    const firstT = all.length ? new Date(all[0].isoDate).getTime() : Date.now();
+    const weeksBack = Math.min(52, Math.max(1, Math.ceil((Date.now() - firstT) / (7 * DAY_MS))));
+    const cells = [];
+    for (let w = weeksBack - 1; w >= 0; w--) {
+      const end = Date.now() - w * 7 * DAY_MS;
+      let trained = 0, possible = 0;
+      for (let d = 6; d >= 0; d--) {
+        const day = new Date(end - d * DAY_MS);
+        if (day.getTime() < firstT - DAY_MS) continue;
+        const iso = edmontonISO(day);
+        const dow = day.toLocaleDateString("en-US", { weekday: "long", timeZone: "America/Edmonton" }).toLowerCase();
+        if (DAYS[dow] && DAYS[dow].spa) continue;
+        possible++;
+        if (byIso[iso]) trained++;
+      }
+      const pct = possible ? trained / possible : 0;
+      cells.push({ s: pct >= 0.8 ? "done" : pct >= 0.4 ? "partial" : possible ? "missed" : "rest",
+                   label: String(trained) });
+    }
+    consistency = { subtitle: "One cell per week since her first session (" + weeksBack + " weeks) — the number is days trained.",
+                    showDows: false, cols: Math.min(13, Math.max(6, Math.ceil(cells.length / 4))), cells };
   }
   const consistencyView = (() => {
     const legend = [
@@ -154,7 +185,11 @@ export function buildGrownupVM(state) {
     loadTitle = "Load trend · daily"; loadSubtitle = "Minutes per day, this week vs last week (ghost bars).";
     prevTotal = loadBars.reduce((a, b) => a + (b.prev || 0), 0);
   } else {
-    const weeks = scope === "month" ? 4 : 8;
+    // All-time used to cap at 8 weeks, which made it look like Month. Span her
+    // real history instead (capped so the chart stays readable).
+    const firstT = all.length ? new Date(all[0].isoDate).getTime() : now;
+    const weeks = scope === "month" ? 4
+      : Math.min(26, Math.max(4, Math.ceil((now - firstT) / (7 * DAY_MS))));
     loadBars = [];
     for (let i = weeks - 1; i >= 0; i--) {
       const to = now - i * 7 * DAY_MS;
@@ -308,7 +343,13 @@ export function buildGrownupVM(state) {
 
   /* ---- quiz trend ---- */
   const quiz = loadQuiz();
-  const quizTrend = (quiz.results || []).slice(-6).map((r, i, arr) => {
+  // The quiz trend ignored the scope entirely — always the last 6 runs.
+  const quizInScope = (quiz.results || []).filter(r => {
+    if (scope === "all") return true;
+    if (!r || !r.t) return true;
+    return scopeFilter(scope)({ isoDate: new Date(r.t).toISOString() });
+  });
+  const quizTrend = quizInScope.slice(-6).map((r, i, arr) => {
     const pct = Math.round((r.score / Math.max(1, r.total)) * 100);
     return { k: "Q" + (i + 1), pctLabel: pct + "%",
       barStyle: "width:100%;height:" + Math.max(6, Math.round(pct * 0.8)) + "px;border-radius:6px 6px 0 0;background:" + (i === arr.length - 1 ? "var(--grape)" : "color-mix(in srgb, var(--grape) 45%, #fff)") + ";" };
@@ -327,6 +368,73 @@ export function buildGrownupVM(state) {
       + "Replays are free practice worth 0 XP. "
       + (qBank.left ? qBank.left + " questions still hold XP." : "All questions are mastered — the quiz pays nothing further.")
   };
+
+  /* ---- indicator board -----------------------------------------------------
+     One place where every number answers to the SAME window, each as a total
+     and an average. Before this the toggle really only moved Safety & Flags,
+     and the rest was scattered across cards at different time scales. */
+  const effort = effortSummary(sessions);
+  const trainedDays = new Set(sessions.filter(countsAsTrainedLocal).map(s => edmontonISO(s.isoDate))).size;
+  const availableDays = Math.max(trainedDays, scopeDays(scope, all));
+  const boardRounds = done.reduce((a, s) => a + (s.roundsDone || 0), 0);
+  const boardXp = sessions.reduce((a, s) => a + (s.xpEarned || 0), 0);
+  const moodCount = { great: 0, okay: 0, tired: 0 };
+  sessions.forEach(s => { if (moodCount[s.mood] != null) moodCount[s.mood] += 1; });
+  const levelsUp = (() => {
+    const j = loadJourney() || { xp: 0 };
+    const inWindow = sessions.reduce((a, s) => a + (s.xpEarned || 0), 0);
+    return Math.max(0, levelFromXp(j.xp || 0).level - levelFromXp(Math.max(0, (j.xp || 0) - inWindow)).level);
+  })();
+  const verified = sessions.reduce((a, s) => {
+    (s.parentChecks || []).forEach(c => { a.asked += 1; if (c.pass) a.pass += 1; });
+    return a;
+  }, { asked: 0, pass: 0 });
+  const avg1 = (n, d, unit) => d > 0 ? (Math.round((n / d) * 10) / 10) + (unit ? " " + unit : "") : "—";
+
+  const indicators = [
+    { label: "Days trained",   total: trainedDays + " of " + availableDays, avg: availableDays ? Math.round((trainedDays / availableDays) * 100) + "%" : "—" },
+    { label: "Total time",     total: totalMins >= 60 ? Math.floor(totalMins / 60) + "h " + (totalMins % 60) + "m" : totalMins + "m", avg: avg1(totalMins, sessions.length, "min / session") },
+    { label: "Effort level",   total: effort.avg == null ? "—" : String(effort.avg), avg: effort.band },
+    { label: "Rounds",         total: String(boardRounds), avg: avg1(boardRounds, done.length, "/ session") },
+    { label: "Safety",         total: (stops.length ? stops.length + " stop" + (stops.length === 1 ? "" : "s") : "no stops") + (earlyEnds.length ? " · " + earlyEnds.length + " early" : ""), avg: stops.length ? "needs a conversation" : "clean" },
+    { label: "Completed",      total: done.length + " of " + sessions.length, avg: sessions.length ? Math.round((done.length / sessions.length) * 100) + "%" : "—" },
+    // Average from the SAME rows as the total — moodUpPct is the last-6 trend
+    // used by the mood card, and quoting it here made the two columns disagree.
+    { label: "How she felt",   total: "😀" + moodCount.great + "  🙂" + moodCount.okay + "  😴" + moodCount.tired,
+      avg: (() => { const t = Object.entries(moodCount).sort((a, b) => b[1] - a[1])[0];
+                    return t && t[1] ? "mostly " + MOOD_EMOJI[t[0]] : "—"; })() },
+    { label: "Levels upgraded", total: "+" + levelsUp, avg: levelsUp ? "one every " + avg1(sessions.length, levelsUp, "sessions") : "—" },
+    { label: "Form · she says", total: effort.formAsked ? effort.formClean + " of " + effort.formAsked : "—", avg: effort.formPct == null ? "—" : effort.formPct + "% clean" },
+    { label: "Form · you verified", total: verified.asked ? verified.pass + " of " + verified.asked : "not checked yet", avg: verified.asked ? Math.round((verified.pass / verified.asked) * 100) + "% ✓" : "—" },
+    { label: "XP earned",      total: fmtXp(boardXp), avg: avg1(boardXp, sessions.length, "/ session") }
+  ];
+  // The gap between what she reports and what you verified is the number that
+  // answers "is she really doing it right" — call it out when both exist.
+  const formGap = (effort.formPct != null && verified.asked)
+    ? Math.round((verified.pass / verified.asked) * 100) - effort.formPct : null;
+
+  const isSheTrying = {
+    avg: effort.avg, band: effort.band, sessions: effort.sessions,
+    lines: effort.lines,
+    formGap,
+    gapNote: formGap == null ? "" : formGap <= -15
+      ? "She reports her form cleaner than you've verified it — worth watching the moves below."
+      : "Her self-checks and your verification agree.",
+    trend: effort.trend.map((v, i, arr) => ({
+      v, barStyle: "width:100%;height:" + Math.max(6, Math.round((v / 100) * 70)) + "px;border-radius:5px 5px 0 0;background:"
+        + (i === arr.length - 1 ? "var(--aqua)" : "color-mix(in srgb, var(--aqua) 45%, #fff)") + ";"
+    })),
+    hasTrend: effort.trend.length > 1,
+    note: "Effort is scored on what she controls — finishing the day's own target, showing up on a hard day, not skipping, not rushing, and the random form spot-checks. A pain stop never costs her anything."
+  };
+
+  const periodCovered = (() => {
+    if (!all.length) return "No sessions recorded yet.";
+    const firstT = scope === "all" ? new Date(all[0].isoDate).getTime() : Date.now() - scopeDays(scope, all) * DAY_MS;
+    const f = new Date(Math.max(firstT, new Date(all[0].isoDate).getTime()));
+    return scopeLabel + " · " + dstr(f.toISOString()).replace(/^\w+, /, "") + " – "
+      + dstr(new Date().toISOString()).replace(/^\w+, /, "") + " · " + sessions.length + " session" + (sessions.length === 1 ? "" : "s");
+  })();
 
   /* ---- coach narrative (one honest story per scope) ---- */
   const read = !sessions.length
@@ -397,6 +505,7 @@ export function buildGrownupVM(state) {
     libGrid: "display:grid;grid-template-columns:" + (state.isWide ? "repeat(2,1fr)" : "1fr") + ";gap:14px;",
 
     analytics: {
+      indicators, isSheTrying, periodCovered,
       flags: flags.length ? flags : null,
       hasStops: stopEvents.length > 0, noStops: stopEvents.length === 0, stopEvents,
       adherence, sessions: done.length, scheduled, avgMins, totalMins,

@@ -34,6 +34,8 @@ const tscreen = await import(base + "screens/today.js");
 const effort  = await import(base + "effort.js");
 const pvm     = await import(base + "vm/progress.js");
 const pscreen = await import(base + "screens/progress.js");
+const gvm     = await import(base + "vm/grownup.js");
+const gscreen = await import(base + "screens/grownup.js");
 const rscreen = await import(base + "screens/readiness.js");
 const overlays = await import(base + "screens/overlays.js");
 
@@ -251,6 +253,44 @@ ok(store.xpForSession({ ...sess3(3), sessionType: "spa" }) === 0, "spa still ear
 /* --- defaults --- */
 ok(store.DEFAULT_SETTINGS.voiceStyle === "encouraging", "default voice is process-praise");
 ok(store.DEFAULT_SETTINGS.cloudMirror === true, "cloudMirror default on");
+
+/* --- Grown-up: the period toggle now moves every panel --------------------
+   All-time used to look like Month: the consistency grid was hardcoded to 28
+   days, the load trend capped at 8 weeks, and the quiz trend ignored the scope
+   entirely. */
+localStorage.clear();
+store.migrate();
+for (let d = 150; d >= 1; d -= 3) {
+  store.saveSession({ isoDate: new Date(Date.now() - d * 86400000).toISOString(), dayKey: "monday",
+    completedFully: d % 9 !== 0, roundsDone: 3, xpVersion: store.XP_VERSION, durationSecs: 1400,
+    xpEarned: 360, mood: "okay", lightResult: d % 12 === 0 ? "red" : "green", plannedSecs: 1500,
+    formChecks: [{ clean: true }, { clean: d % 5 !== 0 }], clean: 2, wobbly: 0,
+    perExercise: Array.from({ length: 6 }, () => ({ skipped: false })) });
+}
+store.reconcileJourneyWithSessions();
+const gq = store.loadQuiz();
+gq.results = [{ t: Date.now() - 100 * 86400000, score: 5, total: 8 }, { t: Date.now() - 2 * 86400000, score: 7, total: 8 }];
+store.saveQuiz(gq);
+const gA = k => gvm.buildGrownupVM({ gsScope: k, grownupTab: "analytics", isWide: true }).analytics;
+const gWeek = gA("week"), gMonth = gA("month"), gAll = gA("all");
+ok(gAll.consistency.cells.length !== gMonth.consistency.cells.length, "the consistency grid differs between Month and All-time");
+ok(/per week/.test(gAll.consistency.subtitle), "all-time consistency is one cell per week, back to her first session");
+ok(gAll.loadTrend.length > gMonth.loadTrend.length && gAll.loadTrend.length > 8, "the load trend spans her history instead of capping at 8 weeks");
+ok(gMonth.quizTrend.length < gAll.quizTrend.length, "the quiz trend obeys the scope instead of always showing the last 6 runs");
+ok(gAll.indicators.length === 11 && gAll.indicators.every(i => i.total !== undefined && i.avg !== undefined),
+   "the indicator board reports every category as a total and an average");
+ok(gWeek.indicators[1].total !== gAll.indicators[1].total, "and its numbers move when the period changes");
+ok(gAll.isSheTrying.avg != null && gAll.isSheTrying.lines.length >= 2, "the 'Is she trying?' card has a score and its plain-English lines");
+ok(/Is she trying/.test(gscreen.grownupScreen(gvm.buildGrownupVM({ gsScope: "all", grownupTab: "analytics", isWide: true }))),
+   "and it renders on the Analytics tab");
+
+/* A try-it pain stop must reach Safety & Flags without touching training stats. */
+const beforeCompleted = gA("week").indicators[5].total;
+store.saveSession({ practice: true, dayKey: "monday", isoDate: new Date(Date.now() - 86400000).toISOString(),
+                    pain: true, sessionType: "try-it", completedFully: false, endedEarly: true, safetyOnly: true, durationSecs: 200 });
+ok(gA("week").hasStops === true, "a try-it pain stop shows up in Safety & Flags");
+ok(gA("week").indicators[5].total === beforeCompleted, "but never counts as a session she trained");
+localStorage.clear();
 
 /* --- Progress periods: totals AND averages, over a real window ------------
    The screen only ever showed "this week", so a month of work was invisible. */
