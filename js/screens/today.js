@@ -240,9 +240,15 @@ function dayPane(vm, wide) {
       <div style="display:flex;justify-content:center;padding-top:10px;">
         <button type="button" data-action="startMini" data-arg="${vm.selectedKey}" style="min-height:44px;background:rgba(255,255,255,0.18);border:none;border-radius:var(--radius-pill);padding:0 ${wide ? 20 : 18}px;color:#fff;font-size:${wide ? 14 : 13}px;font-weight:800;cursor:pointer;font-family:inherit;">Short on time? Do a 10-min mini ⚡</button>
       </div>` : ""}
-    ${dv.isActive ? `
-      <div style="display:flex;justify-content:flex-end;padding-top:${wide ? 8 : 6}px;">
-        <button type="button" data-action="togglePractice" style="background:none;border:none;color:rgba(255,255,255,0.65);font-size:12px;font-weight:800;text-decoration:underline;cursor:pointer;padding:2px 0;transition:color 0.15s ease;">${vm.practiceLinkLabel}</button>
+    ${dv.showTryIt ? `
+      <div style="padding-top:${wide ? 10 : 8}px;">
+        <button type="button" data-action="togglePractice" aria-pressed="${vm.practiceMode}" style="${vm.practiceBtnStyle}">
+          <span style="font-size:16px;">🧪</span>${vm.practiceLinkLabel}
+          <span style="display:inline-flex;align-items:center;width:32px;height:18px;border-radius:9px;padding:2px;flex-shrink:0;background:${vm.practiceMode ? "var(--aqua)" : "rgba(255,255,255,0.3)"};">
+            <span style="width:14px;height:14px;border-radius:50%;background:#fff;display:block;transform:translateX(${vm.practiceMode ? "14px" : "0"});transition:transform 0.15s;"></span>
+          </span>
+        </button>
+        <div style="text-align:center;font-size:12px;font-weight:700;opacity:0.8;padding-top:6px;">${vm.practiceHintLine}</div>
       </div>` : ""}
   </div>`;
 

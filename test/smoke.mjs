@@ -30,6 +30,7 @@ const rvm    = await import(base + "vm/readiness.js");
 const svm    = await import(base + "vm/session.js");
 const tvm    = await import(base + "vm/today.js");
 const sscreen = await import(base + "screens/session.js");
+const tscreen = await import(base + "screens/today.js");
 const rscreen = await import(base + "screens/readiness.js");
 const overlays = await import(base + "screens/overlays.js");
 
@@ -247,6 +248,63 @@ ok(store.xpForSession({ ...sess3(3), sessionType: "spa" }) === 0, "spa still ear
 /* --- defaults --- */
 ok(store.DEFAULT_SETTINGS.voiceStyle === "encouraging", "default voice is process-praise");
 ok(store.DEFAULT_SETTINGS.cloudMirror === true, "cloudMirror default on");
+
+/* --- try-it mode: a real control, one-shot, and pain still reports ---------
+   The mode's isolation was already right; its control and lifecycle were not.
+   It was a 12px underlined text link (~16px tall) on the "today" card only, it
+   never turned itself off, and it lived in memory so a reload silently flipped
+   it — recording a run meant as a test. */
+localStorage.clear();
+store.migrate();
+ok(store.tryItArmed() === false, "try-it starts disarmed");
+store.setTryIt(true);
+ok(store.tryItArmed() === true, "arming is persisted, so a reload can't disarm it");
+store.updateSettings({ tryItArmedAt: Date.now() - 3 * 60 * 60 * 1000 });
+ok(store.tryItArmed() === false, "an arm left unused for hours expires on its own");
+store.setTryIt(true);
+store.clearTryIt();
+ok(store.tryItArmed() === false, "and a finished run disarms it — one run, not forever");
+
+store.setTryIt(true);
+const launchDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+const tryItGaps = { noButton: [], noBadge: [], notAButton: [] };
+launchDays.forEach(d => {
+  const vm = tvm.buildTodayVM({ selectedDay: d, expanded: {}, practiceMode: true, isWide: true });
+  const dv = vm.dayView;
+  if (!(dv.isActive || dv.isDone || dv.isMissed || dv.isPreview)) return;   // nothing to launch
+  if (!dv.showTryIt) tryItGaps.noButton.push(d);
+  if (!dv.showTryBadge) tryItGaps.noBadge.push(d);
+  if (!/data-action="togglePractice"/.test(tscreen.todayWide(vm))) tryItGaps.notAButton.push(d);
+});
+ok(tryItGaps.noButton.length === 0, "the try-it control renders on every day a run can start from");
+ok(tryItGaps.noBadge.length === 0, "and the 🧪 badge does too, so a catch-up day can't run as a test silently");
+ok(tryItGaps.notAButton.length === 0, "it is a real button, not the old text link");
+const tryVM = tvm.buildTodayVM({ selectedDay: launchDays[0], expanded: {}, practiceMode: true, isWide: true });
+ok(/min-height:48px/.test(tryVM.practiceBtnStyle), "with a 48px tap target — the old link was ~16px");
+ok(/Try-It/.test(tryVM.dayView.ctaLabel) || tryVM.dayView.ctaAction === "goSessionPractice",
+   "and the start button itself says what it will launch");
+
+engine.sess.practice = true;
+ok(/TRY-IT RUN/.test(sscreen.sessionScreen(svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null }))),
+   "a band stands through the whole run, not just the finish screen");
+engine.sess.practice = false;
+ok(!/TRY-IT RUN/.test(sscreen.sessionScreen(svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null }))),
+   "and never appears on a real run");
+
+/* Pain is the one thing that escapes the sandbox: a stop she reported is real
+   whether or not the run counted, and it used to vanish before reaching the
+   grown-up. It carries no training credit with it. */
+localStorage.clear();
+store.migrate();
+store.saveSession({ app: "swimming", practice: true, dayKey: "monday", dayTitle: "Mon",
+                    isoDate: new Date().toISOString(), durationSecs: 300, sessionType: "try-it",
+                    pain: true, endedEarly: true, completedFully: false, safetyOnly: true });
+const painRow = store.loadSessions()[0];
+ok(painRow && painRow.pain === true, "a pain stop during try-it is recorded for Safety & Flags");
+ok(store.countsAsTrained(painRow) === false, "but it is not a trained day");
+ok(store.sessionXp(painRow) === 0, "and pays no XP");
+ok(store.rebuildJourneyXp() === 0, "so a rebuild still totals nothing");
+localStorage.clear();
 
 /* --- prize pool defaults avoid food / screen-time --- */
 const prizeText = data.PRIZE_POOL.map(p => p.label.toLowerCase()).join("|");

@@ -9,7 +9,7 @@
    ============================================================ */
 
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA, exWork, exRepsDetail } from "./data.js";
-import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, pendingDrawCount, xpForSession, athleteId, noteSessionXpAwarded, patchSession, sessionKey, XP_VERSION } from "./store.js";
+import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, pendingDrawCount, xpForSession, athleteId, noteSessionXpAwarded, patchSession, sessionKey, XP_VERSION, clearTryIt } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
 import { recoveryDoseSecs, refTime } from "./util.js";
@@ -609,6 +609,22 @@ export function finalize(completed) {
   sess.endedEarly = !completed;
 
   if (sess.practice) {
+    // Pain is the one thing that escapes the try-it sandbox. A stop she reported
+    // is real whether or not the run counted, and it used to vanish entirely —
+    // never reaching the grown-up's Safety & Flags. This writes a safety-only
+    // row: flagged practice, so countsAsTrained() and sessionXp() both ignore
+    // it, and no streak, XP or completion comes with it.
+    if (sess.painFlag) {
+      saveSession({
+        app: "swimming", athlete: athleteId(), practice: true,
+        dayKey: sess.dayKey, dayTitle: day.title || sess.dayKey,
+        isoDate: new Date().toISOString(), durationSecs: elapsedSecs,
+        sessionType: "try-it", pain: true, endedEarly: true, completedFully: false,
+        safetyOnly: true
+      });
+      logEvent("pain_stop_tryit", { day: sess.dayKey });
+    }
+    clearTryIt();                 // one run, then the mode disarms itself
     if (completed) speak("Practice run complete. Nothing recorded. You know the movements now.");
     playCue("done");
     setPhase("done");

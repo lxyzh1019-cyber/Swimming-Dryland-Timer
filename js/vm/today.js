@@ -315,7 +315,7 @@ export function buildTodayVM(state) {
       showChips: true, isActive: true, showCta: true, showSettings: true, ctaAction: "goSession"
     };
     dayView = practiceMode
-      ? { ...base, ctaLabel: "Start Try-It Run", ctaIcon: "🧪", showTryBadge: true }
+      ? { ...base, ctaLabel: "Start Try-It Run", ctaIcon: "🧪" }
       : { ...base, ctaLabel: isSpaDay ? "Start Recovery" : "Let's go!", ctaIcon: isSpaDay ? "🧘" : "▶️" };
     if (isSpaDay) { dayView.isRest = true; dayView.isActive = true;
       dayView.recoveryItems = (fullDay.recovery || []).slice(0, 3).map(r => ({ text: r.name + (r.dose ? " · " + r.dose : "") })); }
@@ -383,6 +383,24 @@ export function buildTodayVM(state) {
   }
 
   dayView.showBackToToday = selectedKey !== todayKey;
+
+  /* ---- try-it control ------------------------------------------------------
+     This used to be a bare underlined text link, ~16px tall, in the bottom-right
+     corner, and only on a "today" card. It read as fine print, the tap target
+     was a third of the app's own 44px minimum, and most day states didn't show
+     it at all. It is a real button now, in the start stack, on every card you
+     can launch a run from. */
+  const canLaunch = !!(dayView.isActive || dayView.isDone || dayView.isMissed || dayView.isPreview);
+  dayView.showTryIt = canLaunch;
+  // The badge belongs on every launchable card too: with try-it armed, "Finish
+  // remaining moves" runs as a test, and nothing on screen used to say so.
+  dayView.showTryBadge = canLaunch && practiceMode;
+  // ...and so does the button label, so what you're about to start is never
+  // ambiguous. goSessionPractice always runs as a test, armed or not.
+  if (canLaunch && practiceMode && dayView.ctaAction === "goSession") {
+    dayView.ctaLabel = "Start Try-It Run";
+    dayView.ctaIcon = "🧪";
+  }
   if (dayView.isActive && !dayView.ctaSubtext) dayView.ctaSubtext = (dayView.movesLabel || "") + " · about " + (dayView.mins || "?") + " min · that’s the whole thing — no surprises.";
   if (dayView.isActive && !practiceMode && !isSpaDay) {
     dayView.showMini = true;
@@ -396,7 +414,14 @@ export function buildTodayVM(state) {
 
   const coachIconBtnStyle = "width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;flex-shrink:0;font-size:15px;display:flex;align-items:center;justify-content:center;"
     + (settings.coachVoiceOn ? "background:#fff;color:var(--aqua-deep);" : "background:rgba(255,255,255,0.18);color:#fff;");
-  const practiceLinkLabel = practiceMode ? "Try-it mode is on — tap to turn off" : "Just practicing? Try-it mode";
+  const practiceLinkLabel = practiceMode ? "Try-it mode is ON" : "🧪 Try-it mode";
+  const practiceHintLine = practiceMode
+    ? "This run won't be saved. Turns itself off when the run ends."
+    : "Test a movement without it counting.";
+  const practiceBtnStyle = "width:100%;min-height:48px;display:flex;align-items:center;justify-content:center;gap:9px;border-radius:var(--radius-pill);cursor:pointer;font-family:inherit;font-weight:900;font-size:14px;padding:0 18px;"
+    + (practiceMode
+      ? "background:#fff;color:var(--aqua-deep);border:2px solid #fff;"
+      : "background:rgba(255,255,255,0.14);color:#fff;border:2px solid rgba(255,255,255,0.45);");
 
   // Echo-back: her own last "next time" promise, remembered on the day card.
   const lastSaid = sessions.slice().reverse().map(h => h.nextTime).find(Boolean);
@@ -420,7 +445,8 @@ export function buildTodayVM(state) {
   return {
     athleteName: settings.athleteName || "Jess",
     dateLine, statChips, journey, blocks, week, legend, dayView,
-    gearLabel, focusCue, coachIconBtnStyle, practiceLinkLabel, echoLine, weather,
+    gearLabel, focusCue, coachIconBtnStyle, practiceLinkLabel, practiceHintLine, practiceBtnStyle,
+    practiceMode, echoLine, weather,
     selectedKey, todayKey,
     railToday: railNav(state.nav === "today"),
     railProgress: railNav(state.nav === "progress"),

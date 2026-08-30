@@ -6,7 +6,7 @@
    delegated click listener below.
    ============================================================ */
 
-import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, noteSessionXpAwarded, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS } from "./store.js";
+import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, noteSessionXpAwarded, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS, tryItArmed, setTryIt } from "./store.js";
 import { edmontonDayKey, escapeHtml } from "./util.js";
 import { restoreFromCloud } from "./sync.js";
 import { downloadBackup, restoreBackupFile } from "./backup.js";
@@ -140,7 +140,13 @@ const actions = {
   selectDay(arg) { state.selectedDay = arg; state.expanded = {}; render(); },
   toggleBlock(arg) { state.expanded[arg] = !state.expanded[arg]; render(); },
   toggleCoachVoice() { updateSettings({ coachVoiceOn: !settings.coachVoiceOn }); render(); },
-  togglePractice() { state.practiceMode = !state.practiceMode; render(); },
+  togglePractice() {
+    // Backed by settings, not memory: a reload used to disarm it silently and
+    // record a run meant as a test.
+    setTryIt(!state.practiceMode);
+    state.practiceMode = tryItArmed();
+    render();
+  },
   goSession(arg) {
     state.readiness = newReadinessFlow(arg || state.selectedDay || edmontonDayKey(), state.practiceMode);
     render();
@@ -343,6 +349,9 @@ const actions = {
   resetPrizePool() { updateSettings({ prizePool: null }); render(); },
   exitSession() {
     engine.exitSession();
+    // The engine disarms try-it when a run finalizes; mirror that into the view
+    // state so the button and badges are right the moment we leave the session.
+    state.practiceMode = tryItArmed();
     state.inSession = false;
     state.pendingSession = null;
     state.detailOverlay = false;
@@ -423,6 +432,9 @@ function boot() {
     if (!state.inSession) render();
   });
   migrate();
+  // Try-it survives a reload now (it lives in settings), and expires on its own
+  // if it was armed hours ago and never used.
+  state.practiceMode = tryItArmed();
   if (!state.selectedDay) state.selectedDay = edmontonDayKey();
   render();
   fetchWeather();

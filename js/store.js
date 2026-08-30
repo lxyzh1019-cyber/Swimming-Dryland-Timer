@@ -167,8 +167,38 @@ export const DEFAULT_SETTINGS = {
   coachVoiceOn: true,       // NEW: design's 🎧 toggle gates ALL coach audio
   athleteName: "Jess",      // NEW: editable in Grown-up Settings
   prizePool: null,          // NEW: null = default PRIZE_POOL
-  cloudMirror: true         // NEW: privacy — mirror completed sessions to Firestore
+  cloudMirror: true,        // NEW: privacy — mirror completed sessions to Firestore
+  tryItArmed: false,        // NEW: try-it mode, armed for ONE run (see below)
+  tryItArmedAt: 0
 };
+
+/* ---- try-it mode ----------------------------------------------------------
+   A try-it run is for testing a movement and is deliberately never recorded.
+   The flag used to live only in memory, which failed in both directions: a
+   reload silently disarmed it (so a run meant as a demo was recorded for real),
+   and nothing ever cleared it (so one forgotten arm threw away every session
+   after it — she trains, finishes, and her streak doesn't move).
+
+   So it is persisted AND one-shot: armed here, cleared the moment a run ends,
+   and expired after two hours if it was armed and never used. */
+export const TRY_IT_EXPIRY_MS = 2 * 60 * 60 * 1000;
+
+export function tryItArmed() {
+  if (!settings.tryItArmed) return false;
+  const at = settings.tryItArmedAt || 0;
+  if (at && Date.now() - at > TRY_IT_EXPIRY_MS) { clearTryIt(); return false; }
+  return true;
+}
+export function setTryIt(on) {
+  updateSettings(on ? { tryItArmed: true, tryItArmedAt: Date.now() }
+                    : { tryItArmed: false, tryItArmedAt: 0 });
+  return !!on;
+}
+export function clearTryIt() {
+  if (!settings.tryItArmed && !settings.tryItArmedAt) return false;
+  updateSettings({ tryItArmed: false, tryItArmedAt: 0 });
+  return true;
+}
 
 export let settings = loadSettings();
 
@@ -638,6 +668,9 @@ export function saveJourney(j) { writeStorage(LS_JOURNEY, j); }
    finalize()) for records restored from the cloud or written before xpEarned
    existed. */
 export function sessionXp(entry) {
+  // Try-it rows exist only to carry a pain stop to the grown-up; they are not
+  // training and must never reach the XP total on a rebuild.
+  if (entry && entry.practice) return 0;
   if (Number.isFinite(entry && entry.xpEarned)) return Math.max(0, entry.xpEarned);
   const full = xpForSession(entry || {});
   return entry && entry.completedFully === false ? Math.round(full / 2) : full;

@@ -340,8 +340,19 @@ function tipsSafety(vm) {
   </div>`;
 }
 
+/* A try-it run is never recorded, and the only sign of that used to be a line
+   on the FINISH screen — so a whole workout could be completed before anyone
+   realised it was a test. This band stands across every session screen. */
+function tryItBand() {
+  return `
+    <div role="status" style="position:absolute;top:0;left:0;right:0;z-index:30;background:var(--grape,#7C5BC7);color:#fff;padding:8px 16px;display:flex;align-items:center;justify-content:center;gap:9px;font-family:var(--font-ui);font-weight:900;font-size:13px;letter-spacing:0.02em;">
+      <span style="font-size:15px;">🧪</span>TRY-IT RUN · nothing here will be saved
+    </div>`;
+}
+
 export function sessionScreen(vm) {
   const overlays = `
+    ${vm.practice ? tryItBand() : ""}
     ${vm.detailOverlay ? detailOverlayHtml(vm) : ""}
     ${vm.stopOverlay ? stopOverlay() : ""}`;
 
