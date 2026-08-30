@@ -170,6 +170,61 @@ store.mergeCloudJourney(staleSnap);
 ok(store.pendingDrawCount() === 0, "and a stale cloud copy cannot resurrect a spent draw");
 localStorage.clear();
 
+/* --- redeeming is one-way, with a 5-minute undo for a mis-tap ------------- */
+localStorage.clear();
+store.migrate();
+store.saveJourney({ xp: lvlXp(3), sessionXp: lvlXp(3), prizesWon: [], pendingDraws: 0 });
+store.addPrize({ icon: "🎁", label: "one" });
+const rid = store.loadJourney().prizesWon[0].id;
+const rprize = () => store.loadJourney().prizesWon.find(x => x.id === rid);
+store.redeemPrize(rid);
+ok(rprize().redeemed === true, "redeeming marks the prize used");
+store.redeemPrize(rid);
+ok(rprize().redeemed === false, "a second tap inside 5 minutes undoes the mis-tap");
+store.redeemPrize(rid);
+const agedJ = store.loadJourney();
+agedJ.prizesWon = agedJ.prizesWon.map(x => x.id === rid ? { ...x, redeemedAt: Date.now() - 6 * 60 * 1000 } : x);
+store.saveJourney(agedJ);
+store.redeemPrize(rid);
+ok(rprize().redeemed === true, "past the window it stays used — no toggling a prize back");
+const legacyJ = store.loadJourney();
+legacyJ.prizesWon = legacyJ.prizesWon.map(x => ({ ...x, redeemed: true, redeemedAt: undefined }));
+store.saveJourney(legacyJ);
+store.redeemPrize(rid);
+ok(rprize().redeemed === true, "a prize redeemed before this rule existed is locked");
+localStorage.clear();
+
+/* --- the wallet trims to the rule, and the trim survives the next sync ---- */
+const pz = (n, date, redeemed) => ({ id: "p" + n, label: "prize" + n, date, redeemed });
+const sixPrizes = () => [pz(6, "2026-06-06", false), pz(5, "2026-05-05", false), pz(4, "2026-04-04", false),
+                         pz(3, "2026-03-03", false), pz(2, "2026-02-02", true), pz(1, "2026-01-01", true)];
+localStorage.clear();
+store.migrate();
+store.saveJourney({ xp: lvlXp(4), sessionXp: lvlXp(4), maxLevelSeen: 4, pendingDraws: 0, prizesWon: sixPrizes() });
+const trimJ = store.loadJourney();
+store.reconcileWallet(trimJ);
+store.saveJourney(trimJ);
+const kept = store.loadJourney().prizesWon.map(x => x.id).sort();
+ok(kept.length === 3, "a level-4 wallet of 6 trims to the 3 she earned");
+ok(String(kept) === "p1,p2,p3", "keeping both already-used prizes and the oldest unused");
+ok(store.pendingDrawCount() === 0, "and the trimmed wallet owes no fresh draws");
+ok((store.lastWalletTrim() || {}).count === 3, "the trim is recorded for the grown-up note");
+store.mergeCloudJourney({ ...store.journeySnapshot(), prizesWon: sixPrizes(), voidedPrizeIds: [] });
+ok(store.loadJourney().prizesWon.length === 3, "a cloud copy still holding all 6 cannot undo the trim");
+
+/* A dip in XP — a thin session log, a partial sync — must never delete a prize
+   she really earned. The trim measures against the best level ever reached. */
+localStorage.clear();
+store.migrate();
+store.saveJourney({ xp: lvlXp(4), sessionXp: lvlXp(4), maxLevelSeen: 4, pendingDraws: 0,
+                    prizesWon: [pz(3, "2026-03-03", false), pz(2, "2026-02-02", false), pz(1, "2026-01-01", false)] });
+const dipJ = store.loadJourney();
+dipJ.xp = 0;
+store.reconcileWallet(dipJ);
+store.saveJourney(dipJ);
+ok(store.loadJourney().prizesWon.length === 3, "an XP dip voids nothing — the trim uses the high-water level");
+localStorage.clear();
+
 /* --- XP --- */
 ok(store.xpForSession({ perExercise: [1,2,3,4,5,6] }) === 100, "6 moves = 100 XP");
 ok(store.xpForSession({ sessionType: "spa" }) === 0, "spa earns no XP");
@@ -345,8 +400,13 @@ const todayKey = new Date().toLocaleString("en-US", { timeZone: "America/Edmonto
 store.saveSession({ isoDate: new Date().toISOString(), dayKey: todayKey, completedFully: true,
                     roundsDone: 3, xpVersion: store.XP_VERSION, perExercise: Array(18).fill(1) });
 const dayVM = tvm.buildTodayVM({ selectedDay: todayKey, expanded: {}, practiceMode: false, isWide: true });
-ok(/\+360 XP earned/.test(dayVM.dayView.earnedXpLabel || ""),
-   "a finished 3-round day says +360, the flat rate it actually banked");
+// Assert against the day the calendar actually lands on. Spa Sunday earns 0 by
+// design, so hard-coding "+360" made this test fail every Sunday and pass the
+// other six days — a flake that says nothing about the XP label.
+ok(data.DAYS[todayKey].spa
+   ? (dayVM.dayView.earnedXpLabel || "") === ""
+   : /\+360 XP earned/.test(dayVM.dayView.earnedXpLabel || ""),
+   "a finished 3-round day says +360 (and a spa day says nothing)");
 localStorage.clear();
 
 /* --- view-models + screens render to strings without throwing --- */

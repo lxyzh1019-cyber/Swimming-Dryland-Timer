@@ -6,7 +6,7 @@
    delegated click listener below.
    ============================================================ */
 
-import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, noteSessionXpAwarded, onStorageError, payQuizQuestion, quizQuestionKey } from "./store.js";
+import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, noteSessionXpAwarded, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS } from "./store.js";
 import { edmontonDayKey, escapeHtml } from "./util.js";
 import { restoreFromCloud } from "./sync.js";
 import { downloadBackup, restoreBackupFile } from "./backup.js";
@@ -47,6 +47,7 @@ export const state = {
 };
 
 const root = document.getElementById("app");
+let undoTimer = null;              // repaints the prize wallet when an undo window closes
 
 function computeIsWide() {
   return window.innerWidth >= 900 && window.innerWidth > window.innerHeight;
@@ -267,7 +268,15 @@ const actions = {
     state.prizeDraw = newPrizeDraw();
     render();
   },
-  redeemPrize(arg) { toggleRedeem(arg); render(); },
+  redeemPrize(arg) {
+    toggleRedeem(arg);
+    render();
+    // The undo window closes on a timer, not on a tap, so schedule the repaint
+    // that retires the button — otherwise it keeps offering an undo the store
+    // would refuse.
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(render, REDEEM_UNDO_MS + 1000);
+  },
   logScope(arg) { state.logScope = arg; render(); },
 
   /* ---- grown-up zone ---- */

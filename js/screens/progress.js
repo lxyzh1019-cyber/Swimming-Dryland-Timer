@@ -31,12 +31,19 @@ export function progressScreen(vm) {
         </div>
         <div style="flex:1;min-width:220px;background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-xl);padding:16px 18px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;">
           <div style="font-weight:900;font-size:12px;letter-spacing:0.05em;color:var(--sun-ink);text-transform:uppercase;">My prizes 🎁</div>
-          ${vm.hasPrizes ? vm.prizesWon.map(pz => `
-            <div style="${pz.cardStyle}">
-              <span style="font-size:22px;flex-shrink:0;">${pz.icon}</span>
-              <span style="flex:1;font-size:14px;font-weight:800;color:var(--ink);line-height:1.2;">${pz.label}</span>
-              <button type="button" data-action="redeemPrize" data-arg="${pz.id}" style="${pz.redeemBtnStyle}">${pz.redeemLabel}</button>
-            </div>`).join("")
+          ${vm.hasPrizes ? `
+          <div class="list-wrap" style="--fade-to:var(--sun-wash);">
+            <div data-list="1" style="max-height:260px;display:flex;flex-direction:column;gap:8px;padding-bottom:8px;">
+              ${vm.prizesWon.map(pz => `
+              <div style="${pz.cardStyle}">
+                <span style="font-size:22px;flex-shrink:0;">${pz.icon}</span>
+                <span style="flex:1;font-size:14px;font-weight:800;color:var(--ink);line-height:1.2;">${pz.label}</span>
+                ${pz.spent
+                  ? `<span style="${pz.redeemBtnStyle}display:inline-flex;align-items:center;">${pz.redeemLabel}</span>`
+                  : `<button type="button" data-action="redeemPrize" data-arg="${pz.id}" style="${pz.redeemBtnStyle}">${pz.redeemLabel}</button>`}
+              </div>`).join("")}
+            </div>
+          </div>`
           : `<div style="font-size:13px;font-weight:700;color:var(--sun-ink);line-height:1.4;">Level up to earn a prize! Pick a sealed envelope each time you rank up. 🌟</div>`}
         </div>
       </div>

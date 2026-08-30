@@ -739,8 +739,26 @@ export function drawsClaimed(j) {
 export function pendingDrawsFor(j) {
   return Math.max(0, drawsEarned(j) - drawsClaimed(j));
 }
+/* The best level she has ever reached. Only ever moves UP, and merges with
+   max() across devices, so it is the conservative floor for trimming: an XP
+   total that dips — a thin session log, a legacy re-pricing, a partial sync —
+   must never be grounds for deleting a prize she actually earned.
+
+   Granting stays strict (derived from the CURRENT level, above); only the trim
+   below consults this. Wrong-high here costs an untrimmed prize; wrong-low
+   costs her a real one, so the asymmetry decides the direction. */
+function notePeakLevel(j) {
+  const now = levelFromXp((j && j.xp) || 0).level;
+  j.maxLevelSeen = Math.max(j.maxLevelSeen || 1, now);
+  return j.maxLevelSeen;
+}
+export function drawsEverEarned(j) {
+  return Math.max(drawsEarned(j), (j && j.maxLevelSeen ? j.maxLevelSeen : 1) - 1);
+}
+
 /* Write the derived count onto the journey object (does not save). */
 function syncPendingDraws(j) {
+  notePeakLevel(j);
   j.pendingDraws = pendingDrawsFor(j);
   return j;
 }
@@ -770,14 +788,87 @@ export function addPrize(prize) {
   saveJourney(syncPendingDraws(j));
   return j;
 }
+/* Redeeming is ONE-WAY, with a short undo for a mis-tap. It used to be a plain
+   toggle, so tapping "✓ Used" a second time put the prize back in the pile and
+   one prize could be spent forever. The window is enforced here rather than in
+   the button, so a stale screen can't reopen a closed one. A prize redeemed
+   before this rule existed has no redeemedAt and counts as locked. */
+export const REDEEM_UNDO_MS = 5 * 60 * 1000;
+
+export function prizeUndoOpen(p, now = Date.now()) {
+  if (!p || !p.redeemed) return false;
+  return Number.isFinite(p.redeemedAt) && (now - p.redeemedAt) < REDEEM_UNDO_MS;
+}
+
 export function redeemPrize(id) {
   const j = loadJourney();
   if (!j) return null;
   // Compare as strings: ids are strings now, but wallets written by earlier
   // versions still hold the old numeric Date.now() ids.
-  j.prizesWon = (j.prizesWon || []).map(p => String(p.id) === String(id) ? { ...p, redeemed: !p.redeemed } : p);
+  j.prizesWon = (j.prizesWon || []).map(p => {
+    if (String(p.id) !== String(id)) return p;
+    if (!p.redeemed) return { ...p, redeemed: true, redeemedAt: Date.now() };
+    if (prizeUndoOpen(p)) { const { redeemedAt, ...rest } = p; return { ...rest, redeemed: false }; }
+    return p;                                   // window closed — stays used
+  });
   saveJourney(j);
   return j;
+}
+
+/* ---- wallet reconcile -----------------------------------------------------
+   Prizes handed out under the old double-granting logic leave the wallet
+   holding more than the rule allows. Trim it to what her level actually
+   earned: every prize she has already USED stays (you can't un-watch a movie
+   night), then the oldest unredeemed ones, and the newest unredeemed excess
+   comes off.
+
+   Voided ids are REMEMBERED, not merely dropped. The cloud merge unions
+   wallets by id, so a plain delete would be undone by the next sync from the
+   other device. The voided list travels in the snapshot and is unioned too, so
+   a trim on one device sticks everywhere.
+
+   Only call this once XP is authoritative (after the cloud merge), never
+   mid-boot against a stale total — see rebuildJourneyXp. */
+export function reconcileWallet(j) {
+  const wallet = j.prizesWon || [];
+  const earned = drawsEverEarned(j);          // high-water, never the current dip
+  if (wallet.length <= earned) return { journey: syncPendingDraws(j), removed: [] };
+
+  const oldestFirst = wallet.slice().sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+  const keep = new Set();
+  oldestFirst.forEach(p => { if (p.redeemed) keep.add(String(p.id)); });      // already spent in real life
+  for (const p of oldestFirst) {
+    if (keep.size >= earned) break;
+    keep.add(String(p.id));                                                   // then oldest first
+  }
+  const removed = wallet.filter(p => !keep.has(String(p.id)));
+  if (!removed.length) return { journey: syncPendingDraws(j), removed: [] };
+
+  j.prizesWon = wallet.filter(p => keep.has(String(p.id)));
+  j.voidedPrizeIds = [...new Set([...(j.voidedPrizeIds || []), ...removed.map(p => String(p.id))])];
+  j.walletTrim = { at: Date.now(), count: removed.length };
+  syncPendingDraws(j);
+  logEvent("prize_voided", { count: removed.length, labels: removed.map(p => p.label).join(", ") });
+  return { journey: j, removed };
+}
+
+/* The last trim, for the one-line note in the Grown-up zone. */
+export function lastWalletTrim() {
+  const j = loadJourney();
+  return (j && j.walletTrim) || null;
+}
+
+/* Union two wallets by id, dropping anything either side has voided. */
+function mergeWallets(a, b, voided) {
+  const dead = new Set((voided || []).map(String));
+  const out = new Map();
+  [...(a || []), ...(b || [])].forEach(p => {
+    if (!p || p.id == null) return;
+    const k = String(p.id);
+    if (dead.has(k) || out.has(k)) return;
+    out.set(k, p);
+  });
+  return [...out.values()].sort((x, y) => String(y.date || "").localeCompare(String(x.date || "")));
 }
 
 /* ============================================================
@@ -862,7 +953,11 @@ export function rebuildJourneyXp() {
   const fromQuiz = quizXpFromLedger();
   j.sessionXp = fromSessions;
   j.xp = fromSessions + fromQuiz;
-  saveJourney(syncPendingDraws(j));
+  // Safe to trim here and nowhere earlier: sync.js runs mergeCloudJourney (which
+  // restores the full wallet) BEFORE this, so the level and the wallet are both
+  // final. Trimming mid-boot would void real prizes against a stale total.
+  reconcileWallet(j);
+  saveJourney(j);
   return j.xp;
 }
 
@@ -877,6 +972,10 @@ export function journeySnapshot() {
   return {
     kind: "journey",
     prizesWon: j.prizesWon || [],
+    // Voided ids travel so a wallet trim on one device isn't undone by the
+    // other device's copy coming back through the union below.
+    voidedPrizeIds: j.voidedPrizeIds || [],
+    maxLevelSeen: j.maxLevelSeen || levelFromXp(j.xp || 0).level,
     pendingDraws: pendingDrawsFor(j),
     qLedger: q.qLedger || {},
     quizItems: q.items || {},
@@ -893,14 +992,14 @@ export function mergeCloudJourney(snap) {
   let changed = false;
 
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
-  const wallet = new Map();
-  [...(j.prizesWon || []), ...(snap.prizesWon || [])].forEach(p => {
-    if (p && p.id != null && !wallet.has(String(p.id))) wallet.set(String(p.id), p);
-  });
-  if (wallet.size !== (j.prizesWon || []).length) changed = true;
+  j.maxLevelSeen = Math.max(j.maxLevelSeen || 1, snap.maxLevelSeen || 1);
+  const voided = [...new Set([...(j.voidedPrizeIds || []), ...(snap.voidedPrizeIds || [])].map(String))];
+  if (voided.length !== (j.voidedPrizeIds || []).length) changed = true;
+  j.voidedPrizeIds = voided;
+  const merged = mergeWallets(j.prizesWon, snap.prizesWon, voided);
+  if (merged.length !== (j.prizesWon || []).length) changed = true;
   const before = j.pendingDraws || 0;
-  j.prizesWon = [...wallet.values()]
-    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+  j.prizesWon = merged;
   // Draws are derived, not merged: the unioned wallet already carries every
   // prize claimed on any device, so the count falls out of it.
   syncPendingDraws(j);
@@ -1012,21 +1111,22 @@ export function importProfileData(payload) {
   const inc = d[LS_JOURNEY];
   if (inc && typeof inc === "object") {
     const local = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
-    const wallet = new Map();
-    [...(local.prizesWon || []), ...(inc.prizesWon || [])].forEach(p => {
-      if (p && p.id != null && !wallet.has(String(p.id))) wallet.set(String(p.id), p);
-    });
+    const voided = [...new Set([...(local.voidedPrizeIds || []), ...(inc.voidedPrizeIds || [])].map(String))];
     // pendingDraws is derived from the merged result, never max()'d in — a
     // backup taken before a prize was claimed would otherwise hand it back.
-    saveJourney(syncPendingDraws({
+    const mergedJourney = {
       ...inc, ...local,
       xp: Math.max(local.xp || 0, inc.xp || 0),
       sessionXp: Math.max(
         Number.isFinite(local.sessionXp) ? local.sessionXp : 0,
         Number.isFinite(inc.sessionXp) ? inc.sessionXp : 0
       ),
-      prizesWon: [...wallet.values()].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
-    }));
+      voidedPrizeIds: voided,
+      maxLevelSeen: Math.max(local.maxLevelSeen || 1, inc.maxLevelSeen || 1),
+      prizesWon: mergeWallets(local.prizesWon, inc.prizesWon, voided)
+    };
+    reconcileWallet(mergedJourney);          // XP has merged upward by here
+    saveJourney(mergedJourney);
   }
 
   PROFILE_KEYS.forEach(k => {

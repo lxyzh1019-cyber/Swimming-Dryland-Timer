@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { LADDER, RANK_LORE, RANK_TEASE, fmtXp } from "../data.js";
-import { loadSessions, loadJourney, currentStreak, redeemPrize, countsAsTrained } from "../store.js";
+import { loadSessions, loadJourney, currentStreak, redeemPrize, countsAsTrained, prizeUndoOpen } from "../store.js";
 import { edmontonWeekISODates, edmontonISO } from "../util.js";
 import { buildJourney } from "./today.js";
 
@@ -121,12 +121,21 @@ export function buildProgressVM(state) {
   ];
 
   // Prize wallet
-  const prizesWon = (journeyStore.prizesWon || []).map(pz => ({
-    ...pz,
-    cardStyle: "display:flex;align-items:center;gap:10px;background:" + (pz.redeemed ? "var(--surface-2)" : "var(--surface)") + ";border:2px" + (pz.redeemed ? " dashed var(--hairline)" : " solid var(--sun)") + ";border-radius:16px;padding:10px 12px;" + (pz.redeemed ? "opacity:0.65;" : ""),
-    redeemLabel: pz.redeemed ? "✓ Used" : "Redeem",
-    redeemBtnStyle: "flex-shrink:0;min-height:32px;border-radius:var(--radius-pill);border:none;cursor:" + (pz.redeemed ? "default" : "pointer") + ";font-weight:900;font-size:12px;padding:0 12px;font-family:inherit;" + (pz.redeemed ? "background:transparent;color:var(--ink-faint);" : "background:var(--sun);color:var(--sun-ink);")
-  }));
+  // Redeeming is one-way; for five minutes after the tap it can still be undone,
+  // then the button retires to a plain "used" label that does nothing.
+  const prizesWon = (journeyStore.prizesWon || []).map(pz => {
+    const canUndo = prizeUndoOpen(pz);
+    const spent = pz.redeemed && !canUndo;
+    return {
+      ...pz, canUndo, spent,
+      cardStyle: "display:flex;align-items:center;gap:10px;background:" + (pz.redeemed ? "var(--surface-2)" : "var(--surface)") + ";border:2px" + (pz.redeemed ? " dashed var(--hairline)" : " solid var(--sun)") + ";border-radius:16px;padding:10px 12px;" + (pz.redeemed ? "opacity:0.65;" : ""),
+      redeemLabel: canUndo ? "✓ Used · undo" : pz.redeemed ? "✓ Used" : "Redeem",
+      redeemBtnStyle: "flex-shrink:0;min-height:32px;border-radius:var(--radius-pill);border:none;cursor:" + (spent ? "default" : "pointer") + ";font-weight:900;font-size:12px;padding:0 12px;font-family:inherit;"
+        + (canUndo ? "background:var(--surface);color:var(--ink-soft);border:1.5px solid var(--hairline);"
+          : pz.redeemed ? "background:transparent;color:var(--ink-faint);"
+          : "background:var(--sun);color:var(--sun-ink);")
+    };
+  });
 
   return {
     level, oceanStory, analyticsWeek, milestones,

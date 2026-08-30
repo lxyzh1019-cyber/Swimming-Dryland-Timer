@@ -6,7 +6,7 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl, fmtXp } from "../data.js";
-import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP } from "../store.js";
+import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim } from "../store.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
 
 const LIGHT_COLORS = { green: "var(--mint)", yellow: "var(--sun)", red: "var(--stop)", recovery: "var(--grape)" };
@@ -437,6 +437,14 @@ export function buildGrownupVM(state) {
     practiceHint: state.practiceMode ? "On — runs won't be saved or counted. Great for trying it out." : "Off — sessions count toward streaks & progress.",
     prizePool: activePrizePool(),
     isDefaultPool: !(Array.isArray(settings.prizePool) && settings.prizePool.length),
+    // A wallet trim removes prizes she can see, so it is never silent.
+    walletTrimNote: (() => {
+      const t = lastWalletTrim();
+      if (!t || !t.count) return "";
+      return "🎁 " + t.count + " extra prize" + (t.count === 1 ? "" : "s") + " removed on "
+        + new Date(t.at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Edmonton" })
+        + " — the wallet held more than her levels had earned. Prizes she'd already used were kept.";
+    })(),
 
     coaching: {
       gate, gateLabel: gate.unlocked ? "UNLOCKED — jumps allowed beyond Drop-and-Stick" : "LOCKED — all jumps stay at Drop-and-Stick",

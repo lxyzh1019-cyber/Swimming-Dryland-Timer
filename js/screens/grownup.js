@@ -451,14 +451,17 @@ function settingsTab(vm) {
     </div>
     <div>
       <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Prize pool 🎁 ${vm.isDefaultPool ? '<span style="color:var(--ink-faint);">(default)</span>' : ""}</div>
-      <div style="display:flex;flex-direction:column;gap:6px;">
-        ${vm.prizePool.map((p, i) => `
-          <div style="display:flex;align-items:center;gap:10px;background:var(--surface-2);border-radius:12px;padding:8px 12px;">
-            <span style="font-size:18px;">${p.icon}</span>
-            <span style="flex:1;font-size:14px;font-weight:700;color:var(--ink);">${escapeHtml(p.label)}</span>
-            <button type="button" data-action="removePrizePoolItem" data-arg="${i}" style="border:none;background:none;color:var(--ink-faint);font-weight:900;cursor:pointer;font-size:15px;" aria-label="Remove prize">✕</button>
-          </div>`).join("")}
+      <div class="list-wrap">
+        <div data-list="1" style="max-height:240px;display:flex;flex-direction:column;gap:6px;padding-bottom:8px;">
+          ${vm.prizePool.map((p, i) => `
+            <div style="display:flex;align-items:center;gap:10px;background:var(--surface-2);border-radius:12px;padding:8px 12px;">
+              <span style="font-size:18px;">${p.icon}</span>
+              <span style="flex:1;font-size:14px;font-weight:700;color:var(--ink);">${escapeHtml(p.label)}</span>
+              <button type="button" data-action="removePrizePoolItem" data-arg="${i}" style="border:none;background:none;color:var(--ink-faint);font-weight:900;cursor:pointer;font-size:15px;" aria-label="Remove prize">✕</button>
+            </div>`).join("")}
+        </div>
       </div>
+      ${vm.walletTrimNote ? `<div style="margin-top:8px;font-size:13px;font-weight:700;color:var(--ink-soft);background:var(--surface-2);border-radius:12px;padding:9px 12px;line-height:1.45;">${escapeHtml(vm.walletTrimNote)}</div>` : ""}
       <div style="display:flex;gap:8px;margin-top:8px;">
         <input type="text" placeholder="Add a prize… (e.g. 🎨 Craft afternoon)" data-input="newPrize" style="flex:1;padding:10px 13px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:14px;font-weight:700;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">
         <button type="button" data-action="addPrizePoolItem" style="min-height:44px;border:none;background:var(--sun);color:var(--sun-ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">Add</button>
