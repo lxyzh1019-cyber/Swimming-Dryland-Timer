@@ -1107,8 +1107,9 @@ export function saveFormChecks(fc) { writeStorage(LS_FORMCHECK, fc); }
 
 /* Record a verdict for one move in one month. A later verdict replaces an
    earlier one for the same move and month — you re-checked, that's the answer. */
-export function recordFormVerdict(move, pass, month = monthKeyOf()) {
+export function recordFormVerdict(move, pass, month) {
   if (!move) return null;
+  month = month || monthKeyOf();     // callers pass null for "the current month"
   const fc = loadFormChecks();
   const m = fc.months[month] || { moves: {} };
   m.moves[move] = { pass: !!pass, at: Date.now() };
@@ -1117,7 +1118,8 @@ export function recordFormVerdict(move, pass, month = monthKeyOf()) {
   logEvent("form_check", { move, pass: !!pass, month });
   return fc;
 }
-export function clearFormVerdict(move, month = monthKeyOf()) {
+export function clearFormVerdict(move, month) {
+  month = month || monthKeyOf();
   const fc = loadFormChecks();
   const m = fc.months[month];
   if (!m || !m.moves[move]) return false;
@@ -1125,8 +1127,8 @@ export function clearFormVerdict(move, month = monthKeyOf()) {
   saveFormChecks(fc);
   return true;
 }
-export function formVerdicts(month = monthKeyOf()) {
-  return ((loadFormChecks().months[month] || {}).moves) || {};
+export function formVerdicts(month) {
+  return ((loadFormChecks().months[month || monthKeyOf()] || {}).moves) || {};
 }
 /* Every verdict ever recorded, latest per move. */
 export function latestFormVerdicts() {
@@ -1254,4 +1256,6 @@ export function migrate() {
   // Establish the session-XP baseline BEFORE any cloud restore runs, so a
   // restore awards exactly the XP of the records it actually brings back.
   reconcileJourneyWithSessions();
+  const bootJourney = loadJourney();
+  if (bootJourney) { reconcileWallet(bootJourney); saveJourney(bootJourney); }
 }

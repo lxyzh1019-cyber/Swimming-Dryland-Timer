@@ -291,6 +291,21 @@ ok(/Form check/.test(gscreen.grownupScreen(gvm.buildGrownupVM(fcState))), "the F
 const fcXpBefore = store.loadJourney().xp;
 store.recordFormVerdict("Dead Bug", true);
 ok(store.loadJourney().xp === fcXpBefore, "recording a verdict never touches XP or prizes — it is a conversation tool, not a reward");
+/* The UI passes null for "the current month". A default parameter only fills in
+   for undefined, so null used to file the verdict under a "null" key where the
+   month view never found it. */
+store.recordFormVerdict("Superman", true, null);
+ok(store.formVerdicts(null).Superman && store.formVerdicts().Superman,
+   "a null month means the current month, not a month called 'null'");
+localStorage.clear();
+
+/* The trim used to run only inside rebuildJourneyXp, which only runs on a cloud
+   sync — so a grown-up who turned the mirror off for privacy never got it. */
+store.saveJourney({ xp: lvlXp(4), sessionXp: lvlXp(4), maxLevelSeen: 4, pendingDraws: 0, prizesWon: sixPrizes() });
+store.updateSettings({ cloudMirror: false });
+store.migrate();
+ok(store.loadJourney().prizesWon.length === 3, "the wallet trims at boot, even with the cloud mirror switched off");
+store.updateSettings({ cloudMirror: true });
 localStorage.clear();
 
 /* --- Grown-up: the period toggle now moves every panel --------------------
