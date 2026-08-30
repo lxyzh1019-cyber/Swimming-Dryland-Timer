@@ -30,6 +30,12 @@ const rvm    = await import(base + "vm/readiness.js");
 const svm    = await import(base + "vm/session.js");
 const tvm    = await import(base + "vm/today.js");
 const sscreen = await import(base + "screens/session.js");
+const tscreen = await import(base + "screens/today.js");
+const effort  = await import(base + "effort.js");
+const pvm     = await import(base + "vm/progress.js");
+const pscreen = await import(base + "screens/progress.js");
+const gvm     = await import(base + "vm/grownup.js");
+const gscreen = await import(base + "screens/grownup.js");
 const rscreen = await import(base + "screens/readiness.js");
 const overlays = await import(base + "screens/overlays.js");
 
@@ -170,6 +176,61 @@ store.mergeCloudJourney(staleSnap);
 ok(store.pendingDrawCount() === 0, "and a stale cloud copy cannot resurrect a spent draw");
 localStorage.clear();
 
+/* --- redeeming is one-way, with a 5-minute undo for a mis-tap ------------- */
+localStorage.clear();
+store.migrate();
+store.saveJourney({ xp: lvlXp(3), sessionXp: lvlXp(3), prizesWon: [], pendingDraws: 0 });
+store.addPrize({ icon: "🎁", label: "one" });
+const rid = store.loadJourney().prizesWon[0].id;
+const rprize = () => store.loadJourney().prizesWon.find(x => x.id === rid);
+store.redeemPrize(rid);
+ok(rprize().redeemed === true, "redeeming marks the prize used");
+store.redeemPrize(rid);
+ok(rprize().redeemed === false, "a second tap inside 5 minutes undoes the mis-tap");
+store.redeemPrize(rid);
+const agedJ = store.loadJourney();
+agedJ.prizesWon = agedJ.prizesWon.map(x => x.id === rid ? { ...x, redeemedAt: Date.now() - 6 * 60 * 1000 } : x);
+store.saveJourney(agedJ);
+store.redeemPrize(rid);
+ok(rprize().redeemed === true, "past the window it stays used — no toggling a prize back");
+const legacyJ = store.loadJourney();
+legacyJ.prizesWon = legacyJ.prizesWon.map(x => ({ ...x, redeemed: true, redeemedAt: undefined }));
+store.saveJourney(legacyJ);
+store.redeemPrize(rid);
+ok(rprize().redeemed === true, "a prize redeemed before this rule existed is locked");
+localStorage.clear();
+
+/* --- the wallet trims to the rule, and the trim survives the next sync ---- */
+const pz = (n, date, redeemed) => ({ id: "p" + n, label: "prize" + n, date, redeemed });
+const sixPrizes = () => [pz(6, "2026-06-06", false), pz(5, "2026-05-05", false), pz(4, "2026-04-04", false),
+                         pz(3, "2026-03-03", false), pz(2, "2026-02-02", true), pz(1, "2026-01-01", true)];
+localStorage.clear();
+store.migrate();
+store.saveJourney({ xp: lvlXp(4), sessionXp: lvlXp(4), maxLevelSeen: 4, pendingDraws: 0, prizesWon: sixPrizes() });
+const trimJ = store.loadJourney();
+store.reconcileWallet(trimJ);
+store.saveJourney(trimJ);
+const kept = store.loadJourney().prizesWon.map(x => x.id).sort();
+ok(kept.length === 3, "a level-4 wallet of 6 trims to the 3 she earned");
+ok(String(kept) === "p1,p2,p3", "keeping both already-used prizes and the oldest unused");
+ok(store.pendingDrawCount() === 0, "and the trimmed wallet owes no fresh draws");
+ok((store.lastWalletTrim() || {}).count === 3, "the trim is recorded for the grown-up note");
+store.mergeCloudJourney({ ...store.journeySnapshot(), prizesWon: sixPrizes(), voidedPrizeIds: [] });
+ok(store.loadJourney().prizesWon.length === 3, "a cloud copy still holding all 6 cannot undo the trim");
+
+/* A dip in XP — a thin session log, a partial sync — must never delete a prize
+   she really earned. The trim measures against the best level ever reached. */
+localStorage.clear();
+store.migrate();
+store.saveJourney({ xp: lvlXp(4), sessionXp: lvlXp(4), maxLevelSeen: 4, pendingDraws: 0,
+                    prizesWon: [pz(3, "2026-03-03", false), pz(2, "2026-02-02", false), pz(1, "2026-01-01", false)] });
+const dipJ = store.loadJourney();
+dipJ.xp = 0;
+store.reconcileWallet(dipJ);
+store.saveJourney(dipJ);
+ok(store.loadJourney().prizesWon.length === 3, "an XP dip voids nothing — the trim uses the high-water level");
+localStorage.clear();
+
 /* --- XP --- */
 ok(store.xpForSession({ perExercise: [1,2,3,4,5,6] }) === 100, "6 moves = 100 XP");
 ok(store.xpForSession({ sessionType: "spa" }) === 0, "spa earns no XP");
@@ -192,6 +253,223 @@ ok(store.xpForSession({ ...sess3(3), sessionType: "spa" }) === 0, "spa still ear
 /* --- defaults --- */
 ok(store.DEFAULT_SETTINGS.voiceStyle === "encouraging", "default voice is process-praise");
 ok(store.DEFAULT_SETTINGS.cloudMirror === true, "cloudMirror default on");
+
+/* --- parent form check: the ground truth under every quality number -------
+   Clean %, quiz mastery and the safety gate are all built on the kid's own
+   word, so the app can be confidently wrong about her technique. */
+localStorage.clear();
+store.migrate();
+for (let d = 40; d >= 1; d -= 2) {
+  store.saveSession({ isoDate: new Date(Date.now() - d * 86400000).toISOString(), dayKey: "monday",
+    completedFully: true, roundsDone: 3, xpVersion: store.XP_VERSION, durationSecs: 1400, xpEarned: 360,
+    plannedSecs: 1500, clean: 2, wobbly: 0,
+    formChecks: [{ name: "Glute Bridge March", clean: true }, { name: "Dead Bug", clean: true }],
+    perExercise: [{ name: "Glute Bridge March", skipped: false }, { name: "Dead Bug", skipped: false }, { name: "Superman", skipped: false }] });
+}
+const fcState = { grownupTab: "formcheck", gsScope: "month", isWide: true };
+let fc = gvm.buildGrownupVM(fcState).formCheck;
+ok(fc.queue.length === 5, "five moves a month are queued, not all forty");
+ok(fc.queue.every(c => c.watch), "each carries the written watch-for criteria the app already ships");
+ok(fc.queue.every(c => c.why), "and says why it was picked");
+ok(fc.selfPct === 100 && fc.verifiedPct === null, "she reports 100% clean and nothing is verified yet");
+store.recordFormVerdict("Glute Bridge March", false);
+fc = gvm.buildGrownupVM(fcState).formCheck;
+ok(fc.verifiedPct === 0 && fc.gap === -100, "a failed check surfaces the gap between what she claims and what you saw");
+ok(fc.flagged.includes("Glute Bridge March"), "and flags the move for re-teaching");
+const fcCircuits = [{ block: "main", exercises: [{ name: "Glute Bridge March" }, { name: "Dead Bug" }, { name: "Superman" }, { name: "Pallof Press" }, { name: "Hollow Tuck Flutter" }] }];
+let fcFront = 0;
+for (let i = 0; i < 200; i++) if (engine.pickSpotChecks(fcCircuits).includes("Glute Bridge March")) fcFront++;
+ok(fcFront === 200, "a failed move goes to the front of the next runs' random spot-checks");
+store.recordFormVerdict("Glute Bridge March", true);
+fc = gvm.buildGrownupVM(fcState).formCheck;
+ok(fc.verifiedPct === 100 && fc.flagged.length === 0, "re-verifying it clears the flag");
+const fcInd = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics", isWide: true })
+  .analytics.indicators.find(i => i.label === "Form · you verified");
+ok(fcInd.total === "1 of 1", "the indicator board reports verified form beside self-reported form");
+ok(fc.prevMonth < fc.month && fc.nextMonth > fc.month, "the month stepper moves in both directions");
+ok(/Form check/.test(gscreen.grownupScreen(gvm.buildGrownupVM(fcState))), "the Form Check tab renders");
+const fcXpBefore = store.loadJourney().xp;
+store.recordFormVerdict("Dead Bug", true);
+ok(store.loadJourney().xp === fcXpBefore, "recording a verdict never touches XP or prizes — it is a conversation tool, not a reward");
+/* The UI passes null for "the current month". A default parameter only fills in
+   for undefined, so null used to file the verdict under a "null" key where the
+   month view never found it. */
+store.recordFormVerdict("Superman", true, null);
+ok(store.formVerdicts(null).Superman && store.formVerdicts().Superman,
+   "a null month means the current month, not a month called 'null'");
+localStorage.clear();
+
+/* The trim used to run only inside rebuildJourneyXp, which only runs on a cloud
+   sync — so a grown-up who turned the mirror off for privacy never got it. */
+store.saveJourney({ xp: lvlXp(4), sessionXp: lvlXp(4), maxLevelSeen: 4, pendingDraws: 0, prizesWon: sixPrizes() });
+store.updateSettings({ cloudMirror: false });
+store.migrate();
+ok(store.loadJourney().prizesWon.length === 3, "the wallet trims at boot, even with the cloud mirror switched off");
+store.updateSettings({ cloudMirror: true });
+localStorage.clear();
+
+/* --- Grown-up: the period toggle now moves every panel --------------------
+   All-time used to look like Month: the consistency grid was hardcoded to 28
+   days, the load trend capped at 8 weeks, and the quiz trend ignored the scope
+   entirely. */
+localStorage.clear();
+store.migrate();
+for (let d = 150; d >= 1; d -= 3) {
+  store.saveSession({ isoDate: new Date(Date.now() - d * 86400000).toISOString(), dayKey: "monday",
+    completedFully: d % 9 !== 0, roundsDone: 3, xpVersion: store.XP_VERSION, durationSecs: 1400,
+    xpEarned: 360, mood: "okay", lightResult: d % 12 === 0 ? "red" : "green", plannedSecs: 1500,
+    formChecks: [{ clean: true }, { clean: d % 5 !== 0 }], clean: 2, wobbly: 0,
+    perExercise: Array.from({ length: 6 }, () => ({ skipped: false })) });
+}
+store.reconcileJourneyWithSessions();
+const gq = store.loadQuiz();
+gq.results = [{ t: Date.now() - 100 * 86400000, score: 5, total: 8 }, { t: Date.now() - 2 * 86400000, score: 7, total: 8 }];
+store.saveQuiz(gq);
+const gA = k => gvm.buildGrownupVM({ gsScope: k, grownupTab: "analytics", isWide: true }).analytics;
+const gWeek = gA("week"), gMonth = gA("month"), gAll = gA("all");
+ok(gAll.consistency.cells.length !== gMonth.consistency.cells.length, "the consistency grid differs between Month and All-time");
+ok(/per week/.test(gAll.consistency.subtitle), "all-time consistency is one cell per week, back to her first session");
+ok(gAll.loadTrend.length > gMonth.loadTrend.length && gAll.loadTrend.length > 8, "the load trend spans her history instead of capping at 8 weeks");
+ok(gMonth.quizTrend.length < gAll.quizTrend.length, "the quiz trend obeys the scope instead of always showing the last 6 runs");
+ok(gAll.indicators.length === 11 && gAll.indicators.every(i => i.total !== undefined && i.avg !== undefined),
+   "the indicator board reports every category as a total and an average");
+ok(gWeek.indicators[1].total !== gAll.indicators[1].total, "and its numbers move when the period changes");
+ok(gAll.isSheTrying.avg != null && gAll.isSheTrying.lines.length >= 2, "the 'Is she trying?' card has a score and its plain-English lines");
+ok(/Is she trying/.test(gscreen.grownupScreen(gvm.buildGrownupVM({ gsScope: "all", grownupTab: "analytics", isWide: true }))),
+   "and it renders on the Analytics tab");
+
+/* A try-it pain stop must reach Safety & Flags without touching training stats. */
+const beforeCompleted = gA("week").indicators[5].total;
+store.saveSession({ practice: true, dayKey: "monday", isoDate: new Date(Date.now() - 86400000).toISOString(),
+                    pain: true, sessionType: "try-it", completedFully: false, endedEarly: true, safetyOnly: true, durationSecs: 200 });
+ok(gA("week").hasStops === true, "a try-it pain stop shows up in Safety & Flags");
+ok(gA("week").indicators[5].total === beforeCompleted, "but never counts as a session she trained");
+localStorage.clear();
+
+/* --- Progress periods: totals AND averages, over a real window ------------
+   The screen only ever showed "this week", so a month of work was invisible. */
+localStorage.clear();
+store.migrate();
+const pIso = n => new Date(Date.now() - n * 86400000).toISOString();
+[2, 10, 25, 80].forEach((d, i) => store.saveSession({
+  isoDate: pIso(d), dayKey: "monday", completedFully: true, roundsDone: 3, xpVersion: store.XP_VERSION,
+  durationSecs: 1500, xpEarned: 360, mood: i ? "okay" : "great", lightResult: i === 1 ? "red" : "green",
+  formChecks: [{ clean: true }, { clean: i !== 2 }], clean: 2, wobbly: 0,
+  perExercise: Array.from({ length: 6 }, () => ({ skipped: false })) }));
+store.reconcileJourneyWithSessions();
+["4w", "month", "quarter"].forEach(k => {
+  const ps = pvm.buildProgressVM({ progressScope: k, logScope: "week" }).periodStats;
+  ok(ps.rows.length === 9, k + ": nine categories");
+  ok(ps.rows.every(r => r.total !== undefined && r.avg !== undefined), k + ": every category carries a total AND an average");
+  ok(ps.xpByDay.length > 0, k + ": the XP-per-day strip has a bar per day");
+});
+const p4w = pvm.buildProgressVM({ progressScope: "4w", logScope: "week" }).periodStats;
+const pRow = l => p4w.rows.find(r => r.label === l);
+ok(pRow("Sessions finished").total === "3", "the 4-week window excludes the 80-day-old session");
+ok(pRow("Completion status").total.includes(" of "), "completion status reads done-of-started");
+ok(pRow("Levels upgraded").total.startsWith("+"), "levels upgraded is reported for the window");
+ok(pRow("Tough days finished").total === "1", "a red-light day she finished counts as a tough day");
+ok(/progressScope/.test(pscreen.progressScreen(pvm.buildProgressVM({ progressScope: "month", logScope: "week" }))),
+   "the period toggle renders on the Progress screen");
+localStorage.clear();
+store.migrate();
+ok(pvm.buildProgressVM({ progressScope: "4w", logScope: "week" }).periodStats.hasData === false,
+   "an empty window says so rather than showing a wall of zeros");
+localStorage.clear();
+
+/* --- effort: scored on what she controls, normalised to the day -----------
+   Volume metrics reward an easy day. Effort has to reward the opposite: doing
+   the day's own target properly, especially on a day she felt bad. */
+const eSess = o => ({ perExercise: Array.from({ length: 6 }, (_, i) => ({ name: "m" + i, skipped: false })),
+                      completedFully: true, lightResult: "green", plannedSecs: 1200, durationSecs: 1200,
+                      formChecks: [{ clean: true }, { clean: true }, { clean: true }], ...o });
+const ePain = effort.sessionEffort(eSess({ pain: true, completedFully: false }));
+ok(ePain.counted === false && ePain.painStop === true, "a pain stop is excluded from effort, never penalised");
+ok(/right call/i.test(ePain.band), "and reads as the right call — the stop rule must never cost her");
+const eGreen = effort.sessionEffort(eSess({}));
+ok(effort.sessionEffort(eSess({ lightResult: "red" })).score > eGreen.score,
+   "a red-light day outscores the same work on a green one — showing up when it's hard is the point");
+ok(effort.sessionEffort(eSess({ formChecks: [{ clean: false }, { clean: false }, { clean: false }] })).score < eGreen.score,
+   "wobbly spot-checks cost form points");
+ok(effort.sessionEffort(eSess({ perExercise: [{ skipped: true }, { skipped: true }, { skipped: false }, { skipped: false }, { skipped: false }, { skipped: false }] })).score < eGreen.score,
+   "skipping moves costs effort");
+ok(effort.sessionEffort(eSess({ durationSecs: 400 })).score < eGreen.score, "rushing the clock costs effort");
+ok(effort.sessionEffort(eSess({ durationSecs: 2400 })).score === eGreen.score, "but running long is never penalised");
+const eSum = effort.effortSummary([eSess({}), eSess({ lightResult: "red" }), eSess({ pain: true })]);
+ok(eSum.sessions === 2 && eSum.painStops === 1, "pain stops are reported but kept out of the average");
+ok(eSum.toughDays === 1 && eSum.toughFinished === 1, "tough days shown up for are counted");
+ok(eSum.formPct === 100, "form % comes from the spot-checks, not a guess");
+
+/* The spot-check picker: 2–3 moves, main/prep only, different every run. */
+const spotCircuits = [{ block: "warmup", exercises: [{ name: "w1" }, { name: "w2" }] },
+                      { block: "main", exercises: [{ name: "a" }, { name: "b" }, { name: "c" }, { name: "d" }, { name: "e" }] },
+                      { block: "prep", exercises: [{ name: "p1" }] }];
+const spotSizes = new Set(); const spotSeen = new Set(); let spotWarmup = false;
+for (let i = 0; i < 300; i++) {
+  const pick = engine.pickSpotChecks(spotCircuits);
+  spotSizes.add(pick.length);
+  pick.forEach(n => { spotSeen.add(n); if (n[0] === "w") spotWarmup = true; });
+}
+ok([...spotSizes].every(n => n >= 2 && n <= 3), "the app watches 2–3 moves a run, not all twelve");
+ok(!spotWarmup, "and never a warm-up move — main and prep only");
+ok(spotSeen.size === 6, "the picks vary run to run, so she can't know which move is watched");
+
+/* --- try-it mode: a real control, one-shot, and pain still reports ---------
+   The mode's isolation was already right; its control and lifecycle were not.
+   It was a 12px underlined text link (~16px tall) on the "today" card only, it
+   never turned itself off, and it lived in memory so a reload silently flipped
+   it — recording a run meant as a test. */
+localStorage.clear();
+store.migrate();
+ok(store.tryItArmed() === false, "try-it starts disarmed");
+store.setTryIt(true);
+ok(store.tryItArmed() === true, "arming is persisted, so a reload can't disarm it");
+store.updateSettings({ tryItArmedAt: Date.now() - 3 * 60 * 60 * 1000 });
+ok(store.tryItArmed() === false, "an arm left unused for hours expires on its own");
+store.setTryIt(true);
+store.clearTryIt();
+ok(store.tryItArmed() === false, "and a finished run disarms it — one run, not forever");
+
+store.setTryIt(true);
+const launchDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+const tryItGaps = { noButton: [], noBadge: [], notAButton: [] };
+launchDays.forEach(d => {
+  const vm = tvm.buildTodayVM({ selectedDay: d, expanded: {}, practiceMode: true, isWide: true });
+  const dv = vm.dayView;
+  if (!(dv.isActive || dv.isDone || dv.isMissed || dv.isPreview)) return;   // nothing to launch
+  if (!dv.showTryIt) tryItGaps.noButton.push(d);
+  if (!dv.showTryBadge) tryItGaps.noBadge.push(d);
+  if (!/data-action="togglePractice"/.test(tscreen.todayWide(vm))) tryItGaps.notAButton.push(d);
+});
+ok(tryItGaps.noButton.length === 0, "the try-it control renders on every day a run can start from");
+ok(tryItGaps.noBadge.length === 0, "and the 🧪 badge does too, so a catch-up day can't run as a test silently");
+ok(tryItGaps.notAButton.length === 0, "it is a real button, not the old text link");
+const tryVM = tvm.buildTodayVM({ selectedDay: launchDays[0], expanded: {}, practiceMode: true, isWide: true });
+ok(/min-height:48px/.test(tryVM.practiceBtnStyle), "with a 48px tap target — the old link was ~16px");
+ok(/Try-It/.test(tryVM.dayView.ctaLabel) || tryVM.dayView.ctaAction === "goSessionPractice",
+   "and the start button itself says what it will launch");
+
+engine.sess.practice = true;
+ok(/TRY-IT RUN/.test(sscreen.sessionScreen(svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null }))),
+   "a band stands through the whole run, not just the finish screen");
+engine.sess.practice = false;
+ok(!/TRY-IT RUN/.test(sscreen.sessionScreen(svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null }))),
+   "and never appears on a real run");
+
+/* Pain is the one thing that escapes the sandbox: a stop she reported is real
+   whether or not the run counted, and it used to vanish before reaching the
+   grown-up. It carries no training credit with it. */
+localStorage.clear();
+store.migrate();
+store.saveSession({ app: "swimming", practice: true, dayKey: "monday", dayTitle: "Mon",
+                    isoDate: new Date().toISOString(), durationSecs: 300, sessionType: "try-it",
+                    pain: true, endedEarly: true, completedFully: false, safetyOnly: true });
+const painRow = store.loadSessions()[0];
+ok(painRow && painRow.pain === true, "a pain stop during try-it is recorded for Safety & Flags");
+ok(store.countsAsTrained(painRow) === false, "but it is not a trained day");
+ok(store.sessionXp(painRow) === 0, "and pays no XP");
+ok(store.rebuildJourneyXp() === 0, "so a rebuild still totals nothing");
+localStorage.clear();
 
 /* --- prize pool defaults avoid food / screen-time --- */
 const prizeText = data.PRIZE_POOL.map(p => p.label.toLowerCase()).join("|");
@@ -345,8 +623,13 @@ const todayKey = new Date().toLocaleString("en-US", { timeZone: "America/Edmonto
 store.saveSession({ isoDate: new Date().toISOString(), dayKey: todayKey, completedFully: true,
                     roundsDone: 3, xpVersion: store.XP_VERSION, perExercise: Array(18).fill(1) });
 const dayVM = tvm.buildTodayVM({ selectedDay: todayKey, expanded: {}, practiceMode: false, isWide: true });
-ok(/\+360 XP earned/.test(dayVM.dayView.earnedXpLabel || ""),
-   "a finished 3-round day says +360, the flat rate it actually banked");
+// Assert against the day the calendar actually lands on. Spa Sunday earns 0 by
+// design, so hard-coding "+360" made this test fail every Sunday and pass the
+// other six days — a flake that says nothing about the XP label.
+ok(data.DAYS[todayKey].spa
+   ? (dayVM.dayView.earnedXpLabel || "") === ""
+   : /\+360 XP earned/.test(dayVM.dayView.earnedXpLabel || ""),
+   "a finished 3-round day says +360 (and a spa day says nothing)");
 localStorage.clear();
 
 /* --- view-models + screens render to strings without throwing --- */

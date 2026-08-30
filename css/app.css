@@ -23,6 +23,12 @@ img { max-width: 100%; }
 [data-rail]::-webkit-scrollbar-track { background: transparent; margin: 0 8px; }
 [data-rail]::-webkit-scrollbar-thumb { background: rgba(6,182,212,0.28); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
 [data-rail]:hover::-webkit-scrollbar-thumb { background: rgba(6,182,212,0.45); background-clip: padding-box; }
+/* Vertical sibling of .rail-wrap: a list that scrolls inside a fixed height so
+   whatever sits below it stays reachable however long the list grows. */
+.list-wrap { position: relative; }
+.list-wrap > [data-list] { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.list-wrap::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 26px; pointer-events: none; background: linear-gradient(to bottom, transparent, var(--fade-to, var(--surface))); border-radius: 0 0 14px 14px; }
+
 .rail-wrap { position: relative; }
 .rail-wrap::after { content: ""; position: absolute; top: 0; right: 0; bottom: 10px; width: 44px; pointer-events: none; background: linear-gradient(to right, transparent, var(--surface)); border-radius: 0 var(--radius-xl) var(--radius-xl) 0; }
 

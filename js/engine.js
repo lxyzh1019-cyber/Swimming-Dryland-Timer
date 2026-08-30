@@ -9,7 +9,7 @@
    ============================================================ */
 
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA, exWork, exRepsDetail } from "./data.js";
-import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, pendingDrawCount, xpForSession, athleteId, noteSessionXpAwarded, patchSession, sessionKey, XP_VERSION } from "./store.js";
+import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, pendingDrawCount, xpForSession, athleteId, noteSessionXpAwarded, patchSession, sessionKey, XP_VERSION, clearTryIt, flaggedMoves } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
 import { recoveryDoseSecs, refTime } from "./util.js";
@@ -37,6 +37,7 @@ function blankSession() {
     upNextName: "", upNextDose: "", restCue: "",
     stopOverlay: false, confirmEnd: false, painFlag: false,
     pendingCleanCheck: false, cleanCount: 0, wobblyCount: 0, lastWobbly: false,
+    spotChecks: [], spotAsked: {}, cleanCheckMove: null, formChecks: [],
     intentWord: null, microLoop: null,
     exStatus: {},                // "ci-ei" -> done|skipped
     roundsCompleted: 0, sideLabel: "",
@@ -82,6 +83,39 @@ export function assembleCircuits(dayKey, light, opts = {}) {
     }
   });
   return circuits;
+}
+
+/* ---- form spot-checks -----------------------------------------------------
+   The clean/wobbly self-check used to fire after EVERY main and prep exercise —
+   a dozen taps a session. Tap fatigue makes the answers meaningless, and those
+   answers are the app's only read on technique.
+
+   So the app picks 2–3 moves at random at the start of the run and asks about
+   those alone. She doesn't know which are watched, so the only way to score
+   well is to do every move properly — and each prompt now gets a considered
+   answer instead of a reflex tap. */
+export const SPOT_CHECK_MIN = 2;
+export const SPOT_CHECK_MAX = 3;
+
+export function pickSpotChecks(circuits, rnd = Math.random, flagged = null) {
+  const names = [];
+  (circuits || []).forEach(c => {
+    if (c.block !== "main" && c.block !== "prep") return;
+    (c.exercises || []).forEach(ex => { if (ex && ex.name && !names.includes(ex.name)) names.push(ex.name); });
+  });
+  if (!names.length) return [];
+  const shuffle = arr => {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  };
+  // A move a grown-up verified as FAILING goes to the front of the queue: it is
+  // the one the app most needs a fresh read on, and re-teaching it is the point.
+  const flags = flagged || flaggedMoves();
+  const priority = shuffle(names.filter(n => flags.includes(n)));
+  const rest = shuffle(names.filter(n => !flags.includes(n)));
+  const want = SPOT_CHECK_MIN + Math.floor(rnd() * (SPOT_CHECK_MAX - SPOT_CHECK_MIN + 1));
+  return [...priority, ...rest].slice(0, Math.min(want, names.length));
 }
 
 /* Estimated session length in seconds (rep-based ≈ secondsPerRep × reps). */
@@ -398,6 +432,7 @@ export async function startSession({ dayKey, light = "green", practice = false, 
   sess.circuits = assembleCircuits(dayKey, sess.light, { mini, skip: sess.spa ? [] : skipBlocks });
   if (!sess.circuits.length) { sess.running = false; return; }
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
+  sess.spotChecks = pickSpotChecks(sess.circuits);
 
   if (!practice) logEvent("session_start", { day: dayKey, light: sess.light });
 
@@ -500,8 +535,12 @@ export async function startSession({ dayKey, light = "green", practice = false, 
             skipped: !!wasSkipped
           });
         }
-        // Design's clean/wobbly self-check after main-block work, answered during rest.
-        if ((circuit.block === "main" || circuit.block === "prep") && !wasSkipped) {
+        // Self-check only the moves this run is watching (see pickSpotChecks),
+        // and only the first time each one comes round — main runs 2–3 rounds.
+        if ((circuit.block === "main" || circuit.block === "prep") && !wasSkipped
+            && sess.spotChecks.includes(ex.name) && !sess.spotAsked[ex.name]) {
+          sess.spotAsked[ex.name] = true;
+          sess.cleanCheckMove = ex.name;
           sess.pendingCleanCheck = true;
         }
 
@@ -609,6 +648,22 @@ export function finalize(completed) {
   sess.endedEarly = !completed;
 
   if (sess.practice) {
+    // Pain is the one thing that escapes the try-it sandbox. A stop she reported
+    // is real whether or not the run counted, and it used to vanish entirely —
+    // never reaching the grown-up's Safety & Flags. This writes a safety-only
+    // row: flagged practice, so countsAsTrained() and sessionXp() both ignore
+    // it, and no streak, XP or completion comes with it.
+    if (sess.painFlag) {
+      saveSession({
+        app: "swimming", athlete: athleteId(), practice: true,
+        dayKey: sess.dayKey, dayTitle: day.title || sess.dayKey,
+        isoDate: new Date().toISOString(), durationSecs: elapsedSecs,
+        sessionType: "try-it", pain: true, endedEarly: true, completedFully: false,
+        safetyOnly: true
+      });
+      logEvent("pain_stop_tryit", { day: sess.dayKey });
+    }
+    clearTryIt();                 // one run, then the mode disarms itself
     if (completed) speak("Practice run complete. Nothing recorded. You know the movements now.");
     playCue("done");
     setPhase("done");
@@ -637,6 +692,7 @@ export function finalize(completed) {
     pausedSecs: sess.pausedSecs,
     plannedSecs: sess.plannedSecs,
     clean: sess.cleanCount, wobbly: sess.wobblyCount,
+    formChecks: sess.formChecks || [],       // per-move verdicts from this run's spot-checks
     light: sess.light, mini: sess.mini,
     pain: !!sess.painFlag,
     endedEarly: !completed,
@@ -756,8 +812,12 @@ export function endEarly() {
 
 export function pickIntentWord(word) { if (sess.intentResolver) sess.intentResolver(word); }
 export function answerMicroLoop(answer) { if (sess.microResolver) sess.microResolver(answer); }
-export function pickClean() { sess.pendingCleanCheck = false; sess.cleanCount += 1; sess.lastWobbly = false; notify("phase"); }
-export function pickWobbly() { sess.pendingCleanCheck = false; sess.wobblyCount += 1; sess.lastWobbly = true; notify("phase"); }
+function recordFormCheck(clean) {
+  if (sess.cleanCheckMove) sess.formChecks.push({ name: sess.cleanCheckMove, clean });
+  sess.cleanCheckMove = null;
+}
+export function pickClean() { sess.pendingCleanCheck = false; sess.cleanCount += 1; sess.lastWobbly = false; recordFormCheck(true); notify("phase"); }
+export function pickWobbly() { sess.pendingCleanCheck = false; sess.wobblyCount += 1; sess.lastWobbly = true; recordFormCheck(false); notify("phase"); }
 
 /* Complete-screen interactions: patch the saved record + Firestore mirror. */
 export function setMood(key, emoji) {

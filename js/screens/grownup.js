@@ -113,6 +113,70 @@ function overviewTab(vm) {
   </div>`;
 }
 
+function formCheckTab(vm) {
+  const f = vm.formCheck;
+  return `
+  <div style="display:flex;flex-direction:column;gap:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+      <span style="font-family:var(--font-display);font-weight:600;font-size:20px;color:var(--ink);">Form check</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button type="button" data-action="formCheckMonth" data-arg="${f.prevMonth}" style="min-height:38px;width:38px;border-radius:50%;border:2px solid var(--hairline);background:var(--surface);font-size:15px;font-weight:900;cursor:pointer;font-family:inherit;" aria-label="Previous month">◀</button>
+        <span style="font-weight:900;font-size:14px;color:var(--ink);min-width:120px;text-align:center;">${f.monthLabel}</span>
+        <button type="button" data-action="formCheckMonth" data-arg="${f.nextMonth}" ${f.atCurrentMonth ? "disabled" : ""} style="min-height:38px;width:38px;border-radius:50%;border:2px solid var(--hairline);background:var(--surface);font-size:15px;font-weight:900;cursor:${f.atCurrentMonth ? "default" : "pointer"};opacity:${f.atCurrentMonth ? "0.4" : "1"};font-family:inherit;" aria-label="Next month">▶</button>
+      </div>
+    </div>
+
+    ${card(`
+      ${secTitle("What she claims vs what you saw")}
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-top:10px;">
+        <div style="display:flex;flex-direction:column;align-items:center;background:var(--surface-2);border-radius:16px;padding:11px 18px;">
+          <span style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);line-height:1;">${f.selfPct == null ? "—" : f.selfPct + "%"}</span>
+          <span style="font-size:11px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;">she reports</span>
+        </div>
+        <span style="font-size:20px;color:var(--ink-faint);">vs</span>
+        <div style="display:flex;flex-direction:column;align-items:center;background:${f.gap != null && f.gap <= -15 ? "color-mix(in srgb, var(--coral) 12%, #fff)" : "var(--mint-wash)"};border-radius:16px;padding:11px 18px;">
+          <span style="font-family:var(--font-display);font-weight:600;font-size:28px;color:${f.gap != null && f.gap <= -15 ? "var(--coral)" : "var(--mint-ink)"};line-height:1;">${f.verifiedPct == null ? "—" : f.verifiedPct + "%"}</span>
+          <span style="font-size:11px;font-weight:900;color:${f.gap != null && f.gap <= -15 ? "var(--coral)" : "var(--mint-ink)"};text-transform:uppercase;letter-spacing:0.04em;">you verified</span>
+        </div>
+        <div style="flex:1;min-width:220px;font-size:14px;font-weight:800;color:var(--ink);line-height:1.45;">${f.headline}</div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--ink-faint);margin-top:12px;">${f.doneCount} of ${f.total} checked this month.</div>`)}
+
+    ${divider("👁 Watch these")}
+    ${f.queue.length ? f.queue.map(c => `
+      <div style="${c.cardStyle}">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          <span style="font-family:var(--font-display);font-weight:600;font-size:19px;color:var(--ink);">${escapeHtml(c.name)}</span>
+          <span style="font-size:12px;font-weight:800;color:var(--ink-soft);">${escapeHtml(c.selfLabel)}</span>
+        </div>
+        <div style="display:flex;gap:9px;align-items:flex-start;background:var(--surface-2);border-radius:12px;padding:10px 12px;">
+          <span style="font-size:15px;flex-shrink:0;">👁</span>
+          <div><span style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--ink-faint);text-transform:uppercase;">Watch for</span>
+          <div style="font-size:14px;font-weight:800;color:var(--ink);line-height:1.4;">${escapeHtml(c.watch)}</div></div>
+        </div>
+        ${c.fix ? `
+        <div style="display:flex;gap:9px;align-items:flex-start;background:var(--aqua-wash);border-radius:12px;padding:10px 12px;">
+          <span style="font-size:15px;flex-shrink:0;">🔧</span>
+          <div><span style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--aqua-ink);text-transform:uppercase;">The fix</span>
+          <div style="font-size:14px;font-weight:800;color:var(--aqua-ink);line-height:1.4;">${escapeHtml(c.fix)}</div></div>
+        </div>` : ""}
+        <div style="display:flex;gap:9px;">
+          <button type="button" data-action="formCheckPass" data-arg="${escapeHtml(c.name)}" style="${c.passStyle}">✓ Meets criteria</button>
+          <button type="button" data-action="formCheckFail" data-arg="${escapeHtml(c.name)}" style="${c.failStyle}">✗ Not yet</button>
+        </div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);">Picked because: ${escapeHtml(c.why)}</div>
+      </div>`).join("")
+      : `<div style="font-size:14px;font-weight:700;color:var(--ink-soft);line-height:1.5;">No moves with written criteria yet — once she has trained a few sessions they'll queue up here.</div>`}
+
+    ${f.flagged.length ? card(`
+      ${secTitle("⚠️ Flagged for re-teaching")}
+      <div style="font-size:14px;font-weight:800;color:var(--ink);line-height:1.5;margin-top:8px;">${f.flagged.map(escapeHtml).join(" · ")}</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.45;margin-top:6px;">These go to the front of the next session's random spot-checks.</div>`) : ""}
+
+    <div style="font-size:12px;font-weight:700;color:var(--ink-faint);line-height:1.5;background:var(--surface-2);border-radius:12px;padding:11px 13px;">${f.note}</div>
+  </div>`;
+}
+
 function analyticsTab(vm) {
   const a = vm.analytics;
   return `
@@ -124,6 +188,38 @@ function analyticsTab(vm) {
       </div>
       <button type="button" data-action="exportCsv" style="min-height:40px;border:2px solid var(--aqua);background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">⬇︎ Export CSV</button>
     </div>
+    <div style="font-size:12px;font-weight:700;color:var(--ink-faint);margin-top:-6px;">${a.periodCovered}</div>
+
+    ${card(`
+      ${secTitle("At a glance · " + vm.scopeLabel)}
+      <div style="font-size:13px;color:var(--ink-faint);margin:4px 0 12px;line-height:1.3;">Every number here answers to the period toggle above.</div>
+      <div style="display:grid;grid-template-columns:1fr auto auto;gap:0 14px;align-items:baseline;">
+        <div></div>
+        <div style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--ink-faint);text-transform:uppercase;text-align:right;padding-bottom:6px;">Total</div>
+        <div style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--ink-faint);text-transform:uppercase;text-align:right;padding-bottom:6px;">Average</div>
+        ${a.indicators.map(ind => `
+          <div style="font-size:13px;font-weight:800;color:var(--ink-soft);padding:7px 0;border-top:1px solid var(--hairline);">${ind.label}</div>
+          <div style="font-size:15px;font-weight:900;color:var(--ink);text-align:right;padding:7px 0;border-top:1px solid var(--hairline);white-space:nowrap;">${ind.total}</div>
+          <div style="font-size:13px;font-weight:800;color:var(--aqua-ink);text-align:right;padding:7px 0;border-top:1px solid var(--hairline);white-space:nowrap;">${ind.avg}</div>`).join("")}
+      </div>`)}
+
+    ${card(`
+      ${secTitle("🧭 Is she trying?")}
+      <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:10px;">
+        <div style="display:flex;flex-direction:column;align-items:center;background:var(--aqua-wash);border-radius:18px;padding:12px 18px;flex-shrink:0;">
+          <span style="font-family:var(--font-display);font-weight:600;font-size:34px;color:var(--aqua-ink);line-height:1;">${a.isSheTrying.avg == null ? "—" : a.isSheTrying.avg}</span>
+          <span style="font-size:11px;font-weight:900;letter-spacing:0.04em;color:var(--aqua-ink);text-transform:uppercase;">${a.isSheTrying.band}</span>
+        </div>
+        ${a.isSheTrying.hasTrend ? `
+        <div style="display:flex;align-items:flex-end;gap:5px;height:74px;flex:1;min-width:120px;max-width:280px;">
+          ${a.isSheTrying.trend.map(t => `<div style="flex:1;display:flex;align-items:flex-end;height:100%;"><div style="${t.barStyle}"></div></div>`).join("")}
+        </div>` : ""}
+        <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:6px;">
+          ${a.isSheTrying.lines.map(l => `<div style="font-size:14px;font-weight:800;color:var(--ink);line-height:1.4;">${l}</div>`).join("")}
+          ${a.isSheTrying.gapNote ? `<div style="font-size:13px;font-weight:800;color:${a.isSheTrying.formGap != null && a.isSheTrying.formGap <= -15 ? "var(--coral)" : "var(--mint-ink)"};line-height:1.4;">${a.isSheTrying.gapNote}</div>` : ""}
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--ink-faint);line-height:1.45;margin-top:12px;background:var(--surface-2);border-radius:12px;padding:9px 12px;">${a.isSheTrying.note}</div>`)}
 
     ${divider("🚨 Safety &amp; flags")}
     ${flagsCard(a, vm.scopeLabel)}
@@ -451,14 +547,17 @@ function settingsTab(vm) {
     </div>
     <div>
       <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Prize pool 🎁 ${vm.isDefaultPool ? '<span style="color:var(--ink-faint);">(default)</span>' : ""}</div>
-      <div style="display:flex;flex-direction:column;gap:6px;">
-        ${vm.prizePool.map((p, i) => `
-          <div style="display:flex;align-items:center;gap:10px;background:var(--surface-2);border-radius:12px;padding:8px 12px;">
-            <span style="font-size:18px;">${p.icon}</span>
-            <span style="flex:1;font-size:14px;font-weight:700;color:var(--ink);">${escapeHtml(p.label)}</span>
-            <button type="button" data-action="removePrizePoolItem" data-arg="${i}" style="border:none;background:none;color:var(--ink-faint);font-weight:900;cursor:pointer;font-size:15px;" aria-label="Remove prize">✕</button>
-          </div>`).join("")}
+      <div class="list-wrap">
+        <div data-list="1" style="max-height:240px;display:flex;flex-direction:column;gap:6px;padding-bottom:8px;">
+          ${vm.prizePool.map((p, i) => `
+            <div style="display:flex;align-items:center;gap:10px;background:var(--surface-2);border-radius:12px;padding:8px 12px;">
+              <span style="font-size:18px;">${p.icon}</span>
+              <span style="flex:1;font-size:14px;font-weight:700;color:var(--ink);">${escapeHtml(p.label)}</span>
+              <button type="button" data-action="removePrizePoolItem" data-arg="${i}" style="border:none;background:none;color:var(--ink-faint);font-weight:900;cursor:pointer;font-size:15px;" aria-label="Remove prize">✕</button>
+            </div>`).join("")}
+        </div>
       </div>
+      ${vm.walletTrimNote ? `<div style="margin-top:8px;font-size:13px;font-weight:700;color:var(--ink-soft);background:var(--surface-2);border-radius:12px;padding:9px 12px;line-height:1.45;">${escapeHtml(vm.walletTrimNote)}</div>` : ""}
       <div style="display:flex;gap:8px;margin-top:8px;">
         <input type="text" placeholder="Add a prize… (e.g. 🎨 Craft afternoon)" data-input="newPrize" style="flex:1;padding:10px 13px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:14px;font-weight:700;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">
         <button type="button" data-action="addPrizePoolItem" style="min-height:44px;border:none;background:var(--sun);color:var(--sun-ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">Add</button>
@@ -557,6 +656,7 @@ export function grownupScreen(vm) {
       </div>
       ${tab === "overview" ? overviewTab(vm)
         : tab === "analytics" ? analyticsTab(vm)
+        : tab === "formcheck" ? formCheckTab(vm)
         : tab === "coaching" ? coachingTab(vm)
         : tab === "library" ? libraryTab(vm)
         : settingsTab(vm)}

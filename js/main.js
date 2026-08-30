@@ -6,7 +6,7 @@
    delegated click listener below.
    ============================================================ */
 
-import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, noteSessionXpAwarded, onStorageError, payQuizQuestion, quizQuestionKey } from "./store.js";
+import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, noteSessionXpAwarded, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS, tryItArmed, setTryIt } from "./store.js";
 import { edmontonDayKey, escapeHtml } from "./util.js";
 import { restoreFromCloud } from "./sync.js";
 import { downloadBackup, restoreBackupFile } from "./backup.js";
@@ -23,13 +23,15 @@ import { buildProgressVM, toggleRedeem } from "./vm/progress.js";
 import { progressScreen } from "./screens/progress.js";
 import { buildGrownupVM, exportCsv } from "./vm/grownup.js";
 import { grownupScreen } from "./screens/grownup.js";
-import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS } from "./store.js";
+import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS, recordFormVerdict } from "./store.js";
 
 export const state = {
   nav: "today",                 // 'today' | 'progress' | 'grownup'
   grownupTab: "overview",       // 'overview' | 'analytics' | 'library' | 'settings' | 'coaching'
   gsScope: "week",
   logScope: "week",
+  progressScope: "4w",          // '4w' | 'month' | 'quarter' — Progress period board
+  formCheckMonth: null,         // 'YYYY-MM' — Form Check month being reviewed (null = current)
   expanded: {},                 // day-card block expansion
   selectedDay: null,            // monday..sunday
   practiceMode: false,
@@ -47,6 +49,7 @@ export const state = {
 };
 
 const root = document.getElementById("app");
+let undoTimer = null;              // repaints the prize wallet when an undo window closes
 
 function computeIsWide() {
   return window.innerWidth >= 900 && window.innerWidth > window.innerHeight;
@@ -139,7 +142,13 @@ const actions = {
   selectDay(arg) { state.selectedDay = arg; state.expanded = {}; render(); },
   toggleBlock(arg) { state.expanded[arg] = !state.expanded[arg]; render(); },
   toggleCoachVoice() { updateSettings({ coachVoiceOn: !settings.coachVoiceOn }); render(); },
-  togglePractice() { state.practiceMode = !state.practiceMode; render(); },
+  togglePractice() {
+    // Backed by settings, not memory: a reload used to disarm it silently and
+    // record a run meant as a test.
+    setTryIt(!state.practiceMode);
+    state.practiceMode = tryItArmed();
+    render();
+  },
   goSession(arg) {
     state.readiness = newReadinessFlow(arg || state.selectedDay || edmontonDayKey(), state.practiceMode);
     render();
@@ -267,12 +276,24 @@ const actions = {
     state.prizeDraw = newPrizeDraw();
     render();
   },
-  redeemPrize(arg) { toggleRedeem(arg); render(); },
+  redeemPrize(arg) {
+    toggleRedeem(arg);
+    render();
+    // The undo window closes on a timer, not on a tap, so schedule the repaint
+    // that retires the button — otherwise it keeps offering an undo the store
+    // would refuse.
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(render, REDEEM_UNDO_MS + 1000);
+  },
   logScope(arg) { state.logScope = arg; render(); },
+  progressScope(arg) { state.progressScope = arg; render(); },
 
   /* ---- grown-up zone ---- */
   setGuTab(arg) { state.grownupTab = arg; render(); },
   setGsScope(arg) { state.gsScope = arg; render(); },
+  formCheckMonth(arg) { state.formCheckMonth = arg; render(); },
+  formCheckPass(arg) { recordFormVerdict(arg, true, state.formCheckMonth); render(); },
+  formCheckFail(arg) { recordFormVerdict(arg, false, state.formCheckMonth); render(); },
   setVoiceStyle(arg) { updateSettings({ voiceStyle: arg }); render(); },
   bumpRest(arg) {
     const [key, step, min, max] = arg.split("|");
@@ -334,6 +355,9 @@ const actions = {
   resetPrizePool() { updateSettings({ prizePool: null }); render(); },
   exitSession() {
     engine.exitSession();
+    // The engine disarms try-it when a run finalizes; mirror that into the view
+    // state so the button and badges are right the moment we leave the session.
+    state.practiceMode = tryItArmed();
     state.inSession = false;
     state.pendingSession = null;
     state.detailOverlay = false;
@@ -414,6 +438,9 @@ function boot() {
     if (!state.inSession) render();
   });
   migrate();
+  // Try-it survives a reload now (it lives in settings), and expires on its own
+  // if it was armed hours ago and never used.
+  state.practiceMode = tryItArmed();
   if (!state.selectedDay) state.selectedDay = edmontonDayKey();
   render();
   fetchWeather();
