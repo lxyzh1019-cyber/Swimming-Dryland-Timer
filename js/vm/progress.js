@@ -5,8 +5,9 @@
    ============================================================ */
 
 import { LADDER, RANK_LORE, RANK_TEASE, fmtXp } from "../data.js";
+import { sessionXp, levelFromXp } from "../store.js";
 import { loadSessions, loadJourney, currentStreak, redeemPrize, countsAsTrained, prizeUndoOpen } from "../store.js";
-import { edmontonWeekISODates, edmontonISO } from "../util.js";
+import { edmontonWeekISODates, edmontonISO, DAY_MS } from "../util.js";
 import { buildJourney } from "./today.js";
 
 const LIGHT_CHIP = {
@@ -39,6 +40,36 @@ export function logEntryView(s) {
     lightLabel, note,
     lightChipStyle: "font-size:10px;font-weight:900;letter-spacing:0.04em;border-radius:var(--radius-pill);padding:4px 9px;white-space:nowrap;background:" + (LIGHT_CHIP[lightLabel] || LIGHT_CHIP.GREEN) + ";"
   };
+}
+
+/* ---- period windows -------------------------------------------------------
+   The screen only ever showed "this week", so a month of work was invisible.
+   Three windows, all in Edmonton dates so a late-evening session lands on the
+   day she actually trained. */
+export const PROGRESS_PERIODS = [
+  { key: "4w",      label: "Last 4 weeks" },
+  { key: "month",   label: "This month" },
+  { key: "quarter", label: "This quarter" }
+];
+
+export function periodRange(key, now = new Date()) {
+  const todayIso = edmontonISO(now);
+  if (key === "month")   return { from: todayIso.slice(0, 8) + "01", to: todayIso };
+  if (key === "quarter") {
+    const m = Number(todayIso.slice(5, 7));
+    const qStart = String(Math.floor((m - 1) / 3) * 3 + 1).padStart(2, "0");
+    return { from: todayIso.slice(0, 5) + qStart + "-01", to: todayIso };
+  }
+  return { from: edmontonISO(new Date(now.getTime() - 27 * DAY_MS)), to: todayIso };   // trailing 28 days
+}
+
+function isoSpan(from, to) {
+  const out = [];
+  for (let d = new Date(from + "T12:00:00Z"); edmontonISO(d) <= to; d = new Date(d.getTime() + DAY_MS)) {
+    out.push(edmontonISO(d));
+    if (out.length > 400) break;
+  }
+  return out;
 }
 
 export function buildProgressVM(state) {
@@ -137,7 +168,83 @@ export function buildProgressVM(state) {
     };
   });
 
+  /* ---- period stats: every category as a TOTAL and an AVERAGE ---- */
+  const periodKey = state.progressScope || "4w";
+  const range = periodRange(periodKey);
+  const inRange = s => { const k = edmontonISO(s.isoDate); return k >= range.from && k <= range.to; };
+  const pSessions = sessions.filter(s => inRange(s) && !s.practice);
+  const pDone = pSessions.filter(s => s.completedFully);
+  const days = isoSpan(range.from, range.to);
+  const weeks = Math.max(1, days.length / 7);
+
+  const pMins = Math.round(pSessions.reduce((a, s) => a + (s.durationSecs || 0), 0) / 60);
+  // Rounds are stored as the rounds the DAY ASKED FOR, not the rounds finished,
+  // so an ended-early session would overstate. Count finished sessions only and
+  // name the partials separately rather than quietly inflating the number.
+  const pRounds = pDone.reduce((a, s) => a + (s.roundsDone || 0), 0);
+  const pPartial = pSessions.length - pDone.length;
+  const pXp = pSessions.reduce((a, s) => a + sessionXp(s), 0);
+  const xpNow = journeyStore.xp || 0;
+  // Levels gained inside the window, from the training XP it actually banked.
+  const pLevels = Math.max(0, levelFromXp(xpNow).level - levelFromXp(Math.max(0, xpNow - pXp)).level);
+  const pForm = pSessions.reduce((a, s) => {
+    const fc = (s.formChecks || []);
+    if (fc.length) { a.asked += fc.length; a.clean += fc.filter(f => f.clean).length; }
+    else { a.asked += (s.clean || 0) + (s.wobbly || 0); a.clean += (s.clean || 0); }
+    return a;
+  }, { asked: 0, clean: 0 });
+  const pMoods = { great: 0, okay: 0, tired: 0 };
+  pSessions.forEach(s => { if (pMoods[s.mood] != null) pMoods[s.mood] += 1; });
+  const topMood = Object.entries(pMoods).sort((a, b) => b[1] - a[1])[0];
+  const pTough = pSessions.filter(s => ["yellow", "red"].includes(s.lightResult || s.light));
+  const pToughDone = pTough.filter(s => s.completedFully).length;
+
+  const per = (n, d, unit) => d > 0 ? (Math.round((n / d) * 10) / 10) + " " + unit : "—";
+  const periodStats = {
+    periodKey,
+    tabs: PROGRESS_PERIODS.map(p => ({ ...p, style:
+      "min-height:36px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:12px;padding:0 15px;font-family:inherit;"
+      + (p.key === periodKey ? "background:var(--aqua);color:#fff;" : "background:transparent;color:var(--ink-soft);") })),
+    rangeLabel: pSessions.length
+      ? new Date(range.from + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Edmonton" })
+        + " – " + new Date(range.to + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Edmonton" })
+      : "Nothing logged in this window yet",
+    hasData: pSessions.length > 0,
+    rows: [
+      { label: "Sessions finished", total: String(pDone.length), avg: per(pDone.length, weeks, "/ week") },
+      { label: "Completion status", total: pDone.length + " of " + pSessions.length,
+        avg: pSessions.length ? Math.round((pDone.length / pSessions.length) * 100) + "%" : "—" },
+      { label: "Time", total: pMins >= 60 ? Math.floor(pMins / 60) + "h " + (pMins % 60) + "m" : pMins + "m",
+        avg: per(pMins, pSessions.length, "min / session") },
+      { label: "Main rounds", total: String(pRounds) + (pPartial ? "  (+" + pPartial + " partial)" : ""),
+        avg: per(pRounds, pDone.length, "/ session") },
+      { label: "XP earned", total: fmtXp(pXp), avg: per(pXp, pSessions.length, "/ session") },
+      { label: "Levels upgraded", total: "+" + pLevels,
+        avg: pLevels ? "one every " + per(pSessions.length, pLevels, "sessions") : "—" },
+      { label: "Clean form", total: pForm.asked ? pForm.clean + " of " + pForm.asked : "—",
+        avg: pForm.asked ? Math.round((pForm.clean / pForm.asked) * 100) + "%" : "—" },
+      { label: "How I felt", total: "😀" + pMoods.great + "  🙂" + pMoods.okay + "  😴" + pMoods.tired,
+        avg: topMood && topMood[1] ? "mostly " + MOOD_EMOJI[topMood[0]] : "—" },
+      { label: "Tough days finished", total: String(pToughDone),
+        avg: pSessions.length ? Math.round((pToughDone / pSessions.length) * 100) + "% of sessions" : "—" }
+    ],
+    // One bar per day: a good run and a dead patch are both obvious at a glance.
+    xpByDay: (() => {
+      const byIso = {};
+      pSessions.forEach(s => { const k = edmontonISO(s.isoDate); byIso[k] = (byIso[k] || 0) + sessionXp(s); });
+      const max = Math.max(...days.map(d => byIso[d] || 0), 1);
+      return days.map(d => ({
+        iso: d, xp: byIso[d] || 0,
+        barStyle: "flex:1;min-width:2px;height:" + Math.max(2, Math.round(((byIso[d] || 0) / max) * 46)) + "px;border-radius:2px 2px 0 0;background:"
+          + ((byIso[d] || 0) > 0 ? "var(--aqua)" : "var(--hairline)") + ";"
+      }));
+    })(),
+    xpFirstLabel: new Date(range.from + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Edmonton" }),
+    xpLastLabel: new Date(range.to + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Edmonton" })
+  };
+
   return {
+    periodStats,
     level, oceanStory, analyticsWeek, milestones,
     logItems, logScopeTabs, hasLog: allLog.length > 0,
     prizesWon, hasPrizes: prizesWon.length > 0,

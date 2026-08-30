@@ -30,6 +30,7 @@ export const state = {
   grownupTab: "overview",       // 'overview' | 'analytics' | 'library' | 'settings' | 'coaching'
   gsScope: "week",
   logScope: "week",
+  progressScope: "4w",          // '4w' | 'month' | 'quarter' — Progress period board
   expanded: {},                 // day-card block expansion
   selectedDay: null,            // monday..sunday
   practiceMode: false,
@@ -284,6 +285,7 @@ const actions = {
     undoTimer = setTimeout(render, REDEEM_UNDO_MS + 1000);
   },
   logScope(arg) { state.logScope = arg; render(); },
+  progressScope(arg) { state.progressScope = arg; render(); },
 
   /* ---- grown-up zone ---- */
   setGuTab(arg) { state.grownupTab = arg; render(); },

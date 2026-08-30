@@ -32,6 +32,8 @@ const tvm    = await import(base + "vm/today.js");
 const sscreen = await import(base + "screens/session.js");
 const tscreen = await import(base + "screens/today.js");
 const effort  = await import(base + "effort.js");
+const pvm     = await import(base + "vm/progress.js");
+const pscreen = await import(base + "screens/progress.js");
 const rscreen = await import(base + "screens/readiness.js");
 const overlays = await import(base + "screens/overlays.js");
 
@@ -249,6 +251,37 @@ ok(store.xpForSession({ ...sess3(3), sessionType: "spa" }) === 0, "spa still ear
 /* --- defaults --- */
 ok(store.DEFAULT_SETTINGS.voiceStyle === "encouraging", "default voice is process-praise");
 ok(store.DEFAULT_SETTINGS.cloudMirror === true, "cloudMirror default on");
+
+/* --- Progress periods: totals AND averages, over a real window ------------
+   The screen only ever showed "this week", so a month of work was invisible. */
+localStorage.clear();
+store.migrate();
+const pIso = n => new Date(Date.now() - n * 86400000).toISOString();
+[2, 10, 25, 80].forEach((d, i) => store.saveSession({
+  isoDate: pIso(d), dayKey: "monday", completedFully: true, roundsDone: 3, xpVersion: store.XP_VERSION,
+  durationSecs: 1500, xpEarned: 360, mood: i ? "okay" : "great", lightResult: i === 1 ? "red" : "green",
+  formChecks: [{ clean: true }, { clean: i !== 2 }], clean: 2, wobbly: 0,
+  perExercise: Array.from({ length: 6 }, () => ({ skipped: false })) }));
+store.reconcileJourneyWithSessions();
+["4w", "month", "quarter"].forEach(k => {
+  const ps = pvm.buildProgressVM({ progressScope: k, logScope: "week" }).periodStats;
+  ok(ps.rows.length === 9, k + ": nine categories");
+  ok(ps.rows.every(r => r.total !== undefined && r.avg !== undefined), k + ": every category carries a total AND an average");
+  ok(ps.xpByDay.length > 0, k + ": the XP-per-day strip has a bar per day");
+});
+const p4w = pvm.buildProgressVM({ progressScope: "4w", logScope: "week" }).periodStats;
+const pRow = l => p4w.rows.find(r => r.label === l);
+ok(pRow("Sessions finished").total === "3", "the 4-week window excludes the 80-day-old session");
+ok(pRow("Completion status").total.includes(" of "), "completion status reads done-of-started");
+ok(pRow("Levels upgraded").total.startsWith("+"), "levels upgraded is reported for the window");
+ok(pRow("Tough days finished").total === "1", "a red-light day she finished counts as a tough day");
+ok(/progressScope/.test(pscreen.progressScreen(pvm.buildProgressVM({ progressScope: "month", logScope: "week" }))),
+   "the period toggle renders on the Progress screen");
+localStorage.clear();
+store.migrate();
+ok(pvm.buildProgressVM({ progressScope: "4w", logScope: "week" }).periodStats.hasData === false,
+   "an empty window says so rather than showing a wall of zeros");
+localStorage.clear();
 
 /* --- effort: scored on what she controls, normalised to the day -----------
    Volume metrics reward an easy day. Effort has to reward the opposite: doing

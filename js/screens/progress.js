@@ -49,6 +49,36 @@ export function progressScreen(vm) {
       </div>
 
       <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);margin-bottom:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
+          <div style="font-weight:900;font-size:12px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">How it's going</div>
+          <div style="display:flex;background:var(--surface-2);border-radius:var(--radius-pill);padding:3px;gap:3px;">
+            ${vm.periodStats.tabs.map(t => `<button type="button" data-action="progressScope" data-arg="${t.key}" style="${t.style}">${t.label}</button>`).join("")}
+          </div>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--ink-faint);margin-bottom:12px;">${vm.periodStats.rangeLabel}</div>
+        ${vm.periodStats.hasData ? `
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:0 14px;align-items:baseline;">
+          <div style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--ink-faint);text-transform:uppercase;padding-bottom:6px;"></div>
+          <div style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--ink-faint);text-transform:uppercase;text-align:right;padding-bottom:6px;">Total</div>
+          <div style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--ink-faint);text-transform:uppercase;text-align:right;padding-bottom:6px;">Average</div>
+          ${vm.periodStats.rows.map(r => `
+            <div style="font-size:13px;font-weight:800;color:var(--ink-soft);padding:7px 0;border-top:1px solid var(--hairline);">${r.label}</div>
+            <div style="font-size:15px;font-weight:900;color:var(--ink);text-align:right;padding:7px 0;border-top:1px solid var(--hairline);white-space:nowrap;">${r.total}</div>
+            <div style="font-size:13px;font-weight:800;color:var(--aqua-ink);text-align:right;padding:7px 0;border-top:1px solid var(--hairline);white-space:nowrap;">${r.avg}</div>`).join("")}
+        </div>
+        <div style="margin-top:16px;">
+          <div style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--ink-faint);text-transform:uppercase;margin-bottom:6px;">XP per day</div>
+          <div style="display:flex;align-items:flex-end;gap:2px;height:48px;">
+            ${vm.periodStats.xpByDay.map(d => `<div style="${d.barStyle}" title="${d.iso}: ${d.xp} XP"></div>`).join("")}
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--ink-faint);padding-top:4px;">
+            <span>${vm.periodStats.xpFirstLabel}</span><span>${vm.periodStats.xpLastLabel}</span>
+          </div>
+        </div>` : `
+        <div style="font-size:14px;font-weight:700;color:var(--ink-soft);line-height:1.5;">No sessions in this window yet — train a day and the numbers land here. 🌊</div>`}
+      </div>
+
+      <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);margin-bottom:16px;">
         <div style="font-weight:900;font-size:12px;letter-spacing:0.05em;color:var(--ink-soft);margin-bottom:14px;text-transform:uppercase;">Milestones</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;">
           ${vm.milestones.map(ms => `<div style="${ms.style}">${ms.icon} ${ms.label}</div>`).join("")}
