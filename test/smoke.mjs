@@ -1657,4 +1657,79 @@ ok(repsMonotonic, "the rep count only ever moves forwards within a segment");
 ok(store.loadSessions()[0].ledger.some(l => l.status === "done"),
    "a silent session still runs, and still records real work");
 
+/* ============================================================
+   PHASE 6 — report truth
+   ============================================================ */
+localStorage.clear(); store.migrate();
+const OV6 = outcome.OUTCOME_VERSION;
+const todayKey6 = util.edmontonDayKey();
+const todayIso6 = new Date().toISOString();
+
+/* --- the missed-day card only claims a warm-up the ledger can prove --- */
+const missedVm = () => tvm.buildTodayVM({ selectedDay: todayKey6, expanded: {} }).dayView;
+/* (a) nothing done at all */
+let dv6 = missedVm();
+if (dv6.isMissed) {
+  ok(!/warm-up/i.test(dv6.missedSub || ""),
+     "a missed day with nothing done never claims she got the warm-up in");
+}
+/* (b) a warm-up she really did */
+store.saveSession({ app: "swimming", dayKey: todayKey6, isoDate: todayIso6,
+  xpVersion: store.XP_VERSION, outcomeVersion: OV6, sessionType: "main",
+  roundsDone: 0, roundsPlanned: 3, durationSecs: 300, completedFully: false, endedEarly: true,
+  ledger: [{ name: "A-Skip", block: "warmup", round: 1, status: "done" }] });
+const dvWarm = missedVm();
+if (dvWarm.isMissed) {
+  ok(/warm-up/i.test(dvWarm.missedSub || ""), "and says so when the ledger proves it");
+}
+
+/* --- recovery and safety stops stay out of the training statistics --- */
+localStorage.clear(); store.migrate();
+const mkRow = o => ({ app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: OV6, roundsPlanned: 3, roundsDone: 3,
+  durationSecs: 1800, sessionType: "main", completedFully: true,
+  ledger: [{ name: "x", block: "main", round: 1, status: "done" }], ...o });
+store.saveSession(mkRow({}));                                                   // a real session
+store.saveSession(mkRow({ sessionType: "recovery", roundsDone: 0, roundsPlanned: 0, durationSecs: 600 }));
+store.saveSession(mkRow({ safetyStop: true, pain: true, durationSecs: 900, completedFully: false, endedEarly: true }));
+store.saveSession(mkRow({ practice: true, sessionType: "try-it", durationSecs: 1200 }));
+
+const an6 = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics" }).analytics;
+const totalRow = an6.indicators.find(b => b.label === "Total time");
+ok(/^30m$/.test(totalRow.total),
+   "total time counts only the 30-minute training session (" + totalRow.total + ")");
+ok(!/1h/.test(totalRow.total), "recovery, the safety stop and the try-it row are all excluded");
+const completedRow = an6.indicators.find(b => b.label === "Completed");
+ok(completedRow.total === "1 of 1",
+   "the completed ratio is against training sessions only (" + completedRow.total + ")");
+
+/* streak and adherence agree */
+ok(store.currentStreak(store.loadSessions().filter(store.countsAsTrained)) === 1,
+   "only the training session feeds the streak");
+ok(an6.adherence <= 100, "adherence stays within range");
+
+/* --- every report category comes from the one authority --- */
+const cats = store.loadSessions().map(r => store.outcomeOf(r).state);
+ok(cats.includes("complete"), "a complete session is categorised complete");
+ok(cats.includes("recovery"), "recovery has its own category");
+ok(cats.includes("safety-stop"), "a safety stop has its own category");
+ok(cats.includes("none"), "and a legacy try-it row is not counted as training");
+store.loadSessions().forEach(r => {
+  const oc = store.outcomeOf(r);
+  ok(store.countsAsTrained(r) === oc.countsAsTraining,
+     "the store and the authority never disagree about " + oc.state);
+  if (!oc.xpEligible) ok(store.xpForSession(r) === 0,
+     "and XP never pays for a session the authority calls " + oc.state);
+});
+
+/* --- main-round reporting uses what was really done and really asked --- */
+localStorage.clear(); store.migrate();
+store.saveSession(mkRow({ roundsDone: 1, roundsPlanned: 3 }));
+const an7 = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics" }).analytics;
+ok(an7.rounds.done === 1, "rounds done is what she actually finished");
+ok(an7.rounds.planned === 3, "against what the day actually asked for");
+store.saveSession(mkRow({ mini: true, sessionType: "mini", roundsDone: 1, roundsPlanned: 3 }));
+const an8 = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics" }).analytics;
+ok(an8.rounds.planned === 4, "a mini asks for one round, not the light's three");
+
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

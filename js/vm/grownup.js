@@ -418,20 +418,20 @@ export function buildGrownupVM(state) {
 
   const indicators = [
     { label: "Days trained",   total: trainedDays + " of " + availableDays, avg: availableDays ? Math.round((trainedDays / availableDays) * 100) + "%" : "—" },
-    { label: "Total time",     total: totalMins >= 60 ? Math.floor(totalMins / 60) + "h " + (totalMins % 60) + "m" : totalMins + "m", avg: avg1(totalMins, sessions.length, "min / session") },
+    { label: "Total time",     total: totalMins >= 60 ? Math.floor(totalMins / 60) + "h " + (totalMins % 60) + "m" : totalMins + "m", avg: avg1(totalMins, trainingRows.length, "min / session") },
     { label: "Effort level",   total: effort.avg == null ? "—" : String(effort.avg), avg: effort.band },
     { label: "Rounds",         total: String(boardRounds), avg: avg1(boardRounds, done.length, "/ session") },
     { label: "Safety",         total: (stops.length ? stops.length + " stop" + (stops.length === 1 ? "" : "s") : "no stops") + (earlyEnds.length ? " · " + earlyEnds.length + " early" : ""), avg: stops.length ? "needs a conversation" : "clean" },
-    { label: "Completed",      total: done.length + " of " + sessions.length, avg: sessions.length ? Math.round((done.length / sessions.length) * 100) + "%" : "—" },
+    { label: "Completed",      total: done.length + " of " + trainingRows.length, avg: trainingRows.length ? Math.round((done.length / trainingRows.length) * 100) + "%" : "—" },
     // Average from the SAME rows as the total — moodUpPct is the last-6 trend
     // used by the mood card, and quoting it here made the two columns disagree.
     { label: "How she felt",   total: "😀" + moodCount.great + "  🙂" + moodCount.okay + "  😴" + moodCount.tired,
       avg: (() => { const t = Object.entries(moodCount).sort((a, b) => b[1] - a[1])[0];
                     return t && t[1] ? "mostly " + MOOD_EMOJI[t[0]] : "—"; })() },
-    { label: "Levels upgraded", total: "+" + levelsUp, avg: levelsUp ? "one every " + avg1(sessions.length, levelsUp, "sessions") : "—" },
+    { label: "Levels upgraded", total: "+" + levelsUp, avg: levelsUp ? "one every " + avg1(trainingRows.length, levelsUp, "sessions") : "—" },
     { label: "Form · she says", total: effort.formAsked ? effort.formClean + " of " + effort.formAsked : "—", avg: effort.formPct == null ? "—" : effort.formPct + "% clean" },
     { label: "Form · you verified", total: verified.asked ? verified.pass + " of " + verified.asked : "not checked yet", avg: verified.asked ? Math.round((verified.pass / verified.asked) * 100) + "% ✓" : "—" },
-    { label: "XP earned",      total: fmtXp(boardXp), avg: avg1(boardXp, sessions.length, "/ session") }
+    { label: "XP earned",      total: fmtXp(boardXp), avg: avg1(boardXp, trainingRows.length, "/ session") }
   ];
   // The gap between what she reports and what you verified is the number that
   // answers "is she really doing it right" — call it out when both exist.
@@ -458,13 +458,13 @@ export function buildGrownupVM(state) {
     const firstT = scope === "all" ? new Date(all[0].isoDate).getTime() : Date.now() - scopeDays(scope, all) * DAY_MS;
     const f = new Date(Math.max(firstT, new Date(all[0].isoDate).getTime()));
     return scopeLabel + " · " + dstr(f.toISOString()).replace(/^\w+, /, "") + " – "
-      + dstr(new Date().toISOString()).replace(/^\w+, /, "") + " · " + sessions.length + " session" + (sessions.length === 1 ? "" : "s");
+      + dstr(new Date().toISOString()).replace(/^\w+, /, "") + " · " + trainingRows.length + " training session" + (trainingRows.length === 1 ? "" : "s");
   })();
 
   /* ---- coach narrative (one honest story per scope) ---- */
   const read = !sessions.length
     ? "No sessions recorded " + scopeLabel.toLowerCase() + " yet — the story starts with the first GO."
-    : `${done.length} of ${sessions.length} sessions finished (${adherence}% adherence vs. scheduled). ` +
+    : `${done.length} of ${trainingRows.length} training sessions finished (${adherence}% adherence vs. scheduled). ` +
       (stops.length ? `⚠️ ${stops.length} pain stop${stops.length === 1 ? "" : "s"} — that conversation comes first. ` : "") +
       (formCleanPct != null ? `Form self-checks run ${formCleanPct}% clean. ` : "") +
       (skippedMoves.length ? `Most-skipped: ${skippedMoves[0].name}.` : "Nothing gets skipped consistently.");
@@ -711,11 +711,14 @@ export function buildGrownupVM(state) {
 
 /* CSV export — weekly summary ported from the old Coach Insights. */
 export function exportCsv() {
-  const rows = [["date", "day", "title", "type", "light", "minutes", "completedFully", "endedEarly", "pain", "skips", "pauses", "clean", "wobbly", "mood", "intentWord", "xpEarned"]];
+  const rows = [["date", "day", "title", "type", "light", "minutes", "outcome", "countsAsTraining", "roundsDone", "roundsPlanned", "completedFully", "endedEarly", "pain", "skips", "pauses", "clean", "wobbly", "mood", "intentWord", "xpEarned"]];
   loadSessions().forEach(s => {
     rows.push([
       edmontonISO(s.isoDate), s.dayKey || "", s.dayTitle || "", s.sessionType || "",
       s.lightResult || "", Math.round((s.durationSecs || 0) / 60),
+      // The authoritative reading, alongside the raw flags it was derived from.
+      outcomeOf(s).state, outcomeOf(s).countsAsTraining ? 1 : 0,
+      sessionRoundsDone(s), sessionRoundsPlanned(s),
       s.completedFully ? 1 : 0, s.endedEarly ? 1 : 0, s.pain ? 1 : 0,
       s.skippedCount || 0, s.pauseCount || 0, s.clean || 0, s.wobbly || 0,
       s.mood || "", s.intentWord || "", s.xpEarned || 0

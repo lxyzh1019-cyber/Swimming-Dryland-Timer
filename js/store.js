@@ -879,6 +879,9 @@ export function xpForSession(entry) {
   // Sunday's scheduled spa day is unchanged at 0 above — it was never a
   // training day she gave up.
   if (entry.sessionType === "recovery") return XP_SHOWED_UP;
+  // The authority decides what is payable, not a bare "was there a done row".
+  // A practice / try-it row can carry a full ledger and must still pay nothing.
+  if (!outcomeOf(entry).xpEligible) return 0;
   if (!didRealWork(entry)) return 0;
   return XP_SHOWED_UP + XP_PER_ROUND * sessionRounds(entry);
 }

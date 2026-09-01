@@ -363,7 +363,18 @@ export function buildTodayVM(state) {
       showSettings: false
     };
   } else if (status === "missed") {
-    dayView = { badgeLabel: shortU + " · CATCH UP", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"), showChips: true, isMissed: true, showCta: true, ctaLabel: "Catch Up Now", ctaIcon: "↺", showSettings: false, ctaAction: "goSession" };
+    // "You still got the warm-up in" was printed on EVERY missed day, whether
+    // or not she had done a single thing. A consolation that isn't true is
+    // worse than none: it tells her the app isn't really watching.
+    const missedIso = edmontonWeekISODates()[selectedKey];
+    const missedRecord = loadSessions()
+      .filter(s => s.dayKey === selectedKey && edmontonISO(s.isoDate) === missedIso).pop();
+    const warmupDone = !!(missedRecord && (missedRecord.ledger || [])
+      .some(l => l && l.block === "warmup" && l.status === "done"));
+    dayView = { badgeLabel: shortU + " · CATCH UP", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"), showChips: true, isMissed: true, showCta: true, ctaLabel: "Catch Up Now", ctaIcon: "↺", showSettings: false, ctaAction: "goSession",
+      missedSub: warmupDone
+        ? "You still got the warm-up in — every streak has bumps."
+        : "Every streak has bumps. Pick it back up whenever you're ready." };
   } else if (status === "rest") {
     const recov = (fullDay && fullDay.recovery) || [];
     dayView = {
