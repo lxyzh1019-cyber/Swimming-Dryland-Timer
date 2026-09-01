@@ -25,7 +25,22 @@ globalThis.window = {
     this.destination = {}; this.resume = () => {}; },
   innerWidth: 1200, innerHeight: 800, addEventListener() {}, fetch: () => Promise.reject(new Error("no net"))
 };
-globalThis.document = { getElementById: () => null, addEventListener() {}, querySelector: () => null, querySelectorAll: () => [] };
+/* A DOM stub real enough to import js/main.js, so the ACTION LAYER — which is
+   where the Try-It arm flag and the detail-overlay pause live — can be driven
+   directly instead of guessed at from rendered markup. */
+const fakeEl = () => ({
+  innerHTML: "", scrollIntoView() {}, addEventListener() {}, removeEventListener() {},
+  contains: () => true, closest: () => null, insertAdjacentHTML() {},
+  querySelector: () => null, querySelectorAll: () => [],
+  getBoundingClientRect: () => ({ top: 0, left: 0, width: 0, height: 0 }),
+  style: {}, classList: { add() {}, remove() {}, toggle() {} }, dataset: {}, value: ""
+});
+globalThis.document = {
+  getElementById: () => fakeEl(), createElement: () => fakeEl(),
+  addEventListener() {}, removeEventListener() {},
+  querySelector: () => null, querySelectorAll: () => [],
+  body: fakeEl(), documentElement: fakeEl()
+};
 
 const base = new URL("../js/", import.meta.url).href;
 const util   = await import(base + "util.js");
@@ -47,6 +62,7 @@ const overlays = await import(base + "screens/overlays.js");
 const tryvm   = await import(base + "vm/tryit.js");
 const tryscreen = await import(base + "screens/tryit.js");
 const outcome = await import(base + "outcome.js");
+
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
@@ -1378,5 +1394,75 @@ ok(store.xpForSession({ ...recRow }) === store.XP_SHOWED_UP,
 ok(store.dayXpCap(recRow) === store.XP_SHOWED_UP, "and the day's budget is exactly that, no round XP");
 ok(store.xpForSession({ sessionType: "spa", xpVersion: store.XP_VERSION }) === 0,
    "Sunday's scheduled spa day is unchanged at zero — it was never a training day given up");
+
+/* ============================================================
+   PHASE 3 — interaction state repairs
+   ============================================================ */
+
+/* --- A. Try-It arming (the action layer that clears it: test/actions.mjs) --- */
+localStorage.clear(); store.migrate();
+store.setTryIt(true);
+ok(store.tryItArmed() === true, "Try-It arms");
+ok(store.setTryIt(false) === false && store.tryItArmed() === false, "and can be disarmed");
+store.setTryIt(true);
+ok(store.clearTryIt() === true && store.tryItArmed() === false, "clearTryIt disarms it too");
+
+/* --- B. the form check is its own phase, and rest waits for it --- */
+localStorage.clear(); store.migrate();
+let sawFormCheck = false, restDuringCheck = false, timerMovedDuringCheck = false;
+let lastTimer = null;
+const sFc = await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") {
+      sawFormCheck = true;
+      if (lastTimer !== null && sess.timerSecs !== lastTimer) timerMovedDuringCheck = true;
+      lastTimer = sess.timerSecs;
+      engine.pickClean();
+    } else { lastTimer = null; }
+    if (sess.pendingCleanCheck && ["rest", "roundRest", "sectionRest"].includes(sess.phase)) restDuringCheck = true;
+  }
+});
+ok(sawFormCheck, "the engine enters an explicit formcheck phase");
+ok(restDuringCheck === false, "a rest countdown never runs while a form check is pending");
+ok(timerMovedDuringCheck === false, "and no clock ticks down underneath the question");
+ok(sFc.formChecks.length > 0, "answering records a verdict");
+ok(sFc.formChecks.every(f => f.clean === true), "the verdict given is the verdict recorded");
+
+/* one pending check is never overwritten by a later move */
+localStorage.clear(); store.migrate();
+let overwritten = false, pendingFor = null, heldTicks = 0;
+await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.pendingCleanCheck) {
+      if (pendingFor && sess.cleanCheckMove !== pendingFor) overwritten = true;
+      pendingFor = sess.cleanCheckMove;
+      // Hold the question open a few ticks — the engine must not move on, and
+      // must not swap the move out from under her — then answer it.
+      if (++heldTicks >= 3) { engine.pickClean(); heldTicks = 0; }
+    } else { pendingFor = null; heldTicks = 0; }
+  }
+});
+ok(overwritten === false, "an unanswered check cannot be overwritten by a later move");
+
+/* a SKIPPED check records no verdict and earns no valgus credit */
+localStorage.clear(); store.migrate();
+store.saveGate({ unlocked: false, cleanWeeks: [] });
+const sSkip = await runSession({ dayKey: "monday", light: "red" }, {
+  onTick: (ms, sess) => { if (sess.phase === "formcheck") engine.skipFormCheck(); }
+});
+ok(sSkip.formChecks.length === 0, "a skipped check records no verdict");
+ok(sSkip.cleanCount === 0, "and no clean count");
+ok((store.loadGate().cleanWeeks || []).length === 0,
+   "skipping the check grants no valgus credit — not answering is not answering `clean`");
+
+/* the LAST exercise of a session still gets its check (there is no rest after it) */
+localStorage.clear(); store.migrate();
+let checkedMoves = [];
+await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+  onTick: (ms, sess) => { if (sess.phase === "formcheck") { checkedMoves.push(sess.cleanCheckMove); engine.pickClean(); } }
+});
+ok(checkedMoves.length >= engine.SPOT_CHECK_MIN,
+   "every move this run picked to watch was actually asked about (" + checkedMoves.length + ")");
+
 
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

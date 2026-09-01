@@ -132,7 +132,11 @@ export function render() {
 
 /* ---- delegated actions ---- */
 
-const actions = {
+/* Exported so the test suite can drive the action layer directly. Several of
+   the defects this app has shipped lived here — an action that closed a card
+   and silently restarted the workout clock, another that closed Try-It without
+   disarming it — and neither is visible from rendered markup. */
+export const actions = {
   nav(arg) { state.nav = arg; render(); },
   dismissStorageError() { state.storageError = null; render(); },
   // Switching athlete swaps every storage namespace; a reload is the only way
@@ -169,6 +173,11 @@ const actions = {
     render();
   },
   exitTryIt() {
+    // Try-It is ONE look, then it is over. Closing the move list used to leave
+    // the arm flag set, so every later GO reopened Try-It instead of Body Check
+    // and she could never get back to a real session without finding the toggle.
+    setTryIt(false);
+    state.practiceMode = false;
     state.tryIt = null;
     state.detailOverlay = false; state.detailEx = null;
     render();
@@ -269,6 +278,7 @@ const actions = {
   answerMicro(arg) { engine.answerMicroLoop(arg); },
   pickClean() { engine.pickClean(); },
   pickWobbly() { engine.pickWobbly(); },
+  skipFormCheck() { engine.skipFormCheck(); },
   pickMood(arg) { const [key, emoji] = arg.split("|"); engine.setMood(key, emoji); },
   reflectWell(arg) { engine.setReflect("wentWell", arg); },
   reflectNext(arg) { engine.setReflect("nextTime", arg); },
@@ -323,7 +333,15 @@ const actions = {
     // the clock is stopped before she leaves.
     if (engine.sess.running && !engine.sess.paused) engine.togglePause();
   },
+  /* Closing the instructions and RESUMING the workout are two different
+     intentions. The ✕ and a tap on the backdrop are how you dismiss something
+     you opened by accident, or close it to keep reading the move on the card —
+     they must not start the clock again. Only the Resume button does that. */
   closeDetail() {
+    state.detailOverlay = false; state.detailEx = null;
+    render();
+  },
+  resumeFromDetail() {
     state.detailOverlay = false; state.detailEx = null;
     if (engine.sess.running && engine.sess.paused) engine.togglePause();
     render();

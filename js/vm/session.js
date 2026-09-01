@@ -80,7 +80,7 @@ export function buildSessionVM(state) {
     completedFully: !sess.endedEarly
   });
   const isResting = phase === "rest" || phase === "roundRest" || phase === "sectionRest";
-  const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath";
+  const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath" || phase === "formcheck";
   const isBigRest = phase === "roundRest" || phase === "sectionRest";
   const timerIsReps = phase === "reps";
   const timerIsTime = !timerIsReps && !isPrompt;
@@ -231,7 +231,14 @@ export function buildSessionVM(state) {
     paceColor, overNudge: !!(exOver && timerIsReps),
     upNextName: sess.upNextName, upNextDose: sess.upNextDose,
     cheerMsg: CHEERS[(sess.roundsCompleted || 0) % CHEERS.length],
-    showCleanCheck: !!sess.pendingCleanCheck && isResting,
+    // Its own phase, not something rendered over a rest clock that is already
+    // running down. Naming the move matters: two or three are watched per run
+    // and she has to know which one she is answering for.
+    showCleanCheck: phase === "formcheck" && !!sess.pendingCleanCheck,
+    cleanCheckMove: sess.cleanCheckMove || "",
+    cleanCheckQuestion: sess.cleanCheckMove
+      ? "Were your " + sess.cleanCheckMove + " reps clean?"
+      : "Were your reps clean?",
     wobblyBanner: !!sess.lastWobbly && !isResting && !isPrompt,
     doneLabel: isResting ? "⏭ Skip Rest" : (timerIsReps ? "✓ Done — Next" : "✓ Done — Next"),
 

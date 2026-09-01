@@ -43,7 +43,7 @@ function blankSession() {
     upNextName: "", upNextDose: "", restCue: "",
     stopOverlay: false, confirmEnd: false, painFlag: false,
     pendingCleanCheck: false, cleanCount: 0, wobblyCount: 0, lastWobbly: false,
-    spotChecks: [], spotAsked: {}, cleanCheckMove: null, formChecks: [],
+    spotChecks: [], spotAsked: {}, cleanCheckMove: null, formChecks: [], formResolver: null,
     intentWord: null, microLoop: null,
     exStatus: {},                // "ci-ei" -> done|partial|skipped
     // The completion ledger: one row per exercise per round, holding what was
@@ -565,6 +565,39 @@ function recordBlockDone(blockKey, ci) {
 }
 
 /* ---- intent word / micro-loop prompts (UI resolves via resolvers) ---- */
+/* The clean/wobbly self-check used to be set as a flag and then abandoned: the
+   engine dropped straight into the rest countdown without waiting, so the
+   question appeared over a clock that was already running out, a later spot-check
+   move could overwrite the one she was still looking at, and a check on the very
+   LAST exercise never appeared at all — there is no rest after it.
+
+   It is an explicit phase now. Rest does not begin until she has answered or
+   skipped. Skipping records no verdict, so it can never become valgus credit. */
+function formCheckPrompt(moveName) {
+  return new Promise(resolve => {
+    sess.cleanCheckMove = moveName;
+    sess.pendingCleanCheck = true;
+    setPhase("formcheck");
+    speakIfIdle("How did that feel — clean, or wobbly?");
+    const finish = (result) => {
+      clearInterval(watchdog); clearTimeout(timeout);
+      sess.formResolver = null;
+      sess.pendingCleanCheck = false;
+      resolve(result);
+    };
+    const watchdog = setInterval(() => { if (sess.abort) finish("abort"); }, 200);
+    // A walked-away session must not hang here forever. Timing out is a SKIP:
+    // no verdict is recorded, so an unanswered check never becomes credit.
+    const timeout = setTimeout(() => { sess.cleanCheckMove = null; finish("done"); }, FORM_CHECK_TIMEOUT_MS);
+    sess.formResolver = (verdict) => {
+      if (verdict === null) sess.cleanCheckMove = null;   // skipped: no verdict
+      else recordFormCheck(verdict);
+      finish(sess.abort ? "abort" : "done");
+    };
+  });
+}
+export const FORM_CHECK_TIMEOUT_MS = 30000;
+
 function intentWordPrompt() {
   return new Promise(resolve => {
     setPhase("intent");
@@ -750,11 +783,14 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
 
         // Self-check only the moves this run is watching (see pickSpotChecks),
         // and only the first time each one comes round — main runs 2–3 rounds.
+        // A pending check is never overwritten by the next move: it is awaited
+        // here and resolved before the loop can reach another one.
         if ((circuit.block === "main" || circuit.block === "prep") && row.status === "done"
-            && sess.spotChecks.includes(ex.name) && !sess.spotAsked[ex.name]) {
+            && sess.spotChecks.includes(ex.name) && !sess.spotAsked[ex.name]
+            && !sess.pendingCleanCheck) {
           sess.spotAsked[ex.name] = true;
-          sess.cleanCheckMove = ex.name;
-          sess.pendingCleanCheck = true;
+          const fc = await formCheckPrompt(ex.name);
+          if (fc === "abort") return finalize(false);
         }
 
         // ---------- REST ----------
@@ -1041,8 +1077,28 @@ function recordFormCheck(clean) {
   if (sess.cleanCheckMove) sess.formChecks.push({ name: sess.cleanCheckMove, clean });
   sess.cleanCheckMove = null;
 }
-export function pickClean() { sess.pendingCleanCheck = false; sess.cleanCount += 1; sess.lastWobbly = false; recordFormCheck(true); notify("phase"); }
-export function pickWobbly() { sess.pendingCleanCheck = false; sess.wobblyCount += 1; sess.lastWobbly = true; recordFormCheck(false); notify("phase"); }
+export function pickClean() {
+  if (!sess.pendingCleanCheck) return;
+  sess.cleanCount += 1; sess.lastWobbly = false;
+  if (sess.formResolver) sess.formResolver(true);
+  else { recordFormCheck(true); sess.pendingCleanCheck = false; }
+  notify("phase");
+}
+export function pickWobbly() {
+  if (!sess.pendingCleanCheck) return;
+  sess.wobblyCount += 1; sess.lastWobbly = true;
+  if (sess.formResolver) sess.formResolver(false);
+  else { recordFormCheck(false); sess.pendingCleanCheck = false; }
+  notify("phase");
+}
+/* "Skip check" — no verdict, no clean count, no valgus credit. Not answering is
+   not the same as answering "clean", and only a real Clean may unlock a gate. */
+export function skipFormCheck() {
+  if (!sess.pendingCleanCheck) return;
+  if (sess.formResolver) sess.formResolver(null);
+  else { sess.cleanCheckMove = null; sess.pendingCleanCheck = false; }
+  notify("phase");
+}
 
 /* ---- cloud patches that can't arrive too early ----------------------------
    fsAddSession resolves with the doc ID some time AFTER the finish screen is
