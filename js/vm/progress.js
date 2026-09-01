@@ -6,7 +6,7 @@
 
 import { LADDER, RANK_LORE, RANK_TEASE, fmtXp } from "../data.js";
 import { sessionXp, levelFromXp, sessionRounds, sessionRoundsPlanned } from "../store.js";
-import { loadSessions, loadJourney, currentStreak, redeemPrize, countsAsTrained, prizeUndoOpen } from "../store.js";
+import { loadSessions, loadJourney, currentStreak, redeemPrize, countsAsTrained, prizeUndoOpen, outcomeOf } from "../store.js";
 import { edmontonWeekISODates, edmontonISO, DAY_MS } from "../util.js";
 import { buildJourney } from "./today.js";
 
@@ -28,10 +28,15 @@ export function logEntryView(s) {
   // A session she opened and skipped through reached the end, so it used to be
   // labelled with its traffic light — a GREEN badge on a day where nothing was
   // done. Name it for what it was.
-  const noWork = !countsAsTrained(s);
-  const lightLabel = s.safetyStop ? "SAFETY STOP"
+  // Every category on the log comes from the one outcome authority, so the log
+  // can never disagree with the streak, the week strip or the XP it paid.
+  const oc = outcomeOf(s);
+  const noWork = oc.state === "none";
+  const lightLabel = oc.state === "safety-stop" ? "SAFETY STOP"
+    : oc.state === "recovery" ? "RECOVERY"
     : noWork ? "NOTHING LOGGED"
-    : s.pain || s.endedEarly ? "ENDED EARLY"
+    : s.practice || s.sessionType === "try-it" ? "TRY-IT"
+    : oc.state === "partial" ? "ENDED EARLY"
     : (s.mini || s.sessionType === "mini") ? "MINI"
     : (s.lightResult || s.light || "green").toUpperCase();
   const skips = (s.perExercise || []).filter(p => p.skipped).map(p => p.name);
@@ -195,7 +200,7 @@ export function buildProgressVM(state) {
   // and a GO-and-quit are not training, and counting them dragged every
   // average on the board toward a session that never happened.
   const pSessions = sessions.filter(s => inRange(s) && countsAsTrained(s));
-  const pDone = pSessions.filter(s => s.completedFully);
+  const pDone = pSessions.filter(s => outcomeOf(s).state === "complete");
   const days = isoSpan(range.from, range.to);
   const weeks = Math.max(1, days.length / 7);
 
@@ -222,7 +227,7 @@ export function buildProgressVM(state) {
   const pMoodUnanswered = pSessions.filter(s => pMoods[s.mood] == null).length;
   const topMood = Object.entries(pMoods).sort((a, b) => b[1] - a[1])[0];
   const pTough = pSessions.filter(s => ["yellow", "red"].includes(s.lightResult || s.light));
-  const pToughDone = pTough.filter(s => s.completedFully).length;
+  const pToughDone = pTough.filter(s => outcomeOf(s).state === "complete").length;
 
   const per = (n, d, unit) => d > 0 ? (Math.round((n / d) * 10) / 10) + " " + unit : "—";
   const periodStats = {

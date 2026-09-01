@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overloadWeek } from "../data.js";
-import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress, countsAsTrained, sessionXp } from "../store.js";
+import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress, countsAsTrained, sessionXp, outcomeOf } from "../store.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
 import { assembleCircuits, estimateSessionSecs } from "../engine.js";
 
@@ -54,7 +54,8 @@ export function weekStatuses() {
   const trained = sessions.filter(countsAsTrained);
   // A MINI is a defined subset, never the whole day's plan — a completed mini
   // used to tick the day off entirely and clear what was left of it.
-  const isWholeDay = s => s.completedFully && !s.mini && s.sessionType !== "mini";
+  // "Complete" is the one authority's answer, not the engine's loop flag.
+  const isWholeDay = s => outcomeOf(s).state === "complete" && !s.mini && s.sessionType !== "mini";
   const doneKeys = new Set(trained.filter(isWholeDay).map(s => s.dayKey).filter(Boolean));
   const partialKeys = new Set(trained.filter(s => !isWholeDay(s)).map(s => s.dayKey).filter(Boolean));
   const todayIdx = WEEK_ORDER.indexOf(todayKey);

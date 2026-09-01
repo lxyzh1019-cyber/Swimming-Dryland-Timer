@@ -7,6 +7,7 @@ import { sess, refTime, screenRepsDetail } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork, videoSearchUrl } from "../data.js";
 import { fmtMMSS, exercisePhotoUrl } from "../util.js";
 import { loadSessions } from "../store.js";
+import { deriveSessionOutcome, OUTCOME_VERSION } from "../outcome.js";
 
 const MOOD_DEFS = [
   { key: "great", emoji: "😀", label: "Great" },
@@ -67,6 +68,17 @@ export function buildSessionVM(state) {
   const phase = sess.phase;
 
   const sessionDone = phase === "done";
+  // The finish screen asks the same authority the saved record will be judged
+  // by, so what she is told matches what the reports will say tomorrow.
+  const liveOutcome = deriveSessionOutcome({
+    ledger: sess.ledger || [],
+    expectedWork: Number.isFinite(sess.expectedWork) ? sess.expectedWork : null,
+    safetyStop: !!sess.painFlag,
+    explicitAbort: sess.endedEarly === true,
+    sessionType: sess.mode === "recovery" ? "recovery" : sess.spa ? "spa" : null,
+    outcomeVersion: OUTCOME_VERSION,
+    completedFully: !sess.endedEarly
+  });
   const isResting = phase === "rest" || phase === "roundRest" || phase === "sectionRest";
   const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath";
   const isBigRest = phase === "roundRest" || phase === "sectionRest";
@@ -232,7 +244,9 @@ export function buildSessionVM(state) {
     // complete screen
     endedEarly: sess.endedEarly, painFlag: sess.painFlag,
     // Reaching the end having skipped everything is not "Session Complete!".
-    noWorkDone: !(sess.ledger || []).some(l => l.status === "done"),
+    // Asked of the one authority rather than re-derived here, so the finish
+    // screen can never claim more (or less) than the record it just saved.
+    noWorkDone: liveOutcome.state === "none",
     mini: sess.mode === "mini",
     saveFailed: !!sess.saveFailed,
     sessionMantra: day.mantra || "",

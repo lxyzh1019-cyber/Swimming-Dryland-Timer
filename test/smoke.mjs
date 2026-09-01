@@ -46,6 +46,7 @@ const rscreen = await import(base + "screens/readiness.js");
 const overlays = await import(base + "screens/overlays.js");
 const tryvm   = await import(base + "vm/tryit.js");
 const tryscreen = await import(base + "screens/tryit.js");
+const outcome = await import(base + "outcome.js");
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
@@ -1236,5 +1237,84 @@ const scheduledSoFar = oneDay.scheduled;
 ok(oneDay.adherence === Math.round((1 / Math.max(1, scheduledSoFar)) * 100),
    "it counts the one DAY she trained, not the two records she left on it");
 localStorage.clear();
+
+/* ============================================================
+   PHASE 2 — one session-outcome authority
+   Every one of these calls the real function and asserts on what it RETURNS.
+   ============================================================ */
+localStorage.clear(); store.migrate();
+const OV = outcome.OUTCOME_VERSION;
+const led = (...st) => st.map((status, i) => ({ name: "m" + i, block: "main", round: 1, status }));
+
+/* --- the five states --- */
+ok(outcome.deriveSessionOutcome({ ledger: led("skipped", "skipped"), outcomeVersion: OV }).state === "none",
+   "every exercise skipped is `none`");
+ok(outcome.deriveSessionOutcome({ ledger: led("done", "skipped", "skipped"), outcomeVersion: OV }).state === "partial",
+   "one done plus the rest skipped is `partial`, never a completed session");
+ok(outcome.deriveSessionOutcome({ ledger: led("done", "done"), expectedWork: 2, outcomeVersion: OV }).state === "complete",
+   "every expected instance done is `complete`");
+ok(outcome.deriveSessionOutcome({ ledger: led("done", "done"), expectedWork: 4, outcomeVersion: OV }).state !== "complete",
+   "missing expected ledger rows are not a completed session");
+ok(outcome.deriveSessionOutcome({ ledger: led("done", "partial"), expectedWork: 2, outcomeVersion: OV }).state === "partial",
+   "a required entry left partial is not complete");
+ok(outcome.deriveSessionOutcome({ ledger: led("done"), safetyStop: true, outcomeVersion: OV }).state === "safety-stop",
+   "a pain stop is its own state, not a short workout");
+ok(outcome.deriveSessionOutcome({ ledger: led("done"), sessionType: "recovery", outcomeVersion: OV }).state === "recovery",
+   "recovery is separate from training completion");
+
+/* --- the partial-work correction: the reported defect --- */
+const onePartial = outcome.deriveSessionOutcome({ ledger: [{ status: "partial" }], outcomeVersion: OV });
+ok(onePartial.meaningfulWork === true, "a single partial entry IS meaningful work");
+ok(onePartial.countsAsTraining === true, "and 7-of-8 reps buys the training day it earned");
+ok(onePartial.state === "partial", "recorded as partial, never as complete");
+
+/* --- safety stop and recovery pay nothing toward training --- */
+const ss = outcome.deriveSessionOutcome({ ledger: led("done", "done"), expectedWork: 2, safetyStop: true, outcomeVersion: OV });
+ok(ss.countsForStreak === false && ss.countsAsTraining === false, "a safety stop takes no streak and no training day");
+const rc = outcome.deriveSessionOutcome({ ledger: led("done"), sessionType: "recovery", outcomeVersion: OV });
+ok(rc.countsForStreak === false, "recovery does not increase the streak");
+ok(rc.countsAsTraining === false, "nor does it complete a scheduled training day");
+ok(rc.xpEligible === true, "but recovery is still allowed its care credit");
+
+/* --- main rounds come from the ledger, not the loop --- */
+const twoRounds = [
+  { block: "main", round: 1, status: "done" }, { block: "main", round: 1, status: "done" },
+  { block: "main", round: 2, status: "done" }, { block: "main", round: 2, status: "partial" }
+];
+ok(outcome.mainRoundsFromLedger(twoRounds) === 1,
+   "a round with a partial move in it is not a finished round");
+
+/* --- history is NOT re-scored: rows without outcomeVersion keep the old rule --- */
+const legacyPartial = { ledger: [{ status: "partial" }], isoDate: new Date().toISOString() };
+ok(store.countsAsTrained(legacyPartial) === false,
+   "a pre-fix all-partial record keeps the scoring it was written with");
+ok(store.countsAsTrained({ ...legacyPartial, outcomeVersion: OV }) === true,
+   "the same shape written after the fix counts");
+
+/* --- every consumer reads the SAME answer --- */
+localStorage.clear(); store.migrate();
+const shared = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: OV, sessionType: "main",
+  roundsDone: 1, roundsPlanned: 3, durationSecs: 900, completedFully: false, endedEarly: true,
+  ledger: [{ name: "a", block: "main", round: 1, status: "partial" }] };
+ok(store.countsAsTrained(shared) === true, "the store calls it trained");
+ok(store.isPartialSession(shared) === true, "and partial");
+ok(store.outcomeOf(shared).state === "partial", "the authority agrees");
+ok(store.xpForSession(shared) > 0, "and the XP it pays agrees that work happened");
+ok(pvm.logEntryView(shared).lightLabel === "ENDED EARLY", "the log reports the same partial session");
+
+/* --- regression: the one-full-day XP cap still holds over partial + resume --- */
+localStorage.clear(); store.migrate();
+const capBase = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: OV, sessionType: "main", roundsPlanned: 3,
+  ledger: [{ name: "x", block: "main", round: 1, status: "done" }] };
+const payA = store.claimSessionXp({ ...capBase, roundsDone: 1 });
+const payB = store.claimSessionXp({ ...capBase, roundsDone: 2 });
+ok(payA + payB === 360, "partial then resume still tops out at exactly one full day");
+ok(store.claimSessionXp({ ...capBase, roundsDone: 3 }) === 0, "and a third attempt pays nothing");
+
+/* --- regression: a pain stop is still zero XP and zero streak --- */
+ok(store.xpForSession({ ...capBase, roundsDone: 3, safetyStop: true }) === 0, "a pain stop still pays no XP");
+ok(store.countsAsTrained({ ...capBase, roundsDone: 3, safetyStop: true }) === false, "and still takes no streak");
 
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

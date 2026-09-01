@@ -6,7 +6,7 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl, fmtXp } from "../data.js";
-import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal,
+import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal, outcomeOf,
          sessionRounds as sessionRoundsDone, sessionRoundsPlanned,
          monthKeyOf, formVerdicts, latestFormVerdicts } from "../store.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
@@ -77,22 +77,27 @@ export function buildGrownupVM(state) {
   const guAlerts = flags.length ? flags : [{ icon: "✅", rowStyle: alertRow("sun"), text: "Nothing to flag " + scopeLabel.toLowerCase() + " — sessions ran clean." }];
 
   /* ---- headline stats ---- */
-  const done = sessions.filter(s => s.completedFully);
+  // Headline stats answer for TRAINING. Recovery days, safety stops and
+  // GO-and-quit rows used to land in the minute totals and the average as if
+  // they were workouts, which is how "avg session" drifted below any session
+  // she actually did.
+  const trainingRows = sessions.filter(s => outcomeOf(s).countsAsTraining);
+  const done = sessions.filter(s => outcomeOf(s).state === "complete");
   const days = scopeDays(scope, all);
   const scheduled = scope === "week" ? days : Math.round(days);   // plan trains daily (Sun = recovery)
-  const totalMins = sessions.reduce((a, s) => a + mins(s), 0);
+  const totalMins = trainingRows.reduce((a, s) => a + mins(s), 0);
   // Adherence is "how many of the days she was meant to train did she train",
   // so it counts DAYS, not records. Counting records let two attempts at one
   // Tuesday read as two days of adherence — and pushed the figure over 100%
   // often enough that it had to be clamped.
   const trainedDaySet = new Set(sessions.filter(countsAsTrainedLocal).map(s => edmontonISO(s.isoDate)));
   const adherence = Math.min(100, Math.round((trainedDaySet.size / Math.max(1, scheduled)) * 100));
-  const avgMins = sessions.length ? Math.round(totalMins / sessions.length) : 0;
+  const avgMins = trainingRows.length ? Math.round(totalMins / trainingRows.length) : 0;
 
   /* ---- readiness → completion ---- */
   const readinessOutcome = ["green", "yellow", "red", "recovery"].map(light => {
     const ss = sessions.filter(s => (s.lightResult || s.light) === light);
-    const completed = ss.filter(s => s.completedFully).length;
+    const completed = ss.filter(s => outcomeOf(s).state === "complete").length;
     if (!ss.length) return null;
     return {
       light: light[0].toUpperCase() + light.slice(1), color: LIGHT_COLORS[light],
@@ -113,7 +118,7 @@ export function buildGrownupVM(state) {
   all.forEach(s => {
     if (!countsAsTrainedLocal(s)) return;
     const k = edmontonISO(s.isoDate);
-    const st = (s.completedFully && !s.mini && s.sessionType !== "mini") ? "done" : "partial";
+    const st = (outcomeOf(s).state === "complete" && !s.mini && s.sessionType !== "mini") ? "done" : "partial";
     if (byIso[k] !== "done") byIso[k] = st;
   });
   let consistency;
@@ -328,17 +333,17 @@ export function buildGrownupVM(state) {
     const isoDates = edmontonWeekISODates();
     // The best attempt that day, not the first one found. A GO-and-quit at
     // breakfast used to hide the full session she did after school.
-    const rank = x => (x.completedFully ? 2 : 0) + (countsAsTrainedLocal(x) ? 1 : 0);
+    const rank = x => (outcomeOf(x).state === "complete" ? 2 : 0) + (countsAsTrainedLocal(x) ? 1 : 0);
     byWeekday = WEEK_ORDER.map(k => {
       const sameDay = all.filter(x => edmontonISO(x.isoDate) === isoDates[k]);
       const s = sameDay.sort((a, b) => rank(b) - rank(a) || (b.durationSecs || 0) - (a.durationSecs || 0))[0];
       return {
         k: DAY_SHORT[k], topic: DAYS[k].theme || DAYS[k].title,
         mood: s && s.mood ? MOOD_EMOJI[s.mood] : "·",
-        done: !!(s && s.completedFully), mins: s ? mins(s) : 0,
-        rowBg: s && s.completedFully ? "var(--surface)" : "var(--surface-2)",
-        statusChip: s && s.completedFully ? "✓ " + mins(s) + "m" : (s ? "partial" : "—"),
-        statusStyle: "font-size:11px;font-weight:900;border-radius:var(--radius-pill);padding:3px 9px;white-space:nowrap;" + (s && s.completedFully ? "background:var(--mint-wash);color:var(--mint-ink);" : s ? "background:var(--sun-wash);color:var(--sun-ink);" : "background:var(--surface-2);color:var(--ink-faint);")
+        done: !!(s && outcomeOf(s).state === "complete"), mins: s ? mins(s) : 0,
+        rowBg: s && outcomeOf(s).state === "complete" ? "var(--surface)" : "var(--surface-2)",
+        statusChip: s && outcomeOf(s).state === "complete" ? "✓ " + mins(s) + "m" : (s ? "partial" : "—"),
+        statusStyle: "font-size:11px;font-weight:900;border-radius:var(--radius-pill);padding:3px 9px;white-space:nowrap;" + (s && outcomeOf(s).state === "complete" ? "background:var(--mint-wash);color:var(--mint-ink);" : s ? "background:var(--sun-wash);color:var(--sun-ink);" : "background:var(--surface-2);color:var(--ink-faint);")
       };
     });
   } else {
@@ -347,7 +352,7 @@ export function buildGrownupVM(state) {
       const t = (DAYS[s.dayKey] && DAYS[s.dayKey].theme) || s.dayTitle || "Other";
       topics[t] = topics[t] || { done: 0, planned: 0, moods: [] };
       topics[t].planned += 1;
-      if (s.completedFully) topics[t].done += 1;
+      if (outcomeOf(s).state === "complete") topics[t].done += 1;
       if (s.mood) topics[t].moods.push(MOOD_EMOJI[s.mood]);
     });
     byTopic = Object.entries(topics).map(([k, v]) => ({

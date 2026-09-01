@@ -8,6 +8,7 @@
      notify("tick")  → targeted per-second DOM writes only
    ============================================================ */
 
+import { deriveSessionOutcome, OUTCOME_VERSION } from "./outcome.js";
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA,
          exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
          VALGUS_FLOOR, VALGUS_PROGRESSIONS } from "./data.js";
@@ -38,7 +39,7 @@ function blankSession() {
     phase: "greeting",           // greeting|getready|work|reps|sideswitch|rest|roundRest|sectionRest|intent|microloop|breath|done
     circuits: [], ci: 0, ei: 0, round: 1, exDone: 0,
     timerSecs: 0, timerMax: 0, urgent: false,
-    exElapsed: 0, elapsed: 0, pausedSecs: 0, plannedSecs: 0,
+    exElapsed: 0, elapsed: 0, pausedSecs: 0, plannedSecs: 0, expectedWork: 0,
     upNextName: "", upNextDose: "", restCue: "",
     stopOverlay: false, confirmEnd: false, painFlag: false,
     pendingCleanCheck: false, cleanCount: 0, wobblyCount: 0, lastWobbly: false,
@@ -138,6 +139,20 @@ export function pickSpotChecks(circuits, rnd = Math.random, flagged = null) {
   const rest = shuffle(names.filter(n => !flags.includes(n)));
   const want = SPOT_CHECK_MIN + Math.floor(rnd() * (SPOT_CHECK_MAX - SPOT_CHECK_MIN + 1));
   return [...priority, ...rest].slice(0, Math.min(want, names.length));
+}
+
+/* How many exercise-round instances the session asks for. This is the yardstick
+   completion is measured against: a session that ended early leaves rows
+   MISSING from the ledger, and missing rows are not a completed session however
+   cleanly the loop exited. */
+export function countExpectedWork(circuits) {
+  let n = 0;
+  (circuits || []).forEach(c => {
+    for (let r = 1; r <= c.rounds; r++) {
+      c.exercises.forEach(ex => { if (!(ex.rounds && r > ex.rounds)) n++; });
+    }
+  });
+  return n;
 }
 
 /* Estimated session length in seconds (rep-based ≈ secondsPerRep × reps). */
@@ -444,7 +459,11 @@ function exerciseStatus(ex, wasSkipped, actualSecs, plannedSecs) {
   // Rep work is judged on REPS, timed work on TIME. Judging reps by the clock
   // marked a fully counted set as skipped whenever the voice ran fast.
   if (ex.byReps) {
-    if (!sess.repsCounted) return "skipped";     // an instant Done tap is not an exercise
+    // An instant Done tap is not an exercise. Counting zero reps was never
+    // enough on its own: tapping through fires after the FIRST rep is counted,
+    // which used to land as `partial` — and partial is real work now, so the
+    // tap-through would have paid. A set also has to have taken real time.
+    if (!sess.repsCounted || actualSecs < MIN_EXERCISE_SECS) return "skipped";
     return sess.repsCounted >= sess.repsTarget ? "done" : "partial";
   }
   if (actualSecs < MIN_EXERCISE_SECS) return "skipped";
@@ -589,6 +608,7 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
   sess.circuits = assembleCircuits(dayKey, sess.light, { mini: sess.mini, skip: sess.spa ? [] : skipBlocks });
   if (!sess.circuits.length) { sess.running = false; return; }
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
+  sess.expectedWork = countExpectedWork(sess.circuits);
   // A mini is one shortened round however the light was set; everything else
   // is priced and reported against the light's own round count.
   sess.roundsPlanned = sess.spa ? 0
@@ -848,8 +868,19 @@ export function finalize(completed) {
     light: sess.light, mini: sess.mini,
     pain: safetyStop,
     endedEarly: !completed,
+    // The loop reaching its end is NOT the same as the work being done. The
+    // record now carries what the session ASKED FOR (expectedWork) plus the
+    // version marker that lets partial work count, and every reader derives
+    // completion from the ledger through js/outcome.js.
+    expectedWork: sess.expectedWork || 0,
+    outcomeVersion: OUTCOME_VERSION,
     completedFully: !!completed
   };
+  entry.completedFully = deriveSessionOutcome({
+    ledger: entry.ledger, expectedWork: entry.expectedWork,
+    safetyStop, explicitAbort: !completed, sessionType: entry.sessionType,
+    outcomeVersion: OUTCOME_VERSION, completedFully: !!completed
+  }).state === "complete";
   sess.perExercise = entry.perExercise;
   const saved = saveSession(entry);
   sess.savedEntry = saved;

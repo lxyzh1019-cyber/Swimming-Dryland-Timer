@@ -6,6 +6,7 @@
 
 import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
 import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE } from "./data.js";
+import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION } from "./outcome.js";
 
 /* ---- keys (unchanged from the old app unless noted) ---- */
 export const SETTINGS_KEY     = "swimTrainingSettingsV2";
@@ -363,20 +364,10 @@ export function thisWeekSessions() {
    app's `completedFully !== false` reading. */
 export function countsAsTrained(s) {
   if (!s || s.practice) return false;
-  // A safety stop is a safety event. It belongs in Safety & Flags, not in the
-  // streak — rewarding it the way training is rewarded is exactly backwards.
-  if (s.safetyStop) return false;
-  // With no per-move detail at all there is nothing to judge, so trust the
-  // flag — that is how records written before per-move detail existed read.
-  const hasDetail = ((s.ledger || []).length > 0) || ((s.perExercise || []).length > 0);
-  if (!hasDetail) return s.completedFully !== false;
-  // Otherwise: reaching the end of the session is NOT the same as training.
-  // Skipping every exercise used to arrive here as completedFully:true and
-  // take the day, the streak and the week strip with it.
-  return sessionHadRealWork(s);
+  return outcomeOf(s).countsAsTraining;
 }
 /* Trained, but not all the way through — rendered as a softer ✓. */
-export function isPartialSession(s) { return countsAsTrained(s) && !s.completedFully; }
+export function isPartialSession(s) { return outcomeOf(s).state === "partial"; }
 
 export function daysAgoCount(sessions, days) {
   const cutoff = Date.now() - days * DAY_MS;
@@ -847,21 +838,23 @@ export function sessionRounds(entry) {
 /* Rounds the day asked for — the ceiling a day's XP is capped at. */
 export function sessionRoundsPlanned(entry) {
   if (!entry) return 0;
+  if (entry.sessionType === "recovery" || entry.sessionType === "spa") return 0;
   if (entry.mini || entry.sessionType === "mini") return 1;
   if (Number.isFinite(entry.roundsPlanned)) return Math.min(3, Math.max(0, entry.roundsPlanned));
   return Math.min(3, Math.max(1, entry.roundsDone || 1));
 }
 
-/* Did any real work happen? A session that opened and closed is not a session,
-   and neither is one where every exercise was skipped or instantly tapped
-   through. Prefers the ledger; falls back to the per-move rows on older
-   records that predate it. */
+/* Did any real work happen? Delegated to the one outcome authority — this used
+   to count only `done` rows, so a session of 7-of-8 reps on every move read as
+   nothing at all. See js/outcome.js. */
 export function sessionHadRealWork(entry) {
-  const rows = (entry && entry.ledger) || [];
-  if (rows.length) return rows.some(l => l && l.status === "done");
-  return ((entry && entry.perExercise) || []).some(p => p && !p.skipped);
+  return outcomeOf(entry).meaningfulWork;
 }
 const didRealWork = sessionHadRealWork;
+
+/* Re-exported so every view-model reads the one authority through the store
+   it already imports, instead of re-deriving completion for itself. */
+export { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION };
 
 /* XP a session is worth: showing up and doing real work pays the base, and
    every MAIN ROUND actually finished pays another. Nothing done pays nothing,
@@ -876,6 +869,13 @@ export function xpForSession(entry) {
                   entry.movesDone || entry.moves || 6;
     return moves * 10 + 40;                       // older rows, unchanged
   }
+  // A weekday that resolved to Recovery is care, not a workout. It pays the
+  // flat show-up credit and no round XP: reporting soreness honestly must never
+  // cost her, or the readiness check becomes something to lie to. It still buys
+  // no training day, no streak and no adherence (see js/outcome.js).
+  // Sunday's scheduled spa day is unchanged at 0 above — it was never a
+  // training day she gave up.
+  if (entry.sessionType === "recovery") return XP_SHOWED_UP;
   if (!didRealWork(entry)) return 0;
   return XP_SHOWED_UP + XP_PER_ROUND * sessionRounds(entry);
 }
