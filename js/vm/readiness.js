@@ -37,9 +37,24 @@ function maybeFinish(r) {
   r.resultSource = "readiness";
 }
 
+/* How old a saved check can be and still be "yesterday". Long enough to cover
+   an evening check followed by a morning one, short enough that a record from
+   last month can never be reused. */
+export const SAME_AS_YESTERDAY_MAX_MS = 36 * 60 * 60 * 1000;
+
+/* Is there a check recent enough to reuse? The button asks "same as
+   yesterday?" but the app only ever checked that SOME previous record
+   existed — so a check from months ago answered yes. */
+export function hasRecentReadiness(now = Date.now()) {
+  const prev = loadReadiness();
+  if (!prev || !prev.answers || !Number.isFinite(prev.when)) return false;
+  return now - prev.when <= SAME_AS_YESTERDAY_MAX_MS;
+}
+
 export function sameAsYesterday(r) {
   const prev = loadReadiness();
   if (!prev || !prev.answers) return;
+  if (!hasRecentReadiness()) return;   // stale: she has to actually answer
   if (prev.answers.q_pain === "no") {
     // Yesterday had sore spots — don't silently reuse; soreness must be re-checked today.
     r.answers = { ...prev.answers, q_pain: null };
@@ -204,7 +219,10 @@ export function buildReadinessVM(r, isWide) {
     needsGrownupConfirm: isBodyResultPath && !!BR.needsGrownup,
     grownupConfirmed: !!r.grownupOk,
     questions,
-    hasYesterday: !!(prev && prev.answers) && step === "questions" && !showInlineReadinessResult,
+    // Only offer the one-tap reuse when there is genuinely a recent check to
+    // reuse. It used to appear whenever ANY previous record existed, so
+    // "same as yesterday" could copy a body check from months ago.
+    hasYesterday: hasRecentReadiness() && step === "questions" && !showInlineReadinessResult,
     areaLabel: BODY_ZONES.filter(z => zoneSev[z.n]).map(z => z.label + " — " + SEV_SHORT[zoneSev[z.n]]).join(" · "),
     zoneHighlight, zoneBadge, zoneBadgeBg, legendRows,
     showZonePopup: !!pz,

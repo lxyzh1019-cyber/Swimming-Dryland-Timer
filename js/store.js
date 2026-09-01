@@ -180,8 +180,10 @@ export const DEFAULT_SETTINGS = {
    and nothing ever cleared it (so one forgotten arm threw away every session
    after it — she trains, finishes, and her streak doesn't move).
 
-   So it is persisted AND one-shot: armed here, cleared the moment a run ends,
-   and expired after two hours if it was armed and never used. */
+   Try-It no longer runs a session at all: armed, GO opens the move list
+   (js/screens/tryit.js) instead of starting a workout, so a forgotten arm is
+   visible immediately and can't silently discard training. It still expires
+   after two hours, so a toggle left on overnight isn't waiting for her. */
 export const TRY_IT_EXPIRY_MS = 2 * 60 * 60 * 1000;
 
 export function tryItArmed() {
@@ -287,9 +289,17 @@ export function thisWeekSessions() {
    app's `completedFully !== false` reading. */
 export function countsAsTrained(s) {
   if (!s || s.practice) return false;
-  if (s.completedFully) return true;
-  if (s.completedFully === undefined && s.endedEarly === undefined) return true;
-  return !!s.endedEarly && (s.perExercise || []).some(p => p && !p.skipped);
+  // A safety stop is a safety event. It belongs in Safety & Flags, not in the
+  // streak — rewarding it the way training is rewarded is exactly backwards.
+  if (s.safetyStop) return false;
+  // With no per-move detail at all there is nothing to judge, so trust the
+  // flag — that is how records written before per-move detail existed read.
+  const hasDetail = ((s.ledger || []).length > 0) || ((s.perExercise || []).length > 0);
+  if (!hasDetail) return s.completedFully !== false;
+  // Otherwise: reaching the end of the session is NOT the same as training.
+  // Skipping every exercise used to arrive here as completedFully:true and
+  // take the day, the streak and the week strip with it.
+  return sessionHadRealWork(s);
 }
 /* Trained, but not all the way through — rendered as a softer ✓. */
 export function isPartialSession(s) { return countsAsTrained(s) && !s.completedFully; }
@@ -426,10 +436,54 @@ export function clearDayProgress(dayKey) {
   writeStorage(LS_DAYPROG, all);
 }
 
-/* ---- valgus gate ---- */
-export function loadGate() { return readStorage(LS_GATE, { unlocked: false, cleanCount: 0 }); }
+/* ---- valgus gate ----------------------------------------------------------
+   The gate held a bare `cleanCount` that the engine bumped whenever
+   Drop-and-Stick merely wasn't skipped, while the Grown-up screen promised
+   "5/5 clean ×2 weeks". Two sessions in one afternoon could open a gate meant
+   to take a fortnight. It banks WEEKS now, and only for a session where the
+   move was actually done AND self-checked clean. */
+export const GATE_WEEKS_REQUIRED = 2;
+export const GATE_MOVE = "Drop-and-Stick";
+
+export function loadGate() {
+  const g = readStorage(LS_GATE, { unlocked: false, cleanWeeks: [] });
+  if (!Array.isArray(g.cleanWeeks)) g.cleanWeeks = [];
+  return g;
+}
 export function saveGate(g) { writeStorage(LS_GATE, g); }
 export function gateLocked() { return !loadGate().unlocked; }
+export function gateCleanWeeks() { return loadGate().cleanWeeks.length; }
+
+/* The old bare counter can't say WHICH weeks were clean, and it was inflated by
+   sessions that only had to not-skip the move. Credit at most one week for it
+   so real progress isn't wiped, and let the new rule earn the rest. */
+export function migrateGateWeeks() {
+  const g = readStorage(LS_GATE, null);
+  if (!g || g.cleanWeeks || g.cleanCount == null) return false;
+  const carried = g.cleanCount > 0 && !g.unlocked ? [weekKeyFor(new Date())] : [];
+  const { cleanCount, ...rest } = g;
+  writeStorage(LS_GATE, { ...rest, cleanWeeks: g.unlocked ? [] : carried });
+  return true;
+}
+
+/* Credit this session's week toward the gate, if it earned it. Returns the
+   gate. Unlocking is automatic once the two weeks are banked. */
+export function creditValgusWeek(entry) {
+  const rows = (entry && entry.ledger) || [];
+  const didIt = rows.some(l => l && l.name === GATE_MOVE && l.status === "done");
+  const wasClean = (entry.formChecks || []).some(f => f && f.name === GATE_MOVE && f.clean);
+  // A grown-up who watched the move fail outranks her own self-report — that
+  // verdict is the whole reason the monthly form check exists.
+  const parentSaysNo = flaggedMoves().includes(GATE_MOVE);
+  if (!didIt || !wasClean || parentSaysNo) return loadGate();
+  const g = loadGate();
+  const week = weekKeyFor(new Date(entry.isoDate || Date.now()));
+  if (!g.cleanWeeks.includes(week)) g.cleanWeeks.push(week);
+  g.cleanWeeks = g.cleanWeeks.slice(-8);
+  if (g.cleanWeeks.length >= GATE_WEEKS_REQUIRED) g.unlocked = true;
+  saveGate(g);
+  return g;
+}
 
 /* ---- Independence Ladder ---- */
 export function loadLadderRungs() { return readStorage(LS_LADDER, {}); }
@@ -669,9 +723,14 @@ export function saveJourney(j) { writeStorage(LS_JOURNEY, j); }
    finalize()) for records restored from the cloud or written before xpEarned
    existed. */
 export function sessionXp(entry) {
-  // Try-it rows exist only to carry a pain stop to the grown-up; they are not
-  // training and must never reach the XP total on a rebuild.
+  // Try-it rows are not training (older histories may still hold some) and must
+  // never reach the XP total on a rebuild.
   if (entry && entry.practice) return 0;
+  // xpEarned is the SESSION's XP and nothing else. Quiz XP is priced by the
+  // quiz ledger and rides on the record as its own field, because
+  // rebuildJourneyXp adds the ledger to the session log — a row that folded
+  // the two together was counted twice on every rebuild (360 + 30 came back
+  // as 420). migrateQuizXp() splits the historic rows that did.
   if (Number.isFinite(entry && entry.xpEarned)) return Math.max(0, entry.xpEarned);
   const full = xpForSession(entry || {});
   return entry && entry.completedFully === false ? Math.round(full / 2) : full;
@@ -692,22 +751,97 @@ export function sessionXp(entry) {
    Only records written by this version are priced this way. Legacy rows keep
    the old formula, so a cloud restore re-awards what a session originally paid
    instead of re-pricing history. */
-export const XP_VERSION = 4;
-export const SESSION_XP = { 1: 180, 2: 270, 3: 360 };
+export const XP_VERSION = 5;
+export const SESSION_XP = { 0: 90, 1: 180, 2: 270, 3: 360 };
+export const XP_PER_ROUND = 90;
+export const XP_SHOWED_UP = 90;
 
+/* Main rounds a record actually finished. v4 and earlier stored the rounds the
+   LIGHT ASKED FOR here, so an ended-early session claimed a full green day. */
 export function sessionRounds(entry) {
-  if (entry && entry.mini) return 1;
-  return Math.min(3, Math.max(1, (entry && entry.roundsDone) || 1));
+  if (!entry) return 0;
+  if (entry.xpVersion !== XP_VERSION) {
+    // Legacy rows: roundsDone was the plan, so read it as the plan.
+    if (entry.mini) return 1;
+    return Math.min(3, Math.max(1, entry.roundsDone || 1));
+  }
+  // You cannot finish more rounds than the day asked for — a mini is one
+  // round however the traffic light was set.
+  return Math.min(sessionRoundsPlanned(entry), Math.max(0, entry.roundsDone || 0));
 }
 
+/* Rounds the day asked for — the ceiling a day's XP is capped at. */
+export function sessionRoundsPlanned(entry) {
+  if (!entry) return 0;
+  if (entry.mini || entry.sessionType === "mini") return 1;
+  if (Number.isFinite(entry.roundsPlanned)) return Math.min(3, Math.max(0, entry.roundsPlanned));
+  return Math.min(3, Math.max(1, entry.roundsDone || 1));
+}
+
+/* Did any real work happen? A session that opened and closed is not a session,
+   and neither is one where every exercise was skipped or instantly tapped
+   through. Prefers the ledger; falls back to the per-move rows on older
+   records that predate it. */
+export function sessionHadRealWork(entry) {
+  const rows = (entry && entry.ledger) || [];
+  if (rows.length) return rows.some(l => l && l.status === "done");
+  return ((entry && entry.perExercise) || []).some(p => p && !p.skipped);
+}
+const didRealWork = sessionHadRealWork;
+
+/* XP a session is worth: showing up and doing real work pays the base, and
+   every MAIN ROUND actually finished pays another. Nothing done pays nothing,
+   and a safety stop pays nothing at all. */
 export function xpForSession(entry) {
+  if (!entry) return 0;
   if (entry.sessionType === "spa" || entry.session === "spa" || entry.spa) return 0;
+  if (entry.safetyStop) return 0;
   if (entry.xpVersion !== XP_VERSION) {
+    if (entry.xpVersion === 4) return SESSION_XP[sessionRounds(entry)];
     const moves = (entry.perExercise && entry.perExercise.length) ||
                   entry.movesDone || entry.moves || 6;
-    return moves * 10 + 40;                       // legacy rows, unchanged
+    return moves * 10 + 40;                       // older rows, unchanged
   }
-  return SESSION_XP[sessionRounds(entry)];
+  if (!didRealWork(entry)) return 0;
+  return XP_SHOWED_UP + XP_PER_ROUND * sessionRounds(entry);
+}
+
+/* ---- one training day pays for one training day --------------------------
+   Pricing on rounds actually finished is necessary but not sufficient: a
+   partial that finished one round (180) plus the resumed run that finished the
+   other two (270) still adds to 450 for a 360 day. So the day itself carries a
+   budget, and a session can only draw what is left in it. */
+const DAY_XP_RETENTION = 60;                       // days of budget rows kept
+
+export function dayXpCap(entry) {
+  return XP_SHOWED_UP + XP_PER_ROUND * sessionRoundsPlanned(entry);
+}
+function dayXpKey(entry) {
+  return String(entry.dayKey || "") + "|" + edmontonISO(entry.isoDate || Date.now());
+}
+function pruneDayXp(map) {
+  const keys = Object.keys(map || {});
+  if (keys.length <= DAY_XP_RETENTION) return map || {};
+  const keep = keys.sort((a, b) => a.split("|")[1].localeCompare(b.split("|")[1])).slice(-DAY_XP_RETENTION);
+  const out = {};
+  keep.forEach(k => { out[k] = map[k]; });
+  return out;
+}
+
+/* What this session may actually be paid, after the day's budget. Records the
+   draw, so calling it twice for one session does not pay twice. */
+export function claimSessionXp(entry) {
+  const want = xpForSession(entry);
+  if (want <= 0) return 0;
+  const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
+  const key = dayXpKey(entry);
+  const spent = (j.dayXpPaid && j.dayXpPaid[key]) || 0;
+  const grant = Math.max(0, Math.min(want, dayXpCap(entry) - spent));
+  if (grant > 0) {
+    j.dayXpPaid = pruneDayXp({ ...(j.dayXpPaid || {}), [key]: spent + grant });
+    saveJourney(j);
+  }
+  return grant;
 }
 
 /* Level for a cumulative XP total, plus progress into the current level. */
@@ -868,12 +1002,14 @@ export function reconcileWallet(j) {
   const earned = drawsEverEarned(j);          // high-water, never the current dip
   if (wallet.length <= earned) return { journey: syncPendingDraws(j), removed: [] };
 
+  // Oldest first, full stop. Pinning every redeemed prize ahead of the queue
+  // meant a wallet with more redeemed prizes than the level earned trimmed
+  // AVAILABLE ones instead — she watched prizes she had never used disappear.
   const oldestFirst = wallet.slice().sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
   const keep = new Set();
-  oldestFirst.forEach(p => { if (p.redeemed) keep.add(String(p.id)); });      // already spent in real life
   for (const p of oldestFirst) {
     if (keep.size >= earned) break;
-    keep.add(String(p.id));                                                   // then oldest first
+    keep.add(String(p.id));
   }
   const removed = wallet.filter(p => !keep.has(String(p.id)));
   if (!removed.length) return { journey: syncPendingDraws(j), removed: [] };
@@ -886,21 +1022,100 @@ export function reconcileWallet(j) {
   return { journey: j, removed };
 }
 
+/* ---- one-time repairs, run by a grown-up, not silently on boot -----------
+   Two wallet faults predate the id and redemption rules and cannot be fixed by
+   merging: prizes that share an id (so the cloud union collapses them into
+   one and a won prize disappears), and prizes marked redeemed before
+   redeemedAt existed (so the undo window reads as closed and they are locked
+   forever). Resetting every prize automatically would be worse than the bug,
+   so this is a button in the Grown-up Zone. */
+export function repairPrizeWallet() {
+  const j = loadJourney();
+  if (!j) return { reissued: 0, dated: 0 };
+  const seen = new Set();
+  let reissued = 0, dated = 0;
+  j.prizesWon = (j.prizesWon || []).map(p => {
+    const out = { ...p };
+    if (out.id == null || seen.has(String(out.id))) { out.id = prizeId(); reissued++; }
+    seen.add(String(out.id));
+    if (out.redeemed && !Number.isFinite(out.redeemedAt)) { out.redeemedAt = redeemedAtOf(out) || 0; dated++; }
+    return out;
+  });
+  saveJourney(syncPendingDraws(j));
+  if (reissued || dated) logEvent("wallet_repair", { reissued, dated });
+  return { reissued, dated };
+}
+
+/* Split quiz XP back out of the session rows that folded it in. The Coach's
+   Quiz used to add its XP to BOTH the session record and the quiz ledger, and
+   rebuildJourneyXp sums both — so every rebuild inflated the total by the
+   quiz XP again. Idempotent: a row it has already split carries quizXp. */
+export function migrateQuizXp() {
+  const V4 = { 1: 180, 2: 270, 3: 360 };
+  const all = loadSessions();
+  let touched = 0;
+  all.forEach(s => {
+    if (!s || s.xpVersion !== 4 || s.quizXp != null || !Number.isFinite(s.xpEarned)) return;
+    const rounds = s.mini ? 1 : Math.min(3, Math.max(1, s.roundsDone || 1));
+    const base = V4[rounds] || 0;
+    const expected = s.completedFully ? base : Math.round(base / 2);
+    // Move the excess out of xpEarned rather than leaving it there: after this
+    // every row in the log means the same thing by xpEarned.
+    s.quizXp = Math.max(0, s.xpEarned - expected);
+    s.xpEarned = s.xpEarned - s.quizXp;
+    touched++;
+  });
+  if (touched) writeStorage(LS_SESSIONS, all);
+  return touched;
+}
+
 /* The last trim, for the one-line note in the Grown-up zone. */
 export function lastWalletTrim() {
   const j = loadJourney();
   return (j && j.walletTrim) || null;
 }
 
-/* Union two wallets by id, dropping anything either side has voided. */
+/* A prize redeemed before redeemedAt existed has no timestamp, so
+   prizeUndoOpen() reads it as a closed window and it is locked forever with no
+   way to tell when it was spent. Treat its own date as the redemption time:
+   the undo window is long past either way, but the value is now comparable. */
+function redeemedAtOf(p) {
+  if (!p || !p.redeemed) return null;
+  if (Number.isFinite(p.redeemedAt)) return p.redeemedAt;
+  const t = Date.parse(String(p.date || "") + "T12:00:00");
+  return Number.isFinite(t) ? t : 0;
+}
+
+/* Merge one prize seen on two devices. Redemption is the irreversible half of
+   a prize's life, so it always wins: a device that still shows it available is
+   simply behind, and keeping ITS copy is how the same prize got spent twice. */
+export function mergePrize(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  const base = { ...a, ...b, id: a.id };
+  // Keep the earliest creation date so history doesn't drift forward.
+  base.date = [a.date, b.date].filter(Boolean).sort()[0] || a.date;
+  const ra = redeemedAtOf(a), rb = redeemedAtOf(b);
+  if (ra == null && rb == null) {
+    delete base.redeemedAt;
+    base.redeemed = false;
+    return base;
+  }
+  base.redeemed = true;
+  base.redeemedAt = Math.min(...[ra, rb].filter(v => v != null));
+  return base;
+}
+
+/* Union two wallets by id, dropping anything either side has voided. Prizes
+   present on both sides are merged field by field rather than first-wins. */
 function mergeWallets(a, b, voided) {
   const dead = new Set((voided || []).map(String));
   const out = new Map();
   [...(a || []), ...(b || [])].forEach(p => {
     if (!p || p.id == null) return;
     const k = String(p.id);
-    if (dead.has(k) || out.has(k)) return;
-    out.set(k, p);
+    if (dead.has(k)) return;
+    out.set(k, out.has(k) ? mergePrize(out.get(k), p) : p);
   });
   return [...out.values()].sort((x, y) => String(y.date || "").localeCompare(String(x.date || "")));
 }
@@ -1249,6 +1464,10 @@ export function migrate() {
   // merge any new default settings keys into the saved blob
   settings = loadSettings();
   saveSettings();
+  // Un-double the quiz XP baked into older session rows BEFORE any total is
+  // derived from the log, so the baseline below is the honest number.
+  migrateQuizXp();
+  migrateGateWeeks();
   if (loadJourney() == null) {
     const xp = loadSessions().reduce((sum, s) => sum + sessionXp(s), 0);
     saveJourney({ xp, prizesWon: [], pendingDraws: 0, seededAt: Date.now() });

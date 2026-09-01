@@ -181,8 +181,15 @@ export function buildSessionVM(state) {
     detailName: de.name || "", detailDose: de.dose || "", detailCue: de.cue || "",
     detailWatchFor: de.parentWatch || "", detailFix: de.redFlag || de.fix || "",
     detailSwim: de.swimTransfer || "",
+    // The repo holds 39 "- Timer Image.png" files and zero "- Demo Image.png",
+    // so asking for a demo photo guaranteed the placeholder on every move.
     detailPhotoUrl: exercisePhotoUrl(de.name, "Demo"),
+    detailPhotoFallbackUrl: exercisePhotoUrl(de.name, "Timer"),
     detailVideoUrl: videoSearchUrl(de),
+    // Opening instructions PAUSES the run, and closing them asks for an
+    // explicit Resume — the countdown is timestamp-based, so it used to keep
+    // running (and finish the exercise) while she was reading or on YouTube.
+    detailShowResume: sess.running && sess.paused,
 
     sessionDayTitle: day.title || "",
     elapsedDisplay: fmtMMSS(sess.elapsed),
@@ -197,6 +204,10 @@ export function buildSessionVM(state) {
     timerProgress: sess.timerMax > 0 ? Math.max(0, sess.timerSecs / sess.timerMax) : 1,
     timerIsPaused: sess.paused, timerNotPaused: !sess.paused,
     isResting, notResting: !isResting && !isPrompt, isBigRest,
+    // Only offer the instructions when there is actually a move to describe.
+    // During the lead-in there is no current exercise, so the old ⓘ button
+    // rendered there and did nothing at all when tapped.
+    canOpenDetail: !!sess.currentEx && !isResting && !isPrompt,
     stageTitle, blockBadgeVariant, blockLabel, roundLabelText,
     curExName: ex.name || "", curExDose,
     curExCue: isResting ? sess.restCue : (ex.cue || ""),
@@ -219,11 +230,19 @@ export function buildSessionVM(state) {
     breathText: BREATH_REHEARSAL,
 
     // complete screen
-    practice: sess.practice, endedEarly: sess.endedEarly, painFlag: sess.painFlag,
+    endedEarly: sess.endedEarly, painFlag: sess.painFlag,
+    // Reaching the end having skipped everything is not "Session Complete!".
+    noWorkDone: !(sess.ledger || []).some(l => l.status === "done"),
+    mini: sess.mode === "mini",
     saveFailed: !!sess.saveFailed,
     sessionMantra: day.mantra || "",
     sessionMinutes: Math.round(sess.elapsed / 60),
     roundsCompleted: sess.roundsCompleted || 0,
+    // "N of M main rounds", not a count of every block plus every round added
+    // into one number and labelled "rounds".
+    roundsLine: (sess.mode === "mini")
+      ? `mini · ${sess.roundsCompleted || 0} of 1 main round`
+      : `${sess.roundsCompleted || 0} of ${sess.roundsPlanned || 0} main round${(sess.roundsPlanned || 0) === 1 ? "" : "s"}`,
     xpEarned: sess.xpEarned, leveledUp: sess.leveledUp,
     moodOpts, moodAck: sess.mood ? MOOD_ACK[sess.mood] : "", showReflection: sessionDone && !!sess.mood, reflectWellOpts, reflectNextOpts,
     quizQuestion: QZ.q, quizOpts, quizAnswered, quizWhy: QZ.why,

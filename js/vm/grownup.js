@@ -6,7 +6,7 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl, fmtXp } from "../data.js";
-import { settings, loadSessions, loadEvents, loadQuiz, loadGate, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal,
+import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal,
          monthKeyOf, formVerdicts, latestFormVerdicts } from "../store.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
 import { sessionEffort, effortSummary } from "../effort.js";
@@ -641,6 +641,7 @@ export function buildGrownupVM(state) {
     prizePool: activePrizePool(),
     isDefaultPool: !(Array.isArray(settings.prizePool) && settings.prizePool.length),
     // A wallet trim removes prizes she can see, so it is never silent.
+    walletRepairNote: state.walletRepairNote || "",
     walletTrimNote: (() => {
       const t = lastWalletTrim();
       if (!t || !t.count) return "";
@@ -651,7 +652,12 @@ export function buildGrownupVM(state) {
 
     coaching: {
       gate, gateLabel: gate.unlocked ? "UNLOCKED — jumps allowed beyond Drop-and-Stick" : "LOCKED — all jumps stay at Drop-and-Stick",
-      gateProgress: (gate.cleanCount || 0) + " clean Drop-and-Stick sessions logged (needs 5/5 clean ×2 weeks)",
+      // Says what is actually counted, and counts what it says. The number used
+      // to tick up whenever Drop-and-Stick merely wasn't skipped — no clean
+      // self-check, no separate weeks, nothing the sentence promised.
+      gateProgress: (gate.cleanWeeks || []).length + " of " + GATE_WEEKS_REQUIRED
+        + " weeks with a clean Drop-and-Stick logged"
+        + (gate.unlocked ? "" : " — a week counts when she does the move AND self-checks it clean, and a grown-up hasn't flagged it."),
       ladderRows, trackerWeek, tracker, prFields,
       engagement, engagementSystems: ENGAGEMENT_SYSTEMS
     }

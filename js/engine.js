@@ -8,8 +8,13 @@
      notify("tick")  → targeted per-second DOM writes only
    ============================================================ */
 
-import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA, exWork, exRepsDetail } from "./data.js";
-import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent, loadDayProgress, saveDayProgress, clearDayProgress, loadGate, saveGate, addSkipRecord, addXp, pendingDrawCount, xpForSession, athleteId, noteSessionXpAwarded, patchSession, sessionKey, XP_VERSION, clearTryIt, flaggedMoves } from "./store.js";
+import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA,
+         exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
+         VALGUS_FLOOR, VALGUS_PROGRESSIONS } from "./data.js";
+import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent,
+         loadDayProgress, saveDayProgress, clearDayProgress, gateLocked, creditValgusWeek, addSkipRecord,
+         addXp, pendingDrawCount, claimSessionXp, athleteId, noteSessionXpAwarded, patchSession, sessionKey,
+         XP_VERSION, flaggedMoves } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
 import { recoveryDoseSecs, refTime } from "./util.js";
@@ -39,8 +44,15 @@ function blankSession() {
     pendingCleanCheck: false, cleanCount: 0, wobblyCount: 0, lastWobbly: false,
     spotChecks: [], spotAsked: {}, cleanCheckMove: null, formChecks: [],
     intentWord: null, microLoop: null,
-    exStatus: {},                // "ci-ei" -> done|skipped
-    roundsCompleted: 0, sideLabel: "",
+    exStatus: {},                // "ci-ei" -> done|partial|skipped
+    // The completion ledger: one row per exercise per round, holding what was
+    // actually done. Rounds, XP and every report derive from it.
+    ledger: [], roundsCompleted: 0, roundsPlanned: 0, blocksCompleted: 0,
+    repsCounted: 0, repsTarget: 0, segmentsDone: 0, segmentsPlanned: 0,
+    sideLabel: "", segmentLabel: "",
+    // "normal" | "mini" | "tryit" — practice/mini are kept as mirrors so the
+    // screens and view-models that read them keep working.
+    mode: "normal",
     dayKey: null, light: "green", practice: false, mini: false, spa: false,
     endedEarly: false, xpEarned: 0, leveledUp: false,
     mood: null, wentWell: null, nextTime: null, quizPick: null, quizXp: 0,
@@ -74,6 +86,16 @@ export function assembleCircuits(dayKey, light, opts = {}) {
     // Standing rule: jump rope hidden on double-pool days.
     if (bk === "warmup" && day.poolLoad === "double") {
       exs = exs.filter(ex => !/jump rope/i.test(ex.name));
+    }
+    // A locked gate now actually gates. The app has always DISPLAYED a
+    // locked/unlocked valgus state and nothing ever read it, so a jump
+    // progression would have run whatever the grown-up had set. Locked means
+    // every jump stays at Drop-and-Stick, exactly as the Grown-up Zone says.
+    if (opts.gated !== false && gateLocked() && exs.some(ex => VALGUS_PROGRESSIONS.includes(ex.name))) {
+      const floor = exs.find(ex => ex.name === VALGUS_FLOOR)
+        || (day.blocks.main || []).find(ex => ex.name === VALGUS_FLOOR);
+      exs = exs.filter(ex => !VALGUS_PROGRESSIONS.includes(ex.name));
+      if (floor && !exs.includes(floor)) exs.push(floor);
     }
     if (!exs.length) return;
     circuits.push({ name: BLOCK_LABEL[bk], block: bk,
@@ -130,12 +152,12 @@ export function estimateSessionSecs(circuits) {
         if (ex.rounds && r > ex.rounds) return;
         exInRound++;
         if (ex.byReps) {
-          const m = (ex.repsDetail || "").match(/(\d+)\s*(?:reps?|steps?|alternating)/i)
-                 || (ex.repsDetail || "").match(/(\d+)/);
-          const reps = m ? parseInt(m[1], 10) : 10;
-          const detail = ex.repsDetail || "";
-          const multiplier = /each direction/i.test(detail) ? 4 : (/each side|per side|\/side/i.test(detail) ? 2 : 1);
-          total += reps * (settings.secondsPerRep || 3) * multiplier;
+          // Straight from the prescription: every rep of every segment, plus a
+          // reset between segments. The old guess re-derived reps from the
+          // display string with the same regex that never matched.
+          const p = exPrescription(ex);
+          total += p.totalReps * repSeconds(p, settings.secondsPerRep || 3)
+                 + Math.max(0, p.segments - 1) * SIDE_SWITCH_BUFFER;
         } else {
           total += exWork(ex) + (ex.eachSide ? SIDE_SWITCH_BUFFER : 0);
         }
@@ -208,36 +230,16 @@ function sleep(ms) {
   });
 }
 
-/* ---- reps voice intelligence (ported) ---- */
+/* ---- reps: a real state machine over the structured prescription ----------
+   This used to read the DISPLAY string with a regex that never matched, so
+   every rep exercise counted to 10 once and none of them ever switched sides.
+   The count, the cadence, the sets and the sides now all come from
+   ex.prescription (parsed in data.js), and the exercise is walked as an
+   ordered list of segments — one per set × side × direction — with a reset
+   between each.
 
-const TEMPO_PATTERN = /(\d)-(\d)-(\d)/;
-function repCount(ex, fallback) {
-  const m = (ex.repsDetail || "").match(/(\d+)\s*reps?/i);
-  return m ? parseInt(m[1]) : fallback;
-}
-function getExercisePattern(ex) {
-  const m = (ex.repsDetail || "").match(TEMPO_PATTERN);
-  if (m) {
-    return { count: repCount(ex, 10), phases: [
-      { word: "Up",   secs: parseInt(m[1]), freq: 660 },
-      { word: "Hold", secs: parseInt(m[2]), freq: 880 },
-      { word: "Down", secs: parseInt(m[3]), freq: 440 }
-    ]};
-  }
-  const name = ex.name;
-  if (/glute bridge/i.test(name)) return { count: 12, phases: [
-    { word: "Up", secs: 2, freq: 660 }, { word: "Hold", secs: 1, freq: 880 }, { word: "Down", secs: 2, freq: 440 } ]};
-  if (/dead bug/i.test(name)) return { count: 10, phases: [
-    { word: "Extend", secs: 2, freq: 660 }, { word: "Return", secs: 2, freq: 440 } ]};
-  if (/bird dog/i.test(name)) return { count: 10, phases: [
-    { word: "Extend", secs: 1, freq: 660 }, { word: "Hold", secs: 5, freq: 880 }, { word: "Return", secs: 1, freq: 440 } ]};
-  return null;
-}
-function buildVoiceCues(ex) {
-  const repMatch = (ex.repsDetail || "").match(/(\d+)\s*reps?/i);
-  const count = repMatch ? parseInt(repMatch[1]) : 10;
-  return Array.from({ length: count }, (_, i) => String(i + 1));
-}
+   Done at any point ENDS THE EXERCISE. Whether that counts as finished is not
+   decided here: the caller compares repsCounted against the target. */
 
 const CADENCE_PATTERN = /\d+s\s+(?:up|open|raise)/i;
 export function screenRepsDetail(ex) {
@@ -247,42 +249,97 @@ export function screenRepsDetail(ex) {
   return m ? m[1] : detail.replace(/·.*$/, "").trim();
 }
 
-async function runTempoLoop(ex, pattern, isDone) {
-  const phaseDefs = pattern.phases;
-  async function tempoSleep(ms) {
-    const start = Date.now();
-    let pausedMs = 0;
-    while (true) {
-      if (isDone() || sess.abort || sess.skipExercise) return "interrupt";
-      if (sess.paused) { pausedMs += 100; }
-      else if (Date.now() - start - pausedMs >= ms) return "done";
-      await new Promise(r => setTimeout(r, 100));
-    }
-  }
-  for (let i = 1; i <= pattern.count; i++) {
-    for (let p = 0; p < phaseDefs.length; p++) {
-      const ph = phaseDefs[p];
-      if (ph.secs <= 0) continue;
-      if (isDone()) return;
-      while (sess.paused && !isDone()) { await new Promise(r => setTimeout(r, 200)); }
-      if (isDone()) return;
-      speak(p === 0 ? `${i}. ${ph.word}` : ph.word);
-      beep(ph.freq, 0.1);
-      for (let s = 1; s < ph.secs; s++) {
-        if (await tempoSleep(1000) === "interrupt") return;
-        beep(ph.freq, 0.08);
-      }
-      if (await tempoSleep(1000) === "interrupt") return;
-    }
-  }
+/* Wait `ms` of UNPAUSED time, bailing the moment the exercise is over. */
+function repSleep(ms, stopped) {
+  return new Promise(resolve => {
+    const started = Date.now();
+    let elapsed = 0, last = started;
+    const id = setInterval(() => {
+      if (stopped() || sess.abort || sess.skipExercise) { clearInterval(id); resolve("interrupt"); return; }
+      const now = Date.now();
+      if (!sess.paused) elapsed += now - last;
+      last = now;
+      if (elapsed >= ms) { clearInterval(id); resolve("done"); }
+    }, 50);
+  });
 }
 
-async function runRepsWithVoice(ex) {
-  const pattern = getExercisePattern(ex);
-  const cues = pattern ? null : buildVoiceCues(ex);
-  let cueDone = false;
+/* One rep, spoken and beeped. Tempo reps get their phase words ("Up / Hold /
+   Down"); plain reps get the number. Counting continues with the voice off —
+   the beeps and the clock still have to be right. */
+async function runOneRep(ex, p, n, stopped) {
+  sess.repsCounted += 1;
+  notify("tick");
+  if (!p.tempo) {
+    // Pace on the CLOCK, with speech layered on top — never on how long the
+    // voice happens to take. A device with no installed voices (or speech
+    // blocked before the first tap) resolves speakAndWait instantly, and a
+    // whole set then flew past in milliseconds and was recorded as skipped.
+    // A rep also isn't a rep if it takes 200ms.
+    const started = Date.now();
+    if (voiceOn()) await speakAndWait(String(n));
+    else beep(660, 0.08);
+    const target = Math.max(1, settings.secondsPerRep || 3) * 1000;
+    const left = target - (Date.now() - started);
+    if (left > 0) return repSleep(left, stopped);
+    return stopped() ? "interrupt" : "done";
+  }
+  const words = ex.tempoWords || ["Up", "Hold", "Down"];
+  const freqs = [660, 880, 440];
+  for (let i = 0; i < p.tempo.length; i++) {
+    const secs = p.tempo[i];
+    if (secs <= 0) continue;
+    if (stopped()) return "interrupt";
+    while (sess.paused && !stopped()) { if (await repSleep(200, stopped) === "interrupt") return "interrupt"; }
+    if (stopped()) return "interrupt";
+    if (voiceOn()) speak(i === 0 ? `${n}. ${words[i]}` : words[i]);
+    beep(freqs[i], 0.1);
+    for (let s = 0; s < secs; s++) {
+      if (await repSleep(1000, stopped) === "interrupt") return "interrupt";
+      if (s < secs - 1) beep(freqs[i], 0.06);
+    }
+  }
+  return "done";
+}
 
-  const donePromise = new Promise(resolve => {
+/* The reset between two segments. Done here means "skip the wait", not "end
+   the exercise" — advance() routes it to the countdown, not the resolver. */
+async function segmentBreak(seg) {
+  setPhase("sideswitch");
+  const line = seg.transition === "side"      ? "Nice. Switch sides — five to reset."
+             : seg.transition === "direction" ? "Nice. Other direction — five to reset."
+             :                                  "Nice. Next set — five to reset.";
+  await speakAndWait(line);
+  return countdown(SIDE_SWITCH_BUFFER);
+}
+
+/* A prescribed range ("2–3 clean reps", "8–10/side") counts the LOW number —
+   the reps she can always make cleanly — and then offers the extra rather
+   than demanding it. She takes them and taps Done, or the offer times out. */
+async function offerExtraReps(p, stopped) {
+  const extra = p.repsHigh - p.reps;
+  if (extra <= 0) return;
+  if (voiceOn()) await speakAndWait(`That's ${p.reps}. ${extra === 1 ? "One more" : `Up to ${extra} more`} if they're still clean — then tap Done.`);
+  const window = extra * (settings.secondsPerRep || 3) * 1000 + 3000;
+  await repSleep(window, stopped);
+}
+
+async function runPrescribedReps(ex) {
+  const p = exPrescription(ex);
+  const segments = prescriptionSegments(p);
+  sess.repsTarget = p.totalReps;
+  sess.repsCounted = 0;
+  sess.segmentsPlanned = segments.length;
+  sess.segmentsDone = 0;
+  sess.segmentLabel = "";
+
+  let stopped = false;
+  const isStopped = () => stopped;
+
+  // One resolver for the whole exercise: Done, Skip or abort at any point in
+  // any segment ends it, and the work loop resolves the same promise when it
+  // runs out of segments.
+  const finished = new Promise(resolve => {
     const watchdog = setInterval(() => {
       if (sess.abort || sess.skipExercise) {
         clearInterval(watchdog);
@@ -292,29 +349,42 @@ async function runRepsWithVoice(ex) {
     }, 200);
     sess.byRepsResolver = (result) => {
       clearInterval(watchdog);
-      cueDone = true;
+      stopped = true;
       sess.byRepsResolver = null;
-      cancelSpeech();   // in-flight speech resolves fast after DONE
+      cancelSpeech();
       resolve(result);
     };
   });
 
-  const voiceLoop = !voiceOn() ? Promise.resolve()
-    : pattern
-    ? runTempoLoop(ex, pattern, () => cueDone)
-    : (async () => {
-        for (const cue of cues) {
-          if (cueDone) break;
-          while (sess.paused && !cueDone) { await new Promise(r => setTimeout(r, 200)); }
-          if (cueDone) break;
-          await speakAndWait(cue);
-          if (cueDone) break;
-        }
-      })();
+  const workLoop = (async () => {
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      if (stopped) return;
+      if (i > 0) {
+        const br = await segmentBreak(seg);
+        if (br === "abort" || br === "skip" || stopped) return;
+      }
+      sess.segmentLabel = seg.label;
+      sess.sideLabel = seg.label;
+      setPhase("reps");
+      if (seg.label && voiceOn()) await speakAndWait(seg.label.replace(/^\w/, c => c.toUpperCase()) + ".");
+      for (let n = 1; n <= seg.reps; n++) {
+        if (stopped) return;
+        if (await runOneRep(ex, p, n, isStopped) === "interrupt") return;
+      }
+      sess.segmentsDone += 1;
+    }
+    if (stopped) return;
+    if (p.repsHigh) await offerExtraReps(p, isStopped);
+    // Ran to the end under its own power.
+    if (!stopped && sess.byRepsResolver) sess.byRepsResolver("complete");
+  })();
 
-  const result = await donePromise;
-  cueDone = true;
-  await voiceLoop;
+  const result = await finished;
+  stopped = true;
+  await workLoop;
+  sess.sideLabel = "";
+  sess.segmentLabel = "";
   return result;
 }
 
@@ -361,8 +431,89 @@ function setUpNext(circuits, ci, r, ei) {
   sess.upNextDose = nx ? (nx.dose || "") : "";
 }
 
-function recordBlockDone(blockKey) {
-  if (!blockKey || blockKey === "prep" || sess.practice) return;
+/* ---- the completion ledger -------------------------------------------------
+   Everything downstream — rounds trained, XP, skip analysis, the valgus gate,
+   the parent reports — used to be inferred from "the loop reached the end".
+   It reads from these rows instead: one per exercise per round, saying what
+   was actually done. */
+export const MIN_EXERCISE_SECS = 3;       // under this it wasn't done, it was tapped
+export const DONE_WORK_FRACTION = 0.5;    // timed work under half its dose is partial
+
+function exerciseStatus(ex, wasSkipped, actualSecs, plannedSecs) {
+  if (wasSkipped) return "skipped";
+  // Rep work is judged on REPS, timed work on TIME. Judging reps by the clock
+  // marked a fully counted set as skipped whenever the voice ran fast.
+  if (ex.byReps) {
+    if (!sess.repsCounted) return "skipped";     // an instant Done tap is not an exercise
+    return sess.repsCounted >= sess.repsTarget ? "done" : "partial";
+  }
+  if (actualSecs < MIN_EXERCISE_SECS) return "skipped";
+  return plannedSecs > 0 && actualSecs < plannedSecs * DONE_WORK_FRACTION ? "partial" : "done";
+}
+
+function recordExercise(ex, circuit, ci, ei, r, wasSkipped) {
+  const plannedSecs = ex.byReps ? 0 : exWork(ex);
+  const actualSecs = sess.exElapsed;
+  const row = {
+    name: ex.name,
+    block: ex.block || circuit.block,
+    ci, ei, round: r,
+    driver: ex.driver || (ex.byReps ? "reps" : "time"),
+    dose: ex.dose || ex.repsDetail || "",
+    gate: ex.gate || null,
+    plannedSecs, actualSecs,
+    repsPlanned: ex.byReps ? sess.repsTarget : 0,
+    repsCounted: ex.byReps ? sess.repsCounted : 0,
+    segmentsPlanned: ex.byReps ? sess.segmentsPlanned : (ex.eachSide ? 2 : 1),
+    segmentsDone: ex.byReps ? sess.segmentsDone : 0,
+    status: exerciseStatus(ex, wasSkipped, actualSecs, plannedSecs),
+    at: Date.now()
+  };
+  sess.ledger.push(row);
+  sess.repsCounted = 0; sess.repsTarget = 0;
+  sess.segmentsDone = 0; sess.segmentsPlanned = 0;
+  return row;
+}
+
+/* A round counts only when every move in it was actually done — not when the
+   loop ran off the end of it. */
+function roundFullyDone(ci, round) {
+  const rows = sess.ledger.filter(l => l.ci === ci && l.round === round);
+  return rows.length > 0 && rows.every(l => l.status === "done");
+}
+/* A block counts as trained if at least one move in it was really done. */
+function blockHadWork(ci) {
+  return sess.ledger.some(l => l.ci === ci && l.status === "done");
+}
+
+/* Aggregate the ledger to the per-move shape the reports already read. A move
+   is `skipped` only if it was skipped EVERY round it came up. */
+export function perExerciseFromLedger(ledger) {
+  const byName = new Map();
+  (ledger || []).forEach(l => {
+    const cur = byName.get(l.name);
+    if (!cur) {
+      byName.set(l.name, {
+        name: l.name, block: l.block, driver: l.driver, dose: l.dose, gate: l.gate,
+        rounds: 1, done: l.status === "done" ? 1 : 0,
+        partial: l.status === "partial" ? 1 : 0,
+        skippedRounds: l.status === "skipped" ? 1 : 0,
+        skipped: l.status === "skipped"
+      });
+      return;
+    }
+    cur.rounds += 1;
+    if (l.status === "done") cur.done += 1;
+    else if (l.status === "partial") cur.partial += 1;
+    else cur.skippedRounds += 1;
+    cur.skipped = cur.skippedRounds === cur.rounds;
+  });
+  return [...byName.values()];
+}
+
+function recordBlockDone(blockKey, ci) {
+  if (!blockKey || blockKey === "prep" || sess.mode === "tryit") return;
+  if (!blockHadWork(ci)) return;   // skipping everything doesn't finish a block
   const prog = loadDayProgress(sess.dayKey) || { done: [], light: sess.light };
   if (!prog.done.includes(blockKey)) prog.done.push(blockKey);
   prog.light = sess.light;
@@ -414,27 +565,38 @@ function microLoopPrompt() {
 /* ============================================================
    MAIN RUNNER
    ============================================================ */
-export async function startSession({ dayKey, light = "green", practice = false, mini = false }) {
+export async function startSession({ dayKey, light = "green", mini = false, mode = null }) {
   if (sess.running) return;
+  // Try-It never reaches the engine any more — it is a browse screen with no
+  // timer, no rounds and no record (see js/vm/tryit.js). Refuse it here so a
+  // stale caller can't quietly start a real, recorded workout in "test" mode.
+  if (mode === "tryit") return;
   ensureAudio();
   const day = DAYS[dayKey];
   if (!day) return;
 
+  const sessionMode = mode || (mini ? "mini" : "normal");
   Object.assign(sess, blankSession(), {
-    running: true, dayKey, practice, mini,
+    running: true, dayKey, mode: sessionMode,
+    mini: sessionMode === "mini", practice: false,
     light: day.spa ? "recovery" : light,
     spa: !!day.spa
   });
 
   // Same-day resume: blocks already completed today are skipped.
-  const prog = practice ? null : loadDayProgress(dayKey);
+  const prog = loadDayProgress(dayKey);
   const skipBlocks = (prog && prog.done) || [];
-  sess.circuits = assembleCircuits(dayKey, sess.light, { mini, skip: sess.spa ? [] : skipBlocks });
+  sess.circuits = assembleCircuits(dayKey, sess.light, { mini: sess.mini, skip: sess.spa ? [] : skipBlocks });
   if (!sess.circuits.length) { sess.running = false; return; }
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
+  // A mini is one shortened round however the light was set; everything else
+  // is priced and reported against the light's own round count.
+  sess.roundsPlanned = sess.spa ? 0
+    : sess.mini ? 1
+    : Math.max(1, LIGHT_ROUNDS[sess.light] || 1);
   sess.spotChecks = pickSpotChecks(sess.circuits);
 
-  if (!practice) logEvent("session_start", { day: dayKey, light: sess.light });
+  logEvent("session_start", { day: dayKey, light: sess.light, mode: sessionMode });
 
   const circuits = sess.circuits;
   const dayMantra = day.mantra || MANTRA;
@@ -483,7 +645,7 @@ export async function startSession({ dayKey, light = "green", practice = false, 
           setPhase("reps");
           if (!preAnnounced) await speakAndWait(ex.name + "." + (ex.reset ? " " + ex.reset : "") + " Go.");
           preAnnounced = false;
-          const result = await runRepsWithVoice(ex);
+          const result = await runPrescribedReps(ex);
           if (result === "abort") return finalize(false);
         } else {
           sess.timerSecs = work; sess.timerMax = work;
@@ -523,21 +685,20 @@ export async function startSession({ dayKey, light = "green", practice = false, 
         const wasSkipped = sess.skipExercise;
         sess.skipExercise = false;
         sess.exDone += 1;
-        if (wasSkipped) sess.exStatus[key] = "skipped";
-        else if (r === circuit.rounds) sess.exStatus[key] = "done";
-        if (r === 1) {
-          sess.perExercise.push({
-            name: ex.name,
-            block: ex.block || circuit.block,
-            driver: ex.driver || (ex.byReps ? "reps" : "time"),
-            dose: ex.dose || ex.repsDetail || "",
-            gate: ex.gate || null,
-            skipped: !!wasSkipped
-          });
-        }
+
+        // ---------- LEDGER ----------
+        // What ACTUALLY happened, one row per exercise per round. The old code
+        // wrote perExercise only when r === 1, so a move skipped in round two
+        // or three left no trace at all, and it inferred "done" from reaching
+        // the end of the loop — so tapping Done instantly on everything still
+        // produced a fully completed session.
+        const row = recordExercise(ex, circuit, ci, ei, r, wasSkipped);
+        sess.exStatus[key] = row.status === "skipped" ? "skipped"
+          : r === circuit.rounds ? row.status : sess.exStatus[key];
+
         // Self-check only the moves this run is watching (see pickSpotChecks),
         // and only the first time each one comes round — main runs 2–3 rounds.
-        if ((circuit.block === "main" || circuit.block === "prep") && !wasSkipped
+        if ((circuit.block === "main" || circuit.block === "prep") && row.status === "done"
             && sess.spotChecks.includes(ex.name) && !sess.spotAsked[ex.name]) {
           sess.spotAsked[ex.name] = true;
           sess.cleanCheckMove = ex.name;
@@ -576,7 +737,6 @@ export async function startSession({ dayKey, light = "green", practice = false, 
               }
             });
             if (result === "abort") return finalize(false);
-            sess.roundsCompleted += 1;
             if (result !== "skip" && voiceOn()) await speakAndWait(nextEncouragement());
           } else if (isBlockBreak) {
             playCue("rest");
@@ -610,10 +770,12 @@ export async function startSession({ dayKey, light = "green", practice = false, 
           }
         }
       }
-      if (r === circuit.rounds && circuit.rounds > 1) sess.roundsCompleted += 1;
+      // "Rounds" means MAIN rounds trained. Every one-round block used to add
+      // to this same counter, so the finish screen showed a green day as 8.
+      if (circuit.block === "main" && roundFullyDone(ci, r)) sess.roundsCompleted += 1;
     }
-    if (circuit.rounds === 1) sess.roundsCompleted += 1;
-    recordBlockDone(circuit.block);
+    if (blockHadWork(ci)) sess.blocksCompleted += 1;
+    recordBlockDone(circuit.block, ci);
   }
 
   // Swim-skill extras: micro-loop Q&A + breath rehearsal (skipped on spa days)
@@ -626,7 +788,9 @@ export async function startSession({ dayKey, light = "green", practice = false, 
     if (sess.abort) return finalize(false);
   }
 
-  if (!sess.practice) clearDayProgress(sess.dayKey);
+  // A MINI is a subset, not the day. Clearing day progress here is what let a
+  // 10-minute mini wipe the rest of the plan and tick the whole day off.
+  if (!sess.mini) clearDayProgress(sess.dayKey);
   finalize(true);
 }
 
@@ -647,28 +811,10 @@ export function finalize(completed) {
   const day = DAYS[sess.dayKey] || {};
   sess.endedEarly = !completed;
 
-  if (sess.practice) {
-    // Pain is the one thing that escapes the try-it sandbox. A stop she reported
-    // is real whether or not the run counted, and it used to vanish entirely —
-    // never reaching the grown-up's Safety & Flags. This writes a safety-only
-    // row: flagged practice, so countsAsTrained() and sessionXp() both ignore
-    // it, and no streak, XP or completion comes with it.
-    if (sess.painFlag) {
-      saveSession({
-        app: "swimming", athlete: athleteId(), practice: true,
-        dayKey: sess.dayKey, dayTitle: day.title || sess.dayKey,
-        isoDate: new Date().toISOString(), durationSecs: elapsedSecs,
-        sessionType: "try-it", pain: true, endedEarly: true, completedFully: false,
-        safetyOnly: true
-      });
-      logEvent("pain_stop_tryit", { day: sess.dayKey });
-    }
-    clearTryIt();                 // one run, then the mode disarms itself
-    if (completed) speak("Practice run complete. Nothing recorded. You know the movements now.");
-    playCue("done");
-    setPhase("done");
-    return;
-  }
+  // A pain stop is a safety event, not a short workout. It used to pay half a
+  // session's XP and feed the streak, which rewards stopping the same way it
+  // rewards training — exactly backwards.
+  const safetyStop = !!sess.painFlag;
 
   const entry = {
     app: "swimming",
@@ -680,10 +826,16 @@ export function finalize(completed) {
     session: "morning",
     planVersion: "2026.2",
     xpVersion: XP_VERSION,     // marks a row whose XP counted the rounds trained
-    sessionType: sess.spa ? "spa" : "main",
+    sessionType: sess.spa ? "spa" : sess.mini ? "mini" : "main",
     lightResult: sess.spa ? "recovery" : sess.light,
-    roundsDone: sess.spa ? 0 : Math.max(1, LIGHT_ROUNDS[sess.light] || 1),
-    perExercise: sess.perExercise || [],
+    // What was actually trained, and what the day asked for — two different
+    // numbers. Storing only the planned one is what paid 150% for one day.
+    roundsDone: sess.spa ? 0 : sess.roundsCompleted,
+    roundsPlanned: sess.roundsPlanned,
+    blocksCompleted: sess.blocksCompleted,
+    safetyStop,
+    ledger: sess.ledger || [],
+    perExercise: perExerciseFromLedger(sess.ledger),
     microLoop: sess.microLoop || null,
     intentWord: sess.intentWord || null,
     prSentinel: sess.spa ? null : day.prSentinel || null,
@@ -694,10 +846,11 @@ export function finalize(completed) {
     clean: sess.cleanCount, wobbly: sess.wobblyCount,
     formChecks: sess.formChecks || [],       // per-move verdicts from this run's spot-checks
     light: sess.light, mini: sess.mini,
-    pain: !!sess.painFlag,
+    pain: safetyStop,
     endedEarly: !completed,
     completedFully: !!completed
   };
+  sess.perExercise = entry.perExercise;
   const saved = saveSession(entry);
   sess.savedEntry = saved;
   sess.saveFailed = !saved;   // the complete screen must not claim a save that didn't happen
@@ -708,12 +861,12 @@ export function finalize(completed) {
     pain: !!sess.painFlag
   });
 
-  // Valgus earn-back: a clean (non-skipped) Drop-and-Stick session counts toward unlock.
-  if (completed && (sess.perExercise || []).some(p => p.name === "Drop-and-Stick" && !p.skipped)) {
-    const g = loadGate();
-    g.cleanCount = (g.cleanCount || 0) + 1;
-    saveGate(g);
-  }
+  // Valgus earn-back. This used to tick up whenever Drop-and-Stick merely
+  // wasn't skipped, while the Grown-up screen promised "5/5 clean ×2 weeks".
+  // It now needs the move actually DONE and self-checked CLEAN, and it banks
+  // the WEEK rather than a bare count, so two sessions on one afternoon can't
+  // unlock a gate that is supposed to take two weeks.
+  if (completed) creditValgusWeek(entry);
   if (sess.skipped.length) {
     addSkipRecord({
       createdAt: Date.now(),
@@ -723,10 +876,14 @@ export function finalize(completed) {
     });
   }
 
-  // XP: full completion earns move XP; ended-early earns half; spa earns none.
-  const fullXp = xpForSession(entry);
-  sess.xpEarned = completed ? fullXp : Math.round(fullXp / 2);
+  // XP is paid for rounds actually trained, capped so one training day can
+  // never pay more than the day's own plan however many partial-and-resume
+  // attempts it takes. A safety stop pays nothing, and nothing is ever paid
+  // for a session that failed to save — XP with no record behind it is how a
+  // total drifts away from the history that is supposed to explain it.
+  sess.xpEarned = (!saved || safetyStop) ? 0 : claimSessionXp(entry);
   if (sess.xpEarned > 0) {
+    entry.xpEarned = sess.xpEarned;   // the cloud copy must carry it too
     const { leveledUp } = addXp(sess.xpEarned);
     // Only celebrate a level-up that actually owes a prize, so the button can
     // never be a dead tap (openPrizeDraw refuses when nothing is pending).
@@ -752,7 +909,7 @@ export function finalize(completed) {
 export function togglePause() {
   sess.paused = !sess.paused;
   if (sess.paused) sess.pauseCount = (sess.pauseCount || 0) + 1;
-  if (!sess.practice) logEvent(sess.paused ? "pause" : "resume", { ex: sess.currentEx ? sess.currentEx.name : null });
+  logEvent(sess.paused ? "pause" : "resume", { ex: sess.currentEx ? sess.currentEx.name : null });
   interruptSpeech(sess.paused ? "Paused." : "Resuming.");
   notify("phase");
 }
@@ -777,7 +934,7 @@ export function skipCurrentExercise() {
   if (!["work", "reps", "sideswitch"].includes(sess.phase)) { advance(); return; }
   if (sess.currentEx) {
     sess.skipped.push({ name: sess.currentEx.name, round: `R${sess.round}`, at: Date.now() });
-    if (!sess.practice) logEvent("skip", { ex: sess.currentEx.name, block: sess.currentEx.block || null });
+    logEvent("skip", { ex: sess.currentEx.name, block: sess.currentEx.block || null });
   }
   sess.skipExercise = true;
   sess.justSkipped = true;
@@ -822,7 +979,7 @@ export function pickWobbly() { sess.pendingCleanCheck = false; sess.wobblyCount 
 /* Complete-screen interactions: patch the saved record + Firestore mirror. */
 export function setMood(key, emoji) {
   sess.mood = key;
-  if (!sess.practice && sess.savedEntry) {
+  if (sess.savedEntry) {
     patchSession(sess.savedKey, { mood: key });
     if (sess.fsId) import("./firebase.js").then(m => m.fsUpdateSession(sess.fsId, { mood: key }));
   }
@@ -830,7 +987,7 @@ export function setMood(key, emoji) {
 }
 export function setReflect(field, label) {
   sess[field] = sess[field] === label ? null : label;
-  if (!sess.practice && sess.savedEntry) {
+  if (sess.savedEntry) {
     const patch = field === "wentWell" ? { wentWell: sess.wentWell } : { nextTime: sess.nextTime };
     patchSession(sess.savedKey, patch);
     if (sess.fsId) import("./firebase.js").then(m => m.fsUpdateSession(sess.fsId, patch));

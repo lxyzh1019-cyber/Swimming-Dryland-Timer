@@ -114,12 +114,24 @@ export function exercisePhotoUrl(name, kind) {
   return "assets/exercises/" + encodeURIComponent(clean + " - " + kind + " Image.png");
 }
 
+/* Seconds given between sides / sets of the same move, so she can reset. One
+   definition, re-exported by data.js for the content and runner to share. */
+export const SIDE_SWITCH_BUFFER = 5;
+
 /* Planning-estimate seconds for one exercise (time-driver → work seconds;
    rep/hold → dose heuristic). Single source shared by the engine estimate and
    the Today/plan view-models — previously duplicated verbatim in both. */
 export function refTime(ex) {
   if (!ex) return 30;
   if (ex.driver === "time") return ex.work || 30;
+  // A parsed prescription knows exactly how much work it is: reps × cadence,
+  // plus a reset between each side / direction / set.
+  const p = ex.prescription;
+  if (p) {
+    const perRep = p.tempo ? p.tempo.reduce((a, b) => a + b, 0) : 3;
+    return p.totalReps * perRep + Math.max(0, p.segments - 1) * SIDE_SWITCH_BUFFER;
+  }
+  // Fallback for plain objects with only a display dose (legacy records).
   const d = (ex.dose || "").toLowerCase();
   let base = 30;
   if (/\/side|\/leg|\/dir/.test(d)) base = 40;

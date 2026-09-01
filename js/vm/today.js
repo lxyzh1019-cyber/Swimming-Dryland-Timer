@@ -7,21 +7,26 @@
 import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overloadWeek } from "../data.js";
 import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress, countsAsTrained, sessionXp } from "../store.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
+import { assembleCircuits, estimateSessionSecs } from "../engine.js";
 
-/* Whole-plan stats (design's _planStats). */
-export function planStats(day) {
+/* Whole-plan stats for a day card.
+
+   This counted five named blocks and summed their bare work time ONCE — so it
+   left out the prepMenu moves the session actually inserts, ignored that the
+   main block runs 2–3 rounds, and ignored every rest. It is built from the
+   same circuits the runner assembles and the same estimate the session screen
+   shows, so the card and the workout can no longer disagree about the day. */
+export function planStats(dayKey) {
+  const key = typeof dayKey === "string" ? dayKey : null;
+  const day = key ? DAYS[key] : dayKey;
   if (!day) return { mins: 0, moves: 0 };
-  if (day.spa) {
-    const recov = (day.recovery || []).concat(day.recoveryHolds || []);
-    let secs = 0; recov.forEach(ex => secs += ex.work || refTime(ex));
-    return { mins: recov.length ? Math.max(1, Math.round(secs / 60)) : 0, moves: recov.length };
-  }
-  const blocks = day.blocks || {};
-  let moves = 0, secs = 0;
-  ["warmup", "coordination", "main", "finisher", "swimskill"].forEach(bk => {
-    (blocks[bk] || []).forEach(ex => { moves++; secs += refTime(ex); });
-  });
-  return { mins: moves ? Math.max(1, Math.round(secs / 60)) : 0, moves };
+  const resolvedKey = key || Object.keys(DAYS).find(k => DAYS[k] === day);
+  if (!resolvedKey) return { mins: 0, moves: 0 };
+  const circuits = assembleCircuits(resolvedKey, day.spa ? "recovery" : (day.defaultLight || "green"));
+  if (!circuits.length) return { mins: 0, moves: 0 };
+  // Distinct movements she will meet, counted once however many rounds they run.
+  const moves = new Set(circuits.flatMap(c => c.exercises.map(ex => ex.name))).size;
+  return { mins: Math.max(1, Math.round(estimateSessionSecs(circuits) / 60)), moves };
 }
 
 /* Real per-day status for the current week, derived from the session log:
@@ -47,8 +52,11 @@ export function weekStatuses() {
   // and paid half XP; it now shows a softer ✓ so the app stops contradicting
   // itself. A GO-then-quit with nothing done still reads as "catch up".
   const trained = sessions.filter(countsAsTrained);
-  const doneKeys = new Set(trained.filter(s => s.completedFully).map(s => s.dayKey).filter(Boolean));
-  const partialKeys = new Set(trained.filter(s => !s.completedFully).map(s => s.dayKey).filter(Boolean));
+  // A MINI is a defined subset, never the whole day's plan — a completed mini
+  // used to tick the day off entirely and clear what was left of it.
+  const isWholeDay = s => s.completedFully && !s.mini && s.sessionType !== "mini";
+  const doneKeys = new Set(trained.filter(isWholeDay).map(s => s.dayKey).filter(Boolean));
+  const partialKeys = new Set(trained.filter(s => !isWholeDay(s)).map(s => s.dayKey).filter(Boolean));
   const todayIdx = WEEK_ORDER.indexOf(todayKey);
   const out = {};
   WEEK_ORDER.forEach((k, i) => {
@@ -293,11 +301,10 @@ export function buildTodayVM(state) {
   // ---- Right-pane day view ----
   const practiceMode = state.practiceMode;
   const fullDay = DAYS[selectedKey];
-  const stats = planStats(fullDay);
-  // Authored duration estimate (includes rests), not the bare work-time sum.
-  if (fullDay && fullDay.timeLo) {
-    stats.mins = fullDay.timeLo === fullDay.timeHi ? String(fullDay.timeLo) : fullDay.timeLo + "–" + fullDay.timeHi;
-  }
+  // One computed number, not the authored timeLo/timeHi. Those were written
+  // against a runner that counted 10 reps for every prescription, so the card
+  // promised 18–22 minutes for work the session screen then estimated at 30.
+  const stats = planStats(selectedKey);
   const isSpaDay = !!(fullDay && fullDay.spa);
   let status = statuses[selectedKey];
   if (status === "rest" || status === "future") status = isSpaDay ? "rest" : "future";
@@ -347,11 +354,11 @@ export function buildTodayVM(state) {
         : isPartial ? ("This day counts toward your streak." + (doneBlocks.length && remainingLabel ? " Still open: " + remainingLabel + "." : ""))
         : (allDone ? "Every block is checked off. Want extra reps?" : ("You skipped " + remainingLabel + " — finish up for XP.")),
       showCta: true,
-      ctaLabel: isSpaDay ? "Do it again" : (allDone ? "Practice again" : "Finish remaining moves"),
+      ctaLabel: isSpaDay ? "Do it again" : (allDone ? "Look at the moves" : "Finish remaining moves"),
       ctaIcon: isSpaDay ? "🧘" : (allDone ? "🧪" : "▶️"),
       ctaVariant: (isSpaDay || allDone) ? "secondary" : "primary",
-      ctaSubtext: isSpaDay ? "Doesn't change progress" : (allDone ? "Try-it mode — doesn't change progress" : ""),
-      ctaAction: (isSpaDay || allDone) ? "goSessionPractice" : "goSession",
+      ctaSubtext: isSpaDay ? "Doesn't change progress" : (allDone ? "Just look at the moves — nothing is recorded" : ""),
+      ctaAction: (isSpaDay || allDone) ? "goTryIt" : "goSession",
       showSettings: false
     };
   } else if (status === "missed") {
@@ -396,10 +403,12 @@ export function buildTodayVM(state) {
   // remaining moves" runs as a test, and nothing on screen used to say so.
   dayView.showTryBadge = canLaunch && practiceMode;
   // ...and so does the button label, so what you're about to start is never
-  // ambiguous. goSessionPractice always runs as a test, armed or not.
+  // ambiguous. With Try-It armed the button opens the move list, not a workout.
   if (canLaunch && practiceMode && dayView.ctaAction === "goSession") {
-    dayView.ctaLabel = "Start Try-It Run";
+    dayView.ctaAction = "goTryIt";
+    dayView.ctaLabel = "Look at the moves";
     dayView.ctaIcon = "🧪";
+    dayView.ctaSubtext = "Try-it — instructions and videos only, no timer.";
   }
   if (dayView.isActive && !dayView.ctaSubtext) dayView.ctaSubtext = (dayView.movesLabel || "") + " · about " + (dayView.mins || "?") + " min · that’s the whole thing — no surprises.";
   if (dayView.isActive && !practiceMode && !isSpaDay) {
@@ -416,8 +425,8 @@ export function buildTodayVM(state) {
     + (settings.coachVoiceOn ? "background:#fff;color:var(--aqua-deep);" : "background:rgba(255,255,255,0.18);color:#fff;");
   const practiceLinkLabel = practiceMode ? "Try-it mode is ON" : "🧪 Try-it mode";
   const practiceHintLine = practiceMode
-    ? "This run won't be saved. Turns itself off when the run ends."
-    : "Test a movement without it counting.";
+    ? "GO opens the move list — instructions and videos, no timer."
+    : "Look at the moves without starting a workout.";
   const practiceBtnStyle = "width:100%;min-height:48px;display:flex;align-items:center;justify-content:center;gap:9px;border-radius:var(--radius-pill);cursor:pointer;font-family:inherit;font-weight:900;font-size:14px;padding:0 18px;"
     + (practiceMode
       ? "background:#fff;color:var(--aqua-deep);border:2px solid #fff;"

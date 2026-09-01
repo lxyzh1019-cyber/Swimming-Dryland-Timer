@@ -125,16 +125,16 @@ export function detailOverlayHtml(vm) {
         <div style="width:100%;height:330px;position:relative;overflow:hidden;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
           <span style="font-size:60px;" aria-hidden="true">🏊</span>
           <span style="font-size:13px;font-weight:800;color:var(--aqua-ink);opacity:0.75;">Demo photo coming soon</span>
-          <img src="${vm.detailPhotoUrl}" alt="" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+          <img src="${vm.detailPhotoUrl}" alt="" data-fallback="${vm.detailPhotoFallbackUrl || ""}" onerror="if(this.dataset.fallback&&this.src.indexOf(this.dataset.fallback)<0){this.src=this.dataset.fallback;}else{this.style.display='none';}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
         </div>
-        <button type="button" data-action="closeDetail" style="position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;border:none;background:rgba(20,59,74,0.55);color:#fff;font-size:16px;font-weight:900;cursor:pointer;">✕</button>
+        <button type="button" data-action="closeDetail" style="position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;border:none;background:rgba(20,59,74,0.55);color:#fff;font-size:16px;font-weight:900;cursor:pointer;" aria-label="Close">✕</button>
       </div>
       <div style="padding:22px 26px 26px;display:flex;flex-direction:column;gap:14px;">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">
           <div style="font-family:var(--font-display);font-size:26px;font-weight:600;color:var(--ink);">${vm.detailName}</div>
           <div style="font-family:var(--font-hand);font-size:18px;color:var(--aqua-ink);">${vm.detailDose}</div>
         </div>
-        <a href="${vm.detailVideoUrl}" target="_blank" rel="noopener" style="align-self:flex-start;display:flex;align-items:center;gap:8px;text-decoration:none;background:var(--aqua);color:#fff;font-weight:900;font-size:15px;border-radius:var(--radius-pill);padding:12px 22px;box-shadow:0 4px 0 var(--aqua-deep);">▶ Watch the move</a>
+        <a href="${vm.detailVideoUrl}" target="_blank" rel="noopener" data-action="watchVideo" style="align-self:flex-start;display:flex;align-items:center;gap:8px;text-decoration:none;background:var(--aqua);color:#fff;font-weight:900;font-size:15px;border-radius:var(--radius-pill);padding:12px 22px;box-shadow:0 4px 0 var(--aqua-deep);">▶ Watch the move</a>
         ${vm.detailCue ? `
         <div style="background:var(--aqua-wash);border-radius:var(--radius-md);padding:12px 14px;">
           <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--aqua-ink);margin-bottom:4px;">Coach tip</div>
@@ -151,6 +151,11 @@ export function detailOverlayHtml(vm) {
           <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sea-ink);margin-bottom:4px;">🏊 Swim transfer</div>
           <div style="font-size:15px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.detailSwim}</div>
         </div>` : ""}
+        ${vm.detailShowResume ? `
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch;border-top:1.5px solid var(--hairline);padding-top:14px;">
+          <div style="font-size:13px;font-weight:800;color:var(--ink-soft);text-align:center;">⏸ Your workout is paused while you read.</div>
+          <button type="button" data-action="closeDetail" style="width:100%;min-height:54px;border:none;border-radius:var(--radius-pill);background:var(--mint);color:#fff;font-family:var(--font-display);font-weight:600;font-size:20px;cursor:pointer;box-shadow:0 5px 0 var(--mint-deep);">▶ Resume my workout</button>
+        </div>` : ""}
       </div>
     </div>
   </div>`;
@@ -160,13 +165,14 @@ function completeScreen(vm) {
   return `
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:16px;padding:40px;text-align:center;background:${vm.endedEarly ? "var(--sun-wash)" : "var(--mint-wash)"};overflow-y:auto;">
     <img src="assets/poses/${vm.endedEarly ? "seeyou" : "celebrate"}.png" alt="" style="height:${vm.endedEarly ? 170 : 230}px;object-fit:contain;flex-shrink:0;">
-    <div style="font-family:var(--font-display);font-weight:600;font-size:34px;color:${vm.endedEarly ? "var(--sun-ink)" : "var(--mint-ink)"};">${vm.saveFailed ? "Session finished — but not saved." : vm.endedEarly ? "Stopped early — progress saved." : "Session Complete!"}</div>
+    <div style="font-family:var(--font-display);font-weight:600;font-size:34px;color:${vm.endedEarly ? "var(--sun-ink)" : "var(--mint-ink)"};">${vm.saveFailed ? "Session finished — but not saved." : vm.noWorkDone ? "Nothing logged this time." : vm.endedEarly ? "Stopped early — progress saved." : "Session Complete!"}</div>
     ${vm.saveFailed ? `<div role="alert" style="font-size:15px;font-weight:800;color:var(--stop-ink);background:var(--stop-wash);border:2px solid var(--stop);border-radius:16px;padding:10px 16px;max-width:480px;">⚠️ This device is out of storage, so this session could NOT be saved. Show a grown-up — they can free up space so your next one counts.</div>` : ""}
+    ${vm.noWorkDone && !vm.painFlag ? `<div style="font-size:15px;font-weight:800;color:var(--sun-ink);background:var(--sun-wash);border-radius:16px;padding:10px 16px;max-width:480px;line-height:1.45;">Every move got skipped, so there's nothing to record — no XP and no streak day. That's fine! Come back when you've got the energy and do it for real. 💛</div>` : ""}
     ${vm.painFlag ? `<div style="font-size:16px;font-weight:800;color:var(--stop-ink);background:var(--stop-wash);border:2px solid var(--stop);border-radius:16px;padding:10px 16px;max-width:480px;">Good call stopping. Tell a grown-up how it felt — that's what champions do.</div>` : ""}
     ${vm.sessionMantra && !vm.endedEarly ? `<div style="font-family:var(--font-hand);font-size:26px;font-weight:700;color:var(--aqua-ink);line-height:1.2;">${vm.sessionMantra}</div>` : ""}
-    <div style="font-size:16px;font-weight:700;color:var(--ink-soft);">${vm.sessionDayTitle} · ${vm.sessionMinutes} min · ${vm.roundsCompleted} rounds${vm.practice ? " · 🧪 try-it (not recorded)" : (vm.xpEarned ? ` · ⭐ +${vm.xpEarned} XP` : "")}</div>
+    <div style="font-size:16px;font-weight:700;color:var(--ink-soft);">${vm.sessionDayTitle} · ${vm.sessionMinutes} min · ${vm.roundsLine}${vm.xpEarned ? ` · ⭐ +${vm.xpEarned} XP` : ""}</div>
     ${vm.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="display:flex;align-items:center;gap:10px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:14px 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
-    ${!vm.practice ? `
+    ${vm.sessionDone ? `
     <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;">
       <div style="display:flex;align-items:center;gap:10px;">
         <img src="assets/poses/think.png" alt="" style="height:64px;object-fit:contain;">
@@ -240,10 +246,14 @@ function centerStack(vm, wide) {
       ${badge(vm.blockBadgeVariant, vm.blockLabel)}
       ${vm.roundLabelText ? `<span style="font-size:12px;font-weight:900;color:var(--ink-soft);background:var(--surface-2);border-radius:var(--radius-pill);padding:3px 10px;">${vm.roundLabelText}</span>` : ""}
     </div>
+    ${vm.canOpenDetail ? `
+    <button type="button" data-action="openDetailCur" title="See instructions &amp; video" style="display:flex;align-items:center;justify-content:center;gap:8px;background:none;border:none;padding:4px 6px;margin:0;cursor:pointer;font-family:inherit;min-height:44px;">
+      <span style="font-family:var(--font-display);font-size:${wide ? 22 : 19}px;font-weight:600;color:var(--ink);line-height:1.15;">${vm.stageTitle}</span>
+      <span aria-hidden="true" style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--surface-2);color:var(--ink-soft);font-size:16px;font-weight:900;display:flex;align-items:center;justify-content:center;">ⓘ</span>
+    </button>` : `
     <div style="display:flex;align-items:center;gap:8px;">
       <div style="font-family:var(--font-display);font-size:${wide ? 22 : 19}px;font-weight:600;color:var(--ink);line-height:1.15;">${vm.stageTitle}</div>
-      ${vm.notResting ? `<button type="button" data-action="openDetailCur" title="See detail photo &amp; video" style="flex-shrink:0;width:28px;height:28px;border-radius:50%;border:none;background:var(--surface-2);color:var(--ink-soft);font-size:16px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">ⓘ</button>` : ""}
-    </div>
+    </div>`}
     ${vm.overNudge ? `<div style="font-family:var(--font-hand);font-size:17px;font-weight:700;color:var(--sun-ink);line-height:1.2;">Past the planned time — that's okay. Finish clean, then rest 💛</div>` : ""}
     ${vm.notResting ? `<div style="font-family:var(--font-hand);font-size:${wide ? 16 : 14}px;color:var(--aqua-ink);font-style:italic;line-height:1.2;">${vm.curExDose}</div>` : ""}
     ${vm.upNextName ? `
@@ -340,19 +350,8 @@ function tipsSafety(vm) {
   </div>`;
 }
 
-/* A try-it run is never recorded, and the only sign of that used to be a line
-   on the FINISH screen — so a whole workout could be completed before anyone
-   realised it was a test. This band stands across every session screen. */
-function tryItBand() {
-  return `
-    <div role="status" style="position:absolute;top:0;left:0;right:0;z-index:30;background:var(--grape,#7C5BC7);color:#fff;padding:8px 16px;display:flex;align-items:center;justify-content:center;gap:9px;font-family:var(--font-ui);font-weight:900;font-size:13px;letter-spacing:0.02em;">
-      <span style="font-size:15px;">🧪</span>TRY-IT RUN · nothing here will be saved
-    </div>`;
-}
-
 export function sessionScreen(vm) {
   const overlays = `
-    ${vm.practice ? tryItBand() : ""}
     ${vm.detailOverlay ? detailOverlayHtml(vm) : ""}
     ${vm.stopOverlay ? stopOverlay() : ""}`;
 
