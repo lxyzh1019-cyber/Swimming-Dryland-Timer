@@ -1120,6 +1120,60 @@ export function repairPrizeWallet() {
   return { reissued, dated };
 }
 
+/* Every redeemed prize, for the grown-up to review one at a time.
+   The app CANNOT know which of these she actually spent and which the
+   duplicate-id bug marked used behind her back — so it does not guess. It shows
+   them and asks. */
+export function redeemedPrizesForReview() {
+  const j = loadJourney() || {};
+  return (j.prizesWon || [])
+    .filter(p => p && p.redeemed)
+    .map(p => ({
+      id: String(p.id), label: p.label || p.name || "Prize",
+      date: p.date || "", redeemedAt: redeemedAtOf(p) || 0,
+      repairOf: p.repairOf || null
+    }))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+}
+
+/* Restore ONE prize a grown-up has identified as wrongly marked used.
+
+   Not by setting redeemed:false — that would not survive the night. Redemption
+   always wins a wallet merge (see mergePrize), and it has to: a device that
+   still shows a prize as available is simply behind, and letting ITS copy win
+   is how one prize gets spent twice. So an un-redeemed copy would be quietly
+   re-redeemed by the next sync from her other device.
+
+   Instead the corrupted id is VOIDED — mergeWallets drops a voided id from
+   either side, permanently — and a replacement prize is issued with a new id,
+   the original label and earned date, and repairOf pointing at what it
+   replaces. Nothing she earned is removed; the record simply stops lying. */
+export function restorePrize(prizeId_) {
+  const j = loadJourney();
+  if (!j) return { restored: false, reason: "no-journey" };
+  const key = String(prizeId_);
+  const wallet = j.prizesWon || [];
+  const target = wallet.find(p => p && String(p.id) === key);
+  if (!target) return { restored: false, reason: "not-found" };
+  if (!target.redeemed) return { restored: false, reason: "not-redeemed" };
+
+  const replacement = {
+    ...target,
+    id: prizeId(),
+    date: target.date,            // the day she EARNED it is hers, unchanged
+    redeemed: false,
+    repairOf: key
+  };
+  delete replacement.redeemedAt;
+
+  j.prizesWon = [replacement, ...wallet.filter(p => String(p.id) !== key)];
+  // Voided for good, on this device and on every device it syncs with.
+  j.voidedPrizeIds = [...new Set([...(j.voidedPrizeIds || []), key])];
+  saveJourney(syncPendingDraws(j));
+  logEvent("prize_restored", { was: key, now: replacement.id });
+  return { restored: true, id: replacement.id, was: key, label: replacement.label || "" };
+}
+
 /* Split quiz XP back out of the session rows that folded it in. The Coach's
    Quiz used to add its XP to BOTH the session record and the quiz ledger, and
    rebuildJourneyXp sums both — so every rebuild inflated the total by the
@@ -1193,6 +1247,10 @@ function mergeWallets(a, b, voided) {
   });
   return [...out.values()].sort((x, y) => String(y.date || "").localeCompare(String(x.date || "")));
 }
+
+/* Exposed for tests: the voided-id rule is the load-bearing half of prize
+   repair, and it is only observable through a merge. */
+export const mergeWalletsForTest = mergeWallets;
 
 /* ============================================================
    RESTORE — merging a session history back in (from the Firestore

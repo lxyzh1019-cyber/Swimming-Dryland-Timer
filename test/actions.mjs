@@ -44,6 +44,7 @@ globalThis.document = {
 const base = new URL("../js/", import.meta.url).href;
 const store  = await import(base + "store.js");
 const engine = await import(base + "engine.js");
+const gate   = await import(base + "gate.js");
 const main   = await import(base + "main.js");
 
 let passed = 0;
@@ -107,6 +108,86 @@ engine.sess.paused = true;
 main.actions.openDetail({ name: "Superman" });
 main.actions.closeDetail();
 ok(engine.sess.paused === true, "a session already paused stays paused through a read");
+
+/* ---- Phase 4: a child cannot self-authorize a grown-up decision --------- */
+localStorage.clear(); store.migrate();
+gate.lockGate();
+
+/* The valgus gate decides whether she is jumping at all. */
+const gateBefore = store.loadGate().unlocked;
+main.actions.toggleGate();
+ok(store.loadGate().unlocked === gateBefore,
+   "tapping the valgus gate while locked changes NOTHING");
+ok(main.state.gateAsk === "valgusGate", "it asks for a grown-up instead");
+ok(main.state.gateAsk !== null, "and holds the pending action");
+
+/* A wrong answer does not let it through. */
+main.actions.answerGate("0");
+ok(store.loadGate().unlocked === gateBefore, "a wrong answer still changes nothing");
+ok(main.state.gateAsk === "valgusGate", "and the question stays up");
+ok(main.state.gateError !== "", "with a visible retry message");
+
+/* The right answer performs the action she originally asked for. */
+const ch = gate.gateChallenge().question.match(/\d+/g).map(Number);
+main.actions.answerGate(String(ch[0] * ch[1]));
+ok(main.state.gateAsk === null, "the question closes");
+ok(store.loadGate().unlocked === !gateBefore,
+   "and the action she asked for is carried out, so she does not have to find it again");
+
+/* While unlocked, gated actions go straight through. */
+main.actions.toggleGate();
+ok(store.loadGate().unlocked === gateBefore, "a second change inside the unlock window is not re-challenged");
+
+/* Cancelling abandons the action. */
+gate.lockGate();
+const beforeCancel = store.loadGate().unlocked;
+main.actions.toggleGate();
+main.actions.cancelGate();
+ok(main.state.gateAsk === null, "cancelling closes the question");
+ok(store.loadGate().unlocked === beforeCancel, "and performs nothing");
+
+/* The severity-3 confirmation is no longer a checkbox she can tick herself. */
+gate.lockGate();
+main.state.readiness = { answers: {}, zoneSev: {}, grownupOk: false, light: "green", overridden: false };
+main.actions.rGrownupOk();
+ok(main.state.readiness.grownupOk === false,
+   "a child cannot clear her own severity-3 pain report by tapping the checkbox");
+ok(main.state.gateAsk === "severity3", "it asks for a grown-up");
+const ch2 = gate.gateChallenge().question.match(/\d+/g).map(Number);
+main.actions.answerGate(String(ch2[0] * ch2[1]));
+ok(main.state.readiness.grownupOk === true, "a grown-up who is actually there can clear it");
+/* Un-ticking it again does not need the grown-up back. */
+main.actions.rGrownupOk();
+ok(main.state.readiness.grownupOk === false, "and withdrawing the confirmation is always allowed");
+
+/* Overriding the light the body check produced is an adult decision. */
+gate.lockGate();
+main.state.readiness = { answers: {}, zoneSev: {}, grownupOk: false, light: "red", overridden: false };
+main.actions.rPickLight("green");
+ok(main.state.readiness.light === "red", "a red light cannot be overridden to green by the child");
+ok(main.state.gateAsk === "lightOverride", "it asks for a grown-up");
+const ch3 = gate.gateChallenge().question.match(/\d+/g).map(Number);
+main.actions.answerGate(String(ch3[0] * ch3[1]));
+ok(main.state.readiness.light === "green" && main.state.readiness.overridden === true,
+   "and a grown-up can, with the override recorded");
+
+/* Leaving the Grown-up Zone drops the unlock. */
+main.actions.goToday && main.actions.goToday();
+gate.lockGate();
+ok(gate.gateUnlocked() === false, "the unlock does not follow her out of the Grown-up Zone");
+
+/* ---- the repair message says what actually happened -------------------- */
+localStorage.clear(); store.migrate();
+store.saveJourney({ ...(store.loadJourney() || {}), xp: 0, pendingDraws: 0, prizesWon: [
+  { id: "a", label: "Movie night", date: "2026-01-05", redeemed: true },
+  { id: "a", label: "Ice cream", date: "2026-01-06", redeemed: true }
+] });
+main.actions.repairWallet();
+const note = main.state.walletRepairNote;
+ok(/ID/.test(note), "the repair note reports the IDs it actually fixed");
+ok(!/unstuck/i.test(note), "and never claims a prize was unstuck when it is still marked used");
+ok(/marked used/.test(note), "it says plainly that prizes are still marked used");
+ok(store.redeemedPrizesForReview().length === 2, "and offers them for review");
 
 engine.exitSession();
 console.log(`✓ action-layer tests passed (${passed} assertions)`);

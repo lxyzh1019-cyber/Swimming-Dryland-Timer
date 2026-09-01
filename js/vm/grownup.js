@@ -6,6 +6,8 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl, fmtXp } from "../data.js";
+import { redeemedPrizesForReview } from "../store.js";
+import { gateChallenge, gateUnlocked, GATE_REASON } from "../gate.js";
 import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal, outcomeOf,
          sessionRounds as sessionRoundsDone, sessionRoundsPlanned,
          monthKeyOf, formVerdicts, latestFormVerdicts } from "../store.js";
@@ -664,6 +666,18 @@ export function buildGrownupVM(state) {
     isDefaultPool: !(Array.isArray(settings.prizePool) && settings.prizePool.length),
     // A wallet trim removes prizes she can see, so it is never silent.
     walletRepairNote: state.walletRepairNote || "",
+    // The grown-up gate, and the redeemed prizes it protects.
+    gateAsk: state.gateAsk || null,
+    gateQuestion: state.gateAsk ? gateChallenge().question : "",
+    gateError: state.gateError || "",
+    gateReason: GATE_REASON[state.gateAsk] || "",
+    grownupUnlocked: gateUnlocked(),
+    prizeReviewOpen: !!state.prizeReviewOpen,
+    redeemedPrizes: (state.prizeReviewOpen ? redeemedPrizesForReview() : []).map(p => ({
+      id: p.id, label: p.label,
+      dateLine: "Earned " + (p.date || "—") + (p.repairOf ? " · restored copy" : "")
+    })),
+    noRedeemedPrizes: state.prizeReviewOpen && redeemedPrizesForReview().length === 0,
     pendingRestore: state.pendingRestore
       ? { from: state.pendingRestore.from, to: state.pendingRestore.to }
       : null,

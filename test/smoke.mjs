@@ -1465,4 +1465,95 @@ ok(checkedMoves.length >= engine.SPOT_CHECK_MIN,
    "every move this run picked to watch was actually asked about (" + checkedMoves.length + ")");
 
 
+/* ============================================================
+   PHASE 4 — grown-up authority and prize repair
+   ============================================================ */
+const gate = await import(base + "gate.js");
+
+/* --- the gate --- */
+gate.lockGate();
+ok(gate.gateUnlocked() === false, "the gate starts locked");
+ok(gate.requireGrownup("severity3") === false, "and a gated action is refused while locked");
+ok(gate.requireGrownup("somethingElse") === true, "an ungated action is not affected");
+const gateQ = gate.gateChallenge();
+ok(/^\d+ × \d+ = \?$/.test(gateQ.question), "it asks a generated arithmetic question");
+ok(gate.gateChallenge().question === gateQ.question, "stable across re-renders while unanswered");
+const [gateQa, gateQb] = gateQ.question.match(/\d+/g).map(Number);
+ok(gate.answerGate(gateQa * gateQb - 1) === false, "a wrong answer does not unlock");
+ok(gate.gateUnlocked() === false, "still locked");
+ok(gate.gateChallenge().question !== gateQ.question, "and a wrong answer draws a NEW question");
+const gateQ2 = gate.gateChallenge();
+const [gateQ2a, gateQ2b] = gateQ2.question.match(/\d+/g).map(Number);
+ok(gate.answerGate(gateQ2a * gateQ2b) === true, "the right answer unlocks");
+ok(gate.requireGrownup("prizeRepair") === true, "and every gated action is now allowed");
+/* it expires */
+ok(gate.gateUnlocked(Date.now() + gate.GATE_UNLOCK_MS + 1) === false,
+   "the unlock expires after five minutes");
+ok(gate.gateUnlocked(Date.now() + 1000) === true, "but not before");
+gate.lockGate();
+ok(gate.gateUnlocked() === false, "leaving the Grown-up Zone locks it again");
+/* nothing is stored anywhere */
+ok(Object.keys(localStorage).length === 0 ||
+   !JSON.stringify(Object.entries(localStorage)).includes("gate_secret"),
+   "the gate stores no secret on the device");
+
+/* --- prize repair: IDs are fixed automatically, redemption is NOT --- */
+localStorage.clear(); store.migrate();
+const wallet = [
+  { id: "dup", label: "Movie night", date: "2026-01-05", redeemed: true, redeemedAt: 111 },
+  { id: "dup", label: "Ice cream",   date: "2026-01-06", redeemed: true },
+  { id: "ok",  label: "Late bedtime", date: "2026-01-07", redeemed: false }
+];
+store.saveJourney({ ...(store.loadJourney() || {}), xp: 0, prizesWon: wallet, pendingDraws: 0 });
+const rep = store.repairPrizeWallet();
+ok(rep.reissued === 1, "a duplicate ID is reissued");
+const afterRepair = store.loadJourney().prizesWon;
+ok(new Set(afterRepair.map(p => String(p.id))).size === 3, "every prize now has a unique ID");
+ok(afterRepair.filter(p => p.redeemed).length === 2,
+   "repair does NOT unredeem anything — the app cannot know which she really spent");
+ok(afterRepair.length === 3, "and it never deletes a prize she earned");
+
+/* --- the review list --- */
+const review = store.redeemedPrizesForReview();
+ok(review.length === 2, "both used prizes are offered for review, one at a time");
+ok(review.every(p => p.label && p.id), "each is named so a grown-up can tell them apart");
+
+/* --- restoring ONE selected prize --- */
+const victim = review.find(p => p.label === "Ice cream");
+const res = store.restorePrize(victim.id);
+ok(res.restored === true, "the selected prize is restored");
+ok(res.id !== victim.id, "as a REPLACEMENT with a new ID, not by un-redeeming the old one");
+const w2 = store.loadJourney().prizesWon;
+const fresh = w2.find(p => String(p.id) === String(res.id));
+ok(fresh && fresh.redeemed === false, "the replacement is available again");
+ok(fresh.label === "Ice cream", "with the same label");
+ok(fresh.date === "2026-01-06", "and the day she originally earned it");
+ok(fresh.repairOf === victim.id, "pointing at what it replaces");
+ok(!w2.some(p => String(p.id) === String(victim.id)), "the corrupted copy is gone");
+ok(w2.length === 3, "the wallet still holds three prizes — nothing earned was removed");
+ok(w2.filter(p => p.redeemed).length === 1,
+   "the OTHER used prize stays used — legitimate redemptions are untouched");
+
+/* --- and the restore survives the cloud, which is the whole point --- */
+const voided = store.loadJourney().voidedPrizeIds || [];
+ok(voided.includes(String(victim.id)), "the corrupted ID is voided");
+/* Redemption always wins a merge — so an un-redeemed copy would have been
+   re-redeemed by the next sync from her other device. The voided id must not
+   come back at all. */
+const otherDevice = [{ id: victim.id, label: "Ice cream", date: "2026-01-06", redeemed: true, redeemedAt: 222 }];
+const merged = store.mergeWalletsForTest
+  ? store.mergeWalletsForTest(w2, otherDevice, voided)
+  : null;
+if (merged) {
+  ok(!merged.some(p => String(p.id) === String(victim.id)),
+     "cloud sync cannot reintroduce the voided corrupted copy");
+  ok(merged.some(p => String(p.id) === String(res.id) && p.redeemed === false),
+     "and the restored prize is still available after the merge");
+}
+ok(store.mergePrize({ id: "x", redeemed: false }, { id: "x", redeemed: true, redeemedAt: 5 }).redeemed === true,
+   "normal redeemed-wins merging is unchanged for legitimate redemption");
+ok(store.restorePrize("nope").restored === false, "restoring an unknown prize fails cleanly");
+ok(store.restorePrize(w2.find(p => !p.redeemed).id).restored === false,
+   "and an already-available prize reports that, rather than claiming a restore");
+
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);
