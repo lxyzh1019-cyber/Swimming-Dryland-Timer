@@ -519,7 +519,21 @@ function settingsTab(vm) {
         <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Coach voice 🎧</div>
         <button type="button" data-action="toggleCoachVoice" aria-label="Toggle coach voice" style="${vm.coachTrack}"><span style="${vm.coachKnob}"></span></button>
       </div>
-      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The coach will: count your time · announce the next exercise · remind you to breathe · warn about common mistakes · prompt a self-check.</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The coach will: announce the next exercise · remind you to breathe · warn about common mistakes · prompt a self-check.</div>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Timer sounds 🔔</div>
+        <button type="button" data-action="toggleTimerSounds" aria-label="Toggle timer sounds" style="${vm.timerTrack}"><span style="${vm.timerKnob}"></span></button>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The beeps and rep ticks she paces on. These stay on when the coach's voice is off.</div>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Safety voice 🛟</div>
+        <button type="button" data-action="toggleSafetyVoice" aria-label="Toggle safety voice" style="${vm.safetyTrack}"><span style="${vm.safetyKnob}"></span></button>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">Pain checks and stop confirmations. Spoken even in quiet mode — leave this on.</div>
     </div>
     <div>
       <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Voice style</div>

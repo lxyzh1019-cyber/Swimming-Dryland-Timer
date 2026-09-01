@@ -16,7 +16,7 @@ import { settings, configuredExerciseRest, configuredRoundRest, configuredSectio
          loadDayProgress, saveDayProgress, clearDayProgress, gateLocked, creditValgusWeek, addSkipRecord,
          addXp, pendingDrawCount, claimSessionXp, athleteId, noteSessionXpAwarded, patchSession, sessionKey,
          XP_VERSION, flaggedMoves } from "./store.js";
-import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn } from "./audio.js";
+import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn, speakSafety } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
 import { recoveryDoseSecs, refTime } from "./util.js";
 
@@ -40,6 +40,7 @@ function blankSession() {
     circuits: [], ci: 0, ei: 0, round: 1, exDone: 0,
     timerSecs: 0, timerMax: 0, urgent: false,
     exElapsed: 0, elapsed: 0, pausedSecs: 0, plannedSecs: 0, expectedWork: 0,
+    clockAt: 0, activeMs: 0, pausedMs: 0, exMs: 0,
     upNextName: "", upNextDose: "", restCue: "",
     stopOverlay: false, confirmEnd: false, painFlag: false,
     pendingCleanCheck: false, cleanCount: 0, wobblyCount: 0, lastWobbly: false,
@@ -51,6 +52,15 @@ function blankSession() {
     ledger: [], roundsCompleted: 0, roundsPlanned: 0, blocksCompleted: 0,
     repsCounted: 0, repsTarget: 0, segmentsDone: 0, segmentsPlanned: 0,
     sideLabel: "", segmentLabel: "",
+    /* Live coach state. The engine has always known all of this; it just never
+       said it out loud anywhere she could see. Speech may announce it, but the
+       VISUAL state is the source of truth — a device with no installed voice
+       has to be able to follow the whole session from the screen. */
+    currentSet: 0, totalSets: 0,
+    currentSide: 0, totalSides: 0,
+    currentDirection: 0, totalDirections: 0,
+    repInSegment: 0, repsInSegment: 0,
+    currentSegment: 0, totalSegments: 0,
     // "normal" | "mini" | "tryit" — practice/mini are kept as mirrors so the
     // screens and view-models that read them keep working.
     mode: "normal",
@@ -372,6 +382,10 @@ async function runPrescribedReps(ex) {
   sess.segmentsPlanned = segments.length;
   sess.segmentsDone = 0;
   sess.segmentLabel = "";
+  sess.totalSets = p.sets; sess.totalSides = p.sides; sess.totalDirections = p.dirs;
+  sess.totalSegments = segments.length; sess.currentSegment = 0;
+  sess.currentSet = 0; sess.currentSide = 0; sess.currentDirection = 0;
+  sess.repInSegment = 0; sess.repsInSegment = 0;
 
   let stopped = false;
   const isStopped = () => stopped;
@@ -406,10 +420,14 @@ async function runPrescribedReps(ex) {
       }
       sess.segmentLabel = seg.label;
       sess.sideLabel = seg.label;
+      sess.currentSegment = i + 1;
+      sess.currentSet = seg.set; sess.currentSide = seg.side; sess.currentDirection = seg.dir;
+      sess.repInSegment = 0; sess.repsInSegment = seg.reps;
       setPhase("reps");
       if (seg.label && voiceOn()) await speakAndWait(seg.label.replace(/^\w/, c => c.toUpperCase()) + ".");
       for (let n = 1; n <= seg.reps; n++) {
         if (stopped) return;
+        sess.repInSegment = n;
         if (await runOneRep(ex, p, n, isStopped) === "interrupt") return;
       }
       sess.segmentsDone += 1;
@@ -425,23 +443,62 @@ async function runPrescribedReps(ex) {
   await workLoop;
   sess.sideLabel = "";
   sess.segmentLabel = "";
+  sess.currentSet = 0; sess.totalSets = 0;
+  sess.currentSide = 0; sess.totalSides = 0;
+  sess.currentDirection = 0; sess.totalDirections = 0;
+  sess.repInSegment = 0; sess.repsInSegment = 0;
+  sess.currentSegment = 0; sess.totalSegments = 0;
   return result;
 }
 
-/* ---- elapsed clock ---- */
+/* ---- elapsed clock -------------------------------------------------------
+   This used to be `sess.elapsed += 1` once per setInterval tick. Browsers
+   throttle background timers hard — a phone that locks, or a tab she switches
+   away from, fires that interval a fraction as often — so a real session came
+   back recorded as a few minutes. The same counter drove `exElapsed`, which
+   decides done/partial/skipped, so throttling could also mark work she actually
+   did as skipped.
+
+   Time is derived from wall-clock timestamps now. The interval only redraws;
+   it is not the authority on anything. Paused spans are excluded, so reading
+   the instructions or watching a demo never inflates the recorded duration. */
 let elapsedInterval = null;
+
+function syncClock(now = Date.now()) {
+  if (!sess.clockAt) return;
+  const delta = Math.max(0, now - sess.clockAt);
+  sess.clockAt = now;
+  if (!sess.running) return;
+  if (sess.paused) {
+    sess.pausedMs += delta;
+  } else {
+    sess.activeMs += delta;
+    // The per-exercise clock only runs while she is actually working.
+    if (sess.phase === "reps" || sess.phase === "work") sess.exMs += delta;
+  }
+  sess.elapsed = Math.round(sess.activeMs / 1000);
+  sess.pausedSecs = Math.round(sess.pausedMs / 1000);
+  sess.exElapsed = Math.round(sess.exMs / 1000);
+}
+/* Every reader of the clock calls this first, so a value is never stale by a
+   whole tick — and never short by however long the tab was in the background. */
+export function readClock() { syncClock(); return sess.elapsed; }
+export function resetExerciseClock() { syncClock(); sess.exMs = 0; sess.exElapsed = 0; }
+
 function startElapsed() {
+  syncClock();
   sess.elapsed = 0; sess.pausedSecs = 0;
+  sess.activeMs = 0; sess.pausedMs = 0; sess.exMs = 0;
+  sess.clockAt = Date.now();
   if (elapsedInterval) clearInterval(elapsedInterval);
   elapsedInterval = setInterval(() => {
     if (!sess.running) return;
-    if (sess.paused) { sess.pausedSecs += 1; return; }
-    sess.elapsed += 1;
-    if (sess.phase === "reps" || sess.phase === "work") sess.exElapsed += 1;
+    syncClock();
     notify("tick");
   }, 1000);
 }
 function stopElapsed() {
+  syncClock();
   if (elapsedInterval) { clearInterval(elapsedInterval); elapsedInterval = null; }
 }
 
@@ -497,6 +554,7 @@ function exerciseStatus(ex, wasSkipped, actualSecs, plannedSecs) {
 
 function recordExercise(ex, circuit, ci, ei, r, wasSkipped) {
   const plannedSecs = ex.byReps ? 0 : exWork(ex);
+  syncClock();
   const actualSecs = sess.exElapsed;
   const row = {
     name: ex.name,
@@ -720,7 +778,7 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
         sess.skipExercise = false;
         sess.currentEx = ex;
         sess.ci = ci; sess.ei = ei; sess.round = r;
-        sess.exElapsed = 0;
+        resetExerciseClock();
         setUpNext(circuits, ci, r, ei);
 
         // ---------- WORK ----------
@@ -895,6 +953,7 @@ export function finalize(completed) {
   cancelSpeech();
   stopElapsed();
 
+  syncClock();
   const elapsedSecs = sess.elapsed;
   const day = DAYS[sess.dayKey] || {};
   sess.endedEarly = !completed;
@@ -1011,6 +1070,7 @@ export function finalize(completed) {
    CONTROLS (called from the UI action layer)
    ============================================================ */
 export function togglePause() {
+  syncClock();                       // close the span at the moment of the tap
   sess.paused = !sess.paused;
   if (sess.paused) sess.pauseCount = (sess.pauseCount || 0) + 1;
   logEvent(sess.paused ? "pause" : "resume", { ex: sess.currentEx ? sess.currentEx.name : null });
@@ -1068,6 +1128,11 @@ export function endEarly() {
   if (sess.byRepsResolver) sess.byRepsResolver("abort");
   if (sess.intentResolver) sess.intentResolver(null);
   if (sess.microResolver) sess.microResolver(null);
+  if (sess.formResolver) sess.formResolver(null);
+  // A stop confirmation is a SAFETY line: it is spoken even with the coach
+  // muted, because "I stopped because it hurt" is the one thing she must hear
+  // acknowledged.
+  speakSafety("Session stopped.");
   interruptSpeech("Session stopped.");
 }
 

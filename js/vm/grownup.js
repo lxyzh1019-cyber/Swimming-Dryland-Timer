@@ -655,8 +655,14 @@ export function buildGrownupVM(state) {
     settingsExRest: settings.exerciseRestSeconds, settingsRndRest: settings.roundRestSeconds, settingsSecRest: settings.sectionRestSeconds,
     stepperBtn: "width:44px;height:44px;border-radius:50%;background:var(--surface-2);border:2px solid var(--hairline);font-size:22px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;",
     voiceStyleOpts,
-    coachVoiceOn: settings.coachVoiceOn !== false,
-    coachTrack: onTrack(settings.coachVoiceOn !== false, "var(--mint)"), coachKnob: onKnob(settings.coachVoiceOn !== false),
+    // Three switches, not one. The old single 🎧 toggle silenced the timer
+    // beeps and the safety cues along with the coach's chatter.
+    coachVoiceOn: settings.coachSpeechOn !== false,
+    coachTrack: onTrack(settings.coachSpeechOn !== false, "var(--mint)"), coachKnob: onKnob(settings.coachSpeechOn !== false),
+    timerSoundsOn: settings.timerSoundsOn !== false,
+    timerTrack: onTrack(settings.timerSoundsOn !== false, "var(--aqua)"), timerKnob: onKnob(settings.timerSoundsOn !== false),
+    safetyVoiceOn: settings.safetyVoiceOn !== false,
+    safetyTrack: onTrack(settings.safetyVoiceOn !== false, "var(--coral)"), safetyKnob: onKnob(settings.safetyVoiceOn !== false),
     practiceMode: !!state.practiceMode,
     practiceTrack: onTrack(!!state.practiceMode, "var(--grape)"), practiceKnob: onKnob(!!state.practiceMode),
     practiceHint: state.practiceMode

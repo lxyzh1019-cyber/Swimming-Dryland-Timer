@@ -178,7 +178,7 @@ const GATED_RUNNERS = {
   valgusGate:     () => { const g = loadGate(); g.unlocked = !g.unlocked; saveGate(g); },
   backupRestore:  () => { const p = state.pendingRestore; if (p && p.file) runRestore(p.file, { force: true }); },
   prizeRepair:    () => { state.prizeReviewOpen = true; },
-  safetySettings: () => {}
+  safetySettings: () => { updateSettings({ safetyVoiceOn: settings.safetyVoiceOn === false }); }
 };
 
 /* Exported so the test suite can drive the action layer directly. Several of
@@ -200,7 +200,15 @@ export const actions = {
   },
   selectDay(arg) { state.selectedDay = arg; state.expanded = {}; render(); },
   toggleBlock(arg) { state.expanded[arg] = !state.expanded[arg]; render(); },
-  toggleCoachVoice() { updateSettings({ coachVoiceOn: !settings.coachVoiceOn }); render(); },
+  toggleCoachVoice() { updateSettings({ coachSpeechOn: settings.coachSpeechOn === false }); render(); },
+  toggleTimerSounds() { updateSettings({ timerSoundsOn: settings.timerSoundsOn === false }); render(); },
+  toggleSafetyVoice() {
+    // Safety cues are the point of the readiness system, so turning them OFF is
+    // a grown-up decision. Turning them back on never needs one.
+    if (settings.safetyVoiceOn !== false && !gate("safetySettings")) return;
+    updateSettings({ safetyVoiceOn: settings.safetyVoiceOn === false });
+    render();
+  },
   togglePractice() {
     // Backed by settings, not memory: a reload used to disarm it silently and
     // record a run meant as a test.

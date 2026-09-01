@@ -1556,4 +1556,105 @@ ok(store.restorePrize("nope").restored === false, "restoring an unknown prize fa
 ok(store.restorePrize(w2.find(p => !p.redeemed).id).restored === false,
    "and an already-available prize reports that, rather than claiming a restore");
 
+/* ============================================================
+   PHASE 5 — coach state, audio separation, and the clock
+   ============================================================ */
+const audio = await import(base + "audio.js");
+
+/* --- B. three switches, not one --- */
+localStorage.clear(); store.migrate();
+store.updateSettings({ coachSpeechOn: false, timerSoundsOn: true, safetyVoiceOn: true, voiceStyle: "classic" });
+ok(audio.coachAudioOn() === false, "the coach's voice can be turned off");
+ok(audio.timerSoundsOn() === true, "and the timer beeps stay ON — they used to die with it");
+ok(audio.safetyVoiceOn() === true, "as do the safety cues");
+store.updateSettings({ voiceStyle: "quiet" });
+ok(audio.voiceOn() === false, "quiet mode suppresses the coach");
+ok(audio.safetyVoiceOn() === true, "but quiet mode never removes the safety voice");
+store.updateSettings({ coachSpeechOn: true, timerSoundsOn: false, voiceStyle: "classic" });
+ok(audio.timerSoundsOn() === false && audio.coachAudioOn() === true,
+   "and the beeps can be silenced without muting the coach");
+
+/* migration: the old single flag seeds the new ones */
+localStorage.clear();
+store.updateSettings({ coachVoiceOn: false });
+delete store.settings.audioSplitDone;
+store.updateSettings({ audioSplitDone: false });
+store.migrateAudioSettings();
+ok(store.settings.coachSpeechOn === false, "an existing OFF carries into coach speech");
+ok(store.settings.timerSoundsOn === false, "and into timer sounds");
+ok(store.settings.safetyVoiceOn === true, "while the safety voice defaults ON regardless");
+localStorage.clear(); store.migrate();
+ok(store.settings.coachSpeechOn === true && store.settings.timerSoundsOn === true,
+   "a fresh install gets all three on");
+
+/* --- C. the clock is derived from wall time, not from tick counting ---- */
+localStorage.clear(); store.migrate();
+/* Simulate a BACKGROUNDED tab: real time passes, but the 1s interval barely
+   fires. The old `elapsed += 1` counter recorded only the ticks it got. */
+store.updateSettings({ cloudMirror: false, coachVoiceOn: false, exerciseRestSeconds: 3, roundRestSeconds: 5, sectionRestSeconds: 3 });
+const bgClock = makeClock();
+engine.exitSession();
+const bgRun = engine.startSession({ dayKey: "monday", light: "red", gateUnlocked: true });
+await bgClock.advance(5000);                       // 5s of normal foreground
+const beforeGap = engine.sess.elapsed;
+await bgClock.advance(60000, 30000);               // 60s passes, interval fires twice
+const afterGap = engine.sess.elapsed;
+ok(afterGap - beforeGap >= 59,
+   "a minute in the background is recorded as a minute (" + (afterGap - beforeGap) + "s), not as two ticks");
+/* paused time is excluded */
+engine.togglePause();
+const atPause = engine.sess.elapsed;
+await bgClock.advance(20000);
+ok(engine.sess.elapsed === atPause, "no active time accrues while paused");
+ok(engine.sess.pausedSecs >= 19, "and the paused span is counted as paused (" + engine.sess.pausedSecs + "s)");
+engine.togglePause();
+await bgClock.advance(3000);
+ok(engine.sess.elapsed >= atPause + 2, "the clock picks up again on resume");
+/* opening the instructions pauses, so reading never inflates active time */
+const beforeRead = engine.sess.elapsed;
+engine.togglePause();
+await bgClock.advance(30000);
+engine.togglePause();
+ok(engine.sess.elapsed - beforeRead <= 1,
+   "reading the instructions adds no active time at all");
+/* End it properly so the record is written, then let the loop unwind on the
+   fake clock rather than stranding a promise on the real one. */
+const bgElapsed = engine.sess.elapsed;
+engine.endEarly();
+let bgSpins = 0;
+while (engine.sess.running && bgSpins++ < 200) await bgClock.advance(1000);
+bgClock.restore();
+await bgRun.catch(() => {});
+const bgRow = store.loadSessions()[0];
+ok(bgRow && bgRow.durationSecs >= 60,
+   "and the SAVED record carries the real duration (" + (bgRow && bgRow.durationSecs) + "s), not the tick count");
+ok(bgRow.durationSecs >= bgElapsed - 2, "the saved duration matches the live clock");
+ok(bgRow.pausedSecs >= 19, "with the paused span recorded separately");
+
+/* --- A. the coach state is readable without any speech at all ---------- */
+localStorage.clear(); store.migrate();
+store.updateSettings({ coachSpeechOn: false, timerSoundsOn: false, exerciseRestSeconds: 3, roundRestSeconds: 5, sectionRestSeconds: 3, cloudMirror: false });
+let sawSet = false, sawRep = false, sawSide = false, repsMonotonic = true, lastRep = 0;
+await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    const vm = svm.buildSessionVM({});
+    if (!vm.showCoachState) { lastRep = 0; return; }
+    if (vm.coachSetLine) sawSet = true;
+    if (vm.coachSideLine) sawSide = true;
+    if (vm.coachRepLine) {
+      sawRep = true;
+      const n = Number(vm.coachRepLine.match(/REP (\d+)/)[1]);
+      if (n < lastRep) repsMonotonic = false;
+      lastRep = n;
+    }
+  }
+});
+ok(sawRep, "the screen says which rep she is on, with the voice off entirely");
+ok(sawSet || sawSide, "and which set or side");
+ok(repsMonotonic, "the rep count only ever moves forwards within a segment");
+/* the whole session still completes with no voice and no beeps */
+ok(store.loadSessions()[0].ledger.some(l => l.status === "done"),
+   "a silent session still runs, and still records real work");
+
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

@@ -9,6 +9,16 @@ import { fmtMMSS, exercisePhotoUrl } from "../util.js";
 import { loadSessions } from "../store.js";
 import { deriveSessionOutcome, OUTCOME_VERSION } from "../outcome.js";
 
+/* What changes at the end of this segment — named before she gets there, so the
+   switch is never a surprise she hears about only if the voice is on. */
+function coachNext(sess) {
+  if (!sess.totalSegments || sess.currentSegment >= sess.totalSegments) return "";
+  if (sess.currentSide < sess.totalSides) return "NEXT: SWITCH SIDES";
+  if (sess.currentDirection < sess.totalDirections) return "NEXT: OTHER DIRECTION";
+  if (sess.currentSet < sess.totalSets) return "NEXT: SET " + (sess.currentSet + 1);
+  return "";
+}
+
 const MOOD_DEFS = [
   { key: "great", emoji: "😀", label: "Great" },
   { key: "okay",  emoji: "🙂", label: "Okay" },
@@ -230,6 +240,22 @@ export function buildSessionVM(state) {
     exPacePct: Math.round((curPlanned > 0 ? Math.min(1, curActual / curPlanned) : 0) * 100),
     paceColor, overNudge: !!(exOver && timerIsReps),
     upNextName: sess.upNextName, upNextDose: sess.upNextDose,
+
+    /* ---- live coach state -------------------------------------------------
+       SET 1 OF 2 · LEFT SIDE · REP 5 OF 8 · NEXT: SWITCH SIDES. The engine has
+       always tracked every one of these; nothing ever showed them, so a session
+       run with the voice off (or on a device with no installed voice) gave her
+       no way to know which set or which side she was on. */
+    coachSetLine: sess.totalSets > 1 ? `SET ${sess.currentSet} OF ${sess.totalSets}` : "",
+    coachSideLine: sess.totalSides > 1
+      ? (sess.currentSide === 1 ? "LEFT SIDE" : "RIGHT SIDE") : "",
+    coachDirectionLine: sess.totalDirections > 1
+      ? `DIRECTION ${sess.currentDirection} OF ${sess.totalDirections}` : "",
+    coachRepLine: sess.repsInSegment > 0 ? `REP ${sess.repInSegment} OF ${sess.repsInSegment}` : "",
+    coachNextLine: coachNext(sess),
+    showCoachState: phase === "reps" && sess.totalSegments > 0,
+    coachSegmentLine: sess.totalSegments > 1
+      ? `${sess.currentSegment} of ${sess.totalSegments}` : "",
     cheerMsg: CHEERS[(sess.roundsCompleted || 0) % CHEERS.length],
     // Its own phase, not something rendered over a rest clock that is already
     // running down. Naming the move matters: two or three are watched per run

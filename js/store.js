@@ -174,7 +174,10 @@ export const DEFAULT_SETTINGS = {
   roundRestSeconds: 25,
   sectionRestSeconds: 30,   // NEW (block break; old app hardcoded 8s)
   secondsPerRep: 3,
-  coachVoiceOn: true,       // NEW: design's 🎧 toggle gates ALL coach audio
+  coachVoiceOn: true,       // legacy single switch — migrated into the three below
+  coachSpeechOn: true,      // the coach's spoken cues and encouragement
+  timerSoundsOn: true,      // beeps, rep ticks, round/rest cues
+  safetyVoiceOn: true,      // pain checks, safety stops, form warnings
   athleteName: "Jess",      // NEW: editable in Grown-up Settings
   prizePool: null,          // NEW: null = default PRIZE_POOL
   cloudMirror: true,        // NEW: privacy — mirror completed sessions to Firestore
@@ -1620,10 +1623,29 @@ export function importProfileData(payload, opts = {}) {
 /* One-time idempotent seeding: if the journey key is absent, walk the
    existing session history and award XP retroactively — nothing the kid
    earned ever vanishes. */
+/* One 🎧 switch used to gate every sound in the app, so turning the coach's
+   voice off also silenced the timer beeps she paces on and the safety cues that
+   are the point of the readiness system. Splitting them is only safe if the
+   split inherits what she already chose: the old value seeds speech and timer
+   sounds, and the safety voice starts ON regardless — it is not the thing
+   anyone was trying to turn off. */
+export function migrateAudioSettings() {
+  if (settings.audioSplitDone) return false;
+  const legacy = settings.coachVoiceOn !== false;
+  updateSettings({
+    coachSpeechOn: legacy,
+    timerSoundsOn: legacy,
+    safetyVoiceOn: true,
+    audioSplitDone: true
+  });
+  return true;
+}
+
 export function migrate() {
   // merge any new default settings keys into the saved blob
   settings = loadSettings();
   saveSettings();
+  migrateAudioSettings();
   // Un-double the quiz XP baked into older session rows BEFORE any total is
   // derived from the log, so the baseline below is the honest number.
   migrateQuizXp();

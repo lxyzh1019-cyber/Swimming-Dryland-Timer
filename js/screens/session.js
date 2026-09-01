@@ -268,6 +268,13 @@ function centerStack(vm, wide) {
     <div style="font-family:var(--font-hand);font-size:15px;color:var(--sun-ink);font-style:italic;line-height:1.3;">${vm.cheerMsg}</div>
   </div>` : ""}
 
+  ${vm.showCoachState ? `
+  <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;width:100%;max-width:480px;flex-shrink:0;margin-bottom:2px;">
+    ${[vm.coachSetLine, vm.coachSideLine, vm.coachDirectionLine, vm.coachRepLine].filter(Boolean).map(t =>
+      `<span style="font-size:11px;font-weight:900;letter-spacing:0.06em;border-radius:var(--radius-pill);padding:4px 11px;background:var(--surface-2);color:var(--ink-soft);white-space:nowrap;">${t}</span>`).join("")}
+    ${vm.coachNextLine ? `<span style="font-size:11px;font-weight:900;letter-spacing:0.06em;border-radius:var(--radius-pill);padding:4px 11px;background:var(--sun-wash);color:var(--sun-ink);white-space:nowrap;">${vm.coachNextLine}</span>` : ""}
+  </div>` : ""}
+
   ${vm.showCleanCheck ? `
   <div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:2px solid var(--mint);border-radius:var(--radius-lg);padding:10px 16px;width:100%;max-width:480px;flex-shrink:0;box-sizing:border-box;box-shadow:var(--shadow-soft);">
     <span style="flex:1;font-weight:900;font-size:15px;color:var(--ink);">${vm.cleanCheckQuestion}</span>
