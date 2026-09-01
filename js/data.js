@@ -48,6 +48,19 @@ export function exRepsDetail(ex) {
   if (!bonus || !ex.repsDetail) return ex.repsDetail;
   return ex.repsDetail.replace(/^(\d+)/, n => parseInt(n, 10) + bonus);
 }
+/* The structured prescription the runner counts, with the +1-rep overload
+   bonus applied. Every consumer that needs to know how many reps, how many
+   sides or what tempo goes through here — never through the display string. */
+export function exPrescription(ex) {
+  const p = ex && ex.prescription;
+  if (!p) return null;
+  const bonus = OVERLOAD_PAUSED ? 0 : repBonus();
+  if (!bonus) return p;
+  return normalizePrescription({
+    ...p, reps: p.reps + bonus,
+    repsHigh: p.repsHigh ? p.repsHigh + bonus : null
+  });
+}
 /* Overload-adjusted dose string for display (bumps a leading rep count,
    or a leading seconds figure for timed work). */
 export function exDose(ex) {
@@ -296,6 +309,138 @@ export function videoSearchUrl(ex) {
 }
 
 /* ------------------------------------------------------------
+   STRUCTURED PRESCRIPTION — what the runner actually counts.
+
+   The runner used to read the DISPLAY string ("2×8/side") with a
+   regex that required a digit next to the word "reps". Not one
+   prescription in this file is written that way, so every rep
+   exercise fell through to a hard-coded 10 and no rep exercise
+   ever switched sides. A kid was told 8 per side and counted to
+   10 once.
+
+   So the display string is parsed ONCE, here, into structure:
+
+     { sets, reps, repsHigh, sides, dirs, tempo, holdSeconds, unit }
+
+   parsePrescription THROWS on anything it can't read. New content
+   that invents a dose format fails loudly at load instead of
+   quietly counting to 10 forever.
+   ------------------------------------------------------------ */
+
+const DASHES = /[–—−]/g;   // en / em dash, minus → "-"
+
+function fail(detail, why) {
+  throw new Error(`parsePrescription: ${why} in "${detail}"`);
+}
+
+export function parsePrescription(detail) {
+  const raw = String(detail == null ? "" : detail).replace(DASHES, "-").trim();
+  if (!raw) fail(detail, "empty prescription");
+
+  // "12 · 2-1-2 tempo" → head "12", modifiers "2-1-2 tempo". Splitting on the
+  // separator first keeps a 2-1-2 tempo from being read as a 2-to-1 rep range.
+  const parts = raw.split("·").map(p => p.trim()).filter(Boolean);
+  let body = parts.shift() || "";
+  const mods = parts.join(" ").toLowerCase();
+
+  // leading set count — "2×8", "2x8"
+  let sets = 1;
+  const setsM = body.match(/^(\d+)\s*[×x]\s*/i);
+  if (setsM) { sets = parseInt(setsM[1], 10); body = body.slice(setsM[0].length); }
+
+  // rep count, optionally a range ("8-10") or an approximation ("~24")
+  const repsM = body.match(/^~?\s*(\d+)\s*(?:-\s*(\d+))?/);
+  if (!repsM) fail(detail, "no rep count");
+  const reps = parseInt(repsM[1], 10);
+  const repsHigh = repsM[2] ? parseInt(repsM[2], 10) : null;
+  if (repsHigh != null && repsHigh < reps) fail(detail, "rep range runs backwards");
+
+  // whatever follows the number says how the reps are divided up
+  let tail = body.slice(repsM[0].length).toLowerCase();
+  const eat = (re) => { if (!re.test(tail)) return false; tail = tail.replace(re, " "); return true; };
+  let sides = 1, dirs = 1, unit = "reps";
+  if (eat(/\/\s*side/)) sides = 2;
+  if (eat(/\/\s*leg/))  sides = 2;
+  if (eat(/\/\s*arm/))  sides = 2;
+  if (eat(/\/\s*dir\b/)) dirs = 2;
+  if (eat(/\beach\b/))   sides = 2;        // "3/dir each" — each direction, each arm
+  if (eat(/\bcycles?\b/)) unit = "cycles";
+  if (eat(/\bsteps?\b/))  unit = "steps";
+  eat(/\bclean\b/); eat(/\breps?\b/); eat(/\balternating\b/);
+  tail = tail.replace(/[()\s]+/g, " ").trim();
+  if (tail) fail(detail, `unrecognised "${tail}"`);
+
+  // tempo / hold live after the separator
+  let tempo = null, holdSeconds = 0, left = mods;
+  const tempoM = left.match(/(\d+)\s*-\s*(\d+)\s*-\s*(\d+)/);
+  if (tempoM) {
+    tempo = [parseInt(tempoM[1], 10), parseInt(tempoM[2], 10), parseInt(tempoM[3], 10)];
+    left = left.replace(tempoM[0], " ");
+  }
+  const holdM = left.match(/hold\s*(\d+)\s*s/) || left.match(/(\d+)\s*s\s*hold/);
+  if (holdM) { holdSeconds = parseInt(holdM[1], 10); left = left.replace(holdM[0], " "); }
+  left = left.replace(/\btempo\b/g, " ").replace(/[()\s]+/g, " ").trim();
+  if (left) fail(detail, `unrecognised modifier "${left}"`);
+
+  return normalizePrescription({ sets, reps, repsHigh, sides, dirs, tempo, holdSeconds, unit });
+}
+
+/* Fill in the defaults and derive the totals every consumer wants. */
+export function normalizePrescription(p) {
+  const sets  = Math.max(1, p.sets || 1);
+  const reps  = Math.max(1, p.reps || 1);
+  const sides = Math.max(1, p.sides || 1);
+  const dirs  = Math.max(1, p.dirs  || 1);
+  const hold  = Math.max(0, p.holdSeconds || 0);
+  // A hold with no explicit tempo IS a tempo: one beat out, hold, one beat back.
+  const tempo = p.tempo || (hold > 0 ? [1, hold, 1] : null);
+  const segments = sets * sides * dirs;
+  return {
+    sets, reps, sides, dirs, tempo, holdSeconds: hold,
+    repsHigh: p.repsHigh && p.repsHigh > reps ? p.repsHigh : null,
+    unit: p.unit || "reps",
+    segments, totalReps: segments * reps
+  };
+}
+
+/* Seconds one rep takes: the tempo when there is one, else the configured
+   per-rep estimate the settings own. */
+export function repSeconds(p, secondsPerRep = 3) {
+  if (p && p.tempo) return p.tempo.reduce((a, b) => a + b, 0);
+  return secondsPerRep;
+}
+
+const ORDINAL = ["", "first", "second", "third", "fourth"];
+
+/* The ordered list of stretches of work the runner walks through. One segment
+   per set × side × direction, each carrying how it should be announced and
+   whether reaching it means switching sides. */
+export function prescriptionSegments(p) {
+  const out = [];
+  for (let set = 1; set <= p.sets; set++) {
+    for (let side = 1; side <= p.sides; side++) {
+      for (let dir = 1; dir <= p.dirs; dir++) {
+        const bits = [];
+        if (p.sets  > 1) bits.push(`set ${ORDINAL[set] || set}`);
+        if (p.sides > 1) bits.push(`${ORDINAL[side] || side} side`);
+        if (p.dirs  > 1) bits.push(`${ORDINAL[dir] || dir} direction`);
+        const prev = out[out.length - 1];
+        out.push({
+          set, side, dir, reps: p.reps,
+          label: bits.join(", "),
+          // What changed since the last segment decides what the coach says.
+          transition: !prev ? null
+            : prev.side !== side ? "side"
+            : prev.dir  !== dir  ? "direction"
+            : "set"
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------
    X() — exercise factory. Returns an object compatible with the
    timer/voice runner (work / byReps+repsDetail / reset / cue / redFlag).
    ------------------------------------------------------------ */
@@ -319,7 +464,23 @@ export function X(o) {
     demoUrl: o.demoUrl || null,
     rest: o.rest != null ? o.rest : 5
   };
-  if (driver === "reps") { ex.byReps = true; ex.repsDetail = o.repsDetail || o.dose; }
+  if (driver === "reps") {
+    ex.byReps = true;
+    ex.repsDetail = o.repsDetail || o.dose;
+    // Parsed once, here. The runner reads `prescription`; the display string is
+    // only ever shown. `prescription:` overrides the parse where the written
+    // dose is short of the truth (Band Ankle 4-Way's "/dir" means four).
+    // `tempo:` supplies the cadence a coach knows but the dose doesn't say.
+    const parsed = o.prescription
+      ? normalizePrescription(o.prescription)
+      : parsePrescription(ex.repsDetail);
+    ex.prescription = o.tempo && !parsed.tempo
+      ? normalizePrescription({ ...parsed, tempo: o.tempo })
+      : parsed;
+    // The words a coach actually says for this move's cadence. Defaults to
+    // Up / Hold / Down; Dead Bug extends and returns, it doesn't go up.
+    if (o.tempoWords) ex.tempoWords = o.tempoWords;
+  }
   else if (driver === "time") { ex.work = o.work; }
   if (o.eachSide) ex.eachSide = true;
   return ex;
@@ -327,6 +488,14 @@ export function X(o) {
 
 /* Light → number of rounds for the Main block. */
 export const LIGHT_ROUNDS = { green: 3, yellow: 2, red: 1, recovery: 0 };
+
+/* ---- the valgus gate ------------------------------------------------------
+   The Grown-up Zone states the rule plainly: LOCKED means "all jumps stay at
+   Drop-and-Stick", UNLOCKED means "jumps allowed beyond Drop-and-Stick". So
+   the gate is a CEILING on jump progressions, and Drop-and-Stick is the safe
+   floor she earns her way up from — never the thing held back. */
+export const VALGUS_FLOOR = "Drop-and-Stick";
+export const VALGUS_PROGRESSIONS = ["Box Jump", "Box Jump-Down", "Bosu Squat", "Depth Jump", "Broad Jump"];
 
 /* Top-7 exercises tracked on the Independence Ladder. */
 export const TOP7 = [
@@ -428,11 +597,11 @@ export const DAYS = {
             reset: "Shoulders sink first.", cue: "Shoulders sink first, THEN bend.",
             parentWatch: "Kipping / swinging", fix: "One swing = set over.",
             swimTransfer: "Catch with the lats" }),
-        X({ name: "Dead Bug", block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side", faultAnchor: true,
+        X({ name: "Dead Bug", block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side", faultAnchor: true, tempo: [2, 0, 2], tempoWords: ["Extend", "", "Return"],
             reset: "Back flat, exhale on extend.", cue: "Exhale as limbs extend, back flat.",
             parentWatch: "Low back lifts off floor", fix: "Smaller range.",
             swimTransfer: "Brace under breathing" }),
-        X({ name: "Glute Bridge March", block: "main", driver: "reps", repsDetail: "8–10/side", dose: "8–10/side", faultAnchor: true,
+        X({ name: "Glute Bridge March", block: "main", driver: "reps", repsDetail: "8–10/side", dose: "8–10/side", faultAnchor: true, tempo: [2, 1, 2],
             reset: "Drive from the hip.", cue: "Drive from the HIP, not the heel.",
             parentWatch: "Pelvis tilts / drops", fix: "Slow down, level the pelvis.",
             swimTransfer: "Hip = the motor" }),
@@ -481,7 +650,7 @@ export const DAYS = {
             reset: "Blades first.", cue: "Drive elbows back, squeeze the blades.",
             parentWatch: "Shrugging / arms-only", fix: "Reset, blades first.",
             swimTransfer: "Freestyle pull" }),
-        X({ name: "Bird Dog", block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side",
+        X({ name: "Bird Dog", block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side", tempo: [1, 5, 1], tempoWords: ["Extend", "Hold", "Return"],
             reset: "Flat back.", cue: "Flat back, no hip rotation.",
             parentWatch: "Hips rotate", fix: "Slow down, reduce reach.",
             swimTransfer: "Posterior body line" }),
@@ -548,7 +717,7 @@ export const DAYS = {
             reset: "Lift into streamline.", cue: "Lift arms+legs into streamline, hold.",
             parentWatch: "Neck strains / fast pumping", fix: "Lower the lift, hold the shape.",
             swimTransfer: "Dry-land streamline" }),
-        X({ name: "Glute Bridge March", block: "main", driver: "reps", repsDetail: "8–10/side", dose: "8–10/side", faultAnchor: true,
+        X({ name: "Glute Bridge March", block: "main", driver: "reps", repsDetail: "8–10/side", dose: "8–10/side", faultAnchor: true, tempo: [2, 1, 2],
             reset: "Drive from the hip.", cue: "Drive from the HIP, not the heel.",
             parentWatch: "Pelvis tilts / drops", fix: "Slow down, level the pelvis.",
             swimTransfer: "Hip = the motor" }),
@@ -585,7 +754,8 @@ export const DAYS = {
         X({ name: "Band Pass-Through", block: "warmup", driver: "reps", repsDetail: "8–10", dose: "8–10", cue: "Wide, slow, no shrug." }),
         X({ name: "Shoulder CARs", block: "warmup", driver: "reps", repsDetail: "3/dir each", dose: "3/dir each", cue: "Slow full circle, control the range." }),
         X({ name: "Hip Circles", block: "warmup", driver: "reps", repsDetail: "8/dir", dose: "8/dir", cue: "Big slow circles." }),
-        X({ name: "Band Ankle 4-Way", block: "warmup", driver: "reps", repsDetail: "8/dir", dose: "8/dir", cue: "Slow, full range each direction." }),
+        X({ name: "Band Ankle 4-Way", block: "warmup", driver: "reps", repsDetail: "8/dir", dose: "8/dir", cue: "Slow, full range each direction.",
+            prescription: { reps: 8, dirs: 4 } }),
         X({ name: "Leg Swings", block: "warmup", driver: "reps", repsDetail: "8/dir/leg", dose: "8/dir/leg", cue: "Relaxed, build range." })
       ],
       coordination: [
@@ -603,11 +773,11 @@ export const DAYS = {
             reset: "Torso completely still.", cue: "Torso completely still.",
             parentWatch: "Torso rotates", fix: "Lower tension, widen base.",
             swimTransfer: "Anti-roll in the pull" }),
-        X({ name: "Dead Bug", block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side", faultAnchor: true,
+        X({ name: "Dead Bug", block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side", faultAnchor: true, tempo: [2, 0, 2], tempoWords: ["Extend", "", "Return"],
             reset: "Back flat, exhale on extend.", cue: "Exhale as limbs extend, back flat.",
             parentWatch: "Low back lifts off floor", fix: "Smaller range.",
             swimTransfer: "Brace under breathing" }),
-        X({ name: "Glute Bridge March", block: "main", driver: "reps", repsDetail: "8–10/side", dose: "8–10/side", faultAnchor: true,
+        X({ name: "Glute Bridge March", block: "main", driver: "reps", repsDetail: "8–10/side", dose: "8–10/side", faultAnchor: true, tempo: [2, 1, 2],
             reset: "Drive from the hip.", cue: "Drive from the HIP, not the heel.",
             parentWatch: "Pelvis tilts / drops", fix: "Slow down, level the pelvis.",
             swimTransfer: "Hip = the motor" }),
@@ -666,7 +836,7 @@ export const DAYS = {
             reset: "Shoulders sink first.", cue: "Shoulders sink first, THEN bend.",
             parentWatch: "Kipping / swinging", fix: "One swing = set over.",
             swimTransfer: "Catch with the lats" }),
-        X({ name: "Bird Dog", block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side",
+        X({ name: "Bird Dog", block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side", tempo: [1, 5, 1], tempoWords: ["Extend", "Hold", "Return"],
             reset: "Flat back.", cue: "Flat back, no hip rotation.",
             parentWatch: "Hips rotate", fix: "Slow down, reduce reach.",
             swimTransfer: "Posterior body line" }),
@@ -712,7 +882,8 @@ export const DAYS = {
         X({ name: "World's Greatest Stretch", block: "warmup", driver: "reps", repsDetail: "4/side", dose: "4/side", cue: "Lunge, reach, rotate — whole body opens." }),
         X({ name: "Open-Book / T-Rotation", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Hips stacked, rotate from the spine." }),
         X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Knees lead, sit tall." }),
-        X({ name: "Band Ankle 4-Way", block: "warmup", driver: "reps", repsDetail: "8/dir", dose: "8/dir", cue: "Slow, full range each direction." })
+        X({ name: "Band Ankle 4-Way", block: "warmup", driver: "reps", repsDetail: "8/dir", dose: "8/dir", cue: "Slow, full range each direction.",
+            prescription: { reps: 8, dirs: 4 } })
       ],
       coordination: [
         X({ name: "C-Skip", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Paw the ground back under the hip." }),
@@ -736,7 +907,7 @@ export const DAYS = {
             reset: "Lift into streamline.", cue: "Lift arms+legs into streamline, hold.",
             parentWatch: "Neck strains / fast pumping", fix: "Lower the lift, hold the shape.",
             swimTransfer: "Dry-land streamline" }),
-        X({ name: "Glute Bridge March", block: "main", driver: "reps", repsDetail: "8–10/side", dose: "8–10/side", faultAnchor: true,
+        X({ name: "Glute Bridge March", block: "main", driver: "reps", repsDetail: "8–10/side", dose: "8–10/side", faultAnchor: true, tempo: [2, 1, 2],
             reset: "Drive from the hip.", cue: "Drive from the HIP, not the heel.",
             parentWatch: "Pelvis tilts / drops", fix: "Slow down, level the pelvis.",
             swimTransfer: "Hip = the motor" }),
@@ -839,7 +1010,8 @@ export const BLOCK_META = {
 };
 
 export const MIN_REST = 3;
-export const SIDE_SWITCH_BUFFER = 5;
+/* Re-exported from util so the constant has exactly one definition. */
+export { SIDE_SWITCH_BUFFER } from "./util.js";
 export const ROUND_REST = 25;   // flat all weeks (settings can override)
 
 /* ============================================================

@@ -6,9 +6,9 @@
    delegated click listener below.
    ============================================================ */
 
-import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, noteSessionXpAwarded, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS, tryItArmed, setTryIt } from "./store.js";
+import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS, tryItArmed, setTryIt } from "./store.js";
 import { edmontonDayKey, escapeHtml } from "./util.js";
-import { restoreFromCloud } from "./sync.js";
+import { restoreFromCloud, publishJourney } from "./sync.js";
 import { downloadBackup, restoreBackupFile } from "./backup.js";
 import { buildTodayVM, journeyPathScrollIntoView } from "./vm/today.js";
 import { todayWide, todayNarrow } from "./screens/today.js";
@@ -17,13 +17,15 @@ import { newReadinessFlow, answerQuestion, sameAsYesterday, setZoneSev, resetBod
 import { readinessScreen } from "./screens/readiness.js";
 import * as engine from "./engine.js";
 import { buildSessionVM, sessionQuizFor } from "./vm/session.js";
+import { buildTryItVM, tryItMoves } from "./vm/tryit.js";
+import { tryItScreen } from "./screens/tryit.js";
 import { sessionScreen, updateSessionTick } from "./screens/session.js";
 import { buildQuizDeck, answerQuizDeck, finishQuizDeck, quizDeckHtml, newPrizeDraw, claimPrize, prizeDrawHtml } from "./screens/overlays.js";
 import { buildProgressVM, toggleRedeem } from "./vm/progress.js";
 import { progressScreen } from "./screens/progress.js";
 import { buildGrownupVM, exportCsv } from "./vm/grownup.js";
 import { grownupScreen } from "./screens/grownup.js";
-import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS, recordFormVerdict } from "./store.js";
+import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS, recordFormVerdict, repairPrizeWallet } from "./store.js";
 
 export const state = {
   nav: "today",                 // 'today' | 'progress' | 'grownup'
@@ -35,15 +37,18 @@ export const state = {
   expanded: {},                 // day-card block expansion
   selectedDay: null,            // monday..sunday
   practiceMode: false,
+  tryIt: null,                  // dayKey while the Try-It browse screen is open
   inSession: false,
   readiness: null,              // active readiness-check flow state (null = not in flow)
-  pendingSession: null,         // { light, dayKey, mini?, practice? } — readiness → session handoff
+  pendingSession: null,         // { light, dayKey, mini? } — readiness → session handoff
   quizDeck: null,
   prizeDraw: null,
   detailOverlay: false,
   detailEx: null,
   weather: null,                // { icon, temp, caption } once fetched
   backupNote: "", backupNoteOk: false,   // result line under Backup & restore
+  walletRepairNote: "",         // result line under the prize wallet repair
+  pendingRestore: null,         // { file, from, to } — a backup from another athlete, awaiting confirmation
   storageError: null,           // { name } — set when a write is rejected (disk full)
   isWide: true
 };
@@ -103,7 +108,8 @@ function overlaysHtml() {
 
 export function render() {
   state.isWide = computeIsWide();
-  if (state.readiness) { renderReadiness(); }
+  if (state.tryIt) { root.innerHTML = page(tryItScreen(buildTryItVM(state))); }
+  else if (state.readiness) { renderReadiness(); }
   else if (state.inSession) { renderSession(); }
   else if (state.nav === "progress") {
     const railVm = buildTodayVM(state);
@@ -150,15 +156,40 @@ const actions = {
     render();
   },
   goSession(arg) {
-    state.readiness = newReadinessFlow(arg || state.selectedDay || edmontonDayKey(), state.practiceMode);
+    const dayKey = arg || state.selectedDay || edmontonDayKey();
+    // Try-It is a different destination, not a flavour of the workout. It used
+    // to run Body Check and the whole session engine behind a banner.
+    if (state.practiceMode) { actions.goTryIt(dayKey); return; }
+    state.readiness = newReadinessFlow(dayKey);
     render();
   },
-  goSessionPractice(arg) {
-    state.readiness = newReadinessFlow(arg || state.selectedDay || edmontonDayKey(), true);
+  goTryIt(arg) {
+    state.tryIt = arg || state.selectedDay || edmontonDayKey();
+    state.detailOverlay = false; state.detailEx = null;
+    render();
+  },
+  exitTryIt() {
+    state.tryIt = null;
+    state.detailOverlay = false; state.detailEx = null;
+    render();
+  },
+  tryItDetail(arg) {
+    const moves = tryItMoves(state.tryIt);
+    const ex = moves[Number(arg)];
+    if (!ex) return;
+    state.detailEx = ex; state.detailOverlay = true;
     render();
   },
   startMini(arg) {
-    startPendingSession({ light: "green", dayKey: arg || state.selectedDay, mini: true, practice: state.practiceMode });
+    const dayKey = arg || state.selectedDay || edmontonDayKey();
+    if (state.practiceMode) { actions.goTryIt(dayKey); return; }
+    // A mini goes through Body Check like any other session and uses the light
+    // it resolves to. Skipping readiness and forcing green is how a sore day
+    // still handed her a workout nobody had checked.
+    const r = newReadinessFlow(dayKey);
+    r.mini = true;
+    state.readiness = r;
+    render();
   },
   startQuizDeck() {
     state.quizDeck = buildQuizDeck(8);
@@ -171,7 +202,7 @@ const actions = {
   nextQuizDeck() {
     const qd = state.quizDeck;
     if (!qd) return;
-    if (qd.idx >= qd.qs.length - 1) { qd.done = true; finishQuizDeck(qd); }
+    if (qd.idx >= qd.qs.length - 1) { qd.done = true; finishQuizDeck(qd); publishJourney(); }
     else qd.idx += 1;
     render();
   },
@@ -182,6 +213,7 @@ const actions = {
   claimPrize() {
     claimPrize(state.prizeDraw);
     state.prizeDraw = null;
+    publishJourney();   // a prize won here must not be invisible on her other device
     // One prize per level gained: once every pending draw is claimed, retire
     // the "Pick your prize" buttons so the draw can't be re-farmed.
     if (pendingDrawCount() < 1) {
@@ -215,8 +247,8 @@ const actions = {
     if (arg === "retry") { resetBodyCheck(r); render(); return; }
     // continue: persist the check (try-it runs don't overwrite the real day's
     // check), then hand the resolved light to the session
-    if (!r.practice) saveReadiness({ answers: r.answers, zoneSev: r.zoneSev, light: r.light, overridden: r.overridden });
-    startPendingSession({ light: r.light || "green", dayKey: r.dayKey, practice: r.practice });
+    saveReadiness({ answers: r.answers, zoneSev: r.zoneSev, light: r.light, overridden: r.overridden });
+    startPendingSession({ light: r.light || "green", dayKey: r.dayKey, mini: !!r.mini });
   },
   rResultSecondary(arg) {
     if (arg === "retry") { resetBodyCheck(state.readiness); render(); }
@@ -249,28 +281,53 @@ const actions = {
     // and never again. The Coach's Quiz question rotates but the bank is only
     // six deep, so without the ledger this paid 25 XP a session forever for
     // re-answering questions the kid already knew.
-    if (first && !engine.sess.practice && engine.sess.savedEntry) {
+    if (first && engine.sess.savedEntry) {
       const q = sessionQuizFor(engine.sess.dayKey);
       const correct = !!(q.opts[i] && q.opts[i].ok);
       const { xp, capped } = payQuizQuestion(quizQuestionKey("coach", q.id), correct);
       engine.sess.quizXp = xp;    // the done screen quotes what was actually banked
       engine.sess.quizCapped = capped;
       if (xp > 0) {
-        engine.sess.xpEarned = (engine.sess.xpEarned || 0) + xp;
+        // Quiz XP is priced by the quiz LEDGER, and rebuildJourneyXp adds the
+        // ledger to the session log. Folding it into the session's xpEarned as
+        // well meant every rebuild counted it twice — 360 + 30 came back as
+        // 420. It rides on the record as its own field, for display only.
         if (addXp(xp).leveledUp && pendingDrawCount() > 0) engine.sess.leveledUp = true;
-        noteSessionXpAwarded(xp);   // it lands on the session record via xpEarned below
-        patchSession(engine.sess.savedKey, { xpEarned: engine.sess.xpEarned });
+        patchSession(engine.sess.savedKey, { quizXp: xp });
+        engine.mirrorSessionPatch({ quizXp: xp });
+        publishJourney();
       }
       render();
     }
   },
-  openDetailCur() { state.detailEx = engine.sess.currentEx; state.detailOverlay = true; render(); },
+  /* Reading the instructions PAUSES the run. The countdown is derived from a
+     wall-clock deadline, so it used to keep going — and could finish the
+     exercise, or the whole block — while she was reading, or off in a YouTube
+     tab watching the demo. Closing asks for a deliberate Resume rather than
+     dropping her back into a clock that never stopped. */
+  openDetail(ex) {
+    if (!ex) return;
+    state.detailEx = ex;
+    state.detailOverlay = true;
+    if (engine.sess.running && !engine.sess.paused) engine.togglePause();
+    render();
+  },
+  openDetailCur() { actions.openDetail(engine.sess.currentEx); },
   openDetailAt(arg) {
     const [ci, ei] = arg.split("|").map(Number);
     const c = engine.sess.circuits[ci];
-    if (c && c.exercises[ei]) { state.detailEx = c.exercises[ei]; state.detailOverlay = true; render(); }
+    if (c && c.exercises[ei]) actions.openDetail(c.exercises[ei]);
   },
-  closeDetail() { state.detailOverlay = false; state.detailEx = null; render(); },
+  watchVideo() {
+    // The link opens in a new tab on its own; all this has to do is make sure
+    // the clock is stopped before she leaves.
+    if (engine.sess.running && !engine.sess.paused) engine.togglePause();
+  },
+  closeDetail() {
+    state.detailOverlay = false; state.detailEx = null;
+    if (engine.sess.running && engine.sess.paused) engine.togglePause();
+    render();
+  },
   openPrizeDraw() {
     if (pendingDrawCount() < 1) return;
     state.prizeDraw = newPrizeDraw();
@@ -279,6 +336,9 @@ const actions = {
   redeemPrize(arg) {
     toggleRedeem(arg);
     render();
+    // Redemption is the half of a prize's life that must reach the other
+    // device promptly — until it did, the same prize could be spent twice.
+    publishJourney();
     // The undo window closes on a timer, not on a tap, so schedule the repaint
     // that retires the button — otherwise it keeps offering an undo the store
     // would refuse.
@@ -290,6 +350,22 @@ const actions = {
 
   /* ---- grown-up zone ---- */
   setGuTab(arg) { state.grownupTab = arg; render(); },
+  confirmRestore() {
+    const p = state.pendingRestore;
+    if (!p || !p.file) return;
+    runRestore(p.file, { force: true });
+  },
+  cancelRestore() { state.pendingRestore = null; state.backupNote = ""; render(); },
+  repairWallet() {
+    const { reissued, dated } = repairPrizeWallet();
+    publishJourney();
+    state.walletRepairNote = (reissued || dated)
+      ? "Repaired: " + [reissued ? reissued + " prize" + (reissued === 1 ? "" : "s") + " given a fresh ID" : "",
+                        dated ? dated + " stuck “used” prize" + (dated === 1 ? "" : "s") + " unstuck" : ""]
+          .filter(Boolean).join(", ") + ". Nothing she earned was removed."
+      : "Nothing to repair — every prize already has a unique ID and a proper redemption date.";
+    render();
+  },
   setGsScope(arg) { state.gsScope = arg; render(); },
   formCheckMonth(arg) { state.formCheckMonth = arg; render(); },
   formCheckPass(arg) { recordFormVerdict(arg, true, state.formCheckMonth); render(); },
@@ -383,7 +459,12 @@ root.addEventListener("click", e => {
   const stopEl = e.target.closest("[data-stop-propagation]");
   if (stopEl && el.contains(stopEl) && el !== stopEl) return;
   const fn = actions[el.dataset.action];
-  if (fn) { e.preventDefault(); fn(el.dataset.arg, el); }
+  if (!fn) return;
+  // A real link (the "watch the move" demo) must still navigate — its action
+  // only stops the clock before she leaves the tab.
+  const isLink = el.tagName === "A" && el.getAttribute("href");
+  if (!isLink) e.preventDefault();
+  fn(el.dataset.arg, el);
 });
 
 // Settings name edits flow straight back into the greeting. Saved on every
@@ -399,20 +480,30 @@ root.addEventListener("input", e => {
 
 /* Restoring a backup rewrites storage under the app's feet — settings and the
    engine hold module-level copies — so the page reloads once the merge lands. */
-root.addEventListener("change", e => {
-  if (!(e.target.matches && e.target.matches('[data-input="restoreBackup"]'))) return;
-  const file = e.target.files && e.target.files[0];
-  e.target.value = "";
-  restoreBackupFile(file).then(res => {
+function runRestore(file, opts) {
+  restoreBackupFile(file, opts).then(res => {
     state.backupNote = res.message;
     state.backupNoteOk = true;
+    state.pendingRestore = null;
     render();
     if (res.sessionsAdded || res.filled.length) setTimeout(() => location.reload(), 1200);
   }).catch(err => {
     state.backupNote = err.message || "That restore didn't work.";
     state.backupNoteOk = false;
+    // A backup belonging to the OTHER athlete isn't rejected outright — a
+    // grown-up may genuinely be moving her onto this device — but it takes a
+    // deliberate second tap, because the merge cannot be undone.
+    state.pendingRestore = err.identityMismatch ? { file, ...err.identityMismatch } : null;
     render();
   });
+}
+
+root.addEventListener("change", e => {
+  if (!(e.target.matches && e.target.matches('[data-input="restoreBackup"]'))) return;
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  state.pendingRestore = null;
+  runRestore(file, {});
 });
 
 window.addEventListener("resize", () => {

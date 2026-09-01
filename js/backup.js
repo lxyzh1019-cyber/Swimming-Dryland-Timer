@@ -20,7 +20,7 @@ export function downloadBackup() {
 
 /* Reads a File chosen in the Grown-up Zone and merges it into the ACTIVE
    athlete. Resolves with a message for the UI; rejects with a readable one. */
-export function restoreBackupFile(file) {
+export function restoreBackupFile(file, opts = {}) {
   return new Promise((resolve, reject) => {
     if (!file) { reject(new Error("No file chosen.")); return; }
     const reader = new FileReader();
@@ -30,7 +30,7 @@ export function restoreBackupFile(file) {
       try { payload = JSON.parse(reader.result); }
       catch { reject(new Error("That file isn't valid JSON.")); return; }
       let res;
-      try { res = importProfileData(payload); }
+      try { res = importProfileData(payload, opts); }
       catch (e) { reject(e); return; }
       const who = settings.athleteName || "this athlete";
       const bits = [];

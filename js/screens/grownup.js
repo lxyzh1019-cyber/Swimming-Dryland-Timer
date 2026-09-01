@@ -558,6 +558,11 @@ function settingsTab(vm) {
         </div>
       </div>
       ${vm.walletTrimNote ? `<div style="margin-top:8px;font-size:13px;font-weight:700;color:var(--ink-soft);background:var(--surface-2);border-radius:12px;padding:9px 12px;line-height:1.45;">${escapeHtml(vm.walletTrimNote)}</div>` : ""}
+      <div style="margin-top:10px;border-top:1.5px solid var(--hairline);padding-top:10px;">
+        <div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.45;">Prizes stuck on “✓ Used” that she never redeemed, or several going used at once, come from wallets written before prizes had unique IDs. This repairs those without resetting anything she has earned.</div>
+        <button type="button" data-action="repairWallet" style="margin-top:8px;min-height:44px;border:2px solid var(--hairline);background:var(--surface);border-radius:var(--radius-pill);padding:0 18px;font-weight:900;font-size:13px;color:var(--ink);cursor:pointer;font-family:inherit;">🔧 Repair prize wallet</button>
+        ${vm.walletRepairNote ? `<div style="margin-top:8px;font-size:13px;font-weight:800;color:var(--mint-ink);background:var(--mint-wash);border-radius:12px;padding:9px 12px;line-height:1.45;">${escapeHtml(vm.walletRepairNote)}</div>` : ""}
+      </div>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <input type="text" placeholder="Add a prize… (e.g. 🎨 Craft afternoon)" data-input="newPrize" style="flex:1;padding:10px 13px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:14px;font-weight:700;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">
         <button type="button" data-action="addPrizePoolItem" style="min-height:44px;border:none;background:var(--sun);color:var(--sun-ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">Add</button>
@@ -574,6 +579,11 @@ function settingsTab(vm) {
         </label>
       </div>
       ${vm.backupNote ? `<div role="status" style="margin-top:10px;font-size:13px;font-weight:800;line-height:1.5;color:${vm.backupNoteOk ? "var(--mint-ink)" : "var(--stop-ink)"};background:${vm.backupNoteOk ? "var(--mint-wash)" : "var(--stop-wash)"};border-radius:12px;padding:9px 12px;">${escapeHtml(vm.backupNote)}</div>` : ""}
+      ${vm.pendingRestore ? `
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <button type="button" data-action="confirmRestore" style="min-height:44px;border:none;border-radius:var(--radius-pill);background:var(--stop);color:#fff;font-weight:900;font-size:13px;padding:0 18px;cursor:pointer;font-family:inherit;">Merge ${escapeHtml(vm.pendingRestore.from)}’s data into ${escapeHtml(vm.pendingRestore.to)} anyway</button>
+        <button type="button" data-action="cancelRestore" style="min-height:44px;border:2px solid var(--hairline);border-radius:var(--radius-pill);background:var(--surface);color:var(--ink-soft);font-weight:900;font-size:13px;padding:0 18px;cursor:pointer;font-family:inherit;">Cancel</button>
+      </div>` : ""}
     </div>
     <div style="border-top:1.5px solid var(--hairline);padding-top:16px;">
       <div style="font-size:15px;color:var(--stop);line-height:1.5;font-weight:700;">🔴 Sharp pain, pinching, or numbness → STOP immediately and tell a grown-up.</div>

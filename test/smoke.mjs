@@ -11,8 +11,14 @@ globalThis.localStorage = (() => { const m = new Map(); return {
   getItem: k => (m.has(k) ? m.get(k) : null),
   setItem: (k, v) => m.set(k, String(v)),
   removeItem: k => m.delete(k), clear: () => m.clear() }; })();
+/* An utterance that starts and ends IMMEDIATELY — the real behaviour of a
+   device with no installed voices, and the condition that made a whole rep set
+   fly past in milliseconds and get recorded as skipped. */
+globalThis.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
 globalThis.window = {
-  speechSynthesis: { getVoices: () => [], speak() {}, cancel() {}, speaking: false, pending: false, set onvoiceschanged(f) {} },
+  SpeechSynthesisUtterance: globalThis.SpeechSynthesisUtterance,
+  speechSynthesis: { getVoices: () => [], cancel() {}, speaking: false, pending: false, set onvoiceschanged(f) {},
+    speak(u) { if (u && u.onstart) u.onstart(); if (u && u.onend) u.onend(); } },
   AudioContext: function () { this.state = "running"; this.currentTime = 0;
     this.createOscillator = () => ({ type: "", frequency: { value: 0 }, connect() {}, start() {}, stop() {} });
     this.createGain = () => ({ gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} });
@@ -38,6 +44,8 @@ const gvm     = await import(base + "vm/grownup.js");
 const gscreen = await import(base + "screens/grownup.js");
 const rscreen = await import(base + "screens/readiness.js");
 const overlays = await import(base + "screens/overlays.js");
+const tryvm   = await import(base + "vm/tryit.js");
+const tryscreen = await import(base + "screens/tryit.js");
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
@@ -71,6 +79,15 @@ ok(store.countsAsTrained({ completedFully: true }), "completed session counts");
 ok(store.countsAsTrained(early([{ name: "Superman" }])), "ended early after real work counts");
 ok(!store.countsAsTrained(early([{ name: "Superman", skipped: true }])), "ended early with everything skipped does not");
 ok(!store.countsAsTrained(early([])), "GO-then-quit does not count");
+/* Reaching the END of a session having skipped everything is not training
+   either — it used to arrive as completedFully:true and take the streak. */
+const allSkipped = { isoDate: d0, completedFully: true, endedEarly: false,
+  ledger: [{ name: "A", status: "skipped" }, { name: "B", status: "skipped" }] };
+ok(!store.countsAsTrained(allSkipped), "skipping every exercise is not a trained day, even at the end");
+ok(store.countsAsTrained({ ...allSkipped, ledger: [{ name: "A", status: "done" }] }),
+   "but one real move is");
+ok(!store.countsAsTrained({ isoDate: d0, completedFully: true, safetyStop: true,
+   ledger: [{ name: "A", status: "done" }] }), "and a safety stop is a safety event, not a training day");
 ok(store.countsAsTrained({ isoDate: d0 }), "pre-flag legacy records count (old app's !== false rule)");
 ok(store.isPartialSession(early([{ name: "Superman" }])), "ended-early reads as partial");
 
@@ -446,27 +463,43 @@ ok(tryItGaps.noBadge.length === 0, "and the 🧪 badge does too, so a catch-up d
 ok(tryItGaps.notAButton.length === 0, "it is a real button, not the old text link");
 const tryVM = tvm.buildTodayVM({ selectedDay: launchDays[0], expanded: {}, practiceMode: true, isWide: true });
 ok(/min-height:48px/.test(tryVM.practiceBtnStyle), "with a 48px tap target — the old link was ~16px");
-ok(/Try-It/.test(tryVM.dayView.ctaLabel) || tryVM.dayView.ctaAction === "goSessionPractice",
-   "and the start button itself says what it will launch");
 
-engine.sess.practice = true;
-ok(/TRY-IT RUN/.test(sscreen.sessionScreen(svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null }))),
-   "a band stands through the whole run, not just the finish screen");
-engine.sess.practice = false;
-ok(!/TRY-IT RUN/.test(sscreen.sessionScreen(svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null }))),
-   "and never appears on a real run");
+/* TRY-IT IS NOT A WORKOUT. It used to run the entire session engine — Body
+   Check, traffic light, rounds, timers, clean-checks, a finish screen —
+   behind a purple banner, so a kid could complete a whole workout that was
+   never going to count. It is a list of moves now. */
+launchDays.forEach(d => {
+  const dv = tvm.buildTodayVM({ selectedDay: d, expanded: {}, practiceMode: true, isWide: true }).dayView;
+  if (!(dv.isActive || dv.isDone || dv.isMissed || dv.isPreview)) return;
+  ok(dv.ctaAction === "goTryIt", "with try-it armed, " + d + "'s start button opens the move list, not a session");
+});
+const tryItVM = tryvm.buildTryItVM({ selectedDay: "monday", isWide: true, detailOverlay: false, detailEx: null });
+const tryItHtml = tryscreen.tryItScreen(tryItVM);
+ok(tryItVM.moves.length > 0, "the try-it screen lists the day's moves");
+ok(tryItVM.moves.every(m => m.videoUrl && m.videoUrl !== "#"), "every one links to a demo video");
+ok(/data-action="tryItDetail"/.test(tryItHtml), "and each is tappable for instructions");
+ok(!/data-action="(advance|pauseTimer|skipEx|stopNow)"/.test(tryItHtml),
+   "with no timer controls anywhere — there is nothing running to control");
+ok(/data-action="exitTryIt"/.test(tryItHtml), "and a plain way out");
+/* prepMenu moves are inserted by the session assembly but were missing from
+   every "what's in today" count — in try-it there is nothing to assemble. */
+ok(tryvm.tryItMoves("tuesday").some(m => m.name === "Pallof Press"),
+   "try-it lists prepMenu moves too, which the plan counts never included");
 
-/* Pain is the one thing that escapes the sandbox: a stop she reported is real
-   whether or not the run counted, and it used to vanish before reaching the
-   grown-up. It carries no training credit with it. */
+/* The engine itself refuses the mode, so no stale caller can start a real,
+   recorded workout in "test" mode. */
 localStorage.clear();
 store.migrate();
+await engine.startSession({ dayKey: "monday", light: "green", mode: "tryit" });
+ok(engine.sess.running === false, "the engine refuses to start a try-it session at all");
+ok(store.loadSessions().length === 0, "so try-it can never write a session record");
+
+/* Legacy try-it rows may still sit in a history; they are not training. */
 store.saveSession({ app: "swimming", practice: true, dayKey: "monday", dayTitle: "Mon",
                     isoDate: new Date().toISOString(), durationSecs: 300, sessionType: "try-it",
                     pain: true, endedEarly: true, completedFully: false, safetyOnly: true });
 const painRow = store.loadSessions()[0];
-ok(painRow && painRow.pain === true, "a pain stop during try-it is recorded for Safety & Flags");
-ok(store.countsAsTrained(painRow) === false, "but it is not a trained day");
+ok(store.countsAsTrained(painRow) === false, "a legacy try-it row is not a trained day");
 ok(store.sessionXp(painRow) === 0, "and pays no XP");
 ok(store.rebuildJourneyXp() === 0, "so a rebuild still totals nothing");
 localStorage.clear();
@@ -741,6 +774,467 @@ ok(store.loadSettings().roundRestSeconds === 45, "a changed setting is not overw
 let threw = "";
 try { store.importProfileData({ app: "something-else", data: {} }); } catch (e) { threw = e.message; }
 ok(/isn't a Splash backup/.test(threw), "a foreign file is rejected");
+localStorage.clear();
+
+
+/* ============================================================
+   THE STATE MACHINE ITSELF
+
+   Everything above tests pure helpers. None of it ever ran the
+   timer, and that is precisely why the runner could count to 10
+   for every prescription in the plan, never switch sides, accept
+   an instant Done as a finished exercise, and pay 150% for one
+   day — with 260 assertions passing the whole time.
+
+   These drive a REAL session on a fake clock.
+   ============================================================ */
+
+/* ---- prescriptions: parsed, not guessed --------------------------------- */
+const P = data.parsePrescription;
+const shape = p => `${p.sets}x${p.reps}${p.repsHigh ? "-" + p.repsHigh : ""}/s${p.sides}/d${p.dirs}`;
+ok(shape(P("8/side")) === "1x8/s2/d1", "8/side is eight reps on each of two sides");
+ok(shape(P("2×8/side")) === "2x8/s2/d1", "2x8/side is four segments of eight");
+ok(P("2×8/side").totalReps === 32, "…which is 32 reps, not the 10 the old parser counted");
+ok(shape(P("8/dir/leg")) === "1x8/s2/d2", "8/dir/leg is both directions on both legs");
+ok(shape(P("3/dir each")) === "1x3/s2/d2", "3/dir each is both directions, each arm");
+ok(shape(P("2–3 clean reps")) === "1x2-3/s1/d1", "a range keeps both ends");
+ok(P("~24").reps === 24, "an approximate count is still a count");
+ok(P("8 cycles").unit === "cycles", "a cycle is not a rep");
+ok(P("12 · 2-1-2 tempo").tempo.join("-") === "2-1-2" && P("12 · 2-1-2 tempo").reps === 12,
+   "a tempo is read as a tempo, and 12 still means 12");
+ok(P("5 · hold 3s").tempo.join("-") === "1-3-1", "a hold becomes a cadence with the hold in the middle");
+ok(P("10/side · 2s hold").sides === 2 && P("10/side · 2s hold").holdSeconds === 2, "sides and holds coexist");
+let presThrew = "";
+try { P("as many as you like"); } catch (e) { presThrew = e.message; }
+ok(/parsePrescription/.test(presThrew), "an unreadable dose throws instead of silently counting to 10");
+
+/* Every rep exercise in the whole plan resolves — no fallbacks, anywhere. */
+const allRepEx = Object.values(data.DAYS).flatMap(d =>
+  [...Object.values(d.blocks || {}).flat(), ...(d.prepMenu || [])]).filter(ex => ex.byReps);
+ok(allRepEx.length > 60, "the plan really does have a lot of rep work (" + allRepEx.length + " instances)");
+ok(allRepEx.every(ex => ex.prescription && ex.prescription.totalReps > 0),
+   "every rep exercise in every day carries a real prescription");
+const tenners = allRepEx.filter(ex => ex.prescription.totalReps === 10);
+ok(tenners.length === 0, "and not one of them is the old hard-coded 10");
+const birdDog = allRepEx.find(ex => ex.name === "Bird Dog");
+ok(birdDog.prescription.totalReps === 16 && birdDog.prescription.sides === 2,
+   "Bird Dog 8/side is 16 reps across two sides — it was hard-coded to 10 total, one side");
+const bandRow = allRepEx.find(ex => ex.name === "Band Row");
+ok(bandRow.prescription.reps === 12, "Band Row 12 · 2-1-2 counts 12 — the tempo branch also defaulted to 10");
+const deadBug = allRepEx.find(ex => ex.name === "Dead Bug");
+ok(deadBug.prescription.tempo.join("-") === "2-0-2" && deadBug.tempoWords[0] === "Extend",
+   "Dead Bug keeps its own cadence AND its own words — it extends, it doesn't go up");
+const pullUps = allRepEx.find(ex => ex.name === "Clean Pull-Ups");
+ok(pullUps.prescription.reps === 2 && pullUps.prescription.repsHigh === 3,
+   "Clean Pull-Ups counts the low end of 2–3, then offers the extra");
+
+/* Segments are walked in a real order, with a side switch between them. */
+const segs = data.prescriptionSegments(P("2×8/side"));
+ok(segs.length === 4, "2x8/side walks four segments");
+// left, right, left, right — three switches, and each one gets its own reset.
+ok(segs.filter(g => g.transition === "side").length === 3, "switching sides between every one of them");
+ok(segs[0].transition === null, "the first segment has nothing to switch from");
+ok(data.prescriptionSegments(P("8/dir")).some(g => g.transition === "direction"),
+   "and a /dir move changes direction rather than sides");
+
+/* The day card and the session screen must not disagree about the day. The
+   card read authored timeLo/timeHi and counted five named blocks once; the
+   session estimates the circuits it is about to run, prepMenu and all rounds
+   included. */
+const mondayCircuits = engine.assembleCircuits("monday", "green");
+ok(tvm.planStats("monday").mins === Math.max(1, Math.round(engine.estimateSessionSecs(mondayCircuits) / 60)),
+   "the day card's minutes are the session's own estimate, not a stale authored number");
+ok(tvm.planStats("tuesday").moves === new Set(engine.assembleCircuits("tuesday", "green")
+     .flatMap(c => c.exercises.map(e => e.name))).size,
+   "and its move count includes the prepMenu moves the session actually inserts");
+
+/* ---- a real session on a fake clock -------------------------------------- */
+/* The engine is timestamp-driven (setInterval + Date.now), so the harness
+   moves both together and lets the microtask queue drain between ticks. */
+const realNow = Date.now, realSetInterval = globalThis.setInterval, realClearInterval = globalThis.clearInterval;
+const realSetTimeout = globalThis.setTimeout, realClearTimeout = globalThis.clearTimeout;
+
+function makeClock() {
+  let now = 1780000000000, id = 1;
+  const timers = new Map();
+  Date.now = () => now;
+  globalThis.setInterval = (fn, ms) => { const k = id++; timers.set(k, { fn, ms, next: now + ms, repeat: true }); return k; };
+  globalThis.setTimeout  = (fn, ms) => { const k = id++; timers.set(k, { fn, ms: ms || 0, next: now + (ms || 0), repeat: false }); return k; };
+  globalThis.clearInterval = k => timers.delete(k);
+  globalThis.clearTimeout  = k => timers.delete(k);
+  return {
+    async advance(ms, step = 50) {
+      for (let done = 0; done < ms; done += step) {
+        now += step;
+        [...timers.entries()].forEach(([k, t]) => {
+          if (t.next > now) return;
+          if (t.repeat) t.next = now + t.ms; else timers.delete(k);
+          t.fn();
+        });
+        await new Promise(r => process.nextTick(r));   // let awaits resolve
+      }
+    },
+    restore() {
+      Date.now = realNow;
+      globalThis.setInterval = realSetInterval; globalThis.clearInterval = realClearInterval;
+      globalThis.setTimeout = realSetTimeout;   globalThis.clearTimeout = realClearTimeout;
+    }
+  };
+}
+
+/* Run a session to completion (or until `stop` says otherwise). Voice off, so
+   the runner paces on the clock rather than on speech. */
+async function runSession(opts, script = {}) {
+  localStorage.clear();
+  store.migrate();
+  store.updateSettings({ coachVoiceOn: !!opts.voice, exerciseRestSeconds: 3, roundRestSeconds: 10, sectionRestSeconds: 5, cloudMirror: false });
+  if (opts.gateUnlocked) store.saveGate({ unlocked: true, cleanWeeks: [] });
+  const clock = makeClock();
+  engine.exitSession();
+  const run = engine.startSession(opts);
+  let elapsed = 0;
+  const limit = opts.limitMs || 3600000;
+  while (engine.sess.running && elapsed < limit) {
+    await clock.advance(1000);
+    elapsed += 1000;
+    if (script.onTick) script.onTick(elapsed, engine.sess);
+  }
+  await run;
+  clock.restore();
+  return engine.sess;
+}
+
+/* --- a straight, honest green session --- */
+let s1 = await runSession({ dayKey: "monday", light: "green", gateUnlocked: true });
+ok(s1.running === false, "a green session runs to the end on a fake clock");
+ok(s1.ledger.length > 0, "and writes a completion ledger");
+ok(s1.roundsCompleted === 3, "3 main rounds trained reads as 3 — it used to add every block in too");
+ok(s1.blocksCompleted >= 4, "blocks are counted separately (" + s1.blocksCompleted + ")");
+const mainRows = s1.ledger.filter(l => l.block === "main");
+ok(new Set(mainRows.map(l => l.round)).size === 3, "and the ledger holds a row per exercise PER ROUND");
+ok(s1.ledger.every(l => l.status === "done"), "everything done reads as done");
+const rec1 = store.loadSessions()[0];
+ok(rec1.roundsDone === 3 && rec1.roundsPlanned === 3, "the record stores rounds done AND rounds planned");
+ok(store.sessionXp(rec1) === 360, "a full green day pays 360");
+
+/* --- side switching actually happens --- */
+const sided = s1.ledger.filter(l => l.segmentsPlanned > 1 && l.driver === "reps");
+ok(sided.length > 0, "the day contains multi-segment rep work");
+ok(sided.every(l => l.segmentsDone === l.segmentsPlanned),
+   "and every segment of it was walked — rep moves never switched sides at all before");
+const dbRow = s1.ledger.find(l => l.name === "Dead Bug");
+ok(dbRow.repsPlanned === 16 && dbRow.repsCounted === 16, "Dead Bug counted all 16 reps, 8 to a side");
+
+/* Running the real app caught this one: with the voice ON but no installed
+   voices, speakAndWait resolves instantly, a whole rep set flew past in
+   milliseconds, and the ledger recorded a fully counted set as SKIPPED.
+   Reps are paced on the clock now, and judged on reps rather than wall time. */
+let sVoice = await runSession({ dayKey: "tuesday", light: "red", gateUnlocked: true, voice: true });
+const voiceRows = sVoice.ledger.filter(l => l.driver === "reps");
+ok(voiceRows.length > 0, "the day has rep work");
+ok(voiceRows.every(l => !(l.repsCounted >= l.repsPlanned && l.status === "skipped")),
+   "a fully counted rep set is never recorded as skipped, however fast the voice is");
+ok(voiceRows.filter(l => l.status === "done").length === voiceRows.length,
+   "every completed rep set reads as done");
+
+/* --- Done is no longer a free pass --- */
+let s2 = await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+  onTick: (ms, sess) => { if (["work", "reps"].includes(sess.phase)) engine.advance(); }
+});
+ok(s2.ledger.length > 0, "tapping Done on everything still reaches the end of the session");
+ok(s2.ledger.every(l => l.status !== "done"), "but nothing instantly tapped counts as done");
+ok(s2.roundsCompleted === 0, "so no round was completed");
+const rec2 = store.loadSessions()[0];
+ok(rec2.roundsDone === 0, "the record says zero rounds, not the light's three");
+ok(store.sessionXp(rec2) === 0, "and an untouched session pays nothing");
+
+/* --- one training day pays for one training day --------------------------
+   The reproduction from the report: stop partway (half XP on the planned
+   three rounds = 180), come back, finish the resumed green session (360).
+   That paid 540 for a 360-day plan. */
+localStorage.clear();
+store.migrate();
+const partial = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, roundsDone: 1, roundsPlanned: 3, sessionType: "main",
+  completedFully: false, endedEarly: true, ledger: [{ name: "x", status: "done" }] };
+const firstPay = store.claimSessionXp(partial);
+const resumed = { ...partial, roundsDone: 2, completedFully: true, endedEarly: false };
+const secondPay = store.claimSessionXp(resumed);
+ok(firstPay === 180, "the partial pays for the one round it finished");
+ok(firstPay + secondPay === 360, "and the resume tops it up to exactly one full day, never 540");
+ok(store.claimSessionXp(resumed) === 0, "a third attempt on the same day pays nothing at all");
+
+/* --- a pain stop is a safety event, not a short workout --- */
+const painStop = { ...partial, safetyStop: true, pain: true, roundsDone: 1 };
+ok(store.xpForSession(painStop) === 0, "a pain stop pays no XP");
+ok(store.countsAsTrained({ ...painStop, perExercise: [{ name: "x" }] }) === true ||
+   store.countsAsTrained({ ...painStop, perExercise: [{ name: "x" }] }) === false,
+   "and countsAsTrained has an explicit answer for it");
+
+/* --- a mini is a subset, not the day --- */
+localStorage.clear();
+let s3 = await runSession({ dayKey: "monday", light: "green", mini: true, gateUnlocked: true });
+ok(s3.mode === "mini", "a mini runs as its own mode");
+ok(s3.roundsPlanned === 1, "and plans one round however green the light was");
+const rec3 = store.loadSessions()[0];
+ok(rec3.sessionType === "mini", "the record says mini");
+ok(store.sessionXp(rec3) <= 180, "so it is priced as a one-round day at most");
+const week = tvm.weekStatuses();
+ok(week.monday !== "done", "and a mini never ticks the whole day off");
+ok(store.loadSessions().length === 1 && JSON.parse(localStorage.getItem("swim_day_progress") || "{}"),
+   "while the rest of the day's progress is left standing");
+
+/* --- the Coach's Quiz pays once, not twice --------------------------------
+   Reproduces the report exactly: 360 session + 30 quiz should read 390 after
+   a rebuild, and used to read 420. */
+localStorage.clear();
+store.migrate();
+store.saveSession({ app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, roundsDone: 3, roundsPlanned: 3, completedFully: true,
+  ledger: [{ name: "x", status: "done" }], xpEarned: 360 });
+store.addXp(360);
+const qres = store.payQuizQuestion(store.quizQuestionKey("coach", "hips"), true);
+store.addXp(qres.xp);
+store.patchSession(store.sessionKey(store.loadSessions()[0]), { quizXp: qres.xp });
+const beforeRebuild = store.loadJourney().xp;
+const afterRebuild = store.rebuildJourneyXp();
+ok(qres.xp === 30, "the quiz question pays 30");
+ok(beforeRebuild === 390, "360 session + 30 quiz reads 390");
+ok(afterRebuild === 390, "and still reads 390 after a rebuild — it used to inflate to 420");
+ok(store.rebuildJourneyXp() === 390, "rebuilding again is a no-op");
+
+/* --- prizes: redeemed on either device is redeemed everywhere ------------- */
+const pzAvail = { id: "p1", label: "Movie night", date: "2026-04-01", redeemed: false };
+const pzSpent = { id: "p1", label: "Movie night", date: "2026-04-01", redeemed: true, redeemedAt: 1780000000000 };
+ok(store.mergePrize(pzAvail, pzSpent).redeemed === true, "a prize spent on the other device is spent here");
+ok(store.mergePrize(pzSpent, pzAvail).redeemed === true, "…whichever side the merge sees first");
+const pzEarly = { ...pzSpent, redeemedAt: 1770000000000 };
+ok(store.mergePrize(pzSpent, pzEarly).redeemedAt === 1770000000000, "the earliest real redemption wins");
+const pzLegacy = { id: "p2", label: "Ice cream", date: "2026-04-02", redeemed: true };   // no redeemedAt
+ok(Number.isFinite(store.mergePrize(pzLegacy, pzLegacy).redeemedAt),
+   "a legacy redeemed prize gets a usable date instead of being locked forever");
+
+/* the parent repair, rather than an automatic reset */
+localStorage.clear();
+store.migrate();
+store.saveJourney({ xp: 5000, prizesWon: [
+  { id: "dup", label: "A", date: "2026-04-01", redeemed: false },
+  { id: "dup", label: "B", date: "2026-04-02", redeemed: true },
+  { id: "ok",  label: "C", date: "2026-04-03", redeemed: false }
+] });
+const repair = store.repairPrizeWallet();
+ok(repair.reissued === 1, "the repair gives a duplicate-ID prize its own identity back");
+ok(new Set(store.loadJourney().prizesWon.map(p => String(p.id))).size === 3,
+   "so three prizes stay three prizes instead of collapsing into two");
+ok(store.loadJourney().prizesWon.length === 3, "and none of them is thrown away");
+
+/* --- the valgus gate governs the workout --------------------------------- */
+localStorage.clear();
+store.migrate();
+ok(store.gateLocked() === true, "the gate starts locked");
+ok(store.creditValgusWeek({ isoDate: new Date().toISOString(),
+      ledger: [{ name: "Drop-and-Stick", status: "done" }], formChecks: [] }).cleanWeeks.length === 0,
+   "doing the move without a clean self-check earns nothing — that alone used to count");
+const g1 = store.creditValgusWeek({ isoDate: "2026-04-01T10:00:00.000Z",
+  ledger: [{ name: "Drop-and-Stick", status: "done" }], formChecks: [{ name: "Drop-and-Stick", clean: true }] });
+ok(g1.cleanWeeks.length === 1 && g1.unlocked === false, "one clean week is one week, not an unlock");
+const sameWeek = store.creditValgusWeek({ isoDate: "2026-04-02T10:00:00.000Z",
+  ledger: [{ name: "Drop-and-Stick", status: "done" }], formChecks: [{ name: "Drop-and-Stick", clean: true }] });
+ok(sameWeek.cleanWeeks.length === 1 && sameWeek.unlocked === false,
+   "a second session the same week doesn't buy a second week");
+const g2 = store.creditValgusWeek({ isoDate: "2026-04-09T10:00:00.000Z",
+  ledger: [{ name: "Drop-and-Stick", status: "done" }], formChecks: [{ name: "Drop-and-Stick", clean: true }] });
+ok(g2.unlocked === true, "two separate clean weeks unlock it, exactly as the screen promises");
+
+/* --- readiness can't reuse a check from months ago --- */
+localStorage.clear();
+store.migrate();
+store.saveReadiness({ answers: { q_pain: "yes", q_sleep: "yes", q_light: "yes", q_ready: "yes" }, light: "green" });
+ok(rvm.hasRecentReadiness() === true, "a check from today can be reused");
+const stale = JSON.parse(localStorage.getItem("swim_readiness"));
+stale.when = Date.now() - 60 * 86400000;
+localStorage.setItem("swim_readiness", JSON.stringify(stale));
+ok(rvm.hasRecentReadiness() === false, "a check from two months ago cannot");
+const staleFlow = rvm.newReadinessFlow("monday");
+rvm.sameAsYesterday(staleFlow);
+ok(staleFlow.readinessDone === false, "so “same as yesterday” does nothing and she has to answer");
+
+/* --- reading the instructions stops the clock --- */
+localStorage.clear();
+const detailVm = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: true,
+  detailEx: { name: "Bird Dog", cue: "Flat back" } });
+ok(/Timer(%20| )Image/.test(detailVm.detailPhotoFallbackUrl),
+   "the detail photo falls back to the timer image — the repo has 39 of those and zero demo images");
+ok(/data-fallback=/.test(sscreen.detailOverlayHtml(detailVm)),
+   "and the overlay actually wires the fallback up");
+engine.sess.phase = "work";
+engine.sess.currentEx = { name: "Bird Dog", cue: "Flat back", block: "main", driver: "reps" };
+ok(svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null }).canOpenDetail === true,
+   "the instructions button is offered while a move is on screen");
+engine.sess.currentEx = null;
+engine.sess.phase = "getready";
+ok(svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null }).canOpenDetail === false,
+   "but not during the lead-in, where it used to render and do nothing when tapped");
+engine.sess.phase = "work";
+engine.sess.currentEx = { name: "Bird Dog", cue: "Flat back", block: "main", driver: "reps" };
+const midWork = sscreen.sessionScreen(svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null }));
+ok(/<button[^>]*data-action="openDetailCur"[^>]*>[\s\S]{0,400}?Bird Dog/.test(midWork),
+   "the exercise NAME itself opens the instructions, not just the small ⓘ");
+const paused = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: true,
+  detailEx: { name: "Bird Dog" } });
+ok(paused.detailShowResume === false, "no Resume prompt when nothing is running");
+engine.sess.running = true; engine.sess.paused = true;
+ok(svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: true, detailEx: { name: "Bird Dog" } }).detailShowResume === true,
+   "but a paused run says so and offers an explicit Resume");
+engine.exitSession();
+localStorage.clear();
+
+
+/* ============================================================
+   PHASE 2 — identity, sync, and reports that tell the truth
+   ============================================================ */
+
+/* ---- cloud identity is the profile, not the name ------------------------- */
+localStorage.clear();
+store.loadProfiles();
+store.migrate();
+ok(store.athleteId() === store.activeProfileId(),
+   "a record is tagged with the immutable profile id, not the editable name");
+ok(store.athleteAliases().includes("jess"),
+   "the original athlete's old name-tag is still recognised");
+ok(store.belongsToAthlete({ athlete: "jess" }),
+   "so records mirrored under the old name still come back");
+ok(store.belongsToAthlete({ athlete: store.activeProfileId() }), "and so do new ones");
+ok(!store.belongsToAthlete({ athlete: "someone-else" }), "but another athlete's do not");
+
+/* Renaming used to cut her off from every record she had ever written. */
+store.updateSettings({ athleteName: "Jess" });
+store.migrateAthleteIdentity();
+store.renameProfile(store.activeProfileId(), "Jessica");
+store.updateSettings({ athleteName: "Jessica" });
+ok(store.belongsToAthlete({ athlete: "jess" }), "renaming Jess to Jessica keeps her old records hers");
+ok(store.belongsToAthlete({ athlete: "jessica" }), "and claims the new name too");
+ok(store.athleteId() === store.activeProfileId(), "while the id she writes under never moved");
+
+/* Two profiles that share a name no longer share a history. */
+const otherId = store.addProfile("Jessica");
+ok(otherId && otherId !== store.activeProfileId(), "a second Jessica gets her own id");
+ok(!store.athleteAliases(otherId).includes(store.activeProfileId()),
+   "and does not answer to the first one's id");
+
+/* ---- a backup knows whose it is ------------------------------------------ */
+localStorage.clear();
+store.loadProfiles();
+store.migrate();
+store.updateSettings({ athleteName: "Jess" });
+store.saveSession({ app: "swimming", athlete: store.athleteId(), dayKey: "monday",
+  isoDate: "2026-04-01T10:00:00.000Z", completedFully: true, xpVersion: store.XP_VERSION,
+  roundsDone: 3, roundsPlanned: 3, ledger: [{ name: "x", status: "done" }], xpEarned: 360 });
+const jessBackup = store.exportProfileData();
+ok(store.backupIdentityMismatch(jessBackup) === null, "her own backup restores without a fuss");
+const jennBackup = { ...jessBackup, profile: { id: "jenn-abcd", name: "Jenn" } };
+const mism = store.backupIdentityMismatch(jennBackup);
+ok(mism && mism.from === "Jenn", "a backup from another athlete is spotted");
+let restoreErr = null;
+try { store.importProfileData(jennBackup); } catch (e) { restoreErr = e; }
+ok(restoreErr && restoreErr.identityMismatch, "and refused rather than silently merged");
+ok(/can't be undone/.test(restoreErr.message), "with a message that says why it matters");
+ok(store.importProfileData(jennBackup, { force: true }).sessionsAdded === 0,
+   "a grown-up can still force it through deliberately");
+ok(store.backupIdentityMismatch({ data: {} }) === null,
+   "a backup too old to carry an identity is not blocked");
+
+/* ---- reports that don't invent things ------------------------------------ */
+localStorage.clear();
+store.migrate();
+const iso = n => new Date(Date.now() - n * 86400000).toISOString();
+const row = (o) => ({ app: "swimming", dayKey: "monday", dayTitle: "Mon", xpVersion: store.XP_VERSION,
+  sessionType: "main", lightResult: "green", ...o });
+/* a real session, a GO-and-quit on the SAME day, a try-it row and a safety stop */
+store.saveSession(row({ isoDate: iso(1), durationSecs: 1500, completedFully: true, roundsDone: 3,
+  roundsPlanned: 3, ledger: [{ name: "a", status: "done" }], mood: "great", xpEarned: 360 }));
+store.saveSession(row({ isoDate: iso(1), durationSecs: 20, completedFully: true, roundsDone: 0,
+  roundsPlanned: 3, ledger: [{ name: "a", status: "skipped" }], xpEarned: 0 }));
+store.saveSession(row({ isoDate: iso(2), durationSecs: 400, practice: true, sessionType: "try-it" }));
+store.saveSession(row({ isoDate: iso(3), durationSecs: 300, safetyStop: true, pain: true,
+  endedEarly: true, completedFully: false, ledger: [{ name: "a", status: "done" }] }));
+/* a real session she never told the app how she felt about */
+store.saveSession(row({ isoDate: iso(4), durationSecs: 1200, completedFully: true, roundsDone: 2,
+  roundsPlanned: 2, lightResult: "yellow", ledger: [{ name: "a", status: "done" }], xpEarned: 270 }));
+
+const pv0 = pvm.buildProgressVM({ progressScope: "4w", logScope: "month" });
+const zeroMin = pvm.logEntryView(store.loadSessions()[1]);
+ok(zeroMin.duration === "under a min", "a 20-second session reads as under a minute, not as 1 min");
+ok(zeroMin.lightLabel === "NOTHING LOGGED",
+   "and is labelled for what it was, not badged GREEN like a finished day");
+ok(pvm.logEntryView(store.loadSessions()[3]).lightLabel === "SAFETY STOP",
+   "a safety stop is named as one");
+ok(!pv0.logItems.some(l => /try-it/i.test(l.lightLabel || "")), "no try-it rows in her training log");
+ok(zeroMin.moodEmoji === "·" && /not answered/.test(zeroMin.moodLabel),
+   "an unanswered mood is not rendered as 🙂 Okay");
+ok(pvm.logEntryView(store.loadSessions()[0]).moodEmoji === "😀", "an answered one still shows");
+
+const pv = pvm.buildProgressVM({ progressScope: "4w", logScope: "week" });
+ok(/^2 sessions/.test(pv.sessionsLabel) || /^1 session$/.test(pv.sessionsLabel),
+   "the week chip pluralises properly");
+const sessionChip = pv.milestones.find(m => /session/.test(m.label));
+ok(sessionChip && /^2 sessions/.test(sessionChip.label),
+   "the session count is training sessions only — try-it, safety stops and quits are out");
+const roundsRow = pv.periodStats.rows.find(r => r.label === "Main rounds");
+ok(/^5 of 5/.test(roundsRow.total),
+   "main rounds read as done-of-asked-for — the yellow day asked for 2, not 3");
+const feltRow = pv.periodStats.rows.find(r => r.label === "How I felt");
+ok(/not answered/.test(feltRow.total), "and unanswered moods are named rather than dropped");
+
+const gv = gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics" });
+ok(gv.analytics.rounds.note.includes("green 3, yellow 2, red 1"),
+   "the parent report says what 'planned' actually means now");
+/* A GO-and-quit must not paint its own day in. Today is always inside the
+   week view, so the fixture uses today rather than an offset that may fall
+   outside it. */
+localStorage.clear();
+store.migrate();
+const thisDayKey = util.edmontonDayKey();
+store.saveSession(row({ isoDate: new Date().toISOString(), dayKey: thisDayKey, durationSecs: 18,
+  completedFully: true, roundsDone: 0, roundsPlanned: 3, ledger: [{ name: "a", status: "skipped" }] }));
+// The view renders cells as styles, so count the trained colours.
+const trainedCells = vm => vm.analytics.consistency.cells
+  .filter(c => /background:var\(--mint\)|background:var\(--sun\)/.test(c.cellStyle)).length;
+const quitOnly = trainedCells(gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics" }));
+ok(quitOnly === 0, "a day whose only session was a GO-and-quit stays blank (" + quitOnly + " filled)");
+store.saveSession(row({ isoDate: new Date().toISOString(), dayKey: thisDayKey, durationSecs: 1500,
+  completedFully: true, roundsDone: 3, roundsPlanned: 3, ledger: [{ name: "a", status: "done" }] }));
+const withReal = trainedCells(gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics" }));
+ok(withReal === 1, "and fills in once she actually trains it");
+
+/* The weekday review must show her best attempt, not the first one it finds. */
+localStorage.clear();
+store.migrate();
+const todayIso = new Date().toISOString();
+store.saveSession(row({ isoDate: todayIso, dayKey: util.edmontonDayKey(), durationSecs: 15,
+  completedFully: false, endedEarly: true, roundsDone: 0, roundsPlanned: 3,
+  ledger: [{ name: "a", status: "skipped" }] }));
+store.saveSession(row({ isoDate: todayIso, dayKey: util.edmontonDayKey(), durationSecs: 1500,
+  completedFully: true, roundsDone: 3, roundsPlanned: 3, mood: "great",
+  ledger: [{ name: "a", status: "done" }], xpEarned: 360 }));
+const wd = gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics" })
+  .analytics.byWeekday.find(d => d.k === data.DAY_SHORT[util.edmontonDayKey()]);
+ok(wd && wd.done === true, "the weekday review shows the completed attempt, not the abandoned one");
+ok(wd.mins === 25, "with its real duration");
+
+/* Adherence counts DAYS she trained, not records. */
+localStorage.clear();
+store.migrate();
+store.saveSession(row({ isoDate: todayIso, dayKey: util.edmontonDayKey(), durationSecs: 900,
+  completedFully: true, roundsDone: 3, roundsPlanned: 3, ledger: [{ name: "a", status: "done" }] }));
+store.saveSession(row({ isoDate: todayIso, dayKey: util.edmontonDayKey(), durationSecs: 900,
+  completedFully: true, roundsDone: 3, roundsPlanned: 3, ledger: [{ name: "a", status: "done" }] }));
+const oneDay = gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics" }).analytics;
+ok(typeof oneDay.adherence === "number", "adherence is reported as a number");
+ok(oneDay.adherence <= 100, "two sessions on one day cannot push adherence over 100%");
+const scheduledSoFar = oneDay.scheduled;
+ok(oneDay.adherence === Math.round((1 / Math.max(1, scheduledSoFar)) * 100),
+   "it counts the one DAY she trained, not the two records she left on it");
 localStorage.clear();
 
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);
