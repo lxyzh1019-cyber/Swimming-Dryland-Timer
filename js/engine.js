@@ -894,7 +894,12 @@ export function finalize(completed) {
 
   // Cloud mirror — keep the doc ID so mood/reflection can patch it later.
   // Opt-out via Grown-up settings (privacy): when off, data stays on-device only.
-  if (settings.cloudMirror !== false) fsAddSession(entry).then(id => { sess.fsId = id; });
+  if (settings.cloudMirror !== false) {
+    fsAddSession(entry).then(id => { sess.fsId = id; flushCloudPatch(id); });
+    // XP moved, so the shared journey did too — publish it rather than making
+    // the other device wait until it is next opened.
+    import("./sync.js").then(m => m.publishJourney()).catch(() => {});
+  }
 
   if (completed) {
     playCue("done");
@@ -976,12 +981,32 @@ function recordFormCheck(clean) {
 export function pickClean() { sess.pendingCleanCheck = false; sess.cleanCount += 1; sess.lastWobbly = false; recordFormCheck(true); notify("phase"); }
 export function pickWobbly() { sess.pendingCleanCheck = false; sess.wobblyCount += 1; sess.lastWobbly = true; recordFormCheck(false); notify("phase"); }
 
+/* ---- cloud patches that can't arrive too early ----------------------------
+   fsAddSession resolves with the doc ID some time AFTER the finish screen is
+   already on-screen. A quick mood tap therefore had no ID to patch and the
+   cloud copy simply never got it. Patches made before the ID lands are held
+   and flushed the moment it does. */
+let _pendingCloudPatch = null;
+
+export function mirrorSessionPatch(patch) {
+  if (settings.cloudMirror === false || !patch) return;
+  if (sess.fsId) { import("./firebase.js").then(m => m.fsUpdateSession(sess.fsId, patch)); return; }
+  _pendingCloudPatch = { ...(_pendingCloudPatch || {}), ...patch };
+}
+
+function flushCloudPatch(id) {
+  if (!id || !_pendingCloudPatch) return;
+  const patch = _pendingCloudPatch;
+  _pendingCloudPatch = null;
+  import("./firebase.js").then(m => m.fsUpdateSession(id, patch));
+}
+
 /* Complete-screen interactions: patch the saved record + Firestore mirror. */
 export function setMood(key, emoji) {
   sess.mood = key;
   if (sess.savedEntry) {
     patchSession(sess.savedKey, { mood: key });
-    if (sess.fsId) import("./firebase.js").then(m => m.fsUpdateSession(sess.fsId, { mood: key }));
+    mirrorSessionPatch({ mood: key });
   }
   notify("phase");
 }
@@ -990,7 +1015,7 @@ export function setReflect(field, label) {
   if (sess.savedEntry) {
     const patch = field === "wentWell" ? { wentWell: sess.wentWell } : { nextTime: sess.nextTime };
     patchSession(sess.savedKey, patch);
-    if (sess.fsId) import("./firebase.js").then(m => m.fsUpdateSession(sess.fsId, patch));
+    mirrorSessionPatch(patch);
   }
   notify("phase");
 }
@@ -1000,5 +1025,6 @@ export function setQuizPick(i) { sess.quizPick = i; notify("phase"); }
 export function exitSession() {
   stopElapsed();
   cancelSpeech();
+  _pendingCloudPatch = null;
   Object.assign(sess, blankSession());
 }

@@ -1089,4 +1089,152 @@ ok(svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: true, deta
 engine.exitSession();
 localStorage.clear();
 
+
+/* ============================================================
+   PHASE 2 — identity, sync, and reports that tell the truth
+   ============================================================ */
+
+/* ---- cloud identity is the profile, not the name ------------------------- */
+localStorage.clear();
+store.loadProfiles();
+store.migrate();
+ok(store.athleteId() === store.activeProfileId(),
+   "a record is tagged with the immutable profile id, not the editable name");
+ok(store.athleteAliases().includes("jess"),
+   "the original athlete's old name-tag is still recognised");
+ok(store.belongsToAthlete({ athlete: "jess" }),
+   "so records mirrored under the old name still come back");
+ok(store.belongsToAthlete({ athlete: store.activeProfileId() }), "and so do new ones");
+ok(!store.belongsToAthlete({ athlete: "someone-else" }), "but another athlete's do not");
+
+/* Renaming used to cut her off from every record she had ever written. */
+store.updateSettings({ athleteName: "Jess" });
+store.migrateAthleteIdentity();
+store.renameProfile(store.activeProfileId(), "Jessica");
+store.updateSettings({ athleteName: "Jessica" });
+ok(store.belongsToAthlete({ athlete: "jess" }), "renaming Jess to Jessica keeps her old records hers");
+ok(store.belongsToAthlete({ athlete: "jessica" }), "and claims the new name too");
+ok(store.athleteId() === store.activeProfileId(), "while the id she writes under never moved");
+
+/* Two profiles that share a name no longer share a history. */
+const otherId = store.addProfile("Jessica");
+ok(otherId && otherId !== store.activeProfileId(), "a second Jessica gets her own id");
+ok(!store.athleteAliases(otherId).includes(store.activeProfileId()),
+   "and does not answer to the first one's id");
+
+/* ---- a backup knows whose it is ------------------------------------------ */
+localStorage.clear();
+store.loadProfiles();
+store.migrate();
+store.updateSettings({ athleteName: "Jess" });
+store.saveSession({ app: "swimming", athlete: store.athleteId(), dayKey: "monday",
+  isoDate: "2026-04-01T10:00:00.000Z", completedFully: true, xpVersion: store.XP_VERSION,
+  roundsDone: 3, roundsPlanned: 3, ledger: [{ name: "x", status: "done" }], xpEarned: 360 });
+const jessBackup = store.exportProfileData();
+ok(store.backupIdentityMismatch(jessBackup) === null, "her own backup restores without a fuss");
+const jennBackup = { ...jessBackup, profile: { id: "jenn-abcd", name: "Jenn" } };
+const mism = store.backupIdentityMismatch(jennBackup);
+ok(mism && mism.from === "Jenn", "a backup from another athlete is spotted");
+let restoreErr = null;
+try { store.importProfileData(jennBackup); } catch (e) { restoreErr = e; }
+ok(restoreErr && restoreErr.identityMismatch, "and refused rather than silently merged");
+ok(/can't be undone/.test(restoreErr.message), "with a message that says why it matters");
+ok(store.importProfileData(jennBackup, { force: true }).sessionsAdded === 0,
+   "a grown-up can still force it through deliberately");
+ok(store.backupIdentityMismatch({ data: {} }) === null,
+   "a backup too old to carry an identity is not blocked");
+
+/* ---- reports that don't invent things ------------------------------------ */
+localStorage.clear();
+store.migrate();
+const iso = n => new Date(Date.now() - n * 86400000).toISOString();
+const row = (o) => ({ app: "swimming", dayKey: "monday", dayTitle: "Mon", xpVersion: store.XP_VERSION,
+  sessionType: "main", lightResult: "green", ...o });
+/* a real session, a GO-and-quit on the SAME day, a try-it row and a safety stop */
+store.saveSession(row({ isoDate: iso(1), durationSecs: 1500, completedFully: true, roundsDone: 3,
+  roundsPlanned: 3, ledger: [{ name: "a", status: "done" }], mood: "great", xpEarned: 360 }));
+store.saveSession(row({ isoDate: iso(1), durationSecs: 20, completedFully: true, roundsDone: 0,
+  roundsPlanned: 3, ledger: [{ name: "a", status: "skipped" }], xpEarned: 0 }));
+store.saveSession(row({ isoDate: iso(2), durationSecs: 400, practice: true, sessionType: "try-it" }));
+store.saveSession(row({ isoDate: iso(3), durationSecs: 300, safetyStop: true, pain: true,
+  endedEarly: true, completedFully: false, ledger: [{ name: "a", status: "done" }] }));
+/* a real session she never told the app how she felt about */
+store.saveSession(row({ isoDate: iso(4), durationSecs: 1200, completedFully: true, roundsDone: 2,
+  roundsPlanned: 2, lightResult: "yellow", ledger: [{ name: "a", status: "done" }], xpEarned: 270 }));
+
+const pv0 = pvm.buildProgressVM({ progressScope: "4w", logScope: "month" });
+const zeroMin = pvm.logEntryView(store.loadSessions()[1]);
+ok(zeroMin.duration === "under a min", "a 20-second session reads as under a minute, not as 1 min");
+ok(zeroMin.lightLabel === "NOTHING LOGGED",
+   "and is labelled for what it was, not badged GREEN like a finished day");
+ok(pvm.logEntryView(store.loadSessions()[3]).lightLabel === "SAFETY STOP",
+   "a safety stop is named as one");
+ok(!pv0.logItems.some(l => /try-it/i.test(l.lightLabel || "")), "no try-it rows in her training log");
+ok(zeroMin.moodEmoji === "·" && /not answered/.test(zeroMin.moodLabel),
+   "an unanswered mood is not rendered as 🙂 Okay");
+ok(pvm.logEntryView(store.loadSessions()[0]).moodEmoji === "😀", "an answered one still shows");
+
+const pv = pvm.buildProgressVM({ progressScope: "4w", logScope: "week" });
+ok(/^2 sessions/.test(pv.sessionsLabel) || /^1 session$/.test(pv.sessionsLabel),
+   "the week chip pluralises properly");
+const sessionChip = pv.milestones.find(m => /session/.test(m.label));
+ok(sessionChip && /^2 sessions/.test(sessionChip.label),
+   "the session count is training sessions only — try-it, safety stops and quits are out");
+const roundsRow = pv.periodStats.rows.find(r => r.label === "Main rounds");
+ok(/^5 of 5/.test(roundsRow.total),
+   "main rounds read as done-of-asked-for — the yellow day asked for 2, not 3");
+const feltRow = pv.periodStats.rows.find(r => r.label === "How I felt");
+ok(/not answered/.test(feltRow.total), "and unanswered moods are named rather than dropped");
+
+const gv = gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics" });
+ok(gv.analytics.rounds.note.includes("green 3, yellow 2, red 1"),
+   "the parent report says what 'planned' actually means now");
+/* A GO-and-quit must not paint its own day in. Today is always inside the
+   week view, so the fixture uses today rather than an offset that may fall
+   outside it. */
+localStorage.clear();
+store.migrate();
+const thisDayKey = util.edmontonDayKey();
+store.saveSession(row({ isoDate: new Date().toISOString(), dayKey: thisDayKey, durationSecs: 18,
+  completedFully: true, roundsDone: 0, roundsPlanned: 3, ledger: [{ name: "a", status: "skipped" }] }));
+// The view renders cells as styles, so count the trained colours.
+const trainedCells = vm => vm.analytics.consistency.cells
+  .filter(c => /background:var\(--mint\)|background:var\(--sun\)/.test(c.cellStyle)).length;
+const quitOnly = trainedCells(gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics" }));
+ok(quitOnly === 0, "a day whose only session was a GO-and-quit stays blank (" + quitOnly + " filled)");
+store.saveSession(row({ isoDate: new Date().toISOString(), dayKey: thisDayKey, durationSecs: 1500,
+  completedFully: true, roundsDone: 3, roundsPlanned: 3, ledger: [{ name: "a", status: "done" }] }));
+const withReal = trainedCells(gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics" }));
+ok(withReal === 1, "and fills in once she actually trains it");
+
+/* The weekday review must show her best attempt, not the first one it finds. */
+localStorage.clear();
+store.migrate();
+const todayIso = new Date().toISOString();
+store.saveSession(row({ isoDate: todayIso, dayKey: util.edmontonDayKey(), durationSecs: 15,
+  completedFully: false, endedEarly: true, roundsDone: 0, roundsPlanned: 3,
+  ledger: [{ name: "a", status: "skipped" }] }));
+store.saveSession(row({ isoDate: todayIso, dayKey: util.edmontonDayKey(), durationSecs: 1500,
+  completedFully: true, roundsDone: 3, roundsPlanned: 3, mood: "great",
+  ledger: [{ name: "a", status: "done" }], xpEarned: 360 }));
+const wd = gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics" })
+  .analytics.byWeekday.find(d => d.k === data.DAY_SHORT[util.edmontonDayKey()]);
+ok(wd && wd.done === true, "the weekday review shows the completed attempt, not the abandoned one");
+ok(wd.mins === 25, "with its real duration");
+
+/* Adherence counts DAYS she trained, not records. */
+localStorage.clear();
+store.migrate();
+store.saveSession(row({ isoDate: todayIso, dayKey: util.edmontonDayKey(), durationSecs: 900,
+  completedFully: true, roundsDone: 3, roundsPlanned: 3, ledger: [{ name: "a", status: "done" }] }));
+store.saveSession(row({ isoDate: todayIso, dayKey: util.edmontonDayKey(), durationSecs: 900,
+  completedFully: true, roundsDone: 3, roundsPlanned: 3, ledger: [{ name: "a", status: "done" }] }));
+const oneDay = gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics" }).analytics;
+ok(typeof oneDay.adherence === "number", "adherence is reported as a number");
+ok(oneDay.adherence <= 100, "two sessions on one day cannot push adherence over 100%");
+const scheduledSoFar = oneDay.scheduled;
+ok(oneDay.adherence === Math.round((1 / Math.max(1, scheduledSoFar)) * 100),
+   "it counts the one DAY she trained, not the two records she left on it");
+localStorage.clear();
+
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

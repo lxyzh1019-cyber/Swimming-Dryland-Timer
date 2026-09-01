@@ -579,6 +579,11 @@ function settingsTab(vm) {
         </label>
       </div>
       ${vm.backupNote ? `<div role="status" style="margin-top:10px;font-size:13px;font-weight:800;line-height:1.5;color:${vm.backupNoteOk ? "var(--mint-ink)" : "var(--stop-ink)"};background:${vm.backupNoteOk ? "var(--mint-wash)" : "var(--stop-wash)"};border-radius:12px;padding:9px 12px;">${escapeHtml(vm.backupNote)}</div>` : ""}
+      ${vm.pendingRestore ? `
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <button type="button" data-action="confirmRestore" style="min-height:44px;border:none;border-radius:var(--radius-pill);background:var(--stop);color:#fff;font-weight:900;font-size:13px;padding:0 18px;cursor:pointer;font-family:inherit;">Merge ${escapeHtml(vm.pendingRestore.from)}’s data into ${escapeHtml(vm.pendingRestore.to)} anyway</button>
+        <button type="button" data-action="cancelRestore" style="min-height:44px;border:2px solid var(--hairline);border-radius:var(--radius-pill);background:var(--surface);color:var(--ink-soft);font-weight:900;font-size:13px;padding:0 18px;cursor:pointer;font-family:inherit;">Cancel</button>
+      </div>` : ""}
     </div>
     <div style="border-top:1.5px solid var(--hairline);padding-top:16px;">
       <div style="font-size:15px;color:var(--stop);line-height:1.5;font-weight:700;">🔴 Sharp pain, pinching, or numbness → STOP immediately and tell a grown-up.</div>

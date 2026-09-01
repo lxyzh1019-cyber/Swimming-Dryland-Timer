@@ -7,6 +7,7 @@
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl, fmtXp } from "../data.js";
 import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal,
+         sessionRounds as sessionRoundsDone, sessionRoundsPlanned,
          monthKeyOf, formVerdicts, latestFormVerdicts } from "../store.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
 import { sessionEffort, effortSummary } from "../effort.js";
@@ -80,7 +81,12 @@ export function buildGrownupVM(state) {
   const days = scopeDays(scope, all);
   const scheduled = scope === "week" ? days : Math.round(days);   // plan trains daily (Sun = recovery)
   const totalMins = sessions.reduce((a, s) => a + mins(s), 0);
-  const adherence = Math.min(100, Math.round((done.length / Math.max(1, scheduled)) * 100));
+  // Adherence is "how many of the days she was meant to train did she train",
+  // so it counts DAYS, not records. Counting records let two attempts at one
+  // Tuesday read as two days of adherence — and pushed the figure over 100%
+  // often enough that it had to be clamped.
+  const trainedDaySet = new Set(sessions.filter(countsAsTrainedLocal).map(s => edmontonISO(s.isoDate)));
+  const adherence = Math.min(100, Math.round((trainedDaySet.size / Math.max(1, scheduled)) * 100));
   const avgMins = sessions.length ? Math.round(totalMins / sessions.length) : 0;
 
   /* ---- readiness → completion ---- */
@@ -100,10 +106,14 @@ export function buildGrownupVM(state) {
   }).filter(Boolean);
 
   /* ---- consistency cells ---- */
+  // A day is only coloured in if something was actually trained on it. A GO
+  // followed immediately by a stop — or a run where every move was skipped —
+  // used to paint the day as a partial training day.
   const byIso = {};
   all.forEach(s => {
+    if (!countsAsTrainedLocal(s)) return;
     const k = edmontonISO(s.isoDate);
-    const st = s.completedFully ? "done" : "partial";
+    const st = (s.completedFully && !s.mini && s.sessionType !== "mini") ? "done" : "partial";
     if (byIso[k] !== "done") byIso[k] = st;
   });
   let consistency;
@@ -294,10 +304,13 @@ export function buildGrownupVM(state) {
   });
 
   /* ---- rounds ---- */
-  const roundsDone = sessions.reduce((a, s) => a + (s.roundsDone || 0), 0);
-  const roundsPlanned = sessions.filter(s => s.sessionType !== "spa").length * 3;
+  // Rounds actually finished against the rounds each day actually ASKED FOR.
+  // "Planned" was three per session whatever the traffic light said, so every
+  // yellow, red, mini and recovery day was scored against a plan it never had.
+  const roundsDone = sessions.reduce((a, s) => a + sessionRoundsDone(s), 0);
+  const roundsPlanned = sessions.reduce((a, s) => a + sessionRoundsPlanned(s), 0);
   const rounds = { done: roundsDone, planned: Math.max(roundsPlanned, roundsDone), practice: 0,
-    note: "Planned = 3 main rounds per training day; yellow/red days cap lower by design." };
+    note: "Planned = the rounds each day actually asked for — green 3, yellow 2, red 1, mini 1." };
 
   /* ---- mood before → after ---- */
   const moodRows = sessions.filter(s => s.mood).slice(-6).map(s => {
@@ -313,8 +326,12 @@ export function buildGrownupVM(state) {
   let byWeekday = null, byTopic = null;
   if (scope === "week") {
     const isoDates = edmontonWeekISODates();
+    // The best attempt that day, not the first one found. A GO-and-quit at
+    // breakfast used to hide the full session she did after school.
+    const rank = x => (x.completedFully ? 2 : 0) + (countsAsTrainedLocal(x) ? 1 : 0);
     byWeekday = WEEK_ORDER.map(k => {
-      const s = all.find(x => edmontonISO(x.isoDate) === isoDates[k]);
+      const sameDay = all.filter(x => edmontonISO(x.isoDate) === isoDates[k]);
+      const s = sameDay.sort((a, b) => rank(b) - rank(a) || (b.durationSecs || 0) - (a.durationSecs || 0))[0];
       return {
         k: DAY_SHORT[k], topic: DAYS[k].theme || DAYS[k].title,
         mood: s && s.mood ? MOOD_EMOJI[s.mood] : "·",
@@ -375,9 +392,9 @@ export function buildGrownupVM(state) {
      and an average. Before this the toggle really only moved Safety & Flags,
      and the rest was scattered across cards at different time scales. */
   const effort = effortSummary(sessions);
-  const trainedDays = new Set(sessions.filter(countsAsTrainedLocal).map(s => edmontonISO(s.isoDate))).size;
+  const trainedDays = trainedDaySet.size;
   const availableDays = Math.max(trainedDays, scopeDays(scope, all));
-  const boardRounds = done.reduce((a, s) => a + (s.roundsDone || 0), 0);
+  const boardRounds = sessions.reduce((a, s) => a + sessionRoundsDone(s), 0);
   const boardXp = sessions.reduce((a, s) => a + (s.xpEarned || 0), 0);
   const moodCount = { great: 0, okay: 0, tired: 0 };
   sessions.forEach(s => { if (moodCount[s.mood] != null) moodCount[s.mood] += 1; });
@@ -642,6 +659,9 @@ export function buildGrownupVM(state) {
     isDefaultPool: !(Array.isArray(settings.prizePool) && settings.prizePool.length),
     // A wallet trim removes prizes she can see, so it is never silent.
     walletRepairNote: state.walletRepairNote || "",
+    pendingRestore: state.pendingRestore
+      ? { from: state.pendingRestore.from, to: state.pendingRestore.to }
+      : null,
     walletTrimNote: (() => {
       const t = lastWalletTrim();
       if (!t || !t.count) return "";

@@ -98,8 +98,16 @@ export function switchProfile(id) {
 export function renameProfile(id, name) {
   const clean = String(name || "").trim();
   if (!clean) return false;
+  // Keep the outgoing name as an alias: records already mirrored under it must
+  // keep matching, or a rename silently orphans the whole history.
+  const prev = _profiles.list.find(p => p.id === id);
+  if (prev && prev.name) rememberAthleteAlias(id, prev.name);
   _profiles = { ..._profiles, list: _profiles.list.map(p => p.id === id ? { ...p, name: clean } : p) };
-  return writeRaw(PROFILES_KEY, _profiles);
+  const okWrite = writeRaw(PROFILES_KEY, _profiles);
+  // The new name too: a device still running the old build tags its records
+  // with whatever name it sees, so both must keep matching.
+  rememberAthleteAlias(id, clean);
+  return okWrite;
 }
 
 /* ============================================================
@@ -220,21 +228,87 @@ export function activePrizePool() {
   return Array.isArray(pool) && pool.length ? pool : PRIZE_POOL;
 }
 
-/* The athlete a record belongs to. Storage is still one bucket per browser, but
-   the cloud mirror is shared, so every mirrored record is tagged and a restore
-   only pulls back this athlete's own sessions. Records written before tagging
-   existed belong to the original athlete — the mirror collection is literally
-   named after her. */
+/* ---- who a record belongs to ----------------------------------------------
+   The cloud mirror is shared between the athletes, so every mirrored record is
+   tagged. That tag used to be the athlete's NAME, lowercased — and the name is
+   free text a grown-up can edit in Settings. Renaming "Jess" to "Jessica"
+   therefore cut the profile off from every record it had ever written, and two
+   profiles that happened to share a name merged into one history.
+
+   The tag is the PROFILE ID now, which is generated once and never changes.
+   Records written under the old scheme are still matched, because each profile
+   remembers every name it has been tagged under. */
 export const LEGACY_ATHLETE = "Jess";
-export function athleteId() {
-  return String(settings.athleteName || LEGACY_ATHLETE).trim().toLowerCase();
+
+export function athleteId() { return String(activeProfileId()); }
+
+/* Every tag this profile's records might legitimately carry: the immutable id,
+   plus the names it was known by before ids were used. */
+export function athleteAliases(profileId) {
+  const id = profileId || activeProfileId();
+  const p = _profiles.list.find(x => x.id === id);
+  const out = [String(id).trim().toLowerCase()];
+  const add = v => {
+    const s = String(v == null ? "" : v).trim().toLowerCase();
+    if (s && !out.includes(s)) out.push(s);
+  };
+  ((p && p.aliases) || []).forEach(add);
+  if (id === LEGACY_PROFILE_ID) add(LEGACY_ATHLETE);   // the original, pre-profiles athlete
+  // A NAME claimed by more than one profile identifies nobody. Two sisters both
+  // called Jessica would otherwise pull each other's pre-id records back.
+  const contested = new Set();
+  _profiles.list.forEach(x => {
+    if (x.id === id) return;
+    [x.name, ...(x.aliases || [])].forEach(v => {
+      const t = String(v == null ? "" : v).trim().toLowerCase();
+      if (t) contested.add(t);
+    });
+  });
+  return out.filter((v, i) => i === 0 || !contested.has(v));
 }
+
 export function belongsToAthlete(record) {
   const tag = record && record.athlete;
   // Untagged records predate profiles; they belong to the athlete who was here
   // first — the one still on the bare storage keys.
   if (!tag) return activeProfileId() === LEGACY_PROFILE_ID;
-  return String(tag).trim().toLowerCase() === athleteId();
+  return athleteAliases().includes(String(tag).trim().toLowerCase());
+}
+
+/* Record a name this profile has answered to, so records tagged with it keep
+   matching after a rename. */
+export function rememberAthleteAlias(profileId, name) {
+  const clean = String(name == null ? "" : name).trim().toLowerCase();
+  if (!clean) return false;
+  const id = profileId || activeProfileId();
+  const p = _profiles.list.find(x => x.id === id);
+  if (!p || String(id).toLowerCase() === clean) return false;
+  const aliases = p.aliases || [];
+  if (aliases.includes(clean)) return false;
+  _profiles = { ..._profiles, list: _profiles.list.map(x => x.id === id ? { ...x, aliases: [...aliases, clean] } : x) };
+  return writeRaw(PROFILES_KEY, _profiles);
+}
+
+/* One-time: seed the alias list from the name each profile currently answers
+   to, and retag this profile's own local rows onto the immutable id. */
+export function migrateAthleteIdentity() {
+  const id = activeProfileId();
+  const p = _profiles.list.find(x => x.id === id);
+  rememberAthleteAlias(id, (p && p.name) || "");
+  rememberAthleteAlias(id, settings.athleteName || "");
+  const known = athleteAliases(id);
+  const rows = loadSessions();
+  let retagged = 0;
+  rows.forEach(r => {
+    if (!r || !r.athlete) return;
+    const tag = String(r.athlete).trim().toLowerCase();
+    if (tag === String(id).toLowerCase()) return;
+    if (!known.includes(tag)) return;              // someone else's row — leave it alone
+    r.athlete = String(id);
+    retagged++;
+  });
+  if (retagged) writeStorage(LS_SESSIONS, rows);
+  return retagged;
 }
 
 export const MIN_REST = 3;
@@ -1400,6 +1474,22 @@ export function exportProfileData() {
   };
 }
 
+/* Does this backup belong to someone other than the athlete currently open?
+   Returns null when it matches (or when the file is too old to say). Matches
+   on the immutable profile id first, then on any name the profile has
+   answered to, so a rename doesn't make her own backup look foreign. */
+export function backupIdentityMismatch(payload) {
+  const prof = payload && payload.profile;
+  if (!prof) return null;                       // pre-identity backups can't be checked
+  const known = athleteAliases();
+  const id = String(prof.id == null ? "" : prof.id).trim().toLowerCase();
+  const name = String(prof.name == null ? "" : prof.name).trim().toLowerCase();
+  if (!id && !name) return null;
+  if ((id && known.includes(id)) || (name && known.includes(name))) return null;
+  const me = activeProfile();
+  return { from: prof.name || prof.id || "another athlete", to: (me && me.name) || settings.athleteName || "this athlete" };
+}
+
 /* Restore INTO the active athlete. Additive by design — a backup can only add
    to what's here, never delete or overwrite it:
      · sessions  — merged, deduped (same rule as the cloud restore)
@@ -1407,12 +1497,24 @@ export function exportProfileData() {
      · the rest  — filled in only where this device has nothing
    Returns { sessionsAdded, xpAdded, filled: [keys] }. Throws on a file that
    isn't a Splash backup. */
-export function importProfileData(payload) {
+export function importProfileData(payload, opts = {}) {
   if (!payload || payload.app !== BACKUP_APP || !payload.data || typeof payload.data !== "object") {
     throw new Error("That file isn't a Splash backup.");
   }
   if (Number(payload.schema) > BACKUP_SCHEMA) {
     throw new Error("That backup was made by a newer version of the app.");
+  }
+  // Whose backup is this? A restore merges XP, prizes and a whole training
+  // history into whichever athlete happens to be open, and it cannot be
+  // undone — so Jess's backup opened under Jenn used to silently become
+  // Jenn's. Naming the mismatch and making the grown-up confirm is the only
+  // point at which it can still be caught.
+  const mismatch = backupIdentityMismatch(payload);
+  if (mismatch && !opts.force) {
+    const err = new Error(`That backup is ${mismatch.from}'s, but ${mismatch.to} is the athlete open right now. `
+      + `Restoring would merge ${mismatch.from}'s sessions, XP and prizes into ${mismatch.to} — and it can't be undone.`);
+    err.identityMismatch = mismatch;
+    throw err;
   }
   const d = payload.data;
   const result = { sessionsAdded: 0, xpAdded: 0, filled: [] };
@@ -1468,6 +1570,7 @@ export function migrate() {
   // derived from the log, so the baseline below is the honest number.
   migrateQuizXp();
   migrateGateWeeks();
+  migrateAthleteIdentity();
   if (loadJourney() == null) {
     const xp = loadSessions().reduce((sum, s) => sum + sessionXp(s), 0);
     saveJourney({ xp, prizesWon: [], pendingDraws: 0, seededAt: Date.now() });

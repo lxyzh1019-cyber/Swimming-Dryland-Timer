@@ -8,7 +8,7 @@
 
 import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS, tryItArmed, setTryIt } from "./store.js";
 import { edmontonDayKey, escapeHtml } from "./util.js";
-import { restoreFromCloud } from "./sync.js";
+import { restoreFromCloud, publishJourney } from "./sync.js";
 import { downloadBackup, restoreBackupFile } from "./backup.js";
 import { buildTodayVM, journeyPathScrollIntoView } from "./vm/today.js";
 import { todayWide, todayNarrow } from "./screens/today.js";
@@ -48,6 +48,7 @@ export const state = {
   weather: null,                // { icon, temp, caption } once fetched
   backupNote: "", backupNoteOk: false,   // result line under Backup & restore
   walletRepairNote: "",         // result line under the prize wallet repair
+  pendingRestore: null,         // { file, from, to } — a backup from another athlete, awaiting confirmation
   storageError: null,           // { name } — set when a write is rejected (disk full)
   isWide: true
 };
@@ -201,7 +202,7 @@ const actions = {
   nextQuizDeck() {
     const qd = state.quizDeck;
     if (!qd) return;
-    if (qd.idx >= qd.qs.length - 1) { qd.done = true; finishQuizDeck(qd); }
+    if (qd.idx >= qd.qs.length - 1) { qd.done = true; finishQuizDeck(qd); publishJourney(); }
     else qd.idx += 1;
     render();
   },
@@ -212,6 +213,7 @@ const actions = {
   claimPrize() {
     claimPrize(state.prizeDraw);
     state.prizeDraw = null;
+    publishJourney();   // a prize won here must not be invisible on her other device
     // One prize per level gained: once every pending draw is claimed, retire
     // the "Pick your prize" buttons so the draw can't be re-farmed.
     if (pendingDrawCount() < 1) {
@@ -292,6 +294,8 @@ const actions = {
         // 420. It rides on the record as its own field, for display only.
         if (addXp(xp).leveledUp && pendingDrawCount() > 0) engine.sess.leveledUp = true;
         patchSession(engine.sess.savedKey, { quizXp: xp });
+        engine.mirrorSessionPatch({ quizXp: xp });
+        publishJourney();
       }
       render();
     }
@@ -332,6 +336,9 @@ const actions = {
   redeemPrize(arg) {
     toggleRedeem(arg);
     render();
+    // Redemption is the half of a prize's life that must reach the other
+    // device promptly — until it did, the same prize could be spent twice.
+    publishJourney();
     // The undo window closes on a timer, not on a tap, so schedule the repaint
     // that retires the button — otherwise it keeps offering an undo the store
     // would refuse.
@@ -343,8 +350,15 @@ const actions = {
 
   /* ---- grown-up zone ---- */
   setGuTab(arg) { state.grownupTab = arg; render(); },
+  confirmRestore() {
+    const p = state.pendingRestore;
+    if (!p || !p.file) return;
+    runRestore(p.file, { force: true });
+  },
+  cancelRestore() { state.pendingRestore = null; state.backupNote = ""; render(); },
   repairWallet() {
     const { reissued, dated } = repairPrizeWallet();
+    publishJourney();
     state.walletRepairNote = (reissued || dated)
       ? "Repaired: " + [reissued ? reissued + " prize" + (reissued === 1 ? "" : "s") + " given a fresh ID" : "",
                         dated ? dated + " stuck “used” prize" + (dated === 1 ? "" : "s") + " unstuck" : ""]
@@ -466,20 +480,30 @@ root.addEventListener("input", e => {
 
 /* Restoring a backup rewrites storage under the app's feet — settings and the
    engine hold module-level copies — so the page reloads once the merge lands. */
-root.addEventListener("change", e => {
-  if (!(e.target.matches && e.target.matches('[data-input="restoreBackup"]'))) return;
-  const file = e.target.files && e.target.files[0];
-  e.target.value = "";
-  restoreBackupFile(file).then(res => {
+function runRestore(file, opts) {
+  restoreBackupFile(file, opts).then(res => {
     state.backupNote = res.message;
     state.backupNoteOk = true;
+    state.pendingRestore = null;
     render();
     if (res.sessionsAdded || res.filled.length) setTimeout(() => location.reload(), 1200);
   }).catch(err => {
     state.backupNote = err.message || "That restore didn't work.";
     state.backupNoteOk = false;
+    // A backup belonging to the OTHER athlete isn't rejected outright — a
+    // grown-up may genuinely be moving her onto this device — but it takes a
+    // deliberate second tap, because the merge cannot be undone.
+    state.pendingRestore = err.identityMismatch ? { file, ...err.identityMismatch } : null;
     render();
   });
+}
+
+root.addEventListener("change", e => {
+  if (!(e.target.matches && e.target.matches('[data-input="restoreBackup"]'))) return;
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  state.pendingRestore = null;
+  runRestore(file, {});
 });
 
 window.addEventListener("resize", () => {

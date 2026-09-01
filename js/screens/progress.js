@@ -18,7 +18,7 @@ export function progressScreen(vm) {
           <div style="flex:1;min-width:0;">
             <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
               <span style="font-weight:900;font-size:12px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">This week</span>
-              <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${vm.sessionsVal} sessions · ${vm.minAvgVal} min avg</span>
+              <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${vm.sessionsLabel} · ${vm.minAvgVal} min avg</span>
             </div>
             <div style="display:flex;gap:6px;align-items:flex-end;height:64px;">
               ${vm.analyticsWeek.map(ab => `
@@ -97,7 +97,7 @@ export function progressScreen(vm) {
             ${vm.hasLog ? vm.logItems.map(hi => `
               <div style="width:200px;flex-shrink:0;background:var(--surface-2);border-radius:var(--radius-lg);padding:14px;display:flex;flex-direction:column;gap:6px;box-sizing:border-box;scroll-snap-align:start;">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                  <span style="font-size:26px;line-height:1;">${hi.moodEmoji}</span>
+                  <span style="font-size:26px;line-height:1;" title="${hi.moodLabel}" aria-label="${hi.moodLabel}">${hi.moodEmoji}</span>
                   <span style="${hi.lightChipStyle}">${hi.lightLabel}</span>
                 </div>
                 <div style="font-weight:900;font-size:14px;color:var(--ink);line-height:1.25;">${hi.dayTitle}</div>

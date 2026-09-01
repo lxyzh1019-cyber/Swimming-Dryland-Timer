@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { LADDER, RANK_LORE, RANK_TEASE, fmtXp } from "../data.js";
-import { sessionXp, levelFromXp } from "../store.js";
+import { sessionXp, levelFromXp, sessionRounds, sessionRoundsPlanned } from "../store.js";
 import { loadSessions, loadJourney, currentStreak, redeemPrize, countsAsTrained, prizeUndoOpen } from "../store.js";
 import { edmontonWeekISODates, edmontonISO, DAY_MS } from "../util.js";
 import { buildJourney } from "./today.js";
@@ -16,14 +16,23 @@ const LIGHT_CHIP = {
   RED: "color-mix(in srgb, var(--stop) 12%, #fff);color:var(--stop)",
   RECOVERY: "color-mix(in srgb, var(--grape) 14%, #fff);color:var(--grape)",
   MINI: "var(--aqua-wash);color:var(--aqua-ink)",
-  "ENDED EARLY": "color-mix(in srgb, var(--coral) 14%, #fff);color:var(--coral)"
+  "ENDED EARLY": "color-mix(in srgb, var(--coral) 14%, #fff);color:var(--coral)",
+  "NOTHING LOGGED": "var(--surface-2);color:var(--ink-faint)",
+  "SAFETY STOP": "color-mix(in srgb, var(--stop) 12%, #fff);color:var(--stop)"
 };
 const MOOD_EMOJI = { great: "😀", okay: "🙂", tired: "😴" };
+const MOOD_LABEL = { great: "Great", okay: "Okay", tired: "Tired" };
 
 export function logEntryView(s) {
   const d = new Date(s.isoDate);
-  const lightLabel = s.pain || s.endedEarly ? "ENDED EARLY"
-    : s.mini ? "MINI"
+  // A session she opened and skipped through reached the end, so it used to be
+  // labelled with its traffic light — a GREEN badge on a day where nothing was
+  // done. Name it for what it was.
+  const noWork = !countsAsTrained(s);
+  const lightLabel = s.safetyStop ? "SAFETY STOP"
+    : noWork ? "NOTHING LOGGED"
+    : s.pain || s.endedEarly ? "ENDED EARLY"
+    : (s.mini || s.sessionType === "mini") ? "MINI"
     : (s.lightResult || s.light || "green").toUpperCase();
   const skips = (s.perExercise || []).filter(p => p.skipped).map(p => p.name);
   const note = [
@@ -32,11 +41,16 @@ export function logEntryView(s) {
     s.wentWell ? ("Went well: " + s.wentWell) : "",
     s.nextTime ? ("Next time: " + s.nextTime) : ""
   ].filter(Boolean).join(" · ");
+  const rawMins = (s.durationSecs || 0) / 60;
   return {
-    moodEmoji: MOOD_EMOJI[s.mood] || "🙂",
+    // An unanswered mood is not "Okay" — the app was inventing a reflection
+    // she never gave, in the one place a parent looks to see how she felt.
+    moodEmoji: MOOD_EMOJI[s.mood] || "·",
+    moodLabel: MOOD_LABEL[s.mood] || "not answered",
     dayTitle: s.dayTitle || s.dayKey || "Session",
     dateStr: d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/Edmonton" }),
-    duration: Math.max(1, Math.round((s.durationSecs || 0) / 60)) + " min",
+    // A session abandoned in seconds read as "1 min" of training.
+    duration: rawMins < 1 ? "under a min" : Math.round(rawMins) + " min",
     lightLabel, note,
     lightChipStyle: "font-size:10px;font-weight:900;letter-spacing:0.04em;border-radius:var(--radius-pill);padding:4px 9px;white-space:nowrap;background:" + (LIGHT_CHIP[lightLabel] || LIGHT_CHIP.GREEN) + ";"
   };
@@ -113,8 +127,11 @@ export function buildProgressVM(state) {
   const isoDates = edmontonWeekISODates();
   const order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
   const shorts = { monday: "Mon", tuesday: "Tue", wednesday: "Wed", thursday: "Thu", friday: "Fri", saturday: "Sat", sunday: "Sun" };
+  // Only training minutes. Try-it rows, safety stops and GO-and-quit records
+  // all used to land in this chart as if they were sessions.
+  const trained = sessions.filter(countsAsTrained);
   const minsByIso = {};
-  sessions.forEach(s => {
+  trained.forEach(s => {
     const key = edmontonISO(s.isoDate);
     minsByIso[key] = (minsByIso[key] || 0) + Math.round((s.durationSecs || 0) / 60);
   });
@@ -127,21 +144,23 @@ export function buildProgressVM(state) {
       + (d.mins === 0 ? "opacity:0.35;" : "")
   }));
 
-  const weekSessions = sessions.filter(s => Object.values(isoDates).includes(edmontonISO(s.isoDate)));
-  const streak = currentStreak(sessions.filter(countsAsTrained));
+  const weekSessions = trained.filter(s => Object.values(isoDates).includes(edmontonISO(s.isoDate)));
+  const streak = currentStreak(trained);
   const avgMins = weekSessions.length ? Math.round(weekSessions.reduce((a, s) => a + (s.durationSecs || 0), 0) / weekSessions.length / 60) : 0;
 
   // Milestones — real, honest chips (only what's actually been earned).
   const chip = (bg, ink) => "background:" + bg + ";color:" + ink + ";border-radius:var(--radius-pill);padding:8px 14px;font-weight:900;font-size:13px;";
   const milestones = [];
   if (streak > 1) milestones.push({ icon: "🔥", label: streak + "-day streak", style: chip("var(--coral-wash)", "var(--coral-ink)") });
-  if (j.level > 1 || sessions.length) milestones.push({ icon: "🌊", label: "Reached " + j.rankName, style: chip("var(--sun-wash)", "var(--sun-ink)") });
-  if (sessions.length) milestones.push({ icon: "🏊", label: sessions.length + " session" + (sessions.length === 1 ? "" : "s"), style: chip("var(--aqua-wash)", "var(--aqua-ink)") });
+  if (j.level > 1 || trained.length) milestones.push({ icon: "🌊", label: "Reached " + j.rankName, style: chip("var(--sun-wash)", "var(--sun-ink)") });
+  if (trained.length) milestones.push({ icon: "🏊", label: trained.length + " session" + (trained.length === 1 ? "" : "s"), style: chip("var(--aqua-wash)", "var(--aqua-ink)") });
   if ((journeyStore.xp || 0) > 0) milestones.push({ icon: "💯", label: fmtXp(journeyStore.xp) + " XP earned", style: chip("var(--mint-wash)", "var(--mint-ink)") });
   if (!milestones.length) milestones.push({ icon: "🌱", label: "Your first splash is one GO away!", style: chip("var(--aqua-wash)", "var(--aqua-ink)") });
 
   // Training log — newest first; Week scope = this week's entries (min 4 recent).
-  const allLog = sessions.slice().reverse().map(logEntryView);
+  // Try-it rows (only legacy histories still hold any) were never training and
+  // have no place in her log of it.
+  const allLog = sessions.filter(s => !s.practice).slice().reverse().map(logEntryView);
   const logScope = state.logScope || "week";
   const logItems = logScope === "week" ? allLog.slice(0, 4) : allLog;
   const logScopeTab = (v) => "min-height:32px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:12px;padding:0 14px;font-family:inherit;"
@@ -172,17 +191,22 @@ export function buildProgressVM(state) {
   const periodKey = state.progressScope || "4w";
   const range = periodRange(periodKey);
   const inRange = s => { const k = edmontonISO(s.isoDate); return k >= range.from && k <= range.to; };
-  const pSessions = sessions.filter(s => inRange(s) && !s.practice);
+  // Everything on this board answers for TRAINING. A try-it row, a safety stop
+  // and a GO-and-quit are not training, and counting them dragged every
+  // average on the board toward a session that never happened.
+  const pSessions = sessions.filter(s => inRange(s) && countsAsTrained(s));
   const pDone = pSessions.filter(s => s.completedFully);
   const days = isoSpan(range.from, range.to);
   const weeks = Math.max(1, days.length / 7);
 
   const pMins = Math.round(pSessions.reduce((a, s) => a + (s.durationSecs || 0), 0) / 60);
-  // Rounds are stored as the rounds the DAY ASKED FOR, not the rounds finished,
-  // so an ended-early session would overstate. Count finished sessions only and
-  // name the partials separately rather than quietly inflating the number.
-  const pRounds = pDone.reduce((a, s) => a + (s.roundsDone || 0), 0);
+  // roundsDone is what she actually finished now, so a partial contributes the
+  // rounds it really did instead of being left out of the total entirely.
+  const pRounds = pSessions.reduce((a, s) => a + sessionRounds(s), 0);
   const pPartial = pSessions.length - pDone.length;
+  // What those days actually asked for — green 3, yellow 2, red 1, mini 1 —
+  // rather than three apiece regardless of the light.
+  const pPlannedRounds = pSessions.reduce((a, s) => a + sessionRoundsPlanned(s), 0);
   const pXp = pSessions.reduce((a, s) => a + sessionXp(s), 0);
   const xpNow = journeyStore.xp || 0;
   // Levels gained inside the window, from the training XP it actually banked.
@@ -195,6 +219,7 @@ export function buildProgressVM(state) {
   }, { asked: 0, clean: 0 });
   const pMoods = { great: 0, okay: 0, tired: 0 };
   pSessions.forEach(s => { if (pMoods[s.mood] != null) pMoods[s.mood] += 1; });
+  const pMoodUnanswered = pSessions.filter(s => pMoods[s.mood] == null).length;
   const topMood = Object.entries(pMoods).sort((a, b) => b[1] - a[1])[0];
   const pTough = pSessions.filter(s => ["yellow", "red"].includes(s.lightResult || s.light));
   const pToughDone = pTough.filter(s => s.completedFully).length;
@@ -216,14 +241,15 @@ export function buildProgressVM(state) {
         avg: pSessions.length ? Math.round((pDone.length / pSessions.length) * 100) + "%" : "—" },
       { label: "Time", total: pMins >= 60 ? Math.floor(pMins / 60) + "h " + (pMins % 60) + "m" : pMins + "m",
         avg: per(pMins, pSessions.length, "min / session") },
-      { label: "Main rounds", total: String(pRounds) + (pPartial ? "  (+" + pPartial + " partial)" : ""),
-        avg: per(pRounds, pDone.length, "/ session") },
+      { label: "Main rounds", total: pRounds + " of " + pPlannedRounds + (pPartial ? "  (" + pPartial + " partial)" : ""),
+        avg: per(pRounds, pSessions.length, "/ session") },
       { label: "XP earned", total: fmtXp(pXp), avg: per(pXp, pSessions.length, "/ session") },
       { label: "Levels upgraded", total: "+" + pLevels,
         avg: pLevels ? "one every " + per(pSessions.length, pLevels, "sessions") : "—" },
       { label: "Clean form", total: pForm.asked ? pForm.clean + " of " + pForm.asked : "—",
         avg: pForm.asked ? Math.round((pForm.clean / pForm.asked) * 100) + "%" : "—" },
-      { label: "How I felt", total: "😀" + pMoods.great + "  🙂" + pMoods.okay + "  😴" + pMoods.tired,
+      { label: "How I felt", total: "😀" + pMoods.great + "  🙂" + pMoods.okay + "  😴" + pMoods.tired
+        + (pMoodUnanswered ? "  · " + pMoodUnanswered + " not answered" : ""),
         avg: topMood && topMood[1] ? "mostly " + MOOD_EMOJI[topMood[0]] : "—" },
       { label: "Tough days finished", total: String(pToughDone),
         avg: pSessions.length ? Math.round((pToughDone / pSessions.length) * 100) + "% of sessions" : "—" }
@@ -250,6 +276,7 @@ export function buildProgressVM(state) {
     prizesWon, hasPrizes: prizesWon.length > 0,
     dayStreakVal: String(streak),
     sessionsVal: String(weekSessions.length),
+    sessionsLabel: weekSessions.length + " session" + (weekSessions.length === 1 ? "" : "s"),
     minAvgVal: String(avgMins)
   };
 }

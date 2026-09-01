@@ -24,7 +24,7 @@
    either side; every step can only ADD.
    ============================================================ */
 
-import { settings, mergeSessions, loadSessions, sessionKey, belongsToAthlete, athleteId,
+import { settings, mergeSessions, loadSessions, sessionKey, belongsToAthlete, athleteId, athleteAliases,
          journeySnapshot, mergeCloudJourney, rebuildJourneyXp, logEvent } from "./store.js";
 
 let _done = false;
@@ -66,7 +66,16 @@ export async function restoreFromCloud() {
     // 3. journey — merge the ledger and wallet, publish the merged result for
     // the other device, then recompute the total from the two shared sources.
     // Every device that gets here lands on the same number.
-    const journeyChanged = mergeCloudJourney(await fsGetJourney(me));
+    //
+    // The journey doc is keyed by athlete, and that key used to be the editable
+    // NAME. Every id this profile has answered to is merged in, so the change
+    // to an immutable profile id — and any past rename — doesn't strand the
+    // quiz ledger and prize wallet under a key nothing reads any more. Merging
+    // only ever moves things up, so merging several is safe.
+    let journeyChanged = false;
+    for (const id of athleteAliases()) {
+      if (mergeCloudJourney(await fsGetJourney(id))) journeyChanged = true;
+    }
     await fsSaveJourney(me, journeySnapshot());
     const xp = rebuildJourneyXp();
 
@@ -77,5 +86,38 @@ export async function restoreFromCloud() {
   } catch (e) {
     console.warn("Cloud sync skipped:", e);
     return idle;
+  }
+}
+
+/* ---- publishing a change as it happens -----------------------------------
+   The journey (quiz ledger, prize wallet, XP) was only ever pushed during the
+   boot sync, so a quiz answered or a prize redeemed on one device stayed
+   invisible to the other until the app was next opened there — two devices
+   could disagree for a day. Any code that changes the journey calls this, and
+   the write is debounced so a burst of taps costs one write. */
+let _publishTimer = null;
+let _publishing = false;
+
+export function publishJourney(delaySecs = 2) {
+  if (settings.cloudMirror === false) return false;
+  if (_publishTimer) clearTimeout(_publishTimer);
+  _publishTimer = setTimeout(() => { _publishTimer = null; flushJourney(); }, Math.max(0, delaySecs) * 1000);
+  return true;
+}
+
+/* Push now, skipping the debounce. Never throws: an offline device just keeps
+   its change locally, and the next boot sync carries it up. */
+export async function flushJourney() {
+  if (settings.cloudMirror === false) return false;
+  if (_publishing) return false;
+  _publishing = true;
+  try {
+    const { fsSaveJourney } = await import("./firebase.js");
+    return await fsSaveJourney(athleteId(), journeySnapshot());
+  } catch (e) {
+    console.warn("Journey publish skipped:", e);
+    return false;
+  } finally {
+    _publishing = false;
   }
 }
