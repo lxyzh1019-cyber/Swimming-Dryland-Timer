@@ -54,7 +54,7 @@ function blankSession() {
     // "normal" | "mini" | "tryit" — practice/mini are kept as mirrors so the
     // screens and view-models that read them keep working.
     mode: "normal",
-    dayKey: null, light: "green", practice: false, mini: false, spa: false,
+    dayKey: null, light: "green", practice: false, mini: false, spa: false, recovery: false,
     endedEarly: false, xpEarned: 0, leveledUp: false,
     mood: null, wentWell: null, nextTime: null, quizPick: null, quizXp: 0,
     savedEntry: false, saveFailed: false, savedKey: null, fsId: null
@@ -65,19 +65,44 @@ let notify = () => {};
 export function onSessionUpdate(fn) { notify = fn; }
 
 /* ---- circuits assembly (2026.2 block model) ---- */
+/* The day the recovery menu lives on. A weekday that resolves to Recovery
+   borrows THIS content — it does not invent a lighter version of its own
+   workout, because "a lighter workout" is exactly what a body reporting pain
+   should not be handed. */
+export const RECOVERY_SOURCE_DAY = "sunday";
+
+/* Recovery is its own kind of session: the existing Sunday menu, one pass, no
+   main circuit, no prep, no finisher. Split out of assembleCircuits so a
+   weekday resolving to Recovery reaches the same content by the same path. */
+export function assembleRecoveryCircuit(dayKey) {
+  const day = DAYS[dayKey] || {};
+  const src = (day.recovery && day.recovery.length) ? day : (DAYS[RECOVERY_SOURCE_DAY] || {});
+  const menu = (src.recovery || []).map(r => {
+    const { secs, eachSide } = recoveryDoseSecs(r.dose);
+    return { name: r.name, block: "recovery", driver: "time", work: secs,
+      dose: r.dose, cue: r.why, eachSide, rest: 3 };
+  });
+  const exercises = menu.concat(src.recoveryHolds || []);
+  if (!exercises.length) return [];
+  return [{ name: "Recovery", block: "recovery", rounds: 1, exercises }];
+}
+
+/* Rounds a light asks for. Recovery asks for ZERO, and zero has to survive:
+   the old `Math.max(1, LIGHT_ROUNDS[light] || 1)` turned it into one, which is
+   how a Recovery day launched warm-up, coordination, a main circuit, prep, a
+   finisher and swim-skill work at a body that had just reported pain. */
+export function roundsForLight(light) {
+  const n = LIGHT_ROUNDS[light];
+  return Number.isFinite(n) ? n : 1;
+}
+
 export function assembleCircuits(dayKey, light, opts = {}) {
   const day = DAYS[dayKey];
   if (!day) return [];
-  if (day.spa) {
-    const menu = (day.recovery || []).map(r => {
-      const { secs, eachSide } = recoveryDoseSecs(r.dose);
-      return { name: r.name, block: "recovery", driver: "time", work: secs,
-        dose: r.dose, cue: r.why, eachSide, rest: 3 };
-    });
-    return [{ name: "Recovery", block: "recovery", rounds: 1,
-      exercises: menu.concat(day.recoveryHolds || []) }];
-  }
-  const rounds = Math.max(1, LIGHT_ROUNDS[light] || 1);
+  // Sunday is recovery by design; any other day becomes recovery when the
+  // readiness check says so.
+  if (day.spa || light === "recovery") return assembleRecoveryCircuit(dayKey);
+  const rounds = roundsForLight(light);
   const skipBlocks = opts.skip || [];
   const circuits = [];
   const order = opts.mini ? ["warmup", "main"] : BLOCK_ORDER;
@@ -594,26 +619,32 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
   const day = DAYS[dayKey];
   if (!day) return;
 
-  const sessionMode = mode || (mini ? "mini" : "normal");
+  // Recovery is an explicit MODE, not a light with zero rounds. A Mini that
+  // resolves to Recovery becomes recovery too — the whole point of the check is
+  // that a sore day gets recovery, and "a shortened workout" is still a workout.
+  const resolvedLight = day.spa ? "recovery" : light;
+  const isRecovery = resolvedLight === "recovery";
+  const sessionMode = isRecovery ? "recovery" : (mode || (mini ? "mini" : "normal"));
   Object.assign(sess, blankSession(), {
     running: true, dayKey, mode: sessionMode,
     mini: sessionMode === "mini", practice: false,
-    light: day.spa ? "recovery" : light,
+    light: resolvedLight,
+    recovery: isRecovery,
     spa: !!day.spa
   });
 
   // Same-day resume: blocks already completed today are skipped.
   const prog = loadDayProgress(dayKey);
   const skipBlocks = (prog && prog.done) || [];
-  sess.circuits = assembleCircuits(dayKey, sess.light, { mini: sess.mini, skip: sess.spa ? [] : skipBlocks });
+  sess.circuits = assembleCircuits(dayKey, sess.light, { mini: sess.mini, skip: (sess.spa || sess.recovery) ? [] : skipBlocks });
   if (!sess.circuits.length) { sess.running = false; return; }
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
   sess.expectedWork = countExpectedWork(sess.circuits);
   // A mini is one shortened round however the light was set; everything else
   // is priced and reported against the light's own round count.
-  sess.roundsPlanned = sess.spa ? 0
+  sess.roundsPlanned = (sess.spa || sess.recovery) ? 0
     : sess.mini ? 1
-    : Math.max(1, LIGHT_ROUNDS[sess.light] || 1);
+    : roundsForLight(sess.light);
   sess.spotChecks = pickSpotChecks(sess.circuits);
 
   logEvent("session_start", { day: dayKey, light: sess.light, mode: sessionMode });
@@ -626,8 +657,9 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
 
   setPhase("greeting");
   playCue("work");
-  if (sess.spa) {
-    await speakAndWait("Spa Sunday. Easy recovery, slow and gentle.");
+  if (sess.spa || sess.recovery) {
+    await speakAndWait(sess.spa ? "Spa Sunday. Easy recovery, slow and gentle."
+      : "Recovery today. No workout — just easy, gentle care. Well done for checking in honestly.");
   } else {
     await speakAndWait("Say it out loud with me, loud and proud: " + dayMantra + " " +
       "Your light today is " + lightLabel + ". Starting with " + firstEx + ".");
@@ -739,7 +771,7 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
           const isBlockBreak = isLastOfRound && r === circuit.rounds && !isLastCircuit;
 
           if (isRoundBreak) {
-            if (circuit.block === "main" && r === 1 && !sess.intentWord && !sess.spa) {
+            if (circuit.block === "main" && r === 1 && !sess.intentWord && !sess.spa && !sess.recovery) {
               const iw = await intentWordPrompt();
               if (iw === "abort") return finalize(false);
             }
@@ -846,11 +878,11 @@ export function finalize(completed) {
     session: "morning",
     planVersion: "2026.2",
     xpVersion: XP_VERSION,     // marks a row whose XP counted the rounds trained
-    sessionType: sess.spa ? "spa" : sess.mini ? "mini" : "main",
-    lightResult: sess.spa ? "recovery" : sess.light,
+    sessionType: sess.recovery && !sess.spa ? "recovery" : sess.spa ? "spa" : sess.mini ? "mini" : "main",
+    lightResult: sess.light,
     // What was actually trained, and what the day asked for — two different
     // numbers. Storing only the planned one is what paid 150% for one day.
-    roundsDone: sess.spa ? 0 : sess.roundsCompleted,
+    roundsDone: (sess.spa || sess.recovery) ? 0 : sess.roundsCompleted,
     roundsPlanned: sess.roundsPlanned,
     blocksCompleted: sess.blocksCompleted,
     safetyStop,
@@ -858,7 +890,7 @@ export function finalize(completed) {
     perExercise: perExerciseFromLedger(sess.ledger),
     microLoop: sess.microLoop || null,
     intentWord: sess.intentWord || null,
-    prSentinel: sess.spa ? null : day.prSentinel || null,
+    prSentinel: (sess.spa || sess.recovery) ? null : day.prSentinel || null,
     skippedCount: sess.skipped.length,
     pauseCount: sess.pauseCount || 0,
     pausedSecs: sess.pausedSecs,

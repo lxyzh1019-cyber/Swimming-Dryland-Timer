@@ -1317,4 +1317,66 @@ ok(store.claimSessionXp({ ...capBase, roundsDone: 3 }) === 0, "and a third attem
 ok(store.xpForSession({ ...capBase, roundsDone: 3, safetyStop: true }) === 0, "a pain stop still pays no XP");
 ok(store.countsAsTrained({ ...capBase, roundsDone: 3, safetyStop: true }) === false, "and still takes no streak");
 
+/* ============================================================
+   PHASE 1 — recovery is a safety mode, not a one-round workout
+   ============================================================ */
+
+/* --- the assembly: no workout blocks anywhere in the week --- */
+const WORKOUT_BLOCKS = ["warmup", "coordination", "main", "prep", "finisher"];
+
+for (const dk of ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]) {
+  const cs = engine.assembleCircuits(dk, "recovery");
+  ok(cs.length > 0, dk + " Recovery still gives her something to do");
+  ok(cs.every(c => c.block === "recovery"),
+     dk + " Recovery assembles a recovery circuit and nothing else");
+  ok(cs.every(c => c.exercises.every(e => !WORKOUT_BLOCKS.includes(e.block))),
+     dk + " Recovery contains no warm-up/coordination/main/prep/finisher work");
+  ok(cs.every(c => c.rounds === 1), dk + " Recovery is one pass, never a round count");
+}
+/* It uses the EXISTING recovery movements — no invented exercises. */
+const recNames = new Set(engine.assembleRecoveryCircuit("sunday")[0].exercises.map(e => e.name));
+const monRecNames = engine.assembleCircuits("monday", "recovery")[0].exercises.map(e => e.name);
+ok(monRecNames.length > 0 && monRecNames.every(n => recNames.has(n)),
+   "a weekday Recovery uses only the existing recovery movements");
+
+/* --- zero must survive the light lookup --- */
+ok(engine.roundsForLight("recovery") === 0, "recovery asks for zero rounds, and zero stays zero");
+ok(engine.roundsForLight("green") === 3 && engine.roundsForLight("red") === 1, "the other lights are unchanged");
+
+/* --- Sunday spa still behaves exactly as before --- */
+const spaCs = engine.assembleCircuits("sunday", "recovery");
+ok(spaCs.length === 1 && spaCs[0].block === "recovery" && spaCs[0].exercises.length > 0,
+   "Sunday Spa behaviour continues to work");
+
+/* --- a real weekday Recovery run --- */
+const sRec = await runSession({ dayKey: "monday", light: "recovery", gateUnlocked: true });
+ok(sRec.mode === "recovery", "a weekday resolving to Recovery runs in recovery mode");
+ok(sRec.roundsPlanned === 0, "it plans zero rounds");
+ok(sRec.roundsCompleted === 0, "and completes zero rounds");
+ok(sRec.ledger.every(l => !WORKOUT_BLOCKS.includes(l.block)),
+   "no warm-up, main, prep or finisher work reached the ledger");
+ok(sRec.ledger.every(l => recNames.has(l.name)),
+   "every move she was given came from the existing recovery template");
+const recRow = store.loadSessions()[0];
+ok(recRow.sessionType === "recovery", "the record is typed as recovery");
+ok(recRow.roundsDone === 0 && recRow.roundsPlanned === 0, "with zero rounds done and zero planned");
+ok(store.countsAsTrained(recRow) === false, "recovery does not complete the normal scheduled day");
+ok(store.outcomeOf(recRow).countsForStreak === false, "and does not increase the streak or adherence");
+ok(store.currentStreak(store.loadSessions().filter(store.countsAsTrained)) === 0,
+   "a week of recovery alone leaves the training streak at zero");
+
+/* --- a Mini that resolves to Recovery becomes recovery, not warm-up + main --- */
+const sMiniRec = await runSession({ dayKey: "tuesday", light: "recovery", mini: true, gateUnlocked: true });
+ok(sMiniRec.mode === "recovery", "a recovery Mini is a recovery session");
+ok(sMiniRec.mini === false, "it is not run as a shortened workout");
+ok(sMiniRec.ledger.every(l => !WORKOUT_BLOCKS.includes(l.block)), "and never reaches a main circuit");
+ok(store.loadSessions()[0].sessionType === "recovery", "the recovery-mini is recorded as recovery");
+
+/* --- the care credit: recovery pays a flat show-up credit, and no round XP --- */
+ok(store.xpForSession({ ...recRow }) === store.XP_SHOWED_UP,
+   "recovery pays the flat care credit — reporting soreness honestly must not cost her");
+ok(store.dayXpCap(recRow) === store.XP_SHOWED_UP, "and the day's budget is exactly that, no round XP");
+ok(store.xpForSession({ sessionType: "spa", xpVersion: store.XP_VERSION }) === 0,
+   "Sunday's scheduled spa day is unchanged at zero — it was never a training day given up");
+
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);
