@@ -25,11 +25,15 @@ import { buildProgressVM, toggleRedeem } from "./vm/progress.js";
 import { progressScreen } from "./screens/progress.js";
 import { buildGrownupVM, exportCsv } from "./vm/grownup.js";
 import { grownupScreen } from "./screens/grownup.js";
-import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS, recordFormVerdict, repairPrizeWallet } from "./store.js";
+import { requireGrownup, gateChallenge, answerGate, lockGate, gateUnlocked, GATE_REASON } from "./gate.js";
+import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS, recordFormVerdict, repairPrizeWallet, redeemedPrizesForReview, restorePrize } from "./store.js";
 
 export const state = {
   nav: "today",                 // 'today' | 'progress' | 'grownup'
   grownupTab: "overview",       // 'overview' | 'analytics' | 'library' | 'settings' | 'coaching'
+  gateAsk: null,                // the pending grown-up action, or null
+  gateError: "",                // "that's not it" after a wrong answer
+  prizeReviewOpen: false,       // the redeemed-prize review list
   gsScope: "week",
   logScope: "week",
   progressScope: "4w",          // '4w' | 'month' | 'quarter' — Progress period board
@@ -99,8 +103,30 @@ function storageBannerHtml() {
   </div>`;
 }
 
+/* The grown-up gate, drawn over whatever screen asked for it — the pain-severity
+   confirmation lives on her readiness screen, the prize repair in the Grown-up
+   Zone, and both need the same question. */
+function gateHtml() {
+  if (!state.gateAsk) return "";
+  const reason = GATE_REASON[state.gateAsk] || "continue";
+  return `<div style="position:fixed;inset:0;z-index:210;background:rgba(20,59,74,0.62);display:flex;align-items:center;justify-content:center;padding:24px;font-family:var(--font-ui);">
+    <div data-stop-propagation="1" style="background:var(--surface);border-radius:20px;padding:22px 24px;max-width:380px;width:100%;box-shadow:0 18px 40px rgba(20,59,74,0.3);">
+      <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--ink);margin-bottom:6px;">Grown-up check</div>
+      <div style="font-size:13px;font-weight:800;color:var(--ink-soft);line-height:1.5;margin-bottom:14px;">A grown-up needs to be here to ${escapeHtml(reason)}.</div>
+      <div style="font-family:var(--font-display);font-weight:600;font-size:26px;color:var(--ink);margin-bottom:10px;">${escapeHtml(gateChallenge().question)}</div>
+      <input type="number" inputmode="numeric" data-input="gateAnswer" style="width:100%;min-height:48px;border:2px solid var(--hairline);border-radius:12px;padding:0 14px;font-size:18px;font-weight:900;font-family:inherit;box-sizing:border-box;" placeholder="Answer">
+      ${state.gateError ? `<div style="margin-top:8px;font-size:13px;font-weight:800;color:var(--stop-ink);">${escapeHtml(state.gateError)}</div>` : ""}
+      <div style="display:flex;gap:10px;margin-top:14px;">
+        <button type="button" data-action="submitGate" style="flex:1;min-height:46px;border:none;border-radius:var(--radius-pill);background:var(--mint);color:#fff;font-weight:900;font-size:15px;cursor:pointer;font-family:inherit;">Unlock</button>
+        <button type="button" data-action="cancelGate" style="min-height:46px;border:2px solid var(--hairline);border-radius:var(--radius-pill);background:transparent;color:var(--ink-soft);font-weight:900;font-size:14px;padding:0 16px;cursor:pointer;font-family:inherit;">Cancel</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function overlaysHtml() {
   let html = storageBannerHtml();
+  html += gateHtml();
   if (state.quizDeck) html += quizDeckHtml(state.quizDeck);
   if (state.prizeDraw) html += prizeDrawHtml(state.prizeDraw);
   return html;
@@ -132,7 +158,34 @@ export function render() {
 
 /* ---- delegated actions ---- */
 
-const actions = {
+/* Ask for a grown-up before a consequential action. Returns true when the
+   action may proceed now; false means the challenge is up and the caller has
+   done nothing. The pending action is re-run from GATED_RUNNERS once the
+   question is answered, so the grown-up does not have to find the button again. */
+function gate(action, payload = null) {
+  if (requireGrownup(action)) return true;
+  state.gateAsk = action;
+  state.gatePayload = payload;
+  state.gateError = "";
+  render();
+  return false;
+}
+
+/* What to do once the grown-up has been confirmed. */
+const GATED_RUNNERS = {
+  severity3:      () => { confirmGrownup(state.readiness); },
+  lightOverride:  () => { if (state.readiness && state.gatePayload) { state.readiness.light = state.gatePayload; state.readiness.overridden = true; } },
+  valgusGate:     () => { const g = loadGate(); g.unlocked = !g.unlocked; saveGate(g); },
+  backupRestore:  () => { const p = state.pendingRestore; if (p && p.file) runRestore(p.file, { force: true }); },
+  prizeRepair:    () => { state.prizeReviewOpen = true; },
+  safetySettings: () => { updateSettings({ safetyVoiceOn: settings.safetyVoiceOn === false }); }
+};
+
+/* Exported so the test suite can drive the action layer directly. Several of
+   the defects this app has shipped lived here — an action that closed a card
+   and silently restarted the workout clock, another that closed Try-It without
+   disarming it — and neither is visible from rendered markup. */
+export const actions = {
   nav(arg) { state.nav = arg; render(); },
   dismissStorageError() { state.storageError = null; render(); },
   // Switching athlete swaps every storage namespace; a reload is the only way
@@ -147,7 +200,15 @@ const actions = {
   },
   selectDay(arg) { state.selectedDay = arg; state.expanded = {}; render(); },
   toggleBlock(arg) { state.expanded[arg] = !state.expanded[arg]; render(); },
-  toggleCoachVoice() { updateSettings({ coachVoiceOn: !settings.coachVoiceOn }); render(); },
+  toggleCoachVoice() { updateSettings({ coachSpeechOn: settings.coachSpeechOn === false }); render(); },
+  toggleTimerSounds() { updateSettings({ timerSoundsOn: settings.timerSoundsOn === false }); render(); },
+  toggleSafetyVoice() {
+    // Safety cues are the point of the readiness system, so turning them OFF is
+    // a grown-up decision. Turning them back on never needs one.
+    if (settings.safetyVoiceOn !== false && !gate("safetySettings")) return;
+    updateSettings({ safetyVoiceOn: settings.safetyVoiceOn === false });
+    render();
+  },
   togglePractice() {
     // Backed by settings, not memory: a reload used to disarm it silently and
     // record a run meant as a test.
@@ -169,6 +230,11 @@ const actions = {
     render();
   },
   exitTryIt() {
+    // Try-It is ONE look, then it is over. Closing the move list used to leave
+    // the arm flag set, so every later GO reopened Try-It instead of Body Check
+    // and she could never get back to a real session without finding the toggle.
+    setTryIt(false);
+    state.practiceMode = false;
     state.tryIt = null;
     state.detailOverlay = false; state.detailEx = null;
     render();
@@ -238,8 +304,20 @@ const actions = {
   },
   rClosePopup() { state.readiness.pendingZone = null; render(); },
   rGoBack() { state.readiness.step = "questions"; render(); },
-  rGrownupOk() { confirmGrownup(state.readiness); render(); },
-  rPickLight(arg) { state.readiness.light = arg; state.readiness.overridden = true; render(); },
+  /* "A grown-up said it's OK" used to be a checkbox on her own screen — the app
+     asked whether an adult had cleared a severity-3 pain report and took the
+     answer from whoever was holding the phone. */
+  rGrownupOk() {
+    if (state.readiness && state.readiness.grownupOk) { confirmGrownup(state.readiness); render(); return; }
+    if (!gate("severity3")) return;
+    confirmGrownup(state.readiness);
+    render();
+  },
+  rPickLight(arg) {
+    // Overriding the light the body check produced is an adult decision.
+    if (!gate("lightOverride", arg)) return;
+    state.readiness.light = arg; state.readiness.overridden = true; render();
+  },
   rExit() { state.readiness = null; render(); },
   rResultCta(arg) {
     const r = state.readiness;
@@ -269,6 +347,7 @@ const actions = {
   answerMicro(arg) { engine.answerMicroLoop(arg); },
   pickClean() { engine.pickClean(); },
   pickWobbly() { engine.pickWobbly(); },
+  skipFormCheck() { engine.skipFormCheck(); },
   pickMood(arg) { const [key, emoji] = arg.split("|"); engine.setMood(key, emoji); },
   reflectWell(arg) { engine.setReflect("wentWell", arg); },
   reflectNext(arg) { engine.setReflect("nextTime", arg); },
@@ -323,7 +402,15 @@ const actions = {
     // the clock is stopped before she leaves.
     if (engine.sess.running && !engine.sess.paused) engine.togglePause();
   },
+  /* Closing the instructions and RESUMING the workout are two different
+     intentions. The ✕ and a tap on the backdrop are how you dismiss something
+     you opened by accident, or close it to keep reading the move on the card —
+     they must not start the clock again. Only the Resume button does that. */
   closeDetail() {
+    state.detailOverlay = false; state.detailEx = null;
+    render();
+  },
+  resumeFromDetail() {
     state.detailOverlay = false; state.detailEx = null;
     if (engine.sess.running && engine.sess.paused) engine.togglePause();
     render();
@@ -350,20 +437,66 @@ const actions = {
 
   /* ---- grown-up zone ---- */
   setGuTab(arg) { state.grownupTab = arg; render(); },
+
+  /* ---- grown-up gate ------------------------------------------------------
+     Consequential decisions ask for a grown-up first. See js/gate.js for why
+     this is an arithmetic question rather than a PIN. */
+  answerGate(arg) {
+    const action = state.gateAsk;
+    if (!action) return;
+    if (!answerGate(arg)) { state.gateError = "Not quite — try the new one."; render(); return; }
+    state.gateError = "";
+    state.gateAsk = null;
+    const run = GATED_RUNNERS[action];
+    if (run) run();
+    render();
+  },
+  submitGate() {
+    const inp = root.querySelector('[data-input="gateAnswer"]');
+    actions.answerGate(inp ? inp.value : "");
+  },
+  cancelGate() { state.gateAsk = null; state.gateError = ""; state.gatePayload = null; render(); },
   confirmRestore() {
     const p = state.pendingRestore;
     if (!p || !p.file) return;
+    if (!gate("backupRestore")) return;
     runRestore(p.file, { force: true });
   },
   cancelRestore() { state.pendingRestore = null; state.backupNote = ""; render(); },
+  /* Repairing IDs and repairing a wrongly-redeemed prize are two different
+     jobs, and the app used to report the first as if it were the second:
+     backfilling a missing timestamp was announced as a "stuck used prize
+     unstuck" while the prize stayed firmly used. */
   repairWallet() {
     const { reissued, dated } = repairPrizeWallet();
     publishJourney();
-    state.walletRepairNote = (reissued || dated)
-      ? "Repaired: " + [reissued ? reissued + " prize" + (reissued === 1 ? "" : "s") + " given a fresh ID" : "",
-                        dated ? dated + " stuck “used” prize" + (dated === 1 ? "" : "s") + " unstuck" : ""]
-          .filter(Boolean).join(", ") + ". Nothing she earned was removed."
+    const parts = [];
+    if (reissued) parts.push(reissued + " duplicate or missing ID" + (reissued === 1 ? "" : "s") + " fixed");
+    if (dated) parts.push(dated + " redemption date" + (dated === 1 ? "" : "s") + " filled in");
+    const stillRedeemed = redeemedPrizesForReview().length;
+    state.walletRepairNote = parts.length
+      ? "Repaired: " + parts.join(", ") + ". Nothing she earned was removed."
       : "Nothing to repair — every prize already has a unique ID and a proper redemption date.";
+    if (stillRedeemed) {
+      state.walletRepairNote += " " + stillRedeemed + " prize" + (stillRedeemed === 1 ? " is" : "s are")
+        + " marked used. The app can't tell which of those she actually spent — open the review to restore any that are wrong.";
+    }
+    render();
+  },
+  reviewPrizes() {
+    if (!gate("prizeRepair")) return;
+    state.prizeReviewOpen = true;
+    render();
+  },
+  closePrizeReview() { state.prizeReviewOpen = false; state.walletRepairNote = ""; render(); },
+  restorePrize(arg) {
+    if (!gate("prizeRepair")) return;
+    const r = restorePrize(arg);
+    publishJourney();
+    state.walletRepairNote = r.restored
+      ? "Restored “" + (r.label || "that prize") + "”. It is available again on every device, and the corrupted copy can't come back."
+      : r.reason === "not-redeemed" ? "That prize was already available — nothing to restore."
+      : "Couldn't find that prize to restore.";
     render();
   },
   setGsScope(arg) { state.gsScope = arg; render(); },
@@ -386,6 +519,8 @@ const actions = {
     render();
   },
   toggleGate() {
+    // The valgus gate decides whether she is jumping at all. That is not hers.
+    if (!gate("valgusGate")) return;
     const g = loadGate();
     g.unlocked = !g.unlocked;
     saveGate(g);
@@ -439,6 +574,9 @@ const actions = {
     state.detailOverlay = false;
     state.nav = "today";
     state.selectedDay = edmontonDayKey();
+    // The unlock does not follow her back out of the Grown-up Zone.
+    lockGate();
+    state.gateAsk = null; state.prizeReviewOpen = false;
     render();
   }
 };

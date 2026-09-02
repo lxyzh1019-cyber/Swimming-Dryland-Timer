@@ -1,9 +1,16 @@
 /* ============================================================
    AUDIO — the speech coach (speechSynthesis) + Web Audio cues.
-   Everything is gated by settings.coachVoiceOn (the design's 🎧
-   toggle): voice off ⇒ speakAndWait resolves immediately and no
-   cues play — which is also what makes headless test runs fast.
-   voiceStyle 'quiet' keeps the cues but suppresses most speech.
+
+   THREE independent switches, not one. A single 🎧 toggle used to gate every
+   sound in the app, so silencing the coach's chatter also killed the timer
+   beeps she paces on and the safety cues the readiness system exists to
+   deliver.
+     coachSpeechOn  — the coach's spoken cues and encouragement
+     timerSoundsOn  — beeps, rep ticks, round and rest cues
+     safetyVoiceOn  — pain checks and stop confirmations (speakSafety)
+   Coach speech off ⇒ speakAndWait resolves immediately, which is also what
+   makes headless test runs fast. voiceStyle 'quiet' suppresses most coach
+   speech but never the safety voice.
    ============================================================ */
 
 import { settings } from "./store.js";
@@ -16,8 +23,17 @@ let calmMode = false;
 
 export function setCalmMode(on) { calmMode = !!on; }
 
-export function coachAudioOn() { return settings.coachVoiceOn !== false; }
+/* Three independent switches, because they answer to three different needs.
+   Turning the coach's chatter off must not take the beeps she paces on with it,
+   and neither of those may ever silence a safety cue. */
+export function coachAudioOn() { return settings.coachSpeechOn !== false; }
+export function timerSoundsOn() { return settings.timerSoundsOn !== false; }
+export function safetyVoiceOn() { return settings.safetyVoiceOn !== false; }
+
 export function voiceOn() { return coachAudioOn() && settings.voiceStyle !== "quiet" && !!speech; }
+/* A safety line is spoken whenever the safety voice is on, even in quiet mode
+   and even with the coach muted. */
+export function safetySpeechOn() { return safetyVoiceOn() && !!speech; }
 
 /* Prefer an installed high-quality English voice; never force a gender or pitch. */
 let _coachVoice = null;
@@ -81,6 +97,17 @@ export function interruptSpeech(msg) {
   if (!voiceOn()) return;
   speech.cancel();
   speak(msg);
+}
+
+/* A safety line — "Session stopped", a pain check, a form warning. It is spoken
+   whenever the safety voice is on, independently of the coach's voice and of
+   quiet mode. Muting the chatter must never mute this. */
+export function speakSafety(msg) {
+  if (!safetySpeechOn() || !msg) return;
+  speech.cancel();
+  const u = createCoachUtterance(String(msg));
+  u.rate = 0.95; u.pitch = 1;      // level and clear, whatever persona is set
+  speech.speak(u);
 }
 
 export function cancelSpeech() {
@@ -156,7 +183,7 @@ function note(freq, at, dur, type, vol) {
 }
 
 export function playCue(kind) {
-  if (!coachAudioOn()) return;
+  if (!timerSoundsOn()) return;
   // never blip over the coach's voice
   if (kind.startsWith("tick") && speechActive()) return;
   if (kind === "work")          { note(659, 0, 0.14, "triangle", 0.18); note(880, 0.15, 0.2, "triangle", 0.2); }
@@ -168,10 +195,10 @@ export function playCue(kind) {
 }
 
 export function beep(freq = 440, duration = 0.12) {
-  if (!coachAudioOn() || calmMode) return;
+  if (!timerSoundsOn() || calmMode) return;
   note(freq, 0, duration, "sine", 0.15);
 }
 export function endBeep() {
-  if (!coachAudioOn()) return;
+  if (!timerSoundsOn()) return;
   note(700, 0, 0.25, "sine", calmMode ? 0.07 : 0.18);
 }

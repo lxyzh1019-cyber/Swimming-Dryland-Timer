@@ -6,6 +6,7 @@
 
 import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
 import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE } from "./data.js";
+import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION } from "./outcome.js";
 
 /* ---- keys (unchanged from the old app unless noted) ---- */
 export const SETTINGS_KEY     = "swimTrainingSettingsV2";
@@ -173,7 +174,10 @@ export const DEFAULT_SETTINGS = {
   roundRestSeconds: 25,
   sectionRestSeconds: 30,   // NEW (block break; old app hardcoded 8s)
   secondsPerRep: 3,
-  coachVoiceOn: true,       // NEW: design's 🎧 toggle gates ALL coach audio
+  coachVoiceOn: true,       // legacy single switch — migrated into the three below
+  coachSpeechOn: true,      // the coach's spoken cues and encouragement
+  timerSoundsOn: true,      // beeps, rep ticks, round/rest cues
+  safetyVoiceOn: true,      // pain checks, safety stops, form warnings
   athleteName: "Jess",      // NEW: editable in Grown-up Settings
   prizePool: null,          // NEW: null = default PRIZE_POOL
   cloudMirror: true,        // NEW: privacy — mirror completed sessions to Firestore
@@ -363,20 +367,10 @@ export function thisWeekSessions() {
    app's `completedFully !== false` reading. */
 export function countsAsTrained(s) {
   if (!s || s.practice) return false;
-  // A safety stop is a safety event. It belongs in Safety & Flags, not in the
-  // streak — rewarding it the way training is rewarded is exactly backwards.
-  if (s.safetyStop) return false;
-  // With no per-move detail at all there is nothing to judge, so trust the
-  // flag — that is how records written before per-move detail existed read.
-  const hasDetail = ((s.ledger || []).length > 0) || ((s.perExercise || []).length > 0);
-  if (!hasDetail) return s.completedFully !== false;
-  // Otherwise: reaching the end of the session is NOT the same as training.
-  // Skipping every exercise used to arrive here as completedFully:true and
-  // take the day, the streak and the week strip with it.
-  return sessionHadRealWork(s);
+  return outcomeOf(s).countsAsTraining;
 }
 /* Trained, but not all the way through — rendered as a softer ✓. */
-export function isPartialSession(s) { return countsAsTrained(s) && !s.completedFully; }
+export function isPartialSession(s) { return outcomeOf(s).state === "partial"; }
 
 export function daysAgoCount(sessions, days) {
   const cutoff = Date.now() - days * DAY_MS;
@@ -847,21 +841,23 @@ export function sessionRounds(entry) {
 /* Rounds the day asked for — the ceiling a day's XP is capped at. */
 export function sessionRoundsPlanned(entry) {
   if (!entry) return 0;
+  if (entry.sessionType === "recovery" || entry.sessionType === "spa") return 0;
   if (entry.mini || entry.sessionType === "mini") return 1;
   if (Number.isFinite(entry.roundsPlanned)) return Math.min(3, Math.max(0, entry.roundsPlanned));
   return Math.min(3, Math.max(1, entry.roundsDone || 1));
 }
 
-/* Did any real work happen? A session that opened and closed is not a session,
-   and neither is one where every exercise was skipped or instantly tapped
-   through. Prefers the ledger; falls back to the per-move rows on older
-   records that predate it. */
+/* Did any real work happen? Delegated to the one outcome authority — this used
+   to count only `done` rows, so a session of 7-of-8 reps on every move read as
+   nothing at all. See js/outcome.js. */
 export function sessionHadRealWork(entry) {
-  const rows = (entry && entry.ledger) || [];
-  if (rows.length) return rows.some(l => l && l.status === "done");
-  return ((entry && entry.perExercise) || []).some(p => p && !p.skipped);
+  return outcomeOf(entry).meaningfulWork;
 }
 const didRealWork = sessionHadRealWork;
+
+/* Re-exported so every view-model reads the one authority through the store
+   it already imports, instead of re-deriving completion for itself. */
+export { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION };
 
 /* XP a session is worth: showing up and doing real work pays the base, and
    every MAIN ROUND actually finished pays another. Nothing done pays nothing,
@@ -876,6 +872,16 @@ export function xpForSession(entry) {
                   entry.movesDone || entry.moves || 6;
     return moves * 10 + 40;                       // older rows, unchanged
   }
+  // A weekday that resolved to Recovery is care, not a workout. It pays the
+  // flat show-up credit and no round XP: reporting soreness honestly must never
+  // cost her, or the readiness check becomes something to lie to. It still buys
+  // no training day, no streak and no adherence (see js/outcome.js).
+  // Sunday's scheduled spa day is unchanged at 0 above — it was never a
+  // training day she gave up.
+  if (entry.sessionType === "recovery") return XP_SHOWED_UP;
+  // The authority decides what is payable, not a bare "was there a done row".
+  // A practice / try-it row can carry a full ledger and must still pay nothing.
+  if (!outcomeOf(entry).xpEligible) return 0;
   if (!didRealWork(entry)) return 0;
   return XP_SHOWED_UP + XP_PER_ROUND * sessionRounds(entry);
 }
@@ -1120,6 +1126,60 @@ export function repairPrizeWallet() {
   return { reissued, dated };
 }
 
+/* Every redeemed prize, for the grown-up to review one at a time.
+   The app CANNOT know which of these she actually spent and which the
+   duplicate-id bug marked used behind her back — so it does not guess. It shows
+   them and asks. */
+export function redeemedPrizesForReview() {
+  const j = loadJourney() || {};
+  return (j.prizesWon || [])
+    .filter(p => p && p.redeemed)
+    .map(p => ({
+      id: String(p.id), label: p.label || p.name || "Prize",
+      date: p.date || "", redeemedAt: redeemedAtOf(p) || 0,
+      repairOf: p.repairOf || null
+    }))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+}
+
+/* Restore ONE prize a grown-up has identified as wrongly marked used.
+
+   Not by setting redeemed:false — that would not survive the night. Redemption
+   always wins a wallet merge (see mergePrize), and it has to: a device that
+   still shows a prize as available is simply behind, and letting ITS copy win
+   is how one prize gets spent twice. So an un-redeemed copy would be quietly
+   re-redeemed by the next sync from her other device.
+
+   Instead the corrupted id is VOIDED — mergeWallets drops a voided id from
+   either side, permanently — and a replacement prize is issued with a new id,
+   the original label and earned date, and repairOf pointing at what it
+   replaces. Nothing she earned is removed; the record simply stops lying. */
+export function restorePrize(prizeId_) {
+  const j = loadJourney();
+  if (!j) return { restored: false, reason: "no-journey" };
+  const key = String(prizeId_);
+  const wallet = j.prizesWon || [];
+  const target = wallet.find(p => p && String(p.id) === key);
+  if (!target) return { restored: false, reason: "not-found" };
+  if (!target.redeemed) return { restored: false, reason: "not-redeemed" };
+
+  const replacement = {
+    ...target,
+    id: prizeId(),
+    date: target.date,            // the day she EARNED it is hers, unchanged
+    redeemed: false,
+    repairOf: key
+  };
+  delete replacement.redeemedAt;
+
+  j.prizesWon = [replacement, ...wallet.filter(p => String(p.id) !== key)];
+  // Voided for good, on this device and on every device it syncs with.
+  j.voidedPrizeIds = [...new Set([...(j.voidedPrizeIds || []), key])];
+  saveJourney(syncPendingDraws(j));
+  logEvent("prize_restored", { was: key, now: replacement.id });
+  return { restored: true, id: replacement.id, was: key, label: replacement.label || "" };
+}
+
 /* Split quiz XP back out of the session rows that folded it in. The Coach's
    Quiz used to add its XP to BOTH the session record and the quiz ledger, and
    rebuildJourneyXp sums both — so every rebuild inflated the total by the
@@ -1193,6 +1253,10 @@ function mergeWallets(a, b, voided) {
   });
   return [...out.values()].sort((x, y) => String(y.date || "").localeCompare(String(x.date || "")));
 }
+
+/* Exposed for tests: the voided-id rule is the load-bearing half of prize
+   repair, and it is only observable through a merge. */
+export const mergeWalletsForTest = mergeWallets;
 
 /* ============================================================
    RESTORE — merging a session history back in (from the Firestore
@@ -1562,10 +1626,29 @@ export function importProfileData(payload, opts = {}) {
 /* One-time idempotent seeding: if the journey key is absent, walk the
    existing session history and award XP retroactively — nothing the kid
    earned ever vanishes. */
+/* One 🎧 switch used to gate every sound in the app, so turning the coach's
+   voice off also silenced the timer beeps she paces on and the safety cues that
+   are the point of the readiness system. Splitting them is only safe if the
+   split inherits what she already chose: the old value seeds speech and timer
+   sounds, and the safety voice starts ON regardless — it is not the thing
+   anyone was trying to turn off. */
+export function migrateAudioSettings() {
+  if (settings.audioSplitDone) return false;
+  const legacy = settings.coachVoiceOn !== false;
+  updateSettings({
+    coachSpeechOn: legacy,
+    timerSoundsOn: legacy,
+    safetyVoiceOn: true,
+    audioSplitDone: true
+  });
+  return true;
+}
+
 export function migrate() {
   // merge any new default settings keys into the saved blob
   settings = loadSettings();
   saveSettings();
+  migrateAudioSettings();
   // Un-double the quiz XP baked into older session rows BEFORE any total is
   // derived from the log, so the baseline below is the honest number.
   migrateQuizXp();

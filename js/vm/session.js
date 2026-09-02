@@ -7,6 +7,17 @@ import { sess, refTime, screenRepsDetail } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork, videoSearchUrl } from "../data.js";
 import { fmtMMSS, exercisePhotoUrl } from "../util.js";
 import { loadSessions } from "../store.js";
+import { deriveSessionOutcome, OUTCOME_VERSION } from "../outcome.js";
+
+/* What changes at the end of this segment — named before she gets there, so the
+   switch is never a surprise she hears about only if the voice is on. */
+function coachNext(sess) {
+  if (!sess.totalSegments || sess.currentSegment >= sess.totalSegments) return "";
+  if (sess.currentSide < sess.totalSides) return "NEXT: SWITCH SIDES";
+  if (sess.currentDirection < sess.totalDirections) return "NEXT: OTHER DIRECTION";
+  if (sess.currentSet < sess.totalSets) return "NEXT: SET " + (sess.currentSet + 1);
+  return "";
+}
 
 const MOOD_DEFS = [
   { key: "great", emoji: "😀", label: "Great" },
@@ -67,8 +78,19 @@ export function buildSessionVM(state) {
   const phase = sess.phase;
 
   const sessionDone = phase === "done";
+  // The finish screen asks the same authority the saved record will be judged
+  // by, so what she is told matches what the reports will say tomorrow.
+  const liveOutcome = deriveSessionOutcome({
+    ledger: sess.ledger || [],
+    expectedWork: Number.isFinite(sess.expectedWork) ? sess.expectedWork : null,
+    safetyStop: !!sess.painFlag,
+    explicitAbort: sess.endedEarly === true,
+    sessionType: sess.mode === "recovery" ? "recovery" : sess.spa ? "spa" : null,
+    outcomeVersion: OUTCOME_VERSION,
+    completedFully: !sess.endedEarly
+  });
   const isResting = phase === "rest" || phase === "roundRest" || phase === "sectionRest";
-  const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath";
+  const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath" || phase === "formcheck";
   const isBigRest = phase === "roundRest" || phase === "sectionRest";
   const timerIsReps = phase === "reps";
   const timerIsTime = !timerIsReps && !isPrompt;
@@ -218,8 +240,31 @@ export function buildSessionVM(state) {
     exPacePct: Math.round((curPlanned > 0 ? Math.min(1, curActual / curPlanned) : 0) * 100),
     paceColor, overNudge: !!(exOver && timerIsReps),
     upNextName: sess.upNextName, upNextDose: sess.upNextDose,
+
+    /* ---- live coach state -------------------------------------------------
+       SET 1 OF 2 · LEFT SIDE · REP 5 OF 8 · NEXT: SWITCH SIDES. The engine has
+       always tracked every one of these; nothing ever showed them, so a session
+       run with the voice off (or on a device with no installed voice) gave her
+       no way to know which set or which side she was on. */
+    coachSetLine: sess.totalSets > 1 ? `SET ${sess.currentSet} OF ${sess.totalSets}` : "",
+    coachSideLine: sess.totalSides > 1
+      ? (sess.currentSide === 1 ? "LEFT SIDE" : "RIGHT SIDE") : "",
+    coachDirectionLine: sess.totalDirections > 1
+      ? `DIRECTION ${sess.currentDirection} OF ${sess.totalDirections}` : "",
+    coachRepLine: sess.repsInSegment > 0 ? `REP ${sess.repInSegment} OF ${sess.repsInSegment}` : "",
+    coachNextLine: coachNext(sess),
+    showCoachState: phase === "reps" && sess.totalSegments > 0,
+    coachSegmentLine: sess.totalSegments > 1
+      ? `${sess.currentSegment} of ${sess.totalSegments}` : "",
     cheerMsg: CHEERS[(sess.roundsCompleted || 0) % CHEERS.length],
-    showCleanCheck: !!sess.pendingCleanCheck && isResting,
+    // Its own phase, not something rendered over a rest clock that is already
+    // running down. Naming the move matters: two or three are watched per run
+    // and she has to know which one she is answering for.
+    showCleanCheck: phase === "formcheck" && !!sess.pendingCleanCheck,
+    cleanCheckMove: sess.cleanCheckMove || "",
+    cleanCheckQuestion: sess.cleanCheckMove
+      ? "Were your " + sess.cleanCheckMove + " reps clean?"
+      : "Were your reps clean?",
     wobblyBanner: !!sess.lastWobbly && !isResting && !isPrompt,
     doneLabel: isResting ? "⏭ Skip Rest" : (timerIsReps ? "✓ Done — Next" : "✓ Done — Next"),
 
@@ -232,7 +277,9 @@ export function buildSessionVM(state) {
     // complete screen
     endedEarly: sess.endedEarly, painFlag: sess.painFlag,
     // Reaching the end having skipped everything is not "Session Complete!".
-    noWorkDone: !(sess.ledger || []).some(l => l.status === "done"),
+    // Asked of the one authority rather than re-derived here, so the finish
+    // screen can never claim more (or less) than the record it just saved.
+    noWorkDone: liveOutcome.state === "none",
     mini: sess.mode === "mini",
     saveFailed: !!sess.saveFailed,
     sessionMantra: day.mantra || "",

@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overloadWeek } from "../data.js";
-import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress, countsAsTrained, sessionXp } from "../store.js";
+import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress, countsAsTrained, sessionXp, outcomeOf } from "../store.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
 import { assembleCircuits, estimateSessionSecs } from "../engine.js";
 
@@ -54,7 +54,8 @@ export function weekStatuses() {
   const trained = sessions.filter(countsAsTrained);
   // A MINI is a defined subset, never the whole day's plan — a completed mini
   // used to tick the day off entirely and clear what was left of it.
-  const isWholeDay = s => s.completedFully && !s.mini && s.sessionType !== "mini";
+  // "Complete" is the one authority's answer, not the engine's loop flag.
+  const isWholeDay = s => outcomeOf(s).state === "complete" && !s.mini && s.sessionType !== "mini";
   const doneKeys = new Set(trained.filter(isWholeDay).map(s => s.dayKey).filter(Boolean));
   const partialKeys = new Set(trained.filter(s => !isWholeDay(s)).map(s => s.dayKey).filter(Boolean));
   const todayIdx = WEEK_ORDER.indexOf(todayKey);
@@ -362,7 +363,18 @@ export function buildTodayVM(state) {
       showSettings: false
     };
   } else if (status === "missed") {
-    dayView = { badgeLabel: shortU + " · CATCH UP", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"), showChips: true, isMissed: true, showCta: true, ctaLabel: "Catch Up Now", ctaIcon: "↺", showSettings: false, ctaAction: "goSession" };
+    // "You still got the warm-up in" was printed on EVERY missed day, whether
+    // or not she had done a single thing. A consolation that isn't true is
+    // worse than none: it tells her the app isn't really watching.
+    const missedIso = edmontonWeekISODates()[selectedKey];
+    const missedRecord = loadSessions()
+      .filter(s => s.dayKey === selectedKey && edmontonISO(s.isoDate) === missedIso).pop();
+    const warmupDone = !!(missedRecord && (missedRecord.ledger || [])
+      .some(l => l && l.block === "warmup" && l.status === "done"));
+    dayView = { badgeLabel: shortU + " · CATCH UP", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"), showChips: true, isMissed: true, showCta: true, ctaLabel: "Catch Up Now", ctaIcon: "↺", showSettings: false, ctaAction: "goSession",
+      missedSub: warmupDone
+        ? "You still got the warm-up in — every streak has bumps."
+        : "Every streak has bumps. Pick it back up whenever you're ready." };
   } else if (status === "rest") {
     const recov = (fullDay && fullDay.recovery) || [];
     dayView = {

@@ -6,7 +6,9 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl, fmtXp } from "../data.js";
-import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal,
+import { redeemedPrizesForReview } from "../store.js";
+import { gateChallenge, gateUnlocked, GATE_REASON } from "../gate.js";
+import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal, outcomeOf,
          sessionRounds as sessionRoundsDone, sessionRoundsPlanned,
          monthKeyOf, formVerdicts, latestFormVerdicts } from "../store.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
@@ -77,22 +79,27 @@ export function buildGrownupVM(state) {
   const guAlerts = flags.length ? flags : [{ icon: "✅", rowStyle: alertRow("sun"), text: "Nothing to flag " + scopeLabel.toLowerCase() + " — sessions ran clean." }];
 
   /* ---- headline stats ---- */
-  const done = sessions.filter(s => s.completedFully);
+  // Headline stats answer for TRAINING. Recovery days, safety stops and
+  // GO-and-quit rows used to land in the minute totals and the average as if
+  // they were workouts, which is how "avg session" drifted below any session
+  // she actually did.
+  const trainingRows = sessions.filter(s => outcomeOf(s).countsAsTraining);
+  const done = sessions.filter(s => outcomeOf(s).state === "complete");
   const days = scopeDays(scope, all);
   const scheduled = scope === "week" ? days : Math.round(days);   // plan trains daily (Sun = recovery)
-  const totalMins = sessions.reduce((a, s) => a + mins(s), 0);
+  const totalMins = trainingRows.reduce((a, s) => a + mins(s), 0);
   // Adherence is "how many of the days she was meant to train did she train",
   // so it counts DAYS, not records. Counting records let two attempts at one
   // Tuesday read as two days of adherence — and pushed the figure over 100%
   // often enough that it had to be clamped.
   const trainedDaySet = new Set(sessions.filter(countsAsTrainedLocal).map(s => edmontonISO(s.isoDate)));
   const adherence = Math.min(100, Math.round((trainedDaySet.size / Math.max(1, scheduled)) * 100));
-  const avgMins = sessions.length ? Math.round(totalMins / sessions.length) : 0;
+  const avgMins = trainingRows.length ? Math.round(totalMins / trainingRows.length) : 0;
 
   /* ---- readiness → completion ---- */
   const readinessOutcome = ["green", "yellow", "red", "recovery"].map(light => {
     const ss = sessions.filter(s => (s.lightResult || s.light) === light);
-    const completed = ss.filter(s => s.completedFully).length;
+    const completed = ss.filter(s => outcomeOf(s).state === "complete").length;
     if (!ss.length) return null;
     return {
       light: light[0].toUpperCase() + light.slice(1), color: LIGHT_COLORS[light],
@@ -113,7 +120,7 @@ export function buildGrownupVM(state) {
   all.forEach(s => {
     if (!countsAsTrainedLocal(s)) return;
     const k = edmontonISO(s.isoDate);
-    const st = (s.completedFully && !s.mini && s.sessionType !== "mini") ? "done" : "partial";
+    const st = (outcomeOf(s).state === "complete" && !s.mini && s.sessionType !== "mini") ? "done" : "partial";
     if (byIso[k] !== "done") byIso[k] = st;
   });
   let consistency;
@@ -328,17 +335,17 @@ export function buildGrownupVM(state) {
     const isoDates = edmontonWeekISODates();
     // The best attempt that day, not the first one found. A GO-and-quit at
     // breakfast used to hide the full session she did after school.
-    const rank = x => (x.completedFully ? 2 : 0) + (countsAsTrainedLocal(x) ? 1 : 0);
+    const rank = x => (outcomeOf(x).state === "complete" ? 2 : 0) + (countsAsTrainedLocal(x) ? 1 : 0);
     byWeekday = WEEK_ORDER.map(k => {
       const sameDay = all.filter(x => edmontonISO(x.isoDate) === isoDates[k]);
       const s = sameDay.sort((a, b) => rank(b) - rank(a) || (b.durationSecs || 0) - (a.durationSecs || 0))[0];
       return {
         k: DAY_SHORT[k], topic: DAYS[k].theme || DAYS[k].title,
         mood: s && s.mood ? MOOD_EMOJI[s.mood] : "·",
-        done: !!(s && s.completedFully), mins: s ? mins(s) : 0,
-        rowBg: s && s.completedFully ? "var(--surface)" : "var(--surface-2)",
-        statusChip: s && s.completedFully ? "✓ " + mins(s) + "m" : (s ? "partial" : "—"),
-        statusStyle: "font-size:11px;font-weight:900;border-radius:var(--radius-pill);padding:3px 9px;white-space:nowrap;" + (s && s.completedFully ? "background:var(--mint-wash);color:var(--mint-ink);" : s ? "background:var(--sun-wash);color:var(--sun-ink);" : "background:var(--surface-2);color:var(--ink-faint);")
+        done: !!(s && outcomeOf(s).state === "complete"), mins: s ? mins(s) : 0,
+        rowBg: s && outcomeOf(s).state === "complete" ? "var(--surface)" : "var(--surface-2)",
+        statusChip: s && outcomeOf(s).state === "complete" ? "✓ " + mins(s) + "m" : (s ? "partial" : "—"),
+        statusStyle: "font-size:11px;font-weight:900;border-radius:var(--radius-pill);padding:3px 9px;white-space:nowrap;" + (s && outcomeOf(s).state === "complete" ? "background:var(--mint-wash);color:var(--mint-ink);" : s ? "background:var(--sun-wash);color:var(--sun-ink);" : "background:var(--surface-2);color:var(--ink-faint);")
       };
     });
   } else {
@@ -347,7 +354,7 @@ export function buildGrownupVM(state) {
       const t = (DAYS[s.dayKey] && DAYS[s.dayKey].theme) || s.dayTitle || "Other";
       topics[t] = topics[t] || { done: 0, planned: 0, moods: [] };
       topics[t].planned += 1;
-      if (s.completedFully) topics[t].done += 1;
+      if (outcomeOf(s).state === "complete") topics[t].done += 1;
       if (s.mood) topics[t].moods.push(MOOD_EMOJI[s.mood]);
     });
     byTopic = Object.entries(topics).map(([k, v]) => ({
@@ -411,20 +418,20 @@ export function buildGrownupVM(state) {
 
   const indicators = [
     { label: "Days trained",   total: trainedDays + " of " + availableDays, avg: availableDays ? Math.round((trainedDays / availableDays) * 100) + "%" : "—" },
-    { label: "Total time",     total: totalMins >= 60 ? Math.floor(totalMins / 60) + "h " + (totalMins % 60) + "m" : totalMins + "m", avg: avg1(totalMins, sessions.length, "min / session") },
+    { label: "Total time",     total: totalMins >= 60 ? Math.floor(totalMins / 60) + "h " + (totalMins % 60) + "m" : totalMins + "m", avg: avg1(totalMins, trainingRows.length, "min / session") },
     { label: "Effort level",   total: effort.avg == null ? "—" : String(effort.avg), avg: effort.band },
     { label: "Rounds",         total: String(boardRounds), avg: avg1(boardRounds, done.length, "/ session") },
     { label: "Safety",         total: (stops.length ? stops.length + " stop" + (stops.length === 1 ? "" : "s") : "no stops") + (earlyEnds.length ? " · " + earlyEnds.length + " early" : ""), avg: stops.length ? "needs a conversation" : "clean" },
-    { label: "Completed",      total: done.length + " of " + sessions.length, avg: sessions.length ? Math.round((done.length / sessions.length) * 100) + "%" : "—" },
+    { label: "Completed",      total: done.length + " of " + trainingRows.length, avg: trainingRows.length ? Math.round((done.length / trainingRows.length) * 100) + "%" : "—" },
     // Average from the SAME rows as the total — moodUpPct is the last-6 trend
     // used by the mood card, and quoting it here made the two columns disagree.
     { label: "How she felt",   total: "😀" + moodCount.great + "  🙂" + moodCount.okay + "  😴" + moodCount.tired,
       avg: (() => { const t = Object.entries(moodCount).sort((a, b) => b[1] - a[1])[0];
                     return t && t[1] ? "mostly " + MOOD_EMOJI[t[0]] : "—"; })() },
-    { label: "Levels upgraded", total: "+" + levelsUp, avg: levelsUp ? "one every " + avg1(sessions.length, levelsUp, "sessions") : "—" },
+    { label: "Levels upgraded", total: "+" + levelsUp, avg: levelsUp ? "one every " + avg1(trainingRows.length, levelsUp, "sessions") : "—" },
     { label: "Form · she says", total: effort.formAsked ? effort.formClean + " of " + effort.formAsked : "—", avg: effort.formPct == null ? "—" : effort.formPct + "% clean" },
     { label: "Form · you verified", total: verified.asked ? verified.pass + " of " + verified.asked : "not checked yet", avg: verified.asked ? Math.round((verified.pass / verified.asked) * 100) + "% ✓" : "—" },
-    { label: "XP earned",      total: fmtXp(boardXp), avg: avg1(boardXp, sessions.length, "/ session") }
+    { label: "XP earned",      total: fmtXp(boardXp), avg: avg1(boardXp, trainingRows.length, "/ session") }
   ];
   // The gap between what she reports and what you verified is the number that
   // answers "is she really doing it right" — call it out when both exist.
@@ -451,13 +458,13 @@ export function buildGrownupVM(state) {
     const firstT = scope === "all" ? new Date(all[0].isoDate).getTime() : Date.now() - scopeDays(scope, all) * DAY_MS;
     const f = new Date(Math.max(firstT, new Date(all[0].isoDate).getTime()));
     return scopeLabel + " · " + dstr(f.toISOString()).replace(/^\w+, /, "") + " – "
-      + dstr(new Date().toISOString()).replace(/^\w+, /, "") + " · " + sessions.length + " session" + (sessions.length === 1 ? "" : "s");
+      + dstr(new Date().toISOString()).replace(/^\w+, /, "") + " · " + trainingRows.length + " training session" + (trainingRows.length === 1 ? "" : "s");
   })();
 
   /* ---- coach narrative (one honest story per scope) ---- */
   const read = !sessions.length
     ? "No sessions recorded " + scopeLabel.toLowerCase() + " yet — the story starts with the first GO."
-    : `${done.length} of ${sessions.length} sessions finished (${adherence}% adherence vs. scheduled). ` +
+    : `${done.length} of ${trainingRows.length} training sessions finished (${adherence}% adherence vs. scheduled). ` +
       (stops.length ? `⚠️ ${stops.length} pain stop${stops.length === 1 ? "" : "s"} — that conversation comes first. ` : "") +
       (formCleanPct != null ? `Form self-checks run ${formCleanPct}% clean. ` : "") +
       (skippedMoves.length ? `Most-skipped: ${skippedMoves[0].name}.` : "Nothing gets skipped consistently.");
@@ -648,8 +655,14 @@ export function buildGrownupVM(state) {
     settingsExRest: settings.exerciseRestSeconds, settingsRndRest: settings.roundRestSeconds, settingsSecRest: settings.sectionRestSeconds,
     stepperBtn: "width:44px;height:44px;border-radius:50%;background:var(--surface-2);border:2px solid var(--hairline);font-size:22px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;",
     voiceStyleOpts,
-    coachVoiceOn: settings.coachVoiceOn !== false,
-    coachTrack: onTrack(settings.coachVoiceOn !== false, "var(--mint)"), coachKnob: onKnob(settings.coachVoiceOn !== false),
+    // Three switches, not one. The old single 🎧 toggle silenced the timer
+    // beeps and the safety cues along with the coach's chatter.
+    coachVoiceOn: settings.coachSpeechOn !== false,
+    coachTrack: onTrack(settings.coachSpeechOn !== false, "var(--mint)"), coachKnob: onKnob(settings.coachSpeechOn !== false),
+    timerSoundsOn: settings.timerSoundsOn !== false,
+    timerTrack: onTrack(settings.timerSoundsOn !== false, "var(--aqua)"), timerKnob: onKnob(settings.timerSoundsOn !== false),
+    safetyVoiceOn: settings.safetyVoiceOn !== false,
+    safetyTrack: onTrack(settings.safetyVoiceOn !== false, "var(--coral)"), safetyKnob: onKnob(settings.safetyVoiceOn !== false),
     practiceMode: !!state.practiceMode,
     practiceTrack: onTrack(!!state.practiceMode, "var(--grape)"), practiceKnob: onKnob(!!state.practiceMode),
     practiceHint: state.practiceMode
@@ -659,6 +672,18 @@ export function buildGrownupVM(state) {
     isDefaultPool: !(Array.isArray(settings.prizePool) && settings.prizePool.length),
     // A wallet trim removes prizes she can see, so it is never silent.
     walletRepairNote: state.walletRepairNote || "",
+    // The grown-up gate, and the redeemed prizes it protects.
+    gateAsk: state.gateAsk || null,
+    gateQuestion: state.gateAsk ? gateChallenge().question : "",
+    gateError: state.gateError || "",
+    gateReason: GATE_REASON[state.gateAsk] || "",
+    grownupUnlocked: gateUnlocked(),
+    prizeReviewOpen: !!state.prizeReviewOpen,
+    redeemedPrizes: (state.prizeReviewOpen ? redeemedPrizesForReview() : []).map(p => ({
+      id: p.id, label: p.label,
+      dateLine: "Earned " + (p.date || "—") + (p.repairOf ? " · restored copy" : "")
+    })),
+    noRedeemedPrizes: state.prizeReviewOpen && redeemedPrizesForReview().length === 0,
     pendingRestore: state.pendingRestore
       ? { from: state.pendingRestore.from, to: state.pendingRestore.to }
       : null,
@@ -686,11 +711,14 @@ export function buildGrownupVM(state) {
 
 /* CSV export — weekly summary ported from the old Coach Insights. */
 export function exportCsv() {
-  const rows = [["date", "day", "title", "type", "light", "minutes", "completedFully", "endedEarly", "pain", "skips", "pauses", "clean", "wobbly", "mood", "intentWord", "xpEarned"]];
+  const rows = [["date", "day", "title", "type", "light", "minutes", "outcome", "countsAsTraining", "roundsDone", "roundsPlanned", "completedFully", "endedEarly", "pain", "skips", "pauses", "clean", "wobbly", "mood", "intentWord", "xpEarned"]];
   loadSessions().forEach(s => {
     rows.push([
       edmontonISO(s.isoDate), s.dayKey || "", s.dayTitle || "", s.sessionType || "",
       s.lightResult || "", Math.round((s.durationSecs || 0) / 60),
+      // The authoritative reading, alongside the raw flags it was derived from.
+      outcomeOf(s).state, outcomeOf(s).countsAsTraining ? 1 : 0,
+      sessionRoundsDone(s), sessionRoundsPlanned(s),
       s.completedFully ? 1 : 0, s.endedEarly ? 1 : 0, s.pain ? 1 : 0,
       s.skippedCount || 0, s.pauseCount || 0, s.clean || 0, s.wobbly || 0,
       s.mood || "", s.intentWord || "", s.xpEarned || 0

@@ -25,7 +25,22 @@ globalThis.window = {
     this.destination = {}; this.resume = () => {}; },
   innerWidth: 1200, innerHeight: 800, addEventListener() {}, fetch: () => Promise.reject(new Error("no net"))
 };
-globalThis.document = { getElementById: () => null, addEventListener() {}, querySelector: () => null, querySelectorAll: () => [] };
+/* A DOM stub real enough to import js/main.js, so the ACTION LAYER — which is
+   where the Try-It arm flag and the detail-overlay pause live — can be driven
+   directly instead of guessed at from rendered markup. */
+const fakeEl = () => ({
+  innerHTML: "", scrollIntoView() {}, addEventListener() {}, removeEventListener() {},
+  contains: () => true, closest: () => null, insertAdjacentHTML() {},
+  querySelector: () => null, querySelectorAll: () => [],
+  getBoundingClientRect: () => ({ top: 0, left: 0, width: 0, height: 0 }),
+  style: {}, classList: { add() {}, remove() {}, toggle() {} }, dataset: {}, value: ""
+});
+globalThis.document = {
+  getElementById: () => fakeEl(), createElement: () => fakeEl(),
+  addEventListener() {}, removeEventListener() {},
+  querySelector: () => null, querySelectorAll: () => [],
+  body: fakeEl(), documentElement: fakeEl()
+};
 
 const base = new URL("../js/", import.meta.url).href;
 const util   = await import(base + "util.js");
@@ -46,6 +61,8 @@ const rscreen = await import(base + "screens/readiness.js");
 const overlays = await import(base + "screens/overlays.js");
 const tryvm   = await import(base + "vm/tryit.js");
 const tryscreen = await import(base + "screens/tryit.js");
+const outcome = await import(base + "outcome.js");
+
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
@@ -1236,5 +1253,483 @@ const scheduledSoFar = oneDay.scheduled;
 ok(oneDay.adherence === Math.round((1 / Math.max(1, scheduledSoFar)) * 100),
    "it counts the one DAY she trained, not the two records she left on it");
 localStorage.clear();
+
+/* ============================================================
+   PHASE 2 — one session-outcome authority
+   Every one of these calls the real function and asserts on what it RETURNS.
+   ============================================================ */
+localStorage.clear(); store.migrate();
+const OV = outcome.OUTCOME_VERSION;
+const led = (...st) => st.map((status, i) => ({ name: "m" + i, block: "main", round: 1, status }));
+
+/* --- the five states --- */
+ok(outcome.deriveSessionOutcome({ ledger: led("skipped", "skipped"), outcomeVersion: OV }).state === "none",
+   "every exercise skipped is `none`");
+ok(outcome.deriveSessionOutcome({ ledger: led("done", "skipped", "skipped"), outcomeVersion: OV }).state === "partial",
+   "one done plus the rest skipped is `partial`, never a completed session");
+ok(outcome.deriveSessionOutcome({ ledger: led("done", "done"), expectedWork: 2, outcomeVersion: OV }).state === "complete",
+   "every expected instance done is `complete`");
+ok(outcome.deriveSessionOutcome({ ledger: led("done", "done"), expectedWork: 4, outcomeVersion: OV }).state !== "complete",
+   "missing expected ledger rows are not a completed session");
+ok(outcome.deriveSessionOutcome({ ledger: led("done", "partial"), expectedWork: 2, outcomeVersion: OV }).state === "partial",
+   "a required entry left partial is not complete");
+ok(outcome.deriveSessionOutcome({ ledger: led("done"), safetyStop: true, outcomeVersion: OV }).state === "safety-stop",
+   "a pain stop is its own state, not a short workout");
+ok(outcome.deriveSessionOutcome({ ledger: led("done"), sessionType: "recovery", outcomeVersion: OV }).state === "recovery",
+   "recovery is separate from training completion");
+
+/* --- the partial-work correction: the reported defect --- */
+const onePartial = outcome.deriveSessionOutcome({ ledger: [{ status: "partial" }], outcomeVersion: OV });
+ok(onePartial.meaningfulWork === true, "a single partial entry IS meaningful work");
+ok(onePartial.countsAsTraining === true, "and 7-of-8 reps buys the training day it earned");
+ok(onePartial.state === "partial", "recorded as partial, never as complete");
+
+/* --- safety stop and recovery pay nothing toward training --- */
+const ss = outcome.deriveSessionOutcome({ ledger: led("done", "done"), expectedWork: 2, safetyStop: true, outcomeVersion: OV });
+ok(ss.countsForStreak === false && ss.countsAsTraining === false, "a safety stop takes no streak and no training day");
+const rc = outcome.deriveSessionOutcome({ ledger: led("done"), sessionType: "recovery", outcomeVersion: OV });
+ok(rc.countsForStreak === false, "recovery does not increase the streak");
+ok(rc.countsAsTraining === false, "nor does it complete a scheduled training day");
+ok(rc.xpEligible === true, "but recovery is still allowed its care credit");
+
+/* --- main rounds come from the ledger, not the loop --- */
+const twoRounds = [
+  { block: "main", round: 1, status: "done" }, { block: "main", round: 1, status: "done" },
+  { block: "main", round: 2, status: "done" }, { block: "main", round: 2, status: "partial" }
+];
+ok(outcome.mainRoundsFromLedger(twoRounds) === 1,
+   "a round with a partial move in it is not a finished round");
+
+/* --- history is NOT re-scored: rows without outcomeVersion keep the old rule --- */
+const legacyPartial = { ledger: [{ status: "partial" }], isoDate: new Date().toISOString() };
+ok(store.countsAsTrained(legacyPartial) === false,
+   "a pre-fix all-partial record keeps the scoring it was written with");
+ok(store.countsAsTrained({ ...legacyPartial, outcomeVersion: OV }) === true,
+   "the same shape written after the fix counts");
+
+/* --- every consumer reads the SAME answer --- */
+localStorage.clear(); store.migrate();
+const shared = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: OV, sessionType: "main",
+  roundsDone: 1, roundsPlanned: 3, durationSecs: 900, completedFully: false, endedEarly: true,
+  ledger: [{ name: "a", block: "main", round: 1, status: "partial" }] };
+ok(store.countsAsTrained(shared) === true, "the store calls it trained");
+ok(store.isPartialSession(shared) === true, "and partial");
+ok(store.outcomeOf(shared).state === "partial", "the authority agrees");
+ok(store.xpForSession(shared) > 0, "and the XP it pays agrees that work happened");
+ok(pvm.logEntryView(shared).lightLabel === "ENDED EARLY", "the log reports the same partial session");
+
+/* --- regression: the one-full-day XP cap still holds over partial + resume --- */
+localStorage.clear(); store.migrate();
+const capBase = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: OV, sessionType: "main", roundsPlanned: 3,
+  ledger: [{ name: "x", block: "main", round: 1, status: "done" }] };
+const payA = store.claimSessionXp({ ...capBase, roundsDone: 1 });
+const payB = store.claimSessionXp({ ...capBase, roundsDone: 2 });
+ok(payA + payB === 360, "partial then resume still tops out at exactly one full day");
+ok(store.claimSessionXp({ ...capBase, roundsDone: 3 }) === 0, "and a third attempt pays nothing");
+
+/* --- regression: a pain stop is still zero XP and zero streak --- */
+ok(store.xpForSession({ ...capBase, roundsDone: 3, safetyStop: true }) === 0, "a pain stop still pays no XP");
+ok(store.countsAsTrained({ ...capBase, roundsDone: 3, safetyStop: true }) === false, "and still takes no streak");
+
+/* ============================================================
+   PHASE 1 — recovery is a safety mode, not a one-round workout
+   ============================================================ */
+
+/* --- the assembly: no workout blocks anywhere in the week --- */
+const WORKOUT_BLOCKS = ["warmup", "coordination", "main", "prep", "finisher"];
+
+for (const dk of ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]) {
+  const cs = engine.assembleCircuits(dk, "recovery");
+  ok(cs.length > 0, dk + " Recovery still gives her something to do");
+  ok(cs.every(c => c.block === "recovery"),
+     dk + " Recovery assembles a recovery circuit and nothing else");
+  ok(cs.every(c => c.exercises.every(e => !WORKOUT_BLOCKS.includes(e.block))),
+     dk + " Recovery contains no warm-up/coordination/main/prep/finisher work");
+  ok(cs.every(c => c.rounds === 1), dk + " Recovery is one pass, never a round count");
+}
+/* It uses the EXISTING recovery movements — no invented exercises. */
+const recNames = new Set(engine.assembleRecoveryCircuit("sunday")[0].exercises.map(e => e.name));
+const monRecNames = engine.assembleCircuits("monday", "recovery")[0].exercises.map(e => e.name);
+ok(monRecNames.length > 0 && monRecNames.every(n => recNames.has(n)),
+   "a weekday Recovery uses only the existing recovery movements");
+
+/* --- zero must survive the light lookup --- */
+ok(engine.roundsForLight("recovery") === 0, "recovery asks for zero rounds, and zero stays zero");
+ok(engine.roundsForLight("green") === 3 && engine.roundsForLight("red") === 1, "the other lights are unchanged");
+
+/* --- Sunday spa still behaves exactly as before --- */
+const spaCs = engine.assembleCircuits("sunday", "recovery");
+ok(spaCs.length === 1 && spaCs[0].block === "recovery" && spaCs[0].exercises.length > 0,
+   "Sunday Spa behaviour continues to work");
+
+/* --- a real weekday Recovery run --- */
+const sRec = await runSession({ dayKey: "monday", light: "recovery", gateUnlocked: true });
+ok(sRec.mode === "recovery", "a weekday resolving to Recovery runs in recovery mode");
+ok(sRec.roundsPlanned === 0, "it plans zero rounds");
+ok(sRec.roundsCompleted === 0, "and completes zero rounds");
+ok(sRec.ledger.every(l => !WORKOUT_BLOCKS.includes(l.block)),
+   "no warm-up, main, prep or finisher work reached the ledger");
+ok(sRec.ledger.every(l => recNames.has(l.name)),
+   "every move she was given came from the existing recovery template");
+const recRow = store.loadSessions()[0];
+ok(recRow.sessionType === "recovery", "the record is typed as recovery");
+ok(recRow.roundsDone === 0 && recRow.roundsPlanned === 0, "with zero rounds done and zero planned");
+ok(store.countsAsTrained(recRow) === false, "recovery does not complete the normal scheduled day");
+ok(store.outcomeOf(recRow).countsForStreak === false, "and does not increase the streak or adherence");
+ok(store.currentStreak(store.loadSessions().filter(store.countsAsTrained)) === 0,
+   "a week of recovery alone leaves the training streak at zero");
+
+/* --- a Mini that resolves to Recovery becomes recovery, not warm-up + main --- */
+const sMiniRec = await runSession({ dayKey: "tuesday", light: "recovery", mini: true, gateUnlocked: true });
+ok(sMiniRec.mode === "recovery", "a recovery Mini is a recovery session");
+ok(sMiniRec.mini === false, "it is not run as a shortened workout");
+ok(sMiniRec.ledger.every(l => !WORKOUT_BLOCKS.includes(l.block)), "and never reaches a main circuit");
+ok(store.loadSessions()[0].sessionType === "recovery", "the recovery-mini is recorded as recovery");
+
+/* --- the care credit: recovery pays a flat show-up credit, and no round XP --- */
+ok(store.xpForSession({ ...recRow }) === store.XP_SHOWED_UP,
+   "recovery pays the flat care credit — reporting soreness honestly must not cost her");
+ok(store.dayXpCap(recRow) === store.XP_SHOWED_UP, "and the day's budget is exactly that, no round XP");
+ok(store.xpForSession({ sessionType: "spa", xpVersion: store.XP_VERSION }) === 0,
+   "Sunday's scheduled spa day is unchanged at zero — it was never a training day given up");
+
+/* ============================================================
+   PHASE 3 — interaction state repairs
+   ============================================================ */
+
+/* --- A. Try-It arming (the action layer that clears it: test/actions.mjs) --- */
+localStorage.clear(); store.migrate();
+store.setTryIt(true);
+ok(store.tryItArmed() === true, "Try-It arms");
+ok(store.setTryIt(false) === false && store.tryItArmed() === false, "and can be disarmed");
+store.setTryIt(true);
+ok(store.clearTryIt() === true && store.tryItArmed() === false, "clearTryIt disarms it too");
+
+/* --- B. the form check is its own phase, and rest waits for it --- */
+localStorage.clear(); store.migrate();
+let sawFormCheck = false, restDuringCheck = false, timerMovedDuringCheck = false;
+let lastTimer = null;
+const sFc = await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") {
+      sawFormCheck = true;
+      if (lastTimer !== null && sess.timerSecs !== lastTimer) timerMovedDuringCheck = true;
+      lastTimer = sess.timerSecs;
+      engine.pickClean();
+    } else { lastTimer = null; }
+    if (sess.pendingCleanCheck && ["rest", "roundRest", "sectionRest"].includes(sess.phase)) restDuringCheck = true;
+  }
+});
+ok(sawFormCheck, "the engine enters an explicit formcheck phase");
+ok(restDuringCheck === false, "a rest countdown never runs while a form check is pending");
+ok(timerMovedDuringCheck === false, "and no clock ticks down underneath the question");
+ok(sFc.formChecks.length > 0, "answering records a verdict");
+ok(sFc.formChecks.every(f => f.clean === true), "the verdict given is the verdict recorded");
+
+/* one pending check is never overwritten by a later move */
+localStorage.clear(); store.migrate();
+let overwritten = false, pendingFor = null, heldTicks = 0;
+await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.pendingCleanCheck) {
+      if (pendingFor && sess.cleanCheckMove !== pendingFor) overwritten = true;
+      pendingFor = sess.cleanCheckMove;
+      // Hold the question open a few ticks — the engine must not move on, and
+      // must not swap the move out from under her — then answer it.
+      if (++heldTicks >= 3) { engine.pickClean(); heldTicks = 0; }
+    } else { pendingFor = null; heldTicks = 0; }
+  }
+});
+ok(overwritten === false, "an unanswered check cannot be overwritten by a later move");
+
+/* a SKIPPED check records no verdict and earns no valgus credit */
+localStorage.clear(); store.migrate();
+store.saveGate({ unlocked: false, cleanWeeks: [] });
+const sSkip = await runSession({ dayKey: "monday", light: "red" }, {
+  onTick: (ms, sess) => { if (sess.phase === "formcheck") engine.skipFormCheck(); }
+});
+ok(sSkip.formChecks.length === 0, "a skipped check records no verdict");
+ok(sSkip.cleanCount === 0, "and no clean count");
+ok((store.loadGate().cleanWeeks || []).length === 0,
+   "skipping the check grants no valgus credit — not answering is not answering `clean`");
+
+/* the LAST exercise of a session still gets its check (there is no rest after it) */
+localStorage.clear(); store.migrate();
+let checkedMoves = [];
+await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+  onTick: (ms, sess) => { if (sess.phase === "formcheck") { checkedMoves.push(sess.cleanCheckMove); engine.pickClean(); } }
+});
+ok(checkedMoves.length >= engine.SPOT_CHECK_MIN,
+   "every move this run picked to watch was actually asked about (" + checkedMoves.length + ")");
+
+
+/* ============================================================
+   PHASE 4 — grown-up authority and prize repair
+   ============================================================ */
+const gate = await import(base + "gate.js");
+
+/* --- the gate --- */
+gate.lockGate();
+ok(gate.gateUnlocked() === false, "the gate starts locked");
+ok(gate.requireGrownup("severity3") === false, "and a gated action is refused while locked");
+ok(gate.requireGrownup("somethingElse") === true, "an ungated action is not affected");
+const gateQ = gate.gateChallenge();
+ok(/^\d+ × \d+ = \?$/.test(gateQ.question), "it asks a generated arithmetic question");
+ok(gate.gateChallenge().question === gateQ.question, "stable across re-renders while unanswered");
+const [gateQa, gateQb] = gateQ.question.match(/\d+/g).map(Number);
+ok(gate.answerGate(gateQa * gateQb - 1) === false, "a wrong answer does not unlock");
+ok(gate.gateUnlocked() === false, "still locked");
+ok(gate.gateChallenge().question !== gateQ.question, "and a wrong answer draws a NEW question");
+const gateQ2 = gate.gateChallenge();
+const [gateQ2a, gateQ2b] = gateQ2.question.match(/\d+/g).map(Number);
+ok(gate.answerGate(gateQ2a * gateQ2b) === true, "the right answer unlocks");
+ok(gate.requireGrownup("prizeRepair") === true, "and every gated action is now allowed");
+/* it expires */
+ok(gate.gateUnlocked(Date.now() + gate.GATE_UNLOCK_MS + 1) === false,
+   "the unlock expires after five minutes");
+ok(gate.gateUnlocked(Date.now() + 1000) === true, "but not before");
+gate.lockGate();
+ok(gate.gateUnlocked() === false, "leaving the Grown-up Zone locks it again");
+/* nothing is stored anywhere */
+ok(Object.keys(localStorage).length === 0 ||
+   !JSON.stringify(Object.entries(localStorage)).includes("gate_secret"),
+   "the gate stores no secret on the device");
+
+/* --- prize repair: IDs are fixed automatically, redemption is NOT --- */
+localStorage.clear(); store.migrate();
+const wallet = [
+  { id: "dup", label: "Movie night", date: "2026-01-05", redeemed: true, redeemedAt: 111 },
+  { id: "dup", label: "Ice cream",   date: "2026-01-06", redeemed: true },
+  { id: "ok",  label: "Late bedtime", date: "2026-01-07", redeemed: false }
+];
+store.saveJourney({ ...(store.loadJourney() || {}), xp: 0, prizesWon: wallet, pendingDraws: 0 });
+const rep = store.repairPrizeWallet();
+ok(rep.reissued === 1, "a duplicate ID is reissued");
+const afterRepair = store.loadJourney().prizesWon;
+ok(new Set(afterRepair.map(p => String(p.id))).size === 3, "every prize now has a unique ID");
+ok(afterRepair.filter(p => p.redeemed).length === 2,
+   "repair does NOT unredeem anything — the app cannot know which she really spent");
+ok(afterRepair.length === 3, "and it never deletes a prize she earned");
+
+/* --- the review list --- */
+const review = store.redeemedPrizesForReview();
+ok(review.length === 2, "both used prizes are offered for review, one at a time");
+ok(review.every(p => p.label && p.id), "each is named so a grown-up can tell them apart");
+
+/* --- restoring ONE selected prize --- */
+const victim = review.find(p => p.label === "Ice cream");
+const res = store.restorePrize(victim.id);
+ok(res.restored === true, "the selected prize is restored");
+ok(res.id !== victim.id, "as a REPLACEMENT with a new ID, not by un-redeeming the old one");
+const w2 = store.loadJourney().prizesWon;
+const fresh = w2.find(p => String(p.id) === String(res.id));
+ok(fresh && fresh.redeemed === false, "the replacement is available again");
+ok(fresh.label === "Ice cream", "with the same label");
+ok(fresh.date === "2026-01-06", "and the day she originally earned it");
+ok(fresh.repairOf === victim.id, "pointing at what it replaces");
+ok(!w2.some(p => String(p.id) === String(victim.id)), "the corrupted copy is gone");
+ok(w2.length === 3, "the wallet still holds three prizes — nothing earned was removed");
+ok(w2.filter(p => p.redeemed).length === 1,
+   "the OTHER used prize stays used — legitimate redemptions are untouched");
+
+/* --- and the restore survives the cloud, which is the whole point --- */
+const voided = store.loadJourney().voidedPrizeIds || [];
+ok(voided.includes(String(victim.id)), "the corrupted ID is voided");
+/* Redemption always wins a merge — so an un-redeemed copy would have been
+   re-redeemed by the next sync from her other device. The voided id must not
+   come back at all. */
+const otherDevice = [{ id: victim.id, label: "Ice cream", date: "2026-01-06", redeemed: true, redeemedAt: 222 }];
+const merged = store.mergeWalletsForTest
+  ? store.mergeWalletsForTest(w2, otherDevice, voided)
+  : null;
+if (merged) {
+  ok(!merged.some(p => String(p.id) === String(victim.id)),
+     "cloud sync cannot reintroduce the voided corrupted copy");
+  ok(merged.some(p => String(p.id) === String(res.id) && p.redeemed === false),
+     "and the restored prize is still available after the merge");
+}
+ok(store.mergePrize({ id: "x", redeemed: false }, { id: "x", redeemed: true, redeemedAt: 5 }).redeemed === true,
+   "normal redeemed-wins merging is unchanged for legitimate redemption");
+ok(store.restorePrize("nope").restored === false, "restoring an unknown prize fails cleanly");
+ok(store.restorePrize(w2.find(p => !p.redeemed).id).restored === false,
+   "and an already-available prize reports that, rather than claiming a restore");
+
+/* ============================================================
+   PHASE 5 — coach state, audio separation, and the clock
+   ============================================================ */
+const audio = await import(base + "audio.js");
+
+/* --- B. three switches, not one --- */
+localStorage.clear(); store.migrate();
+store.updateSettings({ coachSpeechOn: false, timerSoundsOn: true, safetyVoiceOn: true, voiceStyle: "classic" });
+ok(audio.coachAudioOn() === false, "the coach's voice can be turned off");
+ok(audio.timerSoundsOn() === true, "and the timer beeps stay ON — they used to die with it");
+ok(audio.safetyVoiceOn() === true, "as do the safety cues");
+store.updateSettings({ voiceStyle: "quiet" });
+ok(audio.voiceOn() === false, "quiet mode suppresses the coach");
+ok(audio.safetyVoiceOn() === true, "but quiet mode never removes the safety voice");
+store.updateSettings({ coachSpeechOn: true, timerSoundsOn: false, voiceStyle: "classic" });
+ok(audio.timerSoundsOn() === false && audio.coachAudioOn() === true,
+   "and the beeps can be silenced without muting the coach");
+
+/* migration: the old single flag seeds the new ones */
+localStorage.clear();
+store.updateSettings({ coachVoiceOn: false });
+delete store.settings.audioSplitDone;
+store.updateSettings({ audioSplitDone: false });
+store.migrateAudioSettings();
+ok(store.settings.coachSpeechOn === false, "an existing OFF carries into coach speech");
+ok(store.settings.timerSoundsOn === false, "and into timer sounds");
+ok(store.settings.safetyVoiceOn === true, "while the safety voice defaults ON regardless");
+localStorage.clear(); store.migrate();
+ok(store.settings.coachSpeechOn === true && store.settings.timerSoundsOn === true,
+   "a fresh install gets all three on");
+
+/* --- C. the clock is derived from wall time, not from tick counting ---- */
+localStorage.clear(); store.migrate();
+/* Simulate a BACKGROUNDED tab: real time passes, but the 1s interval barely
+   fires. The old `elapsed += 1` counter recorded only the ticks it got. */
+store.updateSettings({ cloudMirror: false, coachVoiceOn: false, exerciseRestSeconds: 3, roundRestSeconds: 5, sectionRestSeconds: 3 });
+const bgClock = makeClock();
+engine.exitSession();
+const bgRun = engine.startSession({ dayKey: "monday", light: "red", gateUnlocked: true });
+await bgClock.advance(5000);                       // 5s of normal foreground
+const beforeGap = engine.sess.elapsed;
+await bgClock.advance(60000, 30000);               // 60s passes, interval fires twice
+const afterGap = engine.sess.elapsed;
+ok(afterGap - beforeGap >= 59,
+   "a minute in the background is recorded as a minute (" + (afterGap - beforeGap) + "s), not as two ticks");
+/* paused time is excluded */
+engine.togglePause();
+const atPause = engine.sess.elapsed;
+await bgClock.advance(20000);
+ok(engine.sess.elapsed === atPause, "no active time accrues while paused");
+ok(engine.sess.pausedSecs >= 19, "and the paused span is counted as paused (" + engine.sess.pausedSecs + "s)");
+engine.togglePause();
+await bgClock.advance(3000);
+ok(engine.sess.elapsed >= atPause + 2, "the clock picks up again on resume");
+/* opening the instructions pauses, so reading never inflates active time */
+const beforeRead = engine.sess.elapsed;
+engine.togglePause();
+await bgClock.advance(30000);
+engine.togglePause();
+ok(engine.sess.elapsed - beforeRead <= 1,
+   "reading the instructions adds no active time at all");
+/* End it properly so the record is written, then let the loop unwind on the
+   fake clock rather than stranding a promise on the real one. */
+const bgElapsed = engine.sess.elapsed;
+engine.endEarly();
+let bgSpins = 0;
+while (engine.sess.running && bgSpins++ < 200) await bgClock.advance(1000);
+bgClock.restore();
+await bgRun.catch(() => {});
+const bgRow = store.loadSessions()[0];
+ok(bgRow && bgRow.durationSecs >= 60,
+   "and the SAVED record carries the real duration (" + (bgRow && bgRow.durationSecs) + "s), not the tick count");
+ok(bgRow.durationSecs >= bgElapsed - 2, "the saved duration matches the live clock");
+ok(bgRow.pausedSecs >= 19, "with the paused span recorded separately");
+
+/* --- A. the coach state is readable without any speech at all ---------- */
+localStorage.clear(); store.migrate();
+store.updateSettings({ coachSpeechOn: false, timerSoundsOn: false, exerciseRestSeconds: 3, roundRestSeconds: 5, sectionRestSeconds: 3, cloudMirror: false });
+let sawSet = false, sawRep = false, sawSide = false, repsMonotonic = true, lastRep = 0;
+await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    const vm = svm.buildSessionVM({});
+    if (!vm.showCoachState) { lastRep = 0; return; }
+    if (vm.coachSetLine) sawSet = true;
+    if (vm.coachSideLine) sawSide = true;
+    if (vm.coachRepLine) {
+      sawRep = true;
+      const n = Number(vm.coachRepLine.match(/REP (\d+)/)[1]);
+      if (n < lastRep) repsMonotonic = false;
+      lastRep = n;
+    }
+  }
+});
+ok(sawRep, "the screen says which rep she is on, with the voice off entirely");
+ok(sawSet || sawSide, "and which set or side");
+ok(repsMonotonic, "the rep count only ever moves forwards within a segment");
+/* the whole session still completes with no voice and no beeps */
+ok(store.loadSessions()[0].ledger.some(l => l.status === "done"),
+   "a silent session still runs, and still records real work");
+
+/* ============================================================
+   PHASE 6 — report truth
+   ============================================================ */
+localStorage.clear(); store.migrate();
+const OV6 = outcome.OUTCOME_VERSION;
+const todayKey6 = util.edmontonDayKey();
+const todayIso6 = new Date().toISOString();
+
+/* --- the missed-day card only claims a warm-up the ledger can prove --- */
+const missedVm = () => tvm.buildTodayVM({ selectedDay: todayKey6, expanded: {} }).dayView;
+/* (a) nothing done at all */
+let dv6 = missedVm();
+if (dv6.isMissed) {
+  ok(!/warm-up/i.test(dv6.missedSub || ""),
+     "a missed day with nothing done never claims she got the warm-up in");
+}
+/* (b) a warm-up she really did */
+store.saveSession({ app: "swimming", dayKey: todayKey6, isoDate: todayIso6,
+  xpVersion: store.XP_VERSION, outcomeVersion: OV6, sessionType: "main",
+  roundsDone: 0, roundsPlanned: 3, durationSecs: 300, completedFully: false, endedEarly: true,
+  ledger: [{ name: "A-Skip", block: "warmup", round: 1, status: "done" }] });
+const dvWarm = missedVm();
+if (dvWarm.isMissed) {
+  ok(/warm-up/i.test(dvWarm.missedSub || ""), "and says so when the ledger proves it");
+}
+
+/* --- recovery and safety stops stay out of the training statistics --- */
+localStorage.clear(); store.migrate();
+const mkRow = o => ({ app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: OV6, roundsPlanned: 3, roundsDone: 3,
+  durationSecs: 1800, sessionType: "main", completedFully: true,
+  ledger: [{ name: "x", block: "main", round: 1, status: "done" }], ...o });
+store.saveSession(mkRow({}));                                                   // a real session
+store.saveSession(mkRow({ sessionType: "recovery", roundsDone: 0, roundsPlanned: 0, durationSecs: 600 }));
+store.saveSession(mkRow({ safetyStop: true, pain: true, durationSecs: 900, completedFully: false, endedEarly: true }));
+store.saveSession(mkRow({ practice: true, sessionType: "try-it", durationSecs: 1200 }));
+
+const an6 = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics" }).analytics;
+const totalRow = an6.indicators.find(b => b.label === "Total time");
+ok(/^30m$/.test(totalRow.total),
+   "total time counts only the 30-minute training session (" + totalRow.total + ")");
+ok(!/1h/.test(totalRow.total), "recovery, the safety stop and the try-it row are all excluded");
+const completedRow = an6.indicators.find(b => b.label === "Completed");
+ok(completedRow.total === "1 of 1",
+   "the completed ratio is against training sessions only (" + completedRow.total + ")");
+
+/* streak and adherence agree */
+ok(store.currentStreak(store.loadSessions().filter(store.countsAsTrained)) === 1,
+   "only the training session feeds the streak");
+ok(an6.adherence <= 100, "adherence stays within range");
+
+/* --- every report category comes from the one authority --- */
+const cats = store.loadSessions().map(r => store.outcomeOf(r).state);
+ok(cats.includes("complete"), "a complete session is categorised complete");
+ok(cats.includes("recovery"), "recovery has its own category");
+ok(cats.includes("safety-stop"), "a safety stop has its own category");
+ok(cats.includes("none"), "and a legacy try-it row is not counted as training");
+store.loadSessions().forEach(r => {
+  const oc = store.outcomeOf(r);
+  ok(store.countsAsTrained(r) === oc.countsAsTraining,
+     "the store and the authority never disagree about " + oc.state);
+  if (!oc.xpEligible) ok(store.xpForSession(r) === 0,
+     "and XP never pays for a session the authority calls " + oc.state);
+});
+
+/* --- main-round reporting uses what was really done and really asked --- */
+localStorage.clear(); store.migrate();
+store.saveSession(mkRow({ roundsDone: 1, roundsPlanned: 3 }));
+const an7 = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics" }).analytics;
+ok(an7.rounds.done === 1, "rounds done is what she actually finished");
+ok(an7.rounds.planned === 3, "against what the day actually asked for");
+store.saveSession(mkRow({ mini: true, sessionType: "mini", roundsDone: 1, roundsPlanned: 3 }));
+const an8 = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics" }).analytics;
+ok(an8.rounds.planned === 4, "a mini asks for one round, not the light's three");
 
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

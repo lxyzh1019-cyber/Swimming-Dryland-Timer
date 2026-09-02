@@ -8,6 +8,7 @@
      notify("tick")  → targeted per-second DOM writes only
    ============================================================ */
 
+import { deriveSessionOutcome, OUTCOME_VERSION } from "./outcome.js";
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA,
          exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
          VALGUS_FLOOR, VALGUS_PROGRESSIONS } from "./data.js";
@@ -15,7 +16,7 @@ import { settings, configuredExerciseRest, configuredRoundRest, configuredSectio
          loadDayProgress, saveDayProgress, clearDayProgress, gateLocked, creditValgusWeek, addSkipRecord,
          addXp, pendingDrawCount, claimSessionXp, athleteId, noteSessionXpAwarded, patchSession, sessionKey,
          XP_VERSION, flaggedMoves } from "./store.js";
-import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn } from "./audio.js";
+import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn, speakSafety } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
 import { recoveryDoseSecs, refTime } from "./util.js";
 
@@ -38,11 +39,12 @@ function blankSession() {
     phase: "greeting",           // greeting|getready|work|reps|sideswitch|rest|roundRest|sectionRest|intent|microloop|breath|done
     circuits: [], ci: 0, ei: 0, round: 1, exDone: 0,
     timerSecs: 0, timerMax: 0, urgent: false,
-    exElapsed: 0, elapsed: 0, pausedSecs: 0, plannedSecs: 0,
+    exElapsed: 0, elapsed: 0, pausedSecs: 0, plannedSecs: 0, expectedWork: 0,
+    clockAt: 0, activeMs: 0, pausedMs: 0, exMs: 0,
     upNextName: "", upNextDose: "", restCue: "",
     stopOverlay: false, confirmEnd: false, painFlag: false,
     pendingCleanCheck: false, cleanCount: 0, wobblyCount: 0, lastWobbly: false,
-    spotChecks: [], spotAsked: {}, cleanCheckMove: null, formChecks: [],
+    spotChecks: [], spotAsked: {}, cleanCheckMove: null, formChecks: [], formResolver: null,
     intentWord: null, microLoop: null,
     exStatus: {},                // "ci-ei" -> done|partial|skipped
     // The completion ledger: one row per exercise per round, holding what was
@@ -50,10 +52,19 @@ function blankSession() {
     ledger: [], roundsCompleted: 0, roundsPlanned: 0, blocksCompleted: 0,
     repsCounted: 0, repsTarget: 0, segmentsDone: 0, segmentsPlanned: 0,
     sideLabel: "", segmentLabel: "",
+    /* Live coach state. The engine has always known all of this; it just never
+       said it out loud anywhere she could see. Speech may announce it, but the
+       VISUAL state is the source of truth — a device with no installed voice
+       has to be able to follow the whole session from the screen. */
+    currentSet: 0, totalSets: 0,
+    currentSide: 0, totalSides: 0,
+    currentDirection: 0, totalDirections: 0,
+    repInSegment: 0, repsInSegment: 0,
+    currentSegment: 0, totalSegments: 0,
     // "normal" | "mini" | "tryit" — practice/mini are kept as mirrors so the
     // screens and view-models that read them keep working.
     mode: "normal",
-    dayKey: null, light: "green", practice: false, mini: false, spa: false,
+    dayKey: null, light: "green", practice: false, mini: false, spa: false, recovery: false,
     endedEarly: false, xpEarned: 0, leveledUp: false,
     mood: null, wentWell: null, nextTime: null, quizPick: null, quizXp: 0,
     savedEntry: false, saveFailed: false, savedKey: null, fsId: null
@@ -64,19 +75,44 @@ let notify = () => {};
 export function onSessionUpdate(fn) { notify = fn; }
 
 /* ---- circuits assembly (2026.2 block model) ---- */
+/* The day the recovery menu lives on. A weekday that resolves to Recovery
+   borrows THIS content — it does not invent a lighter version of its own
+   workout, because "a lighter workout" is exactly what a body reporting pain
+   should not be handed. */
+export const RECOVERY_SOURCE_DAY = "sunday";
+
+/* Recovery is its own kind of session: the existing Sunday menu, one pass, no
+   main circuit, no prep, no finisher. Split out of assembleCircuits so a
+   weekday resolving to Recovery reaches the same content by the same path. */
+export function assembleRecoveryCircuit(dayKey) {
+  const day = DAYS[dayKey] || {};
+  const src = (day.recovery && day.recovery.length) ? day : (DAYS[RECOVERY_SOURCE_DAY] || {});
+  const menu = (src.recovery || []).map(r => {
+    const { secs, eachSide } = recoveryDoseSecs(r.dose);
+    return { name: r.name, block: "recovery", driver: "time", work: secs,
+      dose: r.dose, cue: r.why, eachSide, rest: 3 };
+  });
+  const exercises = menu.concat(src.recoveryHolds || []);
+  if (!exercises.length) return [];
+  return [{ name: "Recovery", block: "recovery", rounds: 1, exercises }];
+}
+
+/* Rounds a light asks for. Recovery asks for ZERO, and zero has to survive:
+   the old `Math.max(1, LIGHT_ROUNDS[light] || 1)` turned it into one, which is
+   how a Recovery day launched warm-up, coordination, a main circuit, prep, a
+   finisher and swim-skill work at a body that had just reported pain. */
+export function roundsForLight(light) {
+  const n = LIGHT_ROUNDS[light];
+  return Number.isFinite(n) ? n : 1;
+}
+
 export function assembleCircuits(dayKey, light, opts = {}) {
   const day = DAYS[dayKey];
   if (!day) return [];
-  if (day.spa) {
-    const menu = (day.recovery || []).map(r => {
-      const { secs, eachSide } = recoveryDoseSecs(r.dose);
-      return { name: r.name, block: "recovery", driver: "time", work: secs,
-        dose: r.dose, cue: r.why, eachSide, rest: 3 };
-    });
-    return [{ name: "Recovery", block: "recovery", rounds: 1,
-      exercises: menu.concat(day.recoveryHolds || []) }];
-  }
-  const rounds = Math.max(1, LIGHT_ROUNDS[light] || 1);
+  // Sunday is recovery by design; any other day becomes recovery when the
+  // readiness check says so.
+  if (day.spa || light === "recovery") return assembleRecoveryCircuit(dayKey);
+  const rounds = roundsForLight(light);
   const skipBlocks = opts.skip || [];
   const circuits = [];
   const order = opts.mini ? ["warmup", "main"] : BLOCK_ORDER;
@@ -138,6 +174,20 @@ export function pickSpotChecks(circuits, rnd = Math.random, flagged = null) {
   const rest = shuffle(names.filter(n => !flags.includes(n)));
   const want = SPOT_CHECK_MIN + Math.floor(rnd() * (SPOT_CHECK_MAX - SPOT_CHECK_MIN + 1));
   return [...priority, ...rest].slice(0, Math.min(want, names.length));
+}
+
+/* How many exercise-round instances the session asks for. This is the yardstick
+   completion is measured against: a session that ended early leaves rows
+   MISSING from the ledger, and missing rows are not a completed session however
+   cleanly the loop exited. */
+export function countExpectedWork(circuits) {
+  let n = 0;
+  (circuits || []).forEach(c => {
+    for (let r = 1; r <= c.rounds; r++) {
+      c.exercises.forEach(ex => { if (!(ex.rounds && r > ex.rounds)) n++; });
+    }
+  });
+  return n;
 }
 
 /* Estimated session length in seconds (rep-based ≈ secondsPerRep × reps). */
@@ -332,6 +382,10 @@ async function runPrescribedReps(ex) {
   sess.segmentsPlanned = segments.length;
   sess.segmentsDone = 0;
   sess.segmentLabel = "";
+  sess.totalSets = p.sets; sess.totalSides = p.sides; sess.totalDirections = p.dirs;
+  sess.totalSegments = segments.length; sess.currentSegment = 0;
+  sess.currentSet = 0; sess.currentSide = 0; sess.currentDirection = 0;
+  sess.repInSegment = 0; sess.repsInSegment = 0;
 
   let stopped = false;
   const isStopped = () => stopped;
@@ -366,10 +420,14 @@ async function runPrescribedReps(ex) {
       }
       sess.segmentLabel = seg.label;
       sess.sideLabel = seg.label;
+      sess.currentSegment = i + 1;
+      sess.currentSet = seg.set; sess.currentSide = seg.side; sess.currentDirection = seg.dir;
+      sess.repInSegment = 0; sess.repsInSegment = seg.reps;
       setPhase("reps");
       if (seg.label && voiceOn()) await speakAndWait(seg.label.replace(/^\w/, c => c.toUpperCase()) + ".");
       for (let n = 1; n <= seg.reps; n++) {
         if (stopped) return;
+        sess.repInSegment = n;
         if (await runOneRep(ex, p, n, isStopped) === "interrupt") return;
       }
       sess.segmentsDone += 1;
@@ -385,23 +443,62 @@ async function runPrescribedReps(ex) {
   await workLoop;
   sess.sideLabel = "";
   sess.segmentLabel = "";
+  sess.currentSet = 0; sess.totalSets = 0;
+  sess.currentSide = 0; sess.totalSides = 0;
+  sess.currentDirection = 0; sess.totalDirections = 0;
+  sess.repInSegment = 0; sess.repsInSegment = 0;
+  sess.currentSegment = 0; sess.totalSegments = 0;
   return result;
 }
 
-/* ---- elapsed clock ---- */
+/* ---- elapsed clock -------------------------------------------------------
+   This used to be `sess.elapsed += 1` once per setInterval tick. Browsers
+   throttle background timers hard — a phone that locks, or a tab she switches
+   away from, fires that interval a fraction as often — so a real session came
+   back recorded as a few minutes. The same counter drove `exElapsed`, which
+   decides done/partial/skipped, so throttling could also mark work she actually
+   did as skipped.
+
+   Time is derived from wall-clock timestamps now. The interval only redraws;
+   it is not the authority on anything. Paused spans are excluded, so reading
+   the instructions or watching a demo never inflates the recorded duration. */
 let elapsedInterval = null;
+
+function syncClock(now = Date.now()) {
+  if (!sess.clockAt) return;
+  const delta = Math.max(0, now - sess.clockAt);
+  sess.clockAt = now;
+  if (!sess.running) return;
+  if (sess.paused) {
+    sess.pausedMs += delta;
+  } else {
+    sess.activeMs += delta;
+    // The per-exercise clock only runs while she is actually working.
+    if (sess.phase === "reps" || sess.phase === "work") sess.exMs += delta;
+  }
+  sess.elapsed = Math.round(sess.activeMs / 1000);
+  sess.pausedSecs = Math.round(sess.pausedMs / 1000);
+  sess.exElapsed = Math.round(sess.exMs / 1000);
+}
+/* Every reader of the clock calls this first, so a value is never stale by a
+   whole tick — and never short by however long the tab was in the background. */
+export function readClock() { syncClock(); return sess.elapsed; }
+export function resetExerciseClock() { syncClock(); sess.exMs = 0; sess.exElapsed = 0; }
+
 function startElapsed() {
+  syncClock();
   sess.elapsed = 0; sess.pausedSecs = 0;
+  sess.activeMs = 0; sess.pausedMs = 0; sess.exMs = 0;
+  sess.clockAt = Date.now();
   if (elapsedInterval) clearInterval(elapsedInterval);
   elapsedInterval = setInterval(() => {
     if (!sess.running) return;
-    if (sess.paused) { sess.pausedSecs += 1; return; }
-    sess.elapsed += 1;
-    if (sess.phase === "reps" || sess.phase === "work") sess.exElapsed += 1;
+    syncClock();
     notify("tick");
   }, 1000);
 }
 function stopElapsed() {
+  syncClock();
   if (elapsedInterval) { clearInterval(elapsedInterval); elapsedInterval = null; }
 }
 
@@ -444,7 +541,11 @@ function exerciseStatus(ex, wasSkipped, actualSecs, plannedSecs) {
   // Rep work is judged on REPS, timed work on TIME. Judging reps by the clock
   // marked a fully counted set as skipped whenever the voice ran fast.
   if (ex.byReps) {
-    if (!sess.repsCounted) return "skipped";     // an instant Done tap is not an exercise
+    // An instant Done tap is not an exercise. Counting zero reps was never
+    // enough on its own: tapping through fires after the FIRST rep is counted,
+    // which used to land as `partial` — and partial is real work now, so the
+    // tap-through would have paid. A set also has to have taken real time.
+    if (!sess.repsCounted || actualSecs < MIN_EXERCISE_SECS) return "skipped";
     return sess.repsCounted >= sess.repsTarget ? "done" : "partial";
   }
   if (actualSecs < MIN_EXERCISE_SECS) return "skipped";
@@ -453,6 +554,7 @@ function exerciseStatus(ex, wasSkipped, actualSecs, plannedSecs) {
 
 function recordExercise(ex, circuit, ci, ei, r, wasSkipped) {
   const plannedSecs = ex.byReps ? 0 : exWork(ex);
+  syncClock();
   const actualSecs = sess.exElapsed;
   const row = {
     name: ex.name,
@@ -521,6 +623,39 @@ function recordBlockDone(blockKey, ci) {
 }
 
 /* ---- intent word / micro-loop prompts (UI resolves via resolvers) ---- */
+/* The clean/wobbly self-check used to be set as a flag and then abandoned: the
+   engine dropped straight into the rest countdown without waiting, so the
+   question appeared over a clock that was already running out, a later spot-check
+   move could overwrite the one she was still looking at, and a check on the very
+   LAST exercise never appeared at all — there is no rest after it.
+
+   It is an explicit phase now. Rest does not begin until she has answered or
+   skipped. Skipping records no verdict, so it can never become valgus credit. */
+function formCheckPrompt(moveName) {
+  return new Promise(resolve => {
+    sess.cleanCheckMove = moveName;
+    sess.pendingCleanCheck = true;
+    setPhase("formcheck");
+    speakIfIdle("How did that feel — clean, or wobbly?");
+    const finish = (result) => {
+      clearInterval(watchdog); clearTimeout(timeout);
+      sess.formResolver = null;
+      sess.pendingCleanCheck = false;
+      resolve(result);
+    };
+    const watchdog = setInterval(() => { if (sess.abort) finish("abort"); }, 200);
+    // A walked-away session must not hang here forever. Timing out is a SKIP:
+    // no verdict is recorded, so an unanswered check never becomes credit.
+    const timeout = setTimeout(() => { sess.cleanCheckMove = null; finish("done"); }, FORM_CHECK_TIMEOUT_MS);
+    sess.formResolver = (verdict) => {
+      if (verdict === null) sess.cleanCheckMove = null;   // skipped: no verdict
+      else recordFormCheck(verdict);
+      finish(sess.abort ? "abort" : "done");
+    };
+  });
+}
+export const FORM_CHECK_TIMEOUT_MS = 30000;
+
 function intentWordPrompt() {
   return new Promise(resolve => {
     setPhase("intent");
@@ -575,25 +710,32 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
   const day = DAYS[dayKey];
   if (!day) return;
 
-  const sessionMode = mode || (mini ? "mini" : "normal");
+  // Recovery is an explicit MODE, not a light with zero rounds. A Mini that
+  // resolves to Recovery becomes recovery too — the whole point of the check is
+  // that a sore day gets recovery, and "a shortened workout" is still a workout.
+  const resolvedLight = day.spa ? "recovery" : light;
+  const isRecovery = resolvedLight === "recovery";
+  const sessionMode = isRecovery ? "recovery" : (mode || (mini ? "mini" : "normal"));
   Object.assign(sess, blankSession(), {
     running: true, dayKey, mode: sessionMode,
     mini: sessionMode === "mini", practice: false,
-    light: day.spa ? "recovery" : light,
+    light: resolvedLight,
+    recovery: isRecovery,
     spa: !!day.spa
   });
 
   // Same-day resume: blocks already completed today are skipped.
   const prog = loadDayProgress(dayKey);
   const skipBlocks = (prog && prog.done) || [];
-  sess.circuits = assembleCircuits(dayKey, sess.light, { mini: sess.mini, skip: sess.spa ? [] : skipBlocks });
+  sess.circuits = assembleCircuits(dayKey, sess.light, { mini: sess.mini, skip: (sess.spa || sess.recovery) ? [] : skipBlocks });
   if (!sess.circuits.length) { sess.running = false; return; }
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
+  sess.expectedWork = countExpectedWork(sess.circuits);
   // A mini is one shortened round however the light was set; everything else
   // is priced and reported against the light's own round count.
-  sess.roundsPlanned = sess.spa ? 0
+  sess.roundsPlanned = (sess.spa || sess.recovery) ? 0
     : sess.mini ? 1
-    : Math.max(1, LIGHT_ROUNDS[sess.light] || 1);
+    : roundsForLight(sess.light);
   sess.spotChecks = pickSpotChecks(sess.circuits);
 
   logEvent("session_start", { day: dayKey, light: sess.light, mode: sessionMode });
@@ -606,8 +748,9 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
 
   setPhase("greeting");
   playCue("work");
-  if (sess.spa) {
-    await speakAndWait("Spa Sunday. Easy recovery, slow and gentle.");
+  if (sess.spa || sess.recovery) {
+    await speakAndWait(sess.spa ? "Spa Sunday. Easy recovery, slow and gentle."
+      : "Recovery today. No workout — just easy, gentle care. Well done for checking in honestly.");
   } else {
     await speakAndWait("Say it out loud with me, loud and proud: " + dayMantra + " " +
       "Your light today is " + lightLabel + ". Starting with " + firstEx + ".");
@@ -635,7 +778,7 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
         sess.skipExercise = false;
         sess.currentEx = ex;
         sess.ci = ci; sess.ei = ei; sess.round = r;
-        sess.exElapsed = 0;
+        resetExerciseClock();
         setUpNext(circuits, ci, r, ei);
 
         // ---------- WORK ----------
@@ -698,11 +841,14 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
 
         // Self-check only the moves this run is watching (see pickSpotChecks),
         // and only the first time each one comes round — main runs 2–3 rounds.
+        // A pending check is never overwritten by the next move: it is awaited
+        // here and resolved before the loop can reach another one.
         if ((circuit.block === "main" || circuit.block === "prep") && row.status === "done"
-            && sess.spotChecks.includes(ex.name) && !sess.spotAsked[ex.name]) {
+            && sess.spotChecks.includes(ex.name) && !sess.spotAsked[ex.name]
+            && !sess.pendingCleanCheck) {
           sess.spotAsked[ex.name] = true;
-          sess.cleanCheckMove = ex.name;
-          sess.pendingCleanCheck = true;
+          const fc = await formCheckPrompt(ex.name);
+          if (fc === "abort") return finalize(false);
         }
 
         // ---------- REST ----------
@@ -719,7 +865,7 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
           const isBlockBreak = isLastOfRound && r === circuit.rounds && !isLastCircuit;
 
           if (isRoundBreak) {
-            if (circuit.block === "main" && r === 1 && !sess.intentWord && !sess.spa) {
+            if (circuit.block === "main" && r === 1 && !sess.intentWord && !sess.spa && !sess.recovery) {
               const iw = await intentWordPrompt();
               if (iw === "abort") return finalize(false);
             }
@@ -807,6 +953,7 @@ export function finalize(completed) {
   cancelSpeech();
   stopElapsed();
 
+  syncClock();
   const elapsedSecs = sess.elapsed;
   const day = DAYS[sess.dayKey] || {};
   sess.endedEarly = !completed;
@@ -826,11 +973,11 @@ export function finalize(completed) {
     session: "morning",
     planVersion: "2026.2",
     xpVersion: XP_VERSION,     // marks a row whose XP counted the rounds trained
-    sessionType: sess.spa ? "spa" : sess.mini ? "mini" : "main",
-    lightResult: sess.spa ? "recovery" : sess.light,
+    sessionType: sess.recovery && !sess.spa ? "recovery" : sess.spa ? "spa" : sess.mini ? "mini" : "main",
+    lightResult: sess.light,
     // What was actually trained, and what the day asked for — two different
     // numbers. Storing only the planned one is what paid 150% for one day.
-    roundsDone: sess.spa ? 0 : sess.roundsCompleted,
+    roundsDone: (sess.spa || sess.recovery) ? 0 : sess.roundsCompleted,
     roundsPlanned: sess.roundsPlanned,
     blocksCompleted: sess.blocksCompleted,
     safetyStop,
@@ -838,7 +985,7 @@ export function finalize(completed) {
     perExercise: perExerciseFromLedger(sess.ledger),
     microLoop: sess.microLoop || null,
     intentWord: sess.intentWord || null,
-    prSentinel: sess.spa ? null : day.prSentinel || null,
+    prSentinel: (sess.spa || sess.recovery) ? null : day.prSentinel || null,
     skippedCount: sess.skipped.length,
     pauseCount: sess.pauseCount || 0,
     pausedSecs: sess.pausedSecs,
@@ -848,8 +995,19 @@ export function finalize(completed) {
     light: sess.light, mini: sess.mini,
     pain: safetyStop,
     endedEarly: !completed,
+    // The loop reaching its end is NOT the same as the work being done. The
+    // record now carries what the session ASKED FOR (expectedWork) plus the
+    // version marker that lets partial work count, and every reader derives
+    // completion from the ledger through js/outcome.js.
+    expectedWork: sess.expectedWork || 0,
+    outcomeVersion: OUTCOME_VERSION,
     completedFully: !!completed
   };
+  entry.completedFully = deriveSessionOutcome({
+    ledger: entry.ledger, expectedWork: entry.expectedWork,
+    safetyStop, explicitAbort: !completed, sessionType: entry.sessionType,
+    outcomeVersion: OUTCOME_VERSION, completedFully: !!completed
+  }).state === "complete";
   sess.perExercise = entry.perExercise;
   const saved = saveSession(entry);
   sess.savedEntry = saved;
@@ -912,6 +1070,7 @@ export function finalize(completed) {
    CONTROLS (called from the UI action layer)
    ============================================================ */
 export function togglePause() {
+  syncClock();                       // close the span at the moment of the tap
   sess.paused = !sess.paused;
   if (sess.paused) sess.pauseCount = (sess.pauseCount || 0) + 1;
   logEvent(sess.paused ? "pause" : "resume", { ex: sess.currentEx ? sess.currentEx.name : null });
@@ -969,6 +1128,11 @@ export function endEarly() {
   if (sess.byRepsResolver) sess.byRepsResolver("abort");
   if (sess.intentResolver) sess.intentResolver(null);
   if (sess.microResolver) sess.microResolver(null);
+  if (sess.formResolver) sess.formResolver(null);
+  // A stop confirmation is a SAFETY line: it is spoken even with the coach
+  // muted, because "I stopped because it hurt" is the one thing she must hear
+  // acknowledged.
+  speakSafety("Session stopped.");
   interruptSpeech("Session stopped.");
 }
 
@@ -978,8 +1142,28 @@ function recordFormCheck(clean) {
   if (sess.cleanCheckMove) sess.formChecks.push({ name: sess.cleanCheckMove, clean });
   sess.cleanCheckMove = null;
 }
-export function pickClean() { sess.pendingCleanCheck = false; sess.cleanCount += 1; sess.lastWobbly = false; recordFormCheck(true); notify("phase"); }
-export function pickWobbly() { sess.pendingCleanCheck = false; sess.wobblyCount += 1; sess.lastWobbly = true; recordFormCheck(false); notify("phase"); }
+export function pickClean() {
+  if (!sess.pendingCleanCheck) return;
+  sess.cleanCount += 1; sess.lastWobbly = false;
+  if (sess.formResolver) sess.formResolver(true);
+  else { recordFormCheck(true); sess.pendingCleanCheck = false; }
+  notify("phase");
+}
+export function pickWobbly() {
+  if (!sess.pendingCleanCheck) return;
+  sess.wobblyCount += 1; sess.lastWobbly = true;
+  if (sess.formResolver) sess.formResolver(false);
+  else { recordFormCheck(false); sess.pendingCleanCheck = false; }
+  notify("phase");
+}
+/* "Skip check" — no verdict, no clean count, no valgus credit. Not answering is
+   not the same as answering "clean", and only a real Clean may unlock a gate. */
+export function skipFormCheck() {
+  if (!sess.pendingCleanCheck) return;
+  if (sess.formResolver) sess.formResolver(null);
+  else { sess.cleanCheckMove = null; sess.pendingCleanCheck = false; }
+  notify("phase");
+}
 
 /* ---- cloud patches that can't arrive too early ----------------------------
    fsAddSession resolves with the doc ID some time AFTER the finish screen is

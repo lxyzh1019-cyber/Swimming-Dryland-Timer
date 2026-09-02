@@ -519,7 +519,21 @@ function settingsTab(vm) {
         <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Coach voice 🎧</div>
         <button type="button" data-action="toggleCoachVoice" aria-label="Toggle coach voice" style="${vm.coachTrack}"><span style="${vm.coachKnob}"></span></button>
       </div>
-      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The coach will: count your time · announce the next exercise · remind you to breathe · warn about common mistakes · prompt a self-check.</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The coach will: announce the next exercise · remind you to breathe · warn about common mistakes · prompt a self-check.</div>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Timer sounds 🔔</div>
+        <button type="button" data-action="toggleTimerSounds" aria-label="Toggle timer sounds" style="${vm.timerTrack}"><span style="${vm.timerKnob}"></span></button>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The beeps and rep ticks she paces on. These stay on when the coach's voice is off.</div>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Safety voice 🛟</div>
+        <button type="button" data-action="toggleSafetyVoice" aria-label="Toggle safety voice" style="${vm.safetyTrack}"><span style="${vm.safetyKnob}"></span></button>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">Pain checks and stop confirmations. Spoken even in quiet mode — leave this on.</div>
     </div>
     <div>
       <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Voice style</div>
@@ -561,7 +575,22 @@ function settingsTab(vm) {
       <div style="margin-top:10px;border-top:1.5px solid var(--hairline);padding-top:10px;">
         <div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.45;">Prizes stuck on “✓ Used” that she never redeemed, or several going used at once, come from wallets written before prizes had unique IDs. This repairs those without resetting anything she has earned.</div>
         <button type="button" data-action="repairWallet" style="margin-top:8px;min-height:44px;border:2px solid var(--hairline);background:var(--surface);border-radius:var(--radius-pill);padding:0 18px;font-weight:900;font-size:13px;color:var(--ink);cursor:pointer;font-family:inherit;">🔧 Repair prize wallet</button>
+        <button type="button" data-action="reviewPrizes" style="margin-top:8px;margin-left:8px;min-height:44px;border:2px solid var(--hairline);background:var(--surface);border-radius:var(--radius-pill);padding:0 18px;font-weight:900;font-size:13px;color:var(--ink);cursor:pointer;font-family:inherit;">🎁 Review used prizes</button>
         ${vm.walletRepairNote ? `<div style="margin-top:8px;font-size:13px;font-weight:800;color:var(--mint-ink);background:var(--mint-wash);border-radius:12px;padding:9px 12px;line-height:1.45;">${escapeHtml(vm.walletRepairNote)}</div>` : ""}
+        ${vm.prizeReviewOpen ? `
+        <div style="margin-top:10px;border:2px solid var(--hairline);border-radius:12px;padding:10px 12px;">
+          <div style="font-size:12px;font-weight:900;color:var(--ink-soft);line-height:1.45;margin-bottom:8px;">These prizes are marked used. The app can't tell which she actually spent, so it won't guess — restore only the ones you know are wrong.</div>
+          ${vm.noRedeemedPrizes ? `<div style="font-size:13px;font-weight:800;color:var(--ink-faint);">No prizes are marked used.</div>` : ""}
+          ${vm.redeemedPrizes.map(p => `
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--hairline);">
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:900;font-size:14px;color:var(--ink);">${escapeHtml(p.label)}</div>
+              <div style="font-size:11px;font-weight:800;color:var(--ink-faint);">${escapeHtml(p.dateLine)}</div>
+            </div>
+            <button type="button" data-action="restorePrize" data-arg="${escapeHtml(p.id)}" style="min-height:38px;border:none;border-radius:var(--radius-pill);padding:0 14px;background:var(--mint);color:#fff;font-weight:900;font-size:12px;cursor:pointer;font-family:inherit;">Restore</button>
+          </div>`).join("")}
+          <button type="button" data-action="closePrizeReview" style="margin-top:9px;min-height:38px;border:none;background:transparent;font-weight:900;font-size:12px;color:var(--ink-soft);cursor:pointer;font-family:inherit;">Done</button>
+        </div>` : ""}
       </div>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <input type="text" placeholder="Add a prize… (e.g. 🎨 Craft afternoon)" data-input="newPrize" style="flex:1;padding:10px 13px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:14px;font-weight:700;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">

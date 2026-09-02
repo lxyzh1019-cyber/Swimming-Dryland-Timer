@@ -30,6 +30,7 @@
    ============================================================ */
 
 import { LIGHT_ROUNDS } from "./data.js";
+import { outcomeOf } from "./outcome.js";
 
 export const EFFORT_WEIGHTS = { form: 30, finish: 30, hardDay: 15, stuckWithIt: 15, clock: 10 };
 const LIGHT_CREDIT = { red: 15, yellow: 12, recovery: 10, green: 8 };
@@ -67,7 +68,7 @@ export function sessionEffort(s) {
 
   // finished what the day asked
   let finish;
-  if (s.completedFully) { finish = 1; reasons.push("Finished the whole session."); }
+  if (outcomeOf(s).state === "complete") { finish = 1; reasons.push("Finished the whole session."); }
   else {
     const did = Math.max(0, moves - skipped);
     finish = moves ? Math.min(1, did / moves) : 0.4;
@@ -116,7 +117,7 @@ export function effortSummary(sessions) {
   const avg = counted.length ? Math.round(counted.reduce((a, x) => a + x.e.score, 0) / counted.length) : null;
 
   const toughDays = rows.filter(s => ["yellow", "red"].includes(s.lightResult || s.light));
-  const toughFinished = toughDays.filter(s => s.completedFully).length;
+  const toughFinished = toughDays.filter(s => outcomeOf(s).state === "complete").length;
   const skips = rows.reduce((a, s) => a + ((s.perExercise || []).filter(p => p.skipped).length || s.skippedCount || 0), 0);
   const form = rows.reduce((a, s) => { const f = formChecksOf(s); a.asked += f.asked; a.clean += f.clean; return a; }, { asked: 0, clean: 0 });
   const painStops = scored.filter(x => x.e.painStop).length;

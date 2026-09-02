@@ -180,7 +180,7 @@ function dayPane(vm, wide) {
       <span style="font-size:20px;flex-shrink:0;">✕</span>
       <div style="display:flex;flex-direction:column;gap:1px;">
         <span style="font-weight:900;font-size:${wide ? 16 : 15}px;">This one slipped by — that's okay!</span>
-        <span style="font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.85;">You still got the warm-up in — every streak has bumps.</span>
+        <span style="font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.85;">${dv.missedSub || "Every streak has bumps. Pick it back up whenever you\u2019re ready."}</span>
       </div>
     </div>` : "";
 
