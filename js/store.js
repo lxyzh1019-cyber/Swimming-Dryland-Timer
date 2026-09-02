@@ -993,9 +993,12 @@ function dayXpKey(entry) {
    so they age out over the 60-day retention rather than being migrated. The
    number form is still read because one can arrive from an older BACKUP
    restored onto a device with no journey of its own (restoreBackup keeps the
-   local journey where there is one, so this is the fresh-device case). It never
-   travels through the cloud: journeySnapshot does not carry the budget at all,
-   which is correct — a day's budget is a fact about one device's clock. */
+   local journey where there is one, so this is the fresh-device case).
+
+   The budget is device-local: journeySnapshot does not carry it, so two devices
+   finalizing sessions on the same date each grant their own. That gap predates
+   this key and is not closed here — closing it needs the spend derived from the
+   synced log rather than banked per device. */
 function dayXpRow(map, key) {
   const raw = map && map[key];
   if (typeof raw === "number") return { spent: raw, cap: 0 };
