@@ -1083,6 +1083,62 @@ ok(firstPay === 180, "the partial pays for the one round it finished");
 ok(firstPay + secondPay === 360, "and the resume tops it up to exactly one full day, never 540");
 ok(store.claimSessionXp(resumed) === 0, "a third attempt on the same day pays nothing at all");
 
+/* --- one REAL date pays for one real date --------------------------------
+   The budget used to be keyed by the weekday card as well as the date, so two
+   cards run on one date drew two full budgets. Both routes into a second card
+   are one tap: "Catch Up Now" on a missed day and "Start Early" on an upcoming
+   one. */
+localStorage.clear();
+store.migrate();
+const oneDate = new Date().toISOString();
+const mondayCard = { app: "swimming", dayKey: "monday", isoDate: oneDate,
+  xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main",
+  roundsDone: 3, roundsPlanned: 3, completedFully: true,
+  ledger: [{ name: "x", block: "main", round: 1, status: "done" }] };
+const tuesdayCard = { ...mondayCard, dayKey: "tuesday" };
+const mondayPay = store.claimSessionXp(mondayCard);
+const tuesdayPay = store.claimSessionXp(tuesdayCard);
+ok(mondayPay === 360, "the first card run on a date pays a full day");
+ok(tuesdayPay === 0, "a second weekday card on the SAME real date pays nothing more");
+ok(mondayPay + tuesdayPay === 360, "so one real date is still worth exactly one day, never 720");
+
+/* Crossing Edmonton midnight is a new date, and a new budget. */
+const tomorrowIso = new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString();
+ok(store.claimSessionXp({ ...mondayCard, isoDate: tomorrowIso }) === 360,
+   "the next real date opens a fresh budget");
+
+/* The ceiling is the LARGEST session the date warrants, not the first claimed:
+   a Recovery morning must not hold down training done that afternoon. */
+localStorage.clear();
+store.migrate();
+const recoveryFirst = { ...mondayCard, sessionType: "recovery", roundsDone: 0, roundsPlanned: 0 };
+const recPay = store.claimSessionXp(recoveryFirst);
+const trainedAfter = store.claimSessionXp(mondayCard);
+ok(recPay === store.XP_SHOWED_UP, "a recovery session pays its show-up credit");
+ok(recPay + trainedAfter === 360,
+   "and training later the same date still reaches one full day, no more");
+
+/* ...and the reverse order does not let the day exceed one full day either. */
+localStorage.clear();
+store.migrate();
+const bigFirst = store.claimSessionXp(mondayCard);
+const smallAfter = store.claimSessionXp({ ...mondayCard, dayKey: "wednesday", roundsDone: 1 });
+ok(bigFirst + smallAfter === 360, "a lighter card after a full one adds nothing");
+
+/* Budgets are per athlete: the journey doc is namespaced, so switching athletes
+   must not hand the second one a spent budget. */
+localStorage.clear();
+store.migrate();
+ok(store.claimSessionXp(mondayCard) === 360, "athlete one draws her day's budget");
+const firstAthlete = store.activeProfileId();
+store.switchProfile(store.addProfile("Second"));
+store.migrate();
+ok(store.claimSessionXp(mondayCard) === 360, "a different athlete has her own budget for the same date");
+// Put the first athlete back: everything after this reads her namespace.
+store.switchProfile(firstAthlete);
+localStorage.clear();
+store.migrate();
+
 /* --- a pain stop is a safety event, not a short workout --- */
 const painStop = { ...partial, safetyStop: true, pain: true, roundsDone: 1 };
 ok(store.xpForSession(painStop) === 0, "a pain stop pays no XP");

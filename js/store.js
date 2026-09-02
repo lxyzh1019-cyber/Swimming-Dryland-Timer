@@ -974,29 +974,62 @@ const DAY_XP_RETENTION = 60;                       // days of budget rows kept
 export function dayXpCap(entry) {
   return XP_SHOWED_UP + XP_PER_ROUND * sessionRoundsPlanned(entry);
 }
+
+/* The budget belongs to the REAL DAY, not to the weekday card that was run.
+   The key used to be `dayKey|date`, which gave every weekday card its own
+   budget on the same date — and running two cards on one date is a single tap:
+   "Catch Up Now" on a missed day and "Start Early" on an upcoming one both hand
+   the engine a different dayKey. Monday's catch-up plus Tuesday's card on a
+   Tuesday paid 720 XP for one day of training.
+
+   No profile in the key: the journey doc is already stored per athlete
+   (see nsKey), so two athletes on one device never share these rows. */
 function dayXpKey(entry) {
-  return String(entry.dayKey || "") + "|" + edmontonISO(entry.isoDate || Date.now());
+  return edmontonISO(entry.isoDate || Date.now());
 }
+
+/* A budget row is { spent, cap }. Rows written before the key changed were a
+   bare number under the old `dayKey|date` key — they can never match a new key,
+   so they are simply pruned away over the next 60 days rather than migrated.
+   The number form is still read here because a row can also arrive from an
+   older device through the journey merge. */
+function dayXpRow(map, key) {
+  const raw = map && map[key];
+  if (typeof raw === "number") return { spent: raw, cap: 0 };
+  if (raw && typeof raw === "object") {
+    return { spent: Number(raw.spent) || 0, cap: Number(raw.cap) || 0 };
+  }
+  return { spent: 0, cap: 0 };
+}
+
 function pruneDayXp(map) {
   const keys = Object.keys(map || {});
   if (keys.length <= DAY_XP_RETENTION) return map || {};
-  const keep = keys.sort((a, b) => a.split("|")[1].localeCompare(b.split("|")[1])).slice(-DAY_XP_RETENTION);
+  // The key IS the date now, so it sorts directly.
+  const keep = keys.sort((a, b) => a.localeCompare(b)).slice(-DAY_XP_RETENTION);
   const out = {};
   keep.forEach(k => { out[k] = map[k]; });
   return out;
 }
 
 /* What this session may actually be paid, after the day's budget. Records the
-   draw, so calling it twice for one session does not pay twice. */
+   draw, so calling it twice for one session does not pay twice.
+
+   The day's ceiling is the LARGEST cap any session run on that date warrants,
+   not the first one claimed. Taking the first would let a Recovery morning
+   (cap 90) hold down a real session trained that afternoon; taking the largest
+   still refuses a second full day's pay, because the cap is on the date's TOTAL
+   spend. A partial and its resume share one budget exactly as before. */
 export function claimSessionXp(entry) {
   const want = xpForSession(entry);
   if (want <= 0) return 0;
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
   const key = dayXpKey(entry);
-  const spent = (j.dayXpPaid && j.dayXpPaid[key]) || 0;
-  const grant = Math.max(0, Math.min(want, dayXpCap(entry) - spent));
+  const row = dayXpRow(j.dayXpPaid, key);
+  const cap = Math.max(row.cap, dayXpCap(entry));
+  const grant = Math.max(0, Math.min(want, cap - row.spent));
   if (grant > 0) {
-    j.dayXpPaid = pruneDayXp({ ...(j.dayXpPaid || {}), [key]: spent + grant });
+    j.dayXpPaid = pruneDayXp({ ...(j.dayXpPaid || {}), [key]: { spent: row.spent + grant, cap } });
     saveJourney(j);
   }
   return grant;
