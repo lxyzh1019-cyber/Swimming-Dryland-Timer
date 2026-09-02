@@ -9,7 +9,7 @@
    ============================================================ */
 
 import { deriveSessionOutcome, mainRoundsFromLedger, OUTCOME_VERSION } from "./outcome.js";
-import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA,
+import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA,
          exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
          VALGUS_FLOOR, VALGUS_PROGRESSIONS } from "./data.js";
 import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent,
@@ -117,7 +117,12 @@ export function assembleCircuits(dayKey, light, opts = {}) {
   const rounds = roundsForLight(light);
   const skipBlocks = opts.skip || [];
   const circuits = [];
-  const order = BLOCK_ORDER;
+  /* The light decides which blocks run, not just how many main rounds. One
+     policy object drives assembly, and everything downstream — the duration
+     estimate, the preview, expected work, completion — is derived from the
+     circuits this returns, so none of them can disagree with it. */
+  const policy = LIGHT_SESSION_POLICY[light] || LIGHT_SESSION_POLICY.green;
+  const order = BLOCK_ORDER.filter(bk => policy.blocks.includes(bk));
   order.forEach(bk => {
     if (skipBlocks.includes(bk)) return;
     let exs = (day.blocks[bk] || []).slice();
@@ -138,7 +143,8 @@ export function assembleCircuits(dayKey, light, opts = {}) {
     if (!exs.length) return;
     circuits.push({ name: BLOCK_LABEL[bk], block: bk,
       rounds: bk === "main" ? rounds : 1, exercises: exs });
-    if (bk === "main" && day.prepMenu && day.prepMenu.length && !skipBlocks.includes("prep")) {
+    if (bk === "main" && policy.blocks.includes("prep")
+        && day.prepMenu && day.prepMenu.length && !skipBlocks.includes("prep")) {
       circuits.push({ name: BLOCK_LABEL.prep, block: "prep", rounds: 1, exercises: day.prepMenu });
     }
   });

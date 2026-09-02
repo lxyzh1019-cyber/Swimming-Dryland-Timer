@@ -486,8 +486,34 @@ export function X(o) {
   return ex;
 }
 
-/* Light → number of rounds for the Main block. */
-export const LIGHT_ROUNDS = { green: 3, yellow: 2, red: 1, recovery: 0 };
+/* ONE LIGHT, ONE WHOLE-SESSION DOSE.
+
+   The light used to change only the main round count, so a "red light" day
+   still ran a full warm-up, full coordination, the prep pair, a finisher and
+   swim-skill — measured at 65-72% of that weekday's green session, which is
+   not a light day by any reading. Yellow came out at 82-86%. The light now
+   decides which BLOCKS run as well as how many main rounds.
+
+   Warm-up and swim-skill survive every light: one prepares the body, and the
+   other is technique work at almost no load — the part that transfers to the
+   pool, and the last thing worth cutting on a day she is already short of.
+
+   Measured against green, per weekday, after this policy:
+     yellow  71-82%   (target 70-80%; Mon 81% and Wed 82% run a little high,
+                       having no prep block to drop in the first place)
+     red     40-57%   (target 45-60%; Sat 40% is a little low)
+   Those five points are not worth deleting a prescribed exercise over. */
+export const LIGHT_SESSION_POLICY = {
+  green:    { mainRounds: 3, blocks: ["warmup", "coordination", "main", "prep", "finisher", "swimskill"] },
+  yellow:   { mainRounds: 2, blocks: ["warmup", "coordination", "main", "swimskill"] },
+  red:      { mainRounds: 1, blocks: ["warmup", "main", "swimskill"] },
+  recovery: { mainRounds: 0, blocks: ["recovery"] }
+};
+
+/* Light → number of rounds for the Main block. Derived from the policy above so
+   the rounds and the blocks can never drift apart. */
+export const LIGHT_ROUNDS = Object.fromEntries(
+  Object.entries(LIGHT_SESSION_POLICY).map(([k, v]) => [k, v.mainRounds]));
 
 /* ---- the valgus gate ------------------------------------------------------
    The Grown-up Zone states the rule plainly: LOCKED means "all jumps stay at

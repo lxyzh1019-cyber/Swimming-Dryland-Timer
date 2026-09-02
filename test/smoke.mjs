@@ -964,6 +964,65 @@ ok(tvm.planStats("tuesday").moves === new Set(engine.assembleCircuits("tuesday",
      .flatMap(c => c.exercises.map(e => e.name))).size,
    "and its move count includes the prepMenu moves the session actually inserts");
 
+/* --- the light sets the whole session, not just the round count -----------
+   A "red light" day used to run a full warm-up, full coordination, the prep
+   pair, a finisher and swim-skill — 65-72% of that weekday's green session,
+   which is not a light day. One policy now decides the blocks AND the rounds,
+   and everything downstream is derived from the circuits it produces. */
+const TRAINING_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const blocksOf = (day, light) => engine.assembleCircuits(day, light).map(c => c.block);
+const mainRoundsOf = (day, light) => {
+  const m = engine.assembleCircuits(day, light).find(c => c.block === "main");
+  return m ? m.rounds : 0;
+};
+TRAINING_DAYS.forEach(d => {
+  const green = blocksOf(d, "green"), yellow = blocksOf(d, "yellow"), red = blocksOf(d, "red");
+
+  ok(mainRoundsOf(d, "green") === 3 && mainRoundsOf(d, "yellow") === 2 && mainRoundsOf(d, "red") === 1,
+     d + ": the main rounds still follow the light");
+
+  // Green is the whole authored plan.
+  ok(green.includes("warmup") && green.includes("main") && green.includes("swimskill"),
+     d + ": green runs the full plan");
+
+  // Yellow drops prep and the finisher; keeps coordination.
+  ok(!yellow.includes("prep") && !yellow.includes("finisher"),
+     d + ": yellow drops the prep pair and the finisher");
+  ok(yellow.includes("coordination") === green.includes("coordination"),
+     d + ": yellow keeps coordination");
+
+  // Red drops coordination too.
+  ok(!red.includes("coordination") && !red.includes("prep") && !red.includes("finisher"),
+     d + ": red drops coordination, prep and the finisher");
+
+  // Warm-up and swim-skill survive every light — one prepares the body, the
+  // other is technique at almost no load.
+  ok(red.includes("warmup") && red.includes("swimskill"),
+     d + ": red still warms up and still does swim-skill");
+
+  // A lighter light is never a LONGER session.
+  const g = engine.estimateSessionSecs(engine.assembleCircuits(d, "green"));
+  const y = engine.estimateSessionSecs(engine.assembleCircuits(d, "yellow"));
+  const r = engine.estimateSessionSecs(engine.assembleCircuits(d, "red"));
+  ok(g > y && y > r, d + ": green is longer than yellow, which is longer than red");
+  // Red has to be a genuinely light day, not a green day minus two rounds.
+  ok(r / g < 0.62, d + ": red is well under two thirds of green (" + Math.round(r / g * 100) + "%)");
+  ok(y / g <= 0.85, d + ": yellow is a real step down too (" + Math.round(y / g * 100) + "%)");
+
+  // Expected work is counted off the same circuits the runner walks, so
+  // completion is judged against the light that actually ran.
+  ok(engine.countExpectedWork(engine.assembleCircuits(d, "red"))
+     < engine.countExpectedWork(engine.assembleCircuits(d, "green")),
+     d + ": a red plan expects less work than a green one");
+});
+
+/* Recovery is its own content, whatever weekday it lands on. */
+ok(blocksOf("monday", "recovery").every(b => b === "recovery"),
+   "a weekday that resolves to Recovery runs recovery content only");
+ok(data.LIGHT_ROUNDS.green === 3 && data.LIGHT_ROUNDS.recovery === 0,
+   "the round counts are derived from the one policy object");
+ok(Object.keys(data.LIGHT_SESSION_POLICY).length === 4, "which covers all four lights");
+
 /* ---- a real session on a fake clock -------------------------------------- */
 /* The engine is timestamp-driven (setInterval + Date.now), so the harness
    moves both together and lets the microtask queue drain between ticks. */
