@@ -1165,6 +1165,29 @@ ok(spentRow && spentRow.xpEarned === 0,
 ok(store.sessionXp(spentRow) === 0,
    "so a rebuild reads zero from it rather than re-pricing it at full value");
 
+/* --- and the day holds across her two devices -----------------------------
+   The banked budget row is deliberately not published, so it is a fact about
+   ONE device: train on the tablet in the morning and the phone in the
+   afternoon and each used to grant a full day, neither having seen the other's
+   row. Every session record does sync though, and each one carries what it was
+   paid — so the log is read as a floor under the banked value. */
+localStorage.clear();
+store.migrate();
+const fromOtherDevice = { ...mondayCard, xpEarned: 360, isoDate: new Date().toISOString() };
+store.mergeSessions([fromOtherDevice]);       // arrives from the cloud mirror
+ok(store.loadJourney() === null || !(store.loadJourney() || {}).dayXpPaid,
+   "this device has banked nothing for the date");
+ok(store.claimSessionXp(tuesdayCard) === 0,
+   "a session finished on the other device still spends this device's budget");
+
+/* A lighter session synced in does not cap a bigger one trained here. */
+localStorage.clear();
+store.migrate();
+store.mergeSessions([{ ...mondayCard, sessionType: "recovery", roundsDone: 0,
+  roundsPlanned: 0, xpEarned: store.XP_SHOWED_UP }]);
+ok(store.claimSessionXp(tuesdayCard) === 360 - store.XP_SHOWED_UP,
+   "a recovery session synced from the other device leaves the rest of the day available");
+
 /* Budgets are per athlete: the journey doc is namespaced, so switching athletes
    must not hand the second one a spent budget. */
 localStorage.clear();

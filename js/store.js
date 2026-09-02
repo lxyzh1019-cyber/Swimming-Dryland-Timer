@@ -1026,16 +1026,44 @@ function pruneDayXp(map) {
    (cap 90) hold down a real session trained that afternoon; taking the largest
    still refuses a second full day's pay, because the cap is on the date's TOTAL
    spend. A partial and its resume share one budget exactly as before. */
+/* What the training LOG already says about a date, for the sessions this device
+   can see — which includes every session synced from her other device.
+
+   The banked row alone is a fact about one device: train on the tablet in the
+   morning and the phone in the afternoon and each grants a full day, because
+   neither has ever seen the other's row (the budget is deliberately not
+   published — see dayXpRow). Every session record, however, DOES sync, and
+   since finalize stamps what each one was actually paid, the day's spend can be
+   read back off the log. So the log is used as a floor under the banked value:
+   whichever knows about more spending wins.
+
+   Only the STAMPED amount counts. Re-pricing a row here would count the session
+   being finalized right now — it is already in the log by this point, and its
+   stamp is written a moment later — at full value against its own budget. */
+function loggedDayXp(key, entry) {
+  const rows = loadSessions().filter(s =>
+    s && !s.practice && edmontonISO(s.isoDate) === key);
+  let spent = 0;
+  let cap = dayXpCap(entry);
+  rows.forEach(s => {
+    if (Number.isFinite(s.xpEarned)) spent += Math.max(0, s.xpEarned);
+    cap = Math.max(cap, dayXpCap(s));
+  });
+  return { spent, cap };
+}
+
 export function claimSessionXp(entry) {
   const want = xpForSession(entry);
   if (want <= 0) return 0;
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
   const key = dayXpKey(entry);
-  const row = dayXpRow(j.dayXpPaid, key);
-  const cap = Math.max(row.cap, dayXpCap(entry));
-  const grant = Math.max(0, Math.min(want, cap - row.spent));
+  const banked = dayXpRow(j.dayXpPaid, key);
+  const logged = loggedDayXp(key, entry);
+  const spent = Math.max(banked.spent, logged.spent);
+  const cap = Math.max(banked.cap, logged.cap);
+  const grant = Math.max(0, Math.min(want, cap - spent));
   if (grant > 0) {
-    j.dayXpPaid = pruneDayXp({ ...(j.dayXpPaid || {}), [key]: { spent: row.spent + grant, cap } });
+    j.dayXpPaid = pruneDayXp({ ...(j.dayXpPaid || {}), [key]: { spent: spent + grant, cap } });
     saveJourney(j);
   }
   return grant;
