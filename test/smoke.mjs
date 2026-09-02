@@ -62,10 +62,22 @@ const overlays = await import(base + "screens/overlays.js");
 const tryvm   = await import(base + "vm/tryit.js");
 const tryscreen = await import(base + "screens/tryit.js");
 const outcome = await import(base + "outcome.js");
+const gate    = await import(base + "gate.js");
 
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
+
+/* The Grown-up Zone is gated now, so anything that renders it or drives an
+   action inside it has to be an adult first. Walks the real flow: answer the
+   fallback question, choose a PIN, which unlocks. */
+const TEST_PIN = "4821";
+function unlockGrownup() {
+  gate.lockGate();
+  const [a, b] = gate.gateChallenge().question.match(/\d+/g).map(Number);
+  if (!gate.answerGate(String(a * b))) throw new Error("FAIL: test could not answer the gate challenge");
+  if (!gate.choosePin(TEST_PIN)) throw new Error("FAIL: test could not set the grown-up PIN");
+}
 
 /* --- refTime is single-sourced (engine re-exports util's) --- */
 ok(engine.refTime === util.refTime, "engine.refTime === util.refTime");
@@ -321,6 +333,7 @@ const fcInd = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics", is
   .analytics.indicators.find(i => i.label === "Form · you verified");
 ok(fcInd.total === "1 of 1", "the indicator board reports verified form beside self-reported form");
 ok(fc.prevMonth < fc.month && fc.nextMonth > fc.month, "the month stepper moves in both directions");
+unlockGrownup();   // the Zone renders its tabs only to a grown-up
 ok(/Form check/.test(gscreen.grownupScreen(gvm.buildGrownupVM(fcState))), "the Form Check tab renders");
 const fcXpBefore = store.loadJourney().xp;
 store.recordFormVerdict("Dead Bug", true);
@@ -369,6 +382,7 @@ ok(gAll.indicators.length === 11 && gAll.indicators.every(i => i.total !== undef
    "the indicator board reports every category as a total and an average");
 ok(gWeek.indicators[1].total !== gAll.indicators[1].total, "and its numbers move when the period changes");
 ok(gAll.isSheTrying.avg != null && gAll.isSheTrying.lines.length >= 2, "the 'Is she trying?' card has a score and its plain-English lines");
+unlockGrownup();
 ok(/Is she trying/.test(gscreen.grownupScreen(gvm.buildGrownupVM({ gsScope: "all", grownupTab: "analytics", isWide: true }))),
    "and it renders on the Analytics tab");
 
@@ -906,6 +920,9 @@ async function runSession(opts, script = {}) {
   store.migrate();
   store.updateSettings({ coachVoiceOn: !!opts.voice, exerciseRestSeconds: 3, roundRestSeconds: 10, sectionRestSeconds: 5, cloudMirror: false });
   if (opts.gateUnlocked) store.saveGate({ unlocked: true, cleanWeeks: [] });
+  // Runs after the wipe and before the session starts — the only place a test
+  // can put state on the device that the session will then read.
+  if (opts.seed) opts.seed();
   const clock = makeClock();
   engine.exitSession();
   const run = engine.startSession(opts);
@@ -1468,34 +1485,85 @@ ok(checkedMoves.length >= engine.SPOT_CHECK_MIN,
 /* ============================================================
    PHASE 4 — grown-up authority and prize repair
    ============================================================ */
-const gate = await import(base + "gate.js");
-
-/* --- the gate --- */
+/* --- the gate: DENY BY DEFAULT ---
+   The old rule was an allowlist of six gated actions and "everything else is
+   fine", which is how seventeen mutating actions and the door to the Zone
+   itself ended up unprotected. It is the inverse now: an action is allowed
+   only if it is named as child-safe. */
+localStorage.clear(); store.migrate();
 gate.lockGate();
 ok(gate.gateUnlocked() === false, "the gate starts locked");
-ok(gate.requireGrownup("severity3") === false, "and a gated action is refused while locked");
-ok(gate.requireGrownup("somethingElse") === true, "an ungated action is not affected");
+ok(gate.requireGrownup("severity3") === false, "a gated action is refused while locked");
+ok(gate.requireGrownup("grownupZone") === false, "so is opening the Grown-up Zone at all");
+ok(gate.requireGrownup("toggleCoachVoice") === false, "so is every settings toggle inside it");
+ok(gate.requireGrownup("downloadBackup") === false, "so is downloading her whole history");
+ok(gate.requireGrownup("somethingNobodyHasWrittenYet") === false,
+   "and an action nobody has classified yet is DENIED, not allowed — a new grown-up "
+   + "action is protected by omission instead of exposed by it");
+ok(gate.requireGrownup("advance") === true, "her own session controls are hers");
+ok(gate.requireGrownup("pickMood") === true, "and so is answering how it felt");
+
+/* --- first run: the PIN cannot simply be set by whoever gets there first --- */
+ok(gate.hasGrownupPin() === false, "a fresh device has no PIN");
+ok(gate.gateMode() === "math", "so the FIRST thing asked is the fallback question, not the PIN form");
+ok(gate.choosePin("1234") === false,
+   "and a PIN cannot be chosen without answering it — otherwise 'no PIN is set' would be the way in");
+ok(gate.gateUnlocked() === false, "nothing was unlocked");
+
 const gateQ = gate.gateChallenge();
 ok(/^\d+ × \d+ = \?$/.test(gateQ.question), "it asks a generated arithmetic question");
 ok(gate.gateChallenge().question === gateQ.question, "stable across re-renders while unanswered");
 const [gateQa, gateQb] = gateQ.question.match(/\d+/g).map(Number);
-ok(gate.answerGate(gateQa * gateQb - 1) === false, "a wrong answer does not unlock");
-ok(gate.gateUnlocked() === false, "still locked");
-ok(gate.gateChallenge().question !== gateQ.question, "and a wrong answer draws a NEW question");
+ok(gate.answerGate(gateQa * gateQb - 1) === false, "a wrong answer gets nowhere");
+ok(gate.gateChallenge().question !== gateQ.question, "and draws a NEW question");
 const gateQ2 = gate.gateChallenge();
 const [gateQ2a, gateQ2b] = gateQ2.question.match(/\d+/g).map(Number);
-ok(gate.answerGate(gateQ2a * gateQ2b) === true, "the right answer unlocks");
-ok(gate.requireGrownup("prizeRepair") === true, "and every gated action is now allowed");
+ok(gate.answerGate(gateQ2a * gateQ2b) === true, "the right answer is accepted");
+ok(gate.gateUnlocked() === false,
+   "but answering it does NOT unlock on its own — it earns the right to choose the PIN");
+ok(gate.gateMode() === "setPin", "which is what the card asks for next");
+ok(gate.choosePin("12") === false, "a two-digit PIN is refused");
+ok(gate.choosePin("4821") === true, "a real one is set");
+ok(gate.gateUnlocked() === true, "and setting it unlocks in the same step");
+ok(gate.requireGrownup("prizeRepair") === true, "every gated action is now allowed");
+ok(gate.hasGrownupPin() === true, "the PIN is remembered for next time");
+
 /* it expires */
 ok(gate.gateUnlocked(Date.now() + gate.GATE_UNLOCK_MS + 1) === false,
    "the unlock expires after five minutes");
 ok(gate.gateUnlocked(Date.now() + 1000) === true, "but not before");
 gate.lockGate();
 ok(gate.gateUnlocked() === false, "leaving the Grown-up Zone locks it again");
-/* nothing is stored anywhere */
-ok(Object.keys(localStorage).length === 0 ||
-   !JSON.stringify(Object.entries(localStorage)).includes("gate_secret"),
-   "the gate stores no secret on the device");
+ok(gate.gateMode() === "pin", "and coming back asks for the PIN this time");
+
+/* --- the PIN itself --- */
+ok(gate.answerPin("0000") === false, "a wrong PIN unlocks nothing");
+ok(gate.gateUnlocked() === false, "still locked");
+ok(gate.answerPin("4821") === true, "the right PIN unlocks");
+gate.lockGate();
+
+/* --- Forgot PIN: a recovery, never a bypass --- */
+gate.beginPinReset();
+ok(gate.hasGrownupPin() === true,
+   "the old PIN survives the 'forgot' tap — clearing it up front would mean cancelling here left NO pin at all");
+ok(gate.gateUnlocked() === false, "and nothing is unlocked by asking");
+ok(gate.choosePin("9999") === false, "a new PIN still cannot be set without answering the question");
+const fq = gate.gateChallenge().question.match(/\d+/g).map(Number);
+gate.answerGate(String(fq[0] * fq[1]));
+ok(gate.choosePin("5150") === true, "answering it lets a new PIN replace the old one");
+ok(gate.answerPin("5150") === true && gate.answerPin("4821") === false,
+   "and it is the new PIN that works from then on");
+gate.lockGate();
+
+/* --- the PIN never leaves the device --- */
+ok(!store.PROFILE_KEYS.includes(store.LS_GROWNUP_PIN),
+   "the PIN is NOT a profile key, so downloadBackup can never write it into a file she can open");
+ok(!JSON.stringify(store.exportProfileData()).includes("5150"),
+   "and no export contains it");
+ok(localStorage.getItem(store.LS_GROWNUP_PIN) !== null, "it is stored");
+ok(!String(localStorage.getItem(store.LS_GROWNUP_PIN)).includes("5150"),
+   "but the PIN itself is not what is stored — only a salted digest of it");
+unlockGrownup();
 
 /* --- prize repair: IDs are fixed automatically, redemption is NOT --- */
 localStorage.clear(); store.migrate();
@@ -1731,5 +1799,181 @@ ok(an7.rounds.planned === 3, "against what the day actually asked for");
 store.saveSession(mkRow({ mini: true, sessionType: "mini", roundsDone: 1, roundsPlanned: 3 }));
 const an8 = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics" }).analytics;
 ok(an8.rounds.planned === 4, "a mini asks for one round, not the light's three");
+
+/* ============================================================
+   INTERACTION REGRESSIONS
+
+   Five defects that were all invisible from the outside: nothing about the
+   rendered markup, the saved record or the engine's own counters said any of
+   them was happening. Each of these drives the real thing.
+   ============================================================ */
+
+/* --- 1. Recovery must not touch the training day's progress ---------------
+   The reproduction: half a Monday, then a body check that says Recovery. The
+   Recovery pass shared the `monday|<date>` key, so it stamped `light:"recovery"`
+   over the green she had trained under and its final clearDayProgress threw the
+   finished warm-up away. Reporting soreness honestly cost her the work. */
+const recSeeded = await runSession({ dayKey: "monday", light: "recovery", gateUnlocked: true,
+  seed: () => store.saveDayProgress("monday", { done: ["warmup", "coordination"], light: "green" })
+});
+ok(recSeeded.running === false, "a weekday Recovery pass runs to the end");
+// `sess` is a live singleton the next run resets, so hold on to the saved record.
+const recEntry = recSeeded.savedEntry;
+const keptProg = store.loadDayProgress("monday");
+ok(keptProg !== null, "the half-finished Monday is STILL THERE afterwards — Recovery used to erase it");
+ok(JSON.stringify(keptProg.done) === JSON.stringify(["warmup", "coordination"]),
+   "with exactly the blocks she had really finished, and nothing added");
+ok(keptProg.light === "green",
+   "and still under the light she trained under — not overwritten with 'recovery'");
+ok(!keptProg.done.includes("recovery"), "a recovery block is never written into a training day");
+
+/* It does not READ it either: a Recovery pass is never shortened by blocks a
+   workout finished earlier the same day. */
+ok(recSeeded.circuits.length === 1 && recSeeded.circuits[0].block === "recovery",
+   "the recovery menu is given in full, whatever the workout had already done");
+
+/* Training drills belong to training. A weekday that resolved to Recovery
+   because her body reported pain was still being handed the swim-skill work. */
+ok(recSeeded.microLoop === null, "no micro-loop quiz on a recovery day");
+const TRAINING_BLOCKS = ["warmup", "coordination", "main", "prep", "finisher"];
+ok(recSeeded.ledger.every(l => !TRAINING_BLOCKS.includes(l.block)),
+   "and not one row of training work — only the recovery menu she was actually given");
+
+/* A NORMAL session still resumes and still clears, exactly as before. */
+const normalResume = await runSession({ dayKey: "monday", light: "red", gateUnlocked: true,
+  seed: () => store.saveDayProgress("monday", { done: ["warmup"], light: "red" })
+});
+ok(normalResume.circuits.every(c => c.block !== "warmup"),
+   "a real session still skips the block it already finished today");
+ok(store.loadDayProgress("monday") === null,
+   "and finishing it still clears the day, so tomorrow starts clean");
+
+/* --- 2. a mixed done/skipped session reads as Partial, never Complete ----- */
+let skipEvery = 0;
+const sMixed = await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    // Skip every third move she is given; the rest are done properly.
+    if (["work", "reps"].includes(sess.phase) && sess.ledger.length !== skipEvery && sess.ledger.length % 3 === 2) {
+      skipEvery = sess.ledger.length;
+      engine.skipCurrentExercise();
+    }
+  }
+});
+const mixedRows = sMixed.ledger;
+ok(mixedRows.some(l => l.status === "done") && mixedRows.some(l => l.status === "skipped"),
+   "the run really did mix finished moves with skipped ones");
+const mixedVm = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+ok(mixedVm.completionState === "partial",
+   "a session with skipped moves reads as PARTIAL — reaching the end of the loop is not finishing");
+ok(mixedVm.isComplete === false, "and explicitly not complete");
+const mixedHtml = sscreen.sessionScreen(mixedVm);
+ok(!/Session Complete/.test(mixedHtml), "the finish screen does not say 'Session Complete!'");
+ok(/counts/.test(mixedHtml), "it says what she did do, and that it counts");
+
+/* The same screen, asked about the Recovery run: care, not a completed workout. */
+engine.exitSession();
+// The record the Recovery run actually saved — sess.savedEntry holds the ENTRY now,
+// which is exactly what makes the finish screen readable from the saved row.
+ok(recEntry && recEntry.sessionType === "recovery",
+   "the recovery run saved a record, and sess.savedEntry holds it rather than a bare true");
+Object.assign(engine.sess, { phase: "done", savedEntry: recEntry });
+const recVm = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+ok(recVm.completionState === "recovery",
+   "and a finished Recovery pass reads as RECOVERY, not 'Session Complete!'");
+ok(!/Session Complete/.test(sscreen.sessionScreen(recVm)), "so the screen never claims a workout she did not do");
+ok(recVm.showRoundsLine === false, "and it does not report '0 of 0 main rounds' at her");
+engine.exitSession();
+
+/* --- 3. a round cannot be completed by the rows recorded before an abort -- */
+const truncRow = (r, i) => ({ name: "m" + i, block: "main", round: r, status: "done" });
+const truncLedger = [];
+for (let i = 0; i < 8; i++) truncLedger.push(truncRow(1, i));
+for (let i = 0; i < 3; i++) truncLedger.push(truncRow(2, i));   // aborted 3 moves in
+const truncated = { ledger: truncLedger, expectedByRound: { 1: 8, 2: 8 }, roundsDone: 2,
+                    outcomeVersion: outcome.OUTCOME_VERSION };
+ok(outcome.mainRoundsFromLedger(truncLedger) === 2,
+   "without the expected counts, three done rows out of eight read as a whole round");
+ok(outcome.mainRoundsFromLedger(truncLedger, { 1: 8, 2: 8 }) === 1,
+   "with them, the truncated round is not a round — the rows are simply missing");
+ok(outcome.outcomeOf(truncated).mainRoundsDone === 1,
+   "and where the engine and the ledger disagree, the SMALLER number wins");
+ok(outcome.outcomeOf(truncated).roundsDisagree === true, "the disagreement is surfaced, not absorbed");
+ok(outcome.outcomeOf({ ...truncated, roundsDone: 1 }).roundsDisagree === false,
+   "two witnesses that agree raise nothing");
+ok(outcome.outcomeOf({ ledger: truncLedger, roundsDone: 2, outcomeVersion: outcome.OUTCOME_VERSION })
+     .mainRoundsDone === 2,
+   "a record written before this change keeps its old reading — history is not re-scored underneath her");
+
+/* --- 4. the safety voice obeys ITS OWN switch, in all four combinations ---
+   "Session stopped." used to be spoken by speakSafety and then immediately
+   cancelled by an interruptSpeech on the very next line — so with the coach
+   voice ON, the one cue she must never lose was the one cue she lost. */
+const spoken = [];
+const realSpeak = window.speechSynthesis.speak;
+window.speechSynthesis.speak  = function (u) { spoken.push(String(u.text)); return realSpeak.call(this, u); };
+window.speechSynthesis.cancel = function () { spoken.push("<cancel>"); };
+function stopSaysWhat(coach, safety) {
+  localStorage.clear(); store.migrate();
+  store.updateSettings({ coachSpeechOn: coach, safetyVoiceOn: safety, voiceStyle: "classic" });
+  spoken.length = 0;
+  engine.exitSession();
+  engine.endEarly();
+  return spoken.slice();
+}
+[[true, true], [false, true]].forEach(([coach, safety]) => {
+  const said = stopSaysWhat(coach, safety);
+  const at = said.indexOf("Session stopped.");
+  ok(at >= 0, `the stop is spoken with the coach ${coach ? "on" : "off"} and the safety voice on`);
+  ok(said.filter(t => t === "Session stopped.").length === 1, "exactly once, not twice");
+  ok(!said.slice(at + 1).includes("<cancel>"),
+     `and NOTHING cancels it afterwards (coach ${coach ? "on" : "off"}) — this is the regression`);
+});
+[[true, false], [false, false]].forEach(([coach, safety]) => {
+  const said = stopSaysWhat(coach, safety);
+  ok(!said.includes("Session stopped."),
+     `with the safety voice off it stays silent, coach ${coach ? "on" : "off"}`);
+});
+window.speechSynthesis.speak = realSpeak;
+window.speechSynthesis.cancel = function () {};
+localStorage.clear(); store.migrate();
+
+/* --- 5. the stop overlay keeps honest timestamps --------------------------
+   It used to set sess.paused bare, with no syncClock, so up to a second of real
+   work landed in `pausedMs` on the way in and a second of standing still landed
+   in `activeMs` on the way out. Opening it also counted as HER pausing. */
+const probe = {};
+const sStop = await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (ms === 6000)  { probe.beforeStop = engine.readClock(); probe.pausesBefore = sess.pauseCount || 0; engine.openStopOverlay(); }
+    if (ms === 14000) { probe.duringStop = engine.readClock(); engine.resumeFromStop(); }
+    if (ms === 16000) { probe.afterStop = engine.readClock(); engine.pauseSession("instructions"); }
+    if (ms === 24000) { probe.duringRead = engine.readClock(); engine.resumeSession("instructions"); }
+  }
+});
+ok(probe.beforeStop > 0, "the session clock was running before the stop overlay opened");
+ok(probe.duringStop === probe.beforeStop,
+   "eight seconds with the stop overlay up added NOTHING to the session clock");
+ok(probe.duringRead === probe.afterStop,
+   "and neither did eight seconds reading the instructions");
+ok(sStop.pauseCount === probe.pausesBefore,
+   "neither the stop overlay nor a read counts as her pausing — only the Pause button does");
+const stopRow = store.loadSessions()[0];
+ok(stopRow.pausedSecs >= 15,
+   "the paused time is recorded in full (" + stopRow.pausedSecs + "s), in the right bucket");
+ok(stopRow.durationSecs < stopRow.pausedSecs + stopRow.durationSecs,
+   "and the session duration excludes it");
+
+/* A pause she took HERSELF is not released by closing an overlay she opened
+   on top of it — the reason set has to empty first. */
+engine.exitSession();
+Object.assign(engine.sess, { running: true, paused: false, pauseReasons: [], clockAt: Date.now() });
+engine.togglePause();
+ok(engine.sess.paused === true, "she pauses");
+engine.pauseSession("instructions");
+engine.resumeSession("instructions");
+ok(engine.sess.paused === true, "reading a move and closing it leaves her own pause standing");
+engine.togglePause();
+ok(engine.sess.paused === false, "and only she can lift it");
+engine.exitSession();
 
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

@@ -513,6 +513,76 @@ export function clearDayProgress(dayKey) {
 export const GATE_WEEKS_REQUIRED = 2;
 export const GATE_MOVE = "Drop-and-Stick";
 
+/* ---- the grown-up PIN ------------------------------------------------------
+   The secret behind every grown-up decision in the app (js/gate.js).
+
+   Deliberately stored OUTSIDE the per-athlete namespace and OUTSIDE
+   PROFILE_KEYS, for three separate reasons:
+
+     · Device-level, not per-athlete. "Is a grown-up here?" is a fact about the
+       person holding the phone, not about whose training is on screen — a PIN
+       that lived per profile would be bypassed by switching athlete.
+     · Never exported. PROFILE_KEYS is what downloadBackup() writes into a JSON
+       file the child can open; a PIN in there is a PIN she can simply read.
+     · Never mirrored. Only session records go to Firestore, and this is not one.
+
+   The stored value is a salted digest, not the PIN. Be honest about what that
+   buys: localStorage is readable from devtools and the digest is not
+   cryptographic. It stops a curious 10-year-old from reading the PIN over her
+   parent's shoulder in the stored data — which is the actual threat model. It
+   would not stop an adult who wanted in, and it is not meant to. */
+export const LS_GROWNUP_PIN = "swim_grownup_pin_v1";   // NOT in PROFILE_KEYS — see above
+
+/* A small non-cryptographic digest (FNV-1a, salted). See the caveat above. */
+function pinDigest(pin, salt) {
+  const s = String(salt) + ":" + String(pin);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  // A second pass over the reversed string, so two PINs that differ only in
+  // digit order don't collide as readily as one pass would allow.
+  for (let i = s.length - 1; i >= 0; i--) {
+    h ^= s.charCodeAt(i) * 31;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+export const PIN_MIN_DIGITS = 4;
+export const PIN_MAX_DIGITS = 8;
+
+/* A PIN must be digits only and long enough not to be guessed in three tries. */
+export function isValidPinFormat(pin) {
+  return new RegExp("^\\d{" + PIN_MIN_DIGITS + "," + PIN_MAX_DIGITS + "}$").test(String(pin || "").trim());
+}
+
+export function hasGrownupPin() {
+  const rec = readRaw(LS_GROWNUP_PIN, null);
+  return !!(rec && rec.hash && rec.salt);
+}
+
+/* Returns false (and stores nothing) for a PIN that isn't 4–8 digits. */
+export function setGrownupPin(pin) {
+  const clean = String(pin || "").trim();
+  if (!isValidPinFormat(clean)) return false;
+  const salt = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+  return writeRaw(LS_GROWNUP_PIN, { hash: pinDigest(clean, salt), salt, setAt: Date.now() });
+}
+
+export function verifyGrownupPin(pin) {
+  const rec = readRaw(LS_GROWNUP_PIN, null);
+  if (!rec || !rec.hash || !rec.salt) return false;
+  return pinDigest(String(pin || "").trim(), rec.salt) === rec.hash;
+}
+
+/* Used by the "Forgot PIN" path, which clears the old one so a new one can be
+   set. Never called from anything the child can reach without the fallback. */
+export function clearGrownupPin() {
+  try { localStorage.removeItem(LS_GROWNUP_PIN); return true; } catch { return false; }
+}
+
 export function loadGate() {
   const g = readStorage(LS_GATE, { unlocked: false, cleanWeeks: [] });
   if (!Array.isArray(g.cleanWeeks)) g.cleanWeeks = [];

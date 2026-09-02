@@ -37,8 +37,18 @@ function legacyHadWork(entry) {
 }
 
 /* How many main rounds were actually finished — a round counts only when every
-   one of its rows is `done`. Derived from the ledger, never from the loop. */
-export function mainRoundsFromLedger(ledger) {
+   one of its rows is `done` AND all of its rows are actually there.
+
+   "All the rows that exist are done" is trivially true of a round that was cut
+   short: abort three moves into an eight-move round two and the ledger holds
+   three done rows, which read as a finished round and paid like one. So the
+   record carries `expectedByRound` (see countExpectedByRound in js/engine.js)
+   and a round has to produce that many rows before it can complete.
+
+   Records written before this — legacy rows, and rows restored from the cloud
+   or a backup — have no expected count, so they keep the old reading rather than
+   being re-scored underneath her. */
+export function mainRoundsFromLedger(ledger, expectedByRound = null) {
   const rows = (ledger || []).filter(l => l && l.block === "main");
   if (!rows.length) return 0;
   const byRound = new Map();
@@ -48,7 +58,12 @@ export function mainRoundsFromLedger(ledger) {
     byRound.get(r).push(l);
   });
   let done = 0;
-  byRound.forEach(rs => { if (rs.every(l => l.status === "done")) done += 1; });
+  byRound.forEach((rs, r) => {
+    if (!rs.every(l => l.status === "done")) return;
+    const expected = expectedByRound ? Number(expectedByRound[r]) : NaN;
+    if (Number.isFinite(expected) && rs.length < expected) return;   // rows missing
+    done += 1;
+  });
   return done;
 }
 
@@ -64,7 +79,8 @@ export function mainRoundsFromLedger(ledger) {
 export function deriveSessionOutcome(input = {}) {
   const {
     ledger = [], expectedWork = null, safetyStop = false, explicitAbort = false,
-    sessionType = null, practice = false, outcomeVersion = null
+    sessionType = null, practice = false, outcomeVersion = null,
+    expectedByRound = null, roundsDone = null
   } = input;
 
   const rows = ledger || [];
@@ -80,7 +96,18 @@ export function deriveSessionOutcome(input = {}) {
     : hasDetail ? legacyHadWork(input)
     : input.completedFully !== false;
 
-  const mainRoundsDone = mainRoundsFromLedger(rows);
+  /* Two independent witnesses to the same fact, and we believe the smaller one.
+     The LEDGER says which rounds have a full set of done rows; the ENGINE says
+     which rounds its own loop walked to the end without aborting (saved as
+     `roundsDone`). Either can be wrong on its own — the ledger can be short a
+     row the engine never wrote, and `roundsDone` is a bare number nothing else
+     can check — so a round is only counted when both agree it happened. */
+  const ledgerRounds = mainRoundsFromLedger(rows, expectedByRound);
+  const engineRounds = Number(roundsDone);
+  const mainRoundsDone = Number.isFinite(engineRounds)
+    ? Math.min(ledgerRounds, Math.max(0, engineRounds))
+    : ledgerRounds;
+  const roundsDisagree = Number.isFinite(engineRounds) && engineRounds !== ledgerRounds;
 
   // Completion is "every expected instance was DONE" — never "the loop ended".
   // Partial rows do not complete a session even though they are real work.
@@ -111,6 +138,9 @@ export function deriveSessionOutcome(input = {}) {
     meaningfulWork,
     completedFully: state === "complete",
     mainRoundsDone,
+    // Surfaced rather than logged here: this module stays pure and
+    // dependency-free (store.js imports IT), so the caller does the logging.
+    roundsDisagree,
     countsAsTraining: isTraining,
     countsForStreak: isTraining,
     xpEligible: isTraining || state === "recovery"
@@ -125,6 +155,8 @@ export function outcomeOf(entry) {
     ledger: entry.ledger || [],
     perExercise: entry.perExercise || [],
     expectedWork: Number.isFinite(entry.expectedWork) ? entry.expectedWork : null,
+    expectedByRound: entry.expectedByRound || null,
+    roundsDone: Number.isFinite(entry.roundsDone) ? entry.roundsDone : null,
     safetyStop: !!(entry.safetyStop || entry.pain),
     explicitAbort: entry.endedEarly === true,
     sessionType: entry.sessionType || (entry.spa ? "spa" : null),

@@ -25,7 +25,9 @@ import { buildProgressVM, toggleRedeem } from "./vm/progress.js";
 import { progressScreen } from "./screens/progress.js";
 import { buildGrownupVM, exportCsv } from "./vm/grownup.js";
 import { grownupScreen } from "./screens/grownup.js";
-import { requireGrownup, gateChallenge, answerGate, lockGate, gateUnlocked, GATE_REASON } from "./gate.js";
+import { requireGrownup, gateChallenge, answerGate, answerPin, choosePin, beginPinReset,
+         gateMode, lockGate, gateUnlocked, hasGrownupPin, isValidPinFormat,
+         PIN_MIN_DIGITS, PIN_MAX_DIGITS, GATE_REASON } from "./gate.js";
 import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS, recordFormVerdict, repairPrizeWallet, redeemedPrizesForReview, restorePrize } from "./store.js";
 
 export const state = {
@@ -33,6 +35,7 @@ export const state = {
   grownupTab: "overview",       // 'overview' | 'analytics' | 'library' | 'settings' | 'coaching'
   gateAsk: null,                // the pending grown-up action, or null
   gateError: "",                // "that's not it" after a wrong answer
+  gateFallback: false,          // true once "Forgot PIN" has switched to the arithmetic question
   prizeReviewOpen: false,       // the redeemed-prize review list
   gsScope: "week",
   logScope: "week",
@@ -109,17 +112,33 @@ function storageBannerHtml() {
 function gateHtml() {
   if (!state.gateAsk) return "";
   const reason = GATE_REASON[state.gateAsk] || "continue";
+  const mode = gateMode(state.gateFallback);
+  const inputStyle = "width:100%;min-height:48px;border:2px solid var(--hairline);border-radius:12px;padding:0 14px;font-size:18px;font-weight:900;font-family:inherit;box-sizing:border-box;";
+  // Three shapes, one card: type the PIN, choose a first PIN, or — having
+  // forgotten it — answer the fallback question and choose a new one.
+  const body =
+    mode === "pin" ? `
+      <div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:10px;">Enter the grown-up PIN.</div>
+      <input type="password" inputmode="numeric" autocomplete="off" data-input="gatePin" style="${inputStyle}" placeholder="PIN">`
+    : mode === "setPin" ? `
+      <div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:4px;">Choose a grown-up PIN.</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.5;margin-bottom:10px;">${PIN_MIN_DIGITS}–${PIN_MAX_DIGITS} digits. It stays on this device — it is never in a backup file and never leaves it. Pick one she doesn't know.</div>
+      <input type="password" inputmode="numeric" autocomplete="off" data-input="gateNewPin" style="${inputStyle}" placeholder="New PIN">`
+    : `
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.5;margin-bottom:10px;">The old PIN has been cleared. Answer this, then choose a new one.</div>
+      <div style="font-family:var(--font-display);font-weight:600;font-size:26px;color:var(--ink);margin-bottom:10px;">${escapeHtml(gateChallenge().question)}</div>
+      <input type="number" inputmode="numeric" data-input="gateAnswer" style="${inputStyle}" placeholder="Answer">`;
   return `<div style="position:fixed;inset:0;z-index:210;background:rgba(20,59,74,0.62);display:flex;align-items:center;justify-content:center;padding:24px;font-family:var(--font-ui);">
     <div data-stop-propagation="1" style="background:var(--surface);border-radius:20px;padding:22px 24px;max-width:380px;width:100%;box-shadow:0 18px 40px rgba(20,59,74,0.3);">
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--ink);margin-bottom:6px;">Grown-up check</div>
       <div style="font-size:13px;font-weight:800;color:var(--ink-soft);line-height:1.5;margin-bottom:14px;">A grown-up needs to be here to ${escapeHtml(reason)}.</div>
-      <div style="font-family:var(--font-display);font-weight:600;font-size:26px;color:var(--ink);margin-bottom:10px;">${escapeHtml(gateChallenge().question)}</div>
-      <input type="number" inputmode="numeric" data-input="gateAnswer" style="width:100%;min-height:48px;border:2px solid var(--hairline);border-radius:12px;padding:0 14px;font-size:18px;font-weight:900;font-family:inherit;box-sizing:border-box;" placeholder="Answer">
-      ${state.gateError ? `<div style="margin-top:8px;font-size:13px;font-weight:800;color:var(--stop-ink);">${escapeHtml(state.gateError)}</div>` : ""}
+      ${body}
+      ${state.gateError ? `<div role="alert" style="margin-top:8px;font-size:13px;font-weight:800;color:var(--stop-ink);">${escapeHtml(state.gateError)}</div>` : ""}
       <div style="display:flex;gap:10px;margin-top:14px;">
-        <button type="button" data-action="submitGate" style="flex:1;min-height:46px;border:none;border-radius:var(--radius-pill);background:var(--mint);color:#fff;font-weight:900;font-size:15px;cursor:pointer;font-family:inherit;">Unlock</button>
+        <button type="button" data-action="submitGate" style="flex:1;min-height:46px;border:none;border-radius:var(--radius-pill);background:var(--mint);color:#fff;font-weight:900;font-size:15px;cursor:pointer;font-family:inherit;">${mode === "setPin" ? "Set PIN" : "Unlock"}</button>
         <button type="button" data-action="cancelGate" style="min-height:46px;border:2px solid var(--hairline);border-radius:var(--radius-pill);background:transparent;color:var(--ink-soft);font-weight:900;font-size:14px;padding:0 16px;cursor:pointer;font-family:inherit;">Cancel</button>
       </div>
+      ${mode === "pin" ? `<button type="button" data-action="forgotPin" style="margin-top:10px;background:none;border:none;padding:4px;color:var(--ink-soft);font-weight:800;font-size:13px;text-decoration:underline;cursor:pointer;font-family:inherit;">Forgot the PIN?</button>` : ""}
     </div>
   </div>`;
 }
@@ -167,18 +186,41 @@ function gate(action, payload = null) {
   state.gateAsk = action;
   state.gatePayload = payload;
   state.gateError = "";
+  state.gateFallback = false;
   render();
   return false;
 }
 
-/* What to do once the grown-up has been confirmed. */
+/* What to do once the grown-up has been confirmed.
+
+   Most gated actions simply re-run themselves: `actions.toggleGate()` calls
+   `gate("toggleGate")`, which now passes, and the action completes. That is why
+   the grown-up never has to go and find the button again after unlocking. The
+   handful of entries written out longhand are the ones whose action cannot
+   simply be re-entered — a readiness decision that carries a payload, or a
+   restore holding a File object. */
+const rerun = name => () => { const fn = actions[name]; if (fn) fn(state.gatePayload); };
+
 const GATED_RUNNERS = {
+  // opening the Zone is the action
+  grownupZone:    () => { state.nav = "grownup"; },
+  // readiness decisions, taken from her screen rather than the Zone
   severity3:      () => { confirmGrownup(state.readiness); },
   lightOverride:  () => { if (state.readiness && state.gatePayload) { state.readiness.light = state.gatePayload; state.readiness.overridden = true; } },
-  valgusGate:     () => { const g = loadGate(); g.unlocked = !g.unlocked; saveGate(g); },
-  backupRestore:  () => { const p = state.pendingRestore; if (p && p.file) runRestore(p.file, { force: true }); },
-  prizeRepair:    () => { state.prizeReviewOpen = true; },
-  safetySettings: () => { updateSettings({ safetyVoiceOn: settings.safetyVoiceOn === false }); }
+  safetySettings: () => { updateSettings({ safetyVoiceOn: settings.safetyVoiceOn === false }); },
+  // everything in the Zone: re-run the action she asked for, with its argument
+  toggleGate: rerun("toggleGate"), toggleCoachVoice: rerun("toggleCoachVoice"),
+  toggleTimerSounds: rerun("toggleTimerSounds"),
+  setVoiceStyle: rerun("setVoiceStyle"), bumpRest: rerun("bumpRest"),
+  togglePractice: rerun("togglePractice"), pickAthlete: rerun("pickAthlete"),
+  addAthlete: rerun("addAthlete"), setLadderRung: rerun("setLadderRung"),
+  saveTrackerWeek: rerun("saveTrackerWeek"), formCheckPass: rerun("formCheckPass"),
+  formCheckFail: rerun("formCheckFail"), pickEngagement: rerun("pickEngagement"),
+  repairWallet: rerun("repairWallet"), reviewPrizes: rerun("reviewPrizes"),
+  restorePrize: rerun("restorePrize"), confirmRestore: rerun("confirmRestore"),
+  addPrizePoolItem: rerun("addPrizePoolItem"), removePrizePoolItem: rerun("removePrizePoolItem"),
+  resetPrizePool: rerun("resetPrizePool"), downloadBackup: rerun("downloadBackup"),
+  exportCsv: rerun("exportCsv")
 };
 
 /* Exported so the test suite can drive the action layer directly. Several of
@@ -186,12 +228,32 @@ const GATED_RUNNERS = {
    and silently restarted the workout clock, another that closed Try-It without
    disarming it — and neither is visible from rendered markup. */
 export const actions = {
-  nav(arg) { state.nav = arg; render(); },
+  /* The Grown-up Zone has a DOOR now. It had none: a tap on the 🧑 rail button
+     opened the whole thing, and only six of the actions inside ever asked for
+     anything. Leaving drops the unlock, so coming back asks again — the five
+     minute expiry is a backstop, not the mechanism. */
+  nav(arg) {
+    if (arg === "grownup") {
+      if (!gate("grownupZone")) return;
+    } else if (state.nav === "grownup") {
+      lockGate();
+      state.prizeReviewOpen = false;
+      state.walletRepairNote = ""; state.backupNote = "";
+    }
+    state.nav = arg;
+    render();
+  },
   dismissStorageError() { state.storageError = null; render(); },
   // Switching athlete swaps every storage namespace; a reload is the only way
   // to be sure no module is still holding the previous kid's data.
-  pickAthlete(arg) { if (arg !== activeProfileId() && switchProfile(arg)) location.reload(); },
+  pickAthlete(arg) {
+    if (!gate("pickAthlete", arg)) return;
+    if (arg !== activeProfileId() && switchProfile(arg)) location.reload();
+  },
   addAthlete() {
+    // Gated BEFORE the input is read, so the re-run after unlocking reads the
+    // field as it stands then rather than replaying a stale value.
+    if (!gate("addAthlete")) return;
     const inp = root.querySelector('[data-input="newProfile"]');
     const name = (inp && inp.value || "").trim();
     if (!name) return;
@@ -200,8 +262,18 @@ export const actions = {
   },
   selectDay(arg) { state.selectedDay = arg; state.expanded = {}; render(); },
   toggleBlock(arg) { state.expanded[arg] = !state.expanded[arg]; render(); },
-  toggleCoachVoice() { updateSettings({ coachSpeechOn: settings.coachSpeechOn === false }); render(); },
-  toggleTimerSounds() { updateSettings({ timerSoundsOn: settings.timerSoundsOn === false }); render(); },
+  /* Every one of these lives in the Grown-up Zone and changes how her sessions
+     run or what gets recorded. All of them were reachable by anyone holding the
+     phone; the gate is on the ACTION, so hiding the control was never what was
+     protecting them — and now doesn't need to be. */
+  toggleCoachVoice() {
+    if (!gate("toggleCoachVoice")) return;
+    updateSettings({ coachSpeechOn: settings.coachSpeechOn === false }); render();
+  },
+  toggleTimerSounds() {
+    if (!gate("toggleTimerSounds")) return;
+    updateSettings({ timerSoundsOn: settings.timerSoundsOn === false }); render();
+  },
   toggleSafetyVoice() {
     // Safety cues are the point of the readiness system, so turning them OFF is
     // a grown-up decision. Turning them back on never needs one.
@@ -210,6 +282,9 @@ export const actions = {
     render();
   },
   togglePractice() {
+    // Arming Try-It means the next run is NOT recorded. A child who can arm it
+    // can quietly erase her own training day, so this is a grown-up's switch.
+    if (!gate("togglePractice")) return;
     // Backed by settings, not memory: a reload used to disarm it silently and
     // record a run meant as a test.
     setTryIt(!state.practiceMode);
@@ -388,7 +463,9 @@ export const actions = {
     if (!ex) return;
     state.detailEx = ex;
     state.detailOverlay = true;
-    if (engine.sess.running && !engine.sess.paused) engine.togglePause();
+    // Named reason, not a borrowed user pause: reading a move must not be
+    // announced out loud, and must not count as her stopping for a breather.
+    engine.pauseSession("instructions");
     render();
   },
   openDetailCur() { actions.openDetail(engine.sess.currentEx); },
@@ -400,7 +477,7 @@ export const actions = {
   watchVideo() {
     // The link opens in a new tab on its own; all this has to do is make sure
     // the clock is stopped before she leaves.
-    if (engine.sess.running && !engine.sess.paused) engine.togglePause();
+    engine.pauseSession("video");
   },
   /* Closing the instructions and RESUMING the workout are two different
      intentions. The ✕ and a tap on the backdrop are how you dismiss something
@@ -412,7 +489,10 @@ export const actions = {
   },
   resumeFromDetail() {
     state.detailOverlay = false; state.detailEx = null;
-    if (engine.sess.running && engine.sess.paused) engine.togglePause();
+    // Releases only the pause the instructions took. A session she had already
+    // paused herself, or left open on a video, stays paused.
+    engine.resumeSession("instructions");
+    engine.resumeSession("video");
     render();
   },
   openPrizeDraw() {
@@ -441,25 +521,58 @@ export const actions = {
   /* ---- grown-up gate ------------------------------------------------------
      Consequential decisions ask for a grown-up first. See js/gate.js for why
      this is an arithmetic question rather than a PIN. */
+  /* One place where an unlock becomes real, whichever way it was proved. */
   answerGate(arg) {
     const action = state.gateAsk;
     if (!action) return;
-    if (!answerGate(arg)) { state.gateError = "Not quite — try the new one."; render(); return; }
+    const mode = gateMode(state.gateFallback);
+    let opened = false;
+    if (mode === "pin") {
+      opened = answerPin(arg);
+      if (!opened) state.gateError = "That's not the PIN.";
+    } else if (mode === "setPin") {
+      opened = choosePin(arg);
+      if (!opened) state.gateError = `A PIN is ${PIN_MIN_DIGITS}–${PIN_MAX_DIGITS} digits.`;
+    } else {
+      // The fallback question. Answering it right does not unlock on its own —
+      // it earns the right to SET a PIN, which is the next thing shown.
+      if (answerGate(arg)) { state.gateFallback = false; state.gateError = ""; render(); return; }
+      state.gateError = "Not quite — try the new one.";
+    }
+    if (!opened) { render(); return; }
+    state.gateFallback = false;
     state.gateError = "";
     state.gateAsk = null;
+    state.gateFallback = false;
     const run = GATED_RUNNERS[action];
     if (run) run();
+    state.gatePayload = null;
     render();
   },
   submitGate() {
-    const inp = root.querySelector('[data-input="gateAnswer"]');
+    const mode = gateMode(state.gateFallback);
+    const sel = mode === "pin" ? "gatePin" : mode === "setPin" ? "gateNewPin" : "gateAnswer";
+    const inp = root.querySelector(`[data-input="${sel}"]`);
     actions.answerGate(inp ? inp.value : "");
   },
-  cancelGate() { state.gateAsk = null; state.gateError = ""; state.gatePayload = null; render(); },
+  /* A parent locked out of their own child's history is a worse outcome than
+     the fallback being only child-deterrence. The old PIN goes immediately, so
+     this can't be used to peek at it. */
+  forgotPin() {
+    beginPinReset();
+    state.gateFallback = true;
+    state.gateError = "";
+    render();
+  },
+  cancelGate() {
+    state.gateAsk = null; state.gateError = ""; state.gatePayload = null;
+    state.gateFallback = false;
+    render();
+  },
   confirmRestore() {
     const p = state.pendingRestore;
     if (!p || !p.file) return;
-    if (!gate("backupRestore")) return;
+    if (!gate("confirmRestore")) return;
     runRestore(p.file, { force: true });
   },
   cancelRestore() { state.pendingRestore = null; state.backupNote = ""; render(); },
@@ -468,6 +581,7 @@ export const actions = {
      backfilling a missing timestamp was announced as a "stuck used prize
      unstuck" while the prize stayed firmly used. */
   repairWallet() {
+    if (!gate("repairWallet")) return;
     const { reissued, dated } = repairPrizeWallet();
     publishJourney();
     const parts = [];
@@ -484,13 +598,13 @@ export const actions = {
     render();
   },
   reviewPrizes() {
-    if (!gate("prizeRepair")) return;
+    if (!gate("reviewPrizes")) return;
     state.prizeReviewOpen = true;
     render();
   },
   closePrizeReview() { state.prizeReviewOpen = false; state.walletRepairNote = ""; render(); },
   restorePrize(arg) {
-    if (!gate("prizeRepair")) return;
+    if (!gate("restorePrize", arg)) return;
     const r = restorePrize(arg);
     publishJourney();
     state.walletRepairNote = r.restored
@@ -501,17 +615,22 @@ export const actions = {
   },
   setGsScope(arg) { state.gsScope = arg; render(); },
   formCheckMonth(arg) { state.formCheckMonth = arg; render(); },
-  formCheckPass(arg) { recordFormVerdict(arg, true, state.formCheckMonth); render(); },
-  formCheckFail(arg) { recordFormVerdict(arg, false, state.formCheckMonth); render(); },
-  setVoiceStyle(arg) { updateSettings({ voiceStyle: arg }); render(); },
+  // A form verdict is the parent's own observation of how she moves — it feeds
+  // the valgus gate and the technique reports, so she cannot grade herself.
+  formCheckPass(arg) { if (!gate("formCheckPass", arg)) return; recordFormVerdict(arg, true, state.formCheckMonth); render(); },
+  formCheckFail(arg) { if (!gate("formCheckFail", arg)) return; recordFormVerdict(arg, false, state.formCheckMonth); render(); },
+  setVoiceStyle(arg) { if (!gate("setVoiceStyle", arg)) return; updateSettings({ voiceStyle: arg }); render(); },
   bumpRest(arg) {
+    if (!gate("bumpRest", arg)) return;
     const [key, step, min, max] = arg.split("|");
     const next = Math.min(Number(max), Math.max(Number(min), (settings[key] || 0) + Number(step)));
     updateSettings({ [key]: next });
     render();
   },
-  exportCsv() { exportCsv(); },
+  // Both of these hand her entire training history to whoever asked for it.
+  exportCsv() { if (!gate("exportCsv")) return; exportCsv(); },
   downloadBackup() {
+    if (!gate("downloadBackup")) return;
     const p = downloadBackup();
     const n = (p.data[LS_SESSIONS] || []).length;
     state.backupNote = `Backup downloaded — ${n} session${n === 1 ? "" : "s"} and everything ${p.profile.name} has earned.`;
@@ -520,13 +639,14 @@ export const actions = {
   },
   toggleGate() {
     // The valgus gate decides whether she is jumping at all. That is not hers.
-    if (!gate("valgusGate")) return;
+    if (!gate("toggleGate")) return;
     const g = loadGate();
     g.unlocked = !g.unlocked;
     saveGate(g);
     render();
   },
   setLadderRung(arg) {
+    if (!gate("setLadderRung", arg)) return;
     const [name, lvl] = arg.split("|");
     const rungs = loadLadderRungs();
     rungs[name] = Number(lvl);
@@ -534,6 +654,7 @@ export const actions = {
     render();
   },
   saveTrackerWeek() {
+    if (!gate("saveTrackerWeek")) return;
     const t = loadTracker();
     const wk = "week" + getCurrentTrackerWeek();
     t[wk] = t[wk] || {};
@@ -544,8 +665,9 @@ export const actions = {
     saveTracker(t);
     render();
   },
-  pickEngagement(arg) { setEngagementPick(arg); render(); },
+  pickEngagement(arg) { if (!gate("pickEngagement", arg)) return; setEngagementPick(arg); render(); },
   addPrizePoolItem() {
+    if (!gate("addPrizePoolItem")) return;
     const inp = root.querySelector('[data-input="newPrize"]');
     const text = (inp && inp.value || "").trim();
     if (!text) return;
@@ -558,12 +680,13 @@ export const actions = {
     render();
   },
   removePrizePoolItem(arg) {
+    if (!gate("removePrizePoolItem", arg)) return;
     const pool = buildGrownupVM(state).prizePool.slice();
     pool.splice(Number(arg), 1);
     updateSettings({ prizePool: pool });
     render();
   },
-  resetPrizePool() { updateSettings({ prizePool: null }); render(); },
+  resetPrizePool() { if (!gate("resetPrizePool")) return; updateSettings({ prizePool: null }); render(); },
   exitSession() {
     engine.exitSession();
     // The engine disarms try-it when a run finalizes; mirror that into the view

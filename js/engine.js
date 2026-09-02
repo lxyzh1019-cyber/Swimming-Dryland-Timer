@@ -8,7 +8,7 @@
      notify("tick")  → targeted per-second DOM writes only
    ============================================================ */
 
-import { deriveSessionOutcome, OUTCOME_VERSION } from "./outcome.js";
+import { deriveSessionOutcome, mainRoundsFromLedger, OUTCOME_VERSION } from "./outcome.js";
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA,
          exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
          VALGUS_FLOOR, VALGUS_PROGRESSIONS } from "./data.js";
@@ -33,7 +33,7 @@ export const sess = blankSession();
 
 function blankSession() {
   return {
-    running: false, paused: false, abort: false, skipExercise: false, forceDone: false, forceDoneAt: 0,
+    running: false, paused: false, pauseReasons: [], abort: false, skipExercise: false, forceDone: false, forceDoneAt: 0,
     byRepsResolver: null, intentResolver: null, microResolver: null,
     currentEx: null, skipped: [], perExercise: [], justSkipped: false,
     phase: "greeting",           // greeting|getready|work|reps|sideswitch|rest|roundRest|sectionRest|intent|microloop|breath|done
@@ -188,6 +188,32 @@ export function countExpectedWork(circuits) {
     }
   });
   return n;
+}
+
+/* How many MAIN-circuit rows each main round was supposed to produce, as
+   { "1": 8, "2": 8, "3": 8 }.
+
+   Without this a completed round is unprovable from the saved record.
+   `mainRoundsFromLedger` used to call a round done when every row it could SEE
+   was done — but a session aborted three moves into round two leaves five rows
+   simply missing, and "all of the rows that exist are done" is trivially true of
+   three rows out of eight. The record now carries what each round asked for, so
+   a round completes only when the ledger holds that many done rows.
+
+   Built with the same `ex.rounds && r > ex.rounds` rule as countExpectedWork and
+   the runner itself, so the expected count and the rows the runner writes cannot
+   drift apart. */
+export function countExpectedByRound(circuits) {
+  const out = {};
+  (circuits || []).forEach(c => {
+    if (c.block !== "main") return;
+    for (let r = 1; r <= c.rounds; r++) {
+      let n = 0;
+      c.exercises.forEach(ex => { if (!(ex.rounds && r > ex.rounds)) n++; });
+      out[r] = (out[r] || 0) + n;
+    }
+  });
+  return out;
 }
 
 /* Estimated session length in seconds (rep-based ≈ secondsPerRep × reps). */
@@ -613,8 +639,24 @@ export function perExerciseFromLedger(ledger) {
   return [...byName.values()];
 }
 
+/* Recovery and Spa are CARE, not training, and they share the weekday's key.
+   A Monday Recovery therefore used to read, rewrite and finally CLEAR the very
+   same `monday|<date>` day-progress record a half-finished Monday workout had
+   left behind: it pushed a "recovery" block into her done list, stamped
+   `light: "recovery"` over the green she had actually trained under, and then
+   the end-of-run clearDayProgress threw the finished warm-up away. Reporting
+   soreness honestly cost her the work she had already done.
+
+   Day progress belongs to the TRAINING day. A care session must not read it,
+   write it, or clear it — which also means an interrupted Recovery simply
+   starts again from the top of the recovery menu, and that is fine: it is a
+   short pass, and inventing a second progress namespace would be a second
+   thing to get wrong. */
+function isCareSession(s = sess) { return !!(s.recovery || s.spa); }
+
 function recordBlockDone(blockKey, ci) {
   if (!blockKey || blockKey === "prep" || sess.mode === "tryit") return;
+  if (isCareSession()) return;     // care never touches the training day's record
   if (!blockHadWork(ci)) return;   // skipping everything doesn't finish a block
   const prog = loadDayProgress(sess.dayKey) || { done: [], light: sess.light };
   if (!prog.done.includes(blockKey)) prog.done.push(blockKey);
@@ -724,10 +766,11 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
     spa: !!day.spa
   });
 
-  // Same-day resume: blocks already completed today are skipped.
-  const prog = loadDayProgress(dayKey);
+  // Same-day resume: blocks already completed today are skipped. A care session
+  // does not even READ the training day's progress — see isCareSession.
+  const prog = isCareSession() ? null : loadDayProgress(dayKey);
   const skipBlocks = (prog && prog.done) || [];
-  sess.circuits = assembleCircuits(dayKey, sess.light, { mini: sess.mini, skip: (sess.spa || sess.recovery) ? [] : skipBlocks });
+  sess.circuits = assembleCircuits(dayKey, sess.light, { mini: sess.mini, skip: isCareSession() ? [] : skipBlocks });
   if (!sess.circuits.length) { sess.running = false; return; }
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
   sess.expectedWork = countExpectedWork(sess.circuits);
@@ -924,8 +967,11 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
     recordBlockDone(circuit.block, ci);
   }
 
-  // Swim-skill extras: micro-loop Q&A + breath rehearsal (skipped on spa days)
-  if (!sess.spa) {
+  // Swim-skill extras: micro-loop Q&A + breath rehearsal. These are TRAINING
+  // drills, so no care session runs them — not Spa Sunday, and not a weekday
+  // that resolved to Recovery because her body reported pain. The old `!sess.spa`
+  // guard let a sore Monday be handed a breath rehearsal anyway.
+  if (!isCareSession()) {
     await microLoopPrompt();
     if (sess.abort) return finalize(false);
     setPhase("breath");
@@ -935,8 +981,10 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
   }
 
   // A MINI is a subset, not the day. Clearing day progress here is what let a
-  // 10-minute mini wipe the rest of the plan and tick the whole day off.
-  if (!sess.mini) clearDayProgress(sess.dayKey);
+  // 10-minute mini wipe the rest of the plan and tick the whole day off. A CARE
+  // session is not the day either — finishing a Recovery pass must leave a
+  // half-trained Monday exactly as it found it.
+  if (!sess.mini && !isCareSession()) clearDayProgress(sess.dayKey);
   finalize(true);
 }
 
@@ -947,6 +995,7 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
 export function finalize(completed) {
   sess.running = false;
   sess.paused = false;
+  sess.pauseReasons = [];
   sess.abort = false;
   sess.stopOverlay = false;
   sess.confirmEnd = false;
@@ -1000,17 +1049,35 @@ export function finalize(completed) {
     // version marker that lets partial work count, and every reader derives
     // completion from the ledger through js/outcome.js.
     expectedWork: sess.expectedWork || 0,
+    // What each main round asked for, so a completed round is provable from the
+    // record alone — including a record that arrives back from the cloud or a
+    // backup file, where the engine that ran it is long gone.
+    expectedByRound: countExpectedByRound(sess.circuits),
     outcomeVersion: OUTCOME_VERSION,
     completedFully: !!completed
   };
-  entry.completedFully = deriveSessionOutcome({
+  const finalOutcome = deriveSessionOutcome({
     ledger: entry.ledger, expectedWork: entry.expectedWork,
+    expectedByRound: entry.expectedByRound, roundsDone: entry.roundsDone,
     safetyStop, explicitAbort: !completed, sessionType: entry.sessionType,
     outcomeVersion: OUTCOME_VERSION, completedFully: !!completed
-  }).state === "complete";
+  });
+  entry.completedFully = finalOutcome.state === "complete";
+  // The engine's own round count and the ledger's disagreeing means one of them
+  // is wrong about what happened. The smaller number is used either way; this
+  // makes the discrepancy visible instead of quietly absorbed.
+  if (finalOutcome.roundsDisagree) {
+    logEvent("rounds_disagree", {
+      day: sess.dayKey, engine: entry.roundsDone,
+      ledger: mainRoundsFromLedger(entry.ledger, entry.expectedByRound)
+    });
+  }
   sess.perExercise = entry.perExercise;
   const saved = saveSession(entry);
-  sess.savedEntry = saved;
+  // The RECORD, not a boolean. The finish screen has to say what the saved row
+  // says — read back through outcomeOf, the same authority the parent reports
+  // will use tomorrow — and it cannot do that from a `true`.
+  sess.savedEntry = saved ? entry : null;
   sess.saveFailed = !saved;   // the complete screen must not claim a save that didn't happen
   sess.savedKey = saved ? sessionKey(entry) : null;
   logEvent(completed ? "session_complete" : "session_abort", {
@@ -1069,13 +1136,66 @@ export function finalize(completed) {
 /* ============================================================
    CONTROLS (called from the UI action layer)
    ============================================================ */
-export function togglePause() {
+/* ---- pause transitions ----------------------------------------------------
+   The clock is timestamp-driven, so the ONE thing every pause and resume must
+   do is call syncClock() before it flips the flag: that closes the span at the
+   exact moment of the tap and files it in the right bucket. Four places entered
+   a pause and only one of them did — the stop overlay and the resume out of it
+   set `sess.paused` bare, so up to a second of real work landed in `pausedMs`
+   (or a second of reading landed in `activeMs`) on every stop she opened.
+
+   The other half of the problem was that the instructions card, the video link
+   and the stop overlay all borrowed the USER's pause: each one announced
+   "Paused." out loud and added to `pauseCount`, so the parent report counted
+   reading a move description as her stopping for a breather.
+
+   So a pause now has a REASON, and the reasons are a set. A session paused for
+   two reasons at once — she paused, then opened the instructions — resumes only
+   when both are gone, which is what stops closing a card from restarting a
+   clock she deliberately stopped. Only "user" is audible and only "user"
+   counts. */
+export const PAUSE_USER = "user";
+
+function pauseReasons() {
+  if (!Array.isArray(sess.pauseReasons)) sess.pauseReasons = [];
+  return sess.pauseReasons;
+}
+
+export function pauseSession(reason = PAUSE_USER) {
+  if (!sess.running) return;
   syncClock();                       // close the span at the moment of the tap
-  sess.paused = !sess.paused;
-  if (sess.paused) sess.pauseCount = (sess.pauseCount || 0) + 1;
-  logEvent(sess.paused ? "pause" : "resume", { ex: sess.currentEx ? sess.currentEx.name : null });
-  interruptSpeech(sess.paused ? "Paused." : "Resuming.");
+  const reasons = pauseReasons();
+  // A pause set directly on `sess` (or carried over from before this ran) is
+  // still a pause somebody wants: keep it, so closing an overlay can't undo it.
+  if (sess.paused && !reasons.length) reasons.push(PAUSE_USER);
+  if (!reasons.includes(reason)) reasons.push(reason);
+  const wasPaused = sess.paused;
+  sess.paused = true;
+  if (wasPaused) { notify("phase"); return; }
+  if (reason === PAUSE_USER) sess.pauseCount = (sess.pauseCount || 0) + 1;
+  logEvent("pause", { reason, ex: sess.currentEx ? sess.currentEx.name : null });
+  if (reason === PAUSE_USER) interruptSpeech("Paused.");
   notify("phase");
+}
+
+export function resumeSession(reason = PAUSE_USER) {
+  if (!sess.running) return;
+  syncClock();                       // close the paused span at the same instant
+  const reasons = pauseReasons();
+  const i = reasons.indexOf(reason);
+  if (i >= 0) reasons.splice(i, 1);
+  if (reasons.length) { notify("phase"); return; }   // something else still holds it
+  if (!sess.paused) { notify("phase"); return; }
+  sess.paused = false;
+  logEvent("resume", { reason, ex: sess.currentEx ? sess.currentEx.name : null });
+  if (reason === PAUSE_USER) interruptSpeech("Resuming.");
+  notify("phase");
+}
+
+/* The Pause button. Everything else names its own reason. */
+export function togglePause() {
+  if (sess.paused) resumeSession(PAUSE_USER);
+  else pauseSession(PAUSE_USER);
 }
 
 export function advance() {
@@ -1108,13 +1228,13 @@ export function skipCurrentExercise() {
 
 export function openStopOverlay() {
   sess.stopOverlay = true;
-  sess.paused = true;
   cancelSpeech();
+  pauseSession("stop");
   notify("phase");
 }
 export function resumeFromStop() {
   sess.stopOverlay = false;
-  sess.paused = false;
+  resumeSession("stop");
   notify("phase");
 }
 export function endFromStop() {
@@ -1132,8 +1252,13 @@ export function endEarly() {
   // A stop confirmation is a SAFETY line: it is spoken even with the coach
   // muted, because "I stopped because it hurt" is the one thing she must hear
   // acknowledged.
+  //
+  // It is spoken ONCE, by speakSafety, and nothing may follow it. The line used
+  // to be repeated through interruptSpeech, whose speech.cancel() killed the
+  // safety utterance a moment after it started — so with the coach voice ON the
+  // one cue that must never be lost was the one cue that was. speakSafety
+  // already cancels whatever was mid-sentence before it speaks.
   speakSafety("Session stopped.");
-  interruptSpeech("Session stopped.");
 }
 
 export function pickIntentWord(word) { if (sess.intentResolver) sess.intentResolver(word); }
