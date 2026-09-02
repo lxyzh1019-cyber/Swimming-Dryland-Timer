@@ -101,7 +101,6 @@ export const GATE_REASON = {
   toggleTimerSounds: "change the coaching settings",
   setVoiceStyle:  "change the coach's voice",
   bumpRest:       "change how long her rests are",
-  togglePractice: "arm Try-It, so the next run is not recorded",
   pickAthlete:    "switch to a different athlete",
   addAthlete:     "add a new athlete to this device",
   setLadderRung:  "change where she is on the independence ladder",

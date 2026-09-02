@@ -238,11 +238,8 @@ function dayPane(vm, wide) {
       ${dv.ctaSubtext ? `<div style="text-align:center;font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.8;padding-top:8px;">${dv.ctaSubtext}</div>` : ""}` : ""}
     ${dv.showTryIt ? `
       <div style="padding-top:${wide ? 10 : 8}px;">
-        <button type="button" data-action="togglePractice" aria-pressed="${vm.practiceMode}" style="${vm.practiceBtnStyle}">
-          <span style="font-size:16px;">🧪</span>${vm.practiceLinkLabel}
-          <span style="display:inline-flex;align-items:center;width:32px;height:18px;border-radius:9px;padding:2px;flex-shrink:0;background:${vm.practiceMode ? "var(--aqua)" : "rgba(255,255,255,0.3)"};">
-            <span style="width:14px;height:14px;border-radius:50%;background:#fff;display:block;transform:translateX(${vm.practiceMode ? "14px" : "0"});transition:transform 0.15s;"></span>
-          </span>
+        <button type="button" data-action="goTryIt" data-arg="${vm.selectedKey}" style="${vm.practiceBtnStyle}">
+          ${vm.practiceLinkLabel}
         </button>
         <div style="text-align:center;font-size:12px;font-weight:700;opacity:0.8;padding-top:6px;">${vm.practiceHintLine}</div>
       </div>` : ""}
@@ -260,7 +257,6 @@ function dayPane(vm, wide) {
         ${dv.showSettings ? `<button type="button" data-action="toggleCoachVoice" aria-label="Toggle coach voice" style="${vm.coachIconBtnStyle}">🎧</button>` : ""}
       </div>
     </div>
-    ${dv.showTryBadge ? `<span style="display:inline-block;background:rgba(255,255,255,0.3);border-radius:var(--radius-pill);padding:6px 14px;font-size:11px;font-weight:900;letter-spacing:0.08em;margin-top:8px;">🧪 TRY-IT</span>` : ""}
     <div style="font-family:var(--font-display);font-weight:600;font-size:${titleSize}px;line-height:1.${wide ? "05" : "1"};margin:12px 0 12px;">${dv.title}</div>
     ${dv.showBackToToday ? `<button type="button" data-action="selectDay" data-arg="${vm.todayKey}" style="background:none;border:none;color:rgba(255,255,255,0.85);font-size:13px;font-weight:800;text-decoration:underline;cursor:pointer;padding:0 0 12px;text-align:left;">← Back to today</button>` : ""}
     ${chips}

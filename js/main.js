@@ -6,7 +6,7 @@
    delegated click listener below.
    ============================================================ */
 
-import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS, tryItArmed, setTryIt } from "./store.js";
+import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS } from "./store.js";
 import { edmontonDayKey, escapeHtml } from "./util.js";
 import { restoreFromCloud, publishJourney } from "./sync.js";
 import { downloadBackup, restoreBackupFile } from "./backup.js";
@@ -49,7 +49,6 @@ export const state = {
   formCheckMonth: null,         // 'YYYY-MM' — Form Check month being reviewed (null = current)
   expanded: {},                 // day-card block expansion
   selectedDay: null,            // monday..sunday
-  practiceMode: false,
   tryIt: null,                  // dayKey while the Try-It browse screen is open
   inSession: false,
   readiness: null,              // active readiness-check flow state (null = not in flow)
@@ -330,20 +329,10 @@ Object.assign(RAW, {
     updateSettings({ safetyVoiceOn: settings.safetyVoiceOn === false });
     render();
   },
-  togglePractice() {
-    // Arming Try-It means the next run is NOT recorded. A child who can arm it
-    // can quietly erase her own training day, so this is a grown-up's switch.
-    // Backed by settings, not memory: a reload used to disarm it silently and
-    // record a run meant as a test.
-    setTryIt(!state.practiceMode);
-    state.practiceMode = tryItArmed();
-    render();
-  },
   goSession(arg) {
     const dayKey = arg || state.selectedDay || edmontonDayKey();
-    // Try-It is a different destination, not a flavour of the workout. It used
-    // to run Body Check and the whole session engine behind a banner.
-    if (state.practiceMode) { actions.goTryIt(dayKey); return; }
+    // GO always means GO. Looking at the moves has its own button, so nothing
+    // can re-point this one at the move list behind her.
     state.readiness = newReadinessFlow(dayKey);
     render();
   },
@@ -353,11 +342,7 @@ Object.assign(RAW, {
     render();
   },
   exitTryIt() {
-    // Try-It is ONE look, then it is over. Closing the move list used to leave
-    // the arm flag set, so every later GO reopened Try-It instead of Body Check
-    // and she could never get back to a real session without finding the toggle.
-    setTryIt(false);
-    state.practiceMode = false;
+    // Closing the list is the whole of leaving: there is no mode to stand down.
     state.tryIt = null;
     state.detailOverlay = false; state.detailEx = null;
     render();
@@ -778,7 +763,6 @@ Object.assign(RAW, {
     engine.exitSession();
     // The engine disarms try-it when a run finalizes; mirror that into the view
     // state so the button and badges are right the moment we leave the session.
-    state.practiceMode = tryItArmed();
     state.inSession = false;
     state.pendingSession = null;
     state.detailOverlay = false;
@@ -878,7 +862,6 @@ function boot() {
   migrate();
   // Try-it survives a reload now (it lives in settings), and expires on its own
   // if it was armed hours ago and never used.
-  state.practiceMode = tryItArmed();
   if (!state.selectedDay) state.selectedDay = edmontonDayKey();
   render();
   fetchWeather();

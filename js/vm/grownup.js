@@ -664,11 +664,6 @@ export function buildGrownupVM(state) {
     timerTrack: onTrack(settings.timerSoundsOn !== false, "var(--aqua)"), timerKnob: onKnob(settings.timerSoundsOn !== false),
     safetyVoiceOn: settings.safetyVoiceOn !== false,
     safetyTrack: onTrack(settings.safetyVoiceOn !== false, "var(--coral)"), safetyKnob: onKnob(settings.safetyVoiceOn !== false),
-    practiceMode: !!state.practiceMode,
-    practiceTrack: onTrack(!!state.practiceMode, "var(--grape)"), practiceKnob: onKnob(!!state.practiceMode),
-    practiceHint: state.practiceMode
-      ? "On — this run won't be saved or counted, and try-it turns itself off when the run ends."
-      : "Off — sessions count toward streaks & progress.",
     prizePool: activePrizePool(),
     isDefaultPool: !(Array.isArray(settings.prizePool) && settings.prizePool.length),
     // A wallet trim removes prizes she can see, so it is never silent.

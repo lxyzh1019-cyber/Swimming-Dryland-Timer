@@ -150,29 +150,29 @@ function resetGateState() {
   main.state.gateWantsNewPin = false; main.state.gateBusy = false;
 }
 
-/* ---- A. Try-It is ONE look, then it is over ---------------------------- */
+/* ---- A. looking at the moves is a button, not a mode -------------------- */
 localStorage.clear(); store.migrate();
-// Arming Try-It stops the next run being recorded, so it is a grown-up's switch.
 await unlockGrownup();
+gate.lockGate(); resetGateState();
 
-main.actions.togglePractice();
-ok(store.tryItArmed() === true, "the Try-It toggle arms it");
-ok(main.state.practiceMode === true, "and the screen knows it is armed");
-
-main.actions.goSession("monday");
-ok(main.state.tryIt === "monday", "while armed, GO opens the Try-It move list");
-ok(main.state.readiness === null, "and not a real session");
+/* Straight to the list, with no grown-up and nothing to arm first. Reading an
+   instruction was never something a child should need an adult to unlock. */
+main.actions.goTryIt("monday");
+ok(main.state.gateAsk === null, "a child can look at the moves on her own");
+ok(main.state.tryIt === "monday", "the move list opens on the day she asked for");
+ok(main.state.readiness === null, "with no Body Check in the way");
 
 main.actions.exitTryIt();
-ok(store.tryItArmed() === false,
-   "Done Looking DISARMS Try-It — it used to stay armed, so every later GO reopened it");
-ok(main.state.practiceMode === false, "and practice mode is cleared with it");
-ok(main.state.tryIt === null, "the move list is closed");
+ok(main.state.tryIt === null, "closing it closes it");
 
+/* ...and closing it leaves nothing behind. The old arm flag survived the close,
+   so every later GO reopened Try-It and she could not reach a real session
+   without finding the toggle again. */
 main.actions.goSession("monday");
 ok(main.state.readiness !== null, "the next GO opens Body Check");
-ok(main.state.tryIt === null, "not Try-It again");
-ok(store.loadSessions().length === 0, "and Try-It wrote no session record at all");
+ok(main.state.tryIt === null, "not the move list again");
+ok(store.loadSessions().length === 0, "and looking at the moves wrote no session record at all");
+ok(main.actionNames().includes("togglePractice") === false, "there is no mode left to toggle");
 
 /* Mini is gone as a thing that can be started, so there is no second door into
    a session that skips the arming rules — or into a shortened workout at all. */
@@ -242,7 +242,7 @@ const snapshot = () => JSON.stringify({
   settings: { ...store.settings },
   gate: store.loadGate(), ladder: store.loadLadderRungs(),
   tracker: store.loadTracker(), journey: store.loadJourney(),
-  verdicts: store.formVerdicts(), tryIt: store.tryItArmed(),
+  verdicts: store.formVerdicts(),
   sessions: store.loadSessions().length, profile: store.activeProfileId()
 });
 /* Arguments that would really change something, so "nothing happened" means the

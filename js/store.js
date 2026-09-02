@@ -180,40 +180,20 @@ export const DEFAULT_SETTINGS = {
   safetyVoiceOn: true,      // pain checks, safety stops, form warnings
   athleteName: "Jess",      // NEW: editable in Grown-up Settings
   prizePool: null,          // NEW: null = default PRIZE_POOL
-  cloudMirror: true,        // NEW: privacy — mirror completed sessions to Firestore
-  tryItArmed: false,        // NEW: try-it mode, armed for ONE run (see below)
-  tryItArmedAt: 0
+  cloudMirror: true         // NEW: privacy — mirror completed sessions to Firestore
 };
 
-/* ---- try-it mode ----------------------------------------------------------
-   A try-it run is for testing a movement and is deliberately never recorded.
-   The flag used to live only in memory, which failed in both directions: a
-   reload silently disarmed it (so a run meant as a demo was recorded for real),
-   and nothing ever cleared it (so one forgotten arm threw away every session
-   after it — she trains, finishes, and her streak doesn't move).
+/* ---- looking at the moves is not a mode -----------------------------------
+   Try-It used to be ARMED: a grown-up flipped a persistent setting, and while
+   it was on, GO opened the move list instead of starting a workout. The flag
+   went through several repairs — it lived only in memory, so a reload disarmed
+   it silently; then nothing cleared it, so one forgotten arm threw away every
+   session after it; then it expired after two hours.
 
-   Try-It no longer runs a session at all: armed, GO opens the move list
-   (js/screens/tryit.js) instead of starting a workout, so a forgotten arm is
-   visible immediately and can't silently discard training. It still expires
-   after two hours, so a toggle left on overnight isn't waiting for her. */
-export const TRY_IT_EXPIRY_MS = 2 * 60 * 60 * 1000;
-
-export function tryItArmed() {
-  if (!settings.tryItArmed) return false;
-  const at = settings.tryItArmedAt || 0;
-  if (at && Date.now() - at > TRY_IT_EXPIRY_MS) { clearTryIt(); return false; }
-  return true;
-}
-export function setTryIt(on) {
-  updateSettings(on ? { tryItArmed: true, tryItArmedAt: Date.now() }
-                    : { tryItArmed: false, tryItArmedAt: 0 });
-  return !!on;
-}
-export function clearTryIt() {
-  if (!settings.tryItArmed && !settings.tryItArmedAt) return false;
-  updateSettings({ tryItArmed: false, tryItArmedAt: 0 });
-  return true;
-}
+   None of that is needed to read an instruction. Every launchable day now has
+   its own "Explore the moves" button straight to the list, GO always means GO,
+   and there is no state to leave switched on. The settings keys are gone with
+   it; an old saved value simply goes unread.  */
 
 export let settings = loadSettings();
 

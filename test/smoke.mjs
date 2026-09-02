@@ -547,48 +547,41 @@ ok([...spotSizes].every(n => n >= 2 && n <= 3), "the app watches 2–3 moves a r
 ok(!spotWarmup, "and never a warm-up move — main and prep only");
 ok(spotSeen.size === 6, "the picks vary run to run, so she can't know which move is watched");
 
-/* --- try-it mode: a real control, one-shot, and pain still reports ---------
-   The mode's isolation was already right; its control and lifecycle were not.
-   It was a 12px underlined text link (~16px tall) on the "today" card only, it
-   never turned itself off, and it lived in memory so a reload silently flipped
-   it — recording a run meant as a test. */
+/* --- looking at the moves is a button, not a mode --------------------------
+   Try-It used to be ARMED: a grown-up flipped a persistent setting and, while
+   it was on, GO opened the move list instead of starting a workout. That flag
+   went through three repairs (memory-only, then never cleared, then a two-hour
+   expiry) and none of them were needed to read an instruction. Every launchable
+   day has its own button straight to the list now. */
 localStorage.clear();
 store.migrate();
-ok(store.tryItArmed() === false, "try-it starts disarmed");
-store.setTryIt(true);
-ok(store.tryItArmed() === true, "arming is persisted, so a reload can't disarm it");
-store.updateSettings({ tryItArmedAt: Date.now() - 3 * 60 * 60 * 1000 });
-ok(store.tryItArmed() === false, "an arm left unused for hours expires on its own");
-store.setTryIt(true);
-store.clearTryIt();
-ok(store.tryItArmed() === false, "and a finished run disarms it — one run, not forever");
+ok(store.tryItArmed === undefined && store.setTryIt === undefined,
+   "the arming machinery is gone from the store entirely");
+ok(store.loadSettings().tryItArmed === undefined, "and so is its setting");
 
-store.setTryIt(true);
 const launchDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-const tryItGaps = { noButton: [], noBadge: [], notAButton: [] };
+const tryItGaps = { noButton: [], notAButton: [], goHijacked: [] };
 launchDays.forEach(d => {
-  const vm = tvm.buildTodayVM({ selectedDay: d, expanded: {}, practiceMode: true, isWide: true });
+  const vm = tvm.buildTodayVM({ selectedDay: d, expanded: {}, isWide: true });
   const dv = vm.dayView;
   if (!(dv.isActive || dv.isDone || dv.isMissed || dv.isPreview)) return;   // nothing to launch
   if (!dv.showTryIt) tryItGaps.noButton.push(d);
-  if (!dv.showTryBadge) tryItGaps.noBadge.push(d);
-  if (!/data-action="togglePractice"/.test(tscreen.todayWide(vm))) tryItGaps.notAButton.push(d);
+  const html = tscreen.todayWide(vm);
+  if (!new RegExp('data-action="goTryIt" data-arg="' + d + '"').test(html)) tryItGaps.notAButton.push(d);
+  // GO always means GO — nothing can re-point it at the move list.
+  if (dv.showCta && dv.ctaAction === "goTryIt" && !dv.isDone && !dv.isRest) tryItGaps.goHijacked.push(d);
 });
-ok(tryItGaps.noButton.length === 0, "the try-it control renders on every day a run can start from");
-ok(tryItGaps.noBadge.length === 0, "and the 🧪 badge does too, so a catch-up day can't run as a test silently");
-ok(tryItGaps.notAButton.length === 0, "it is a real button, not the old text link");
-const tryVM = tvm.buildTodayVM({ selectedDay: launchDays[0], expanded: {}, practiceMode: true, isWide: true });
+ok(tryItGaps.noButton.length === 0, "every day a run can start from offers a direct look at the moves");
+ok(tryItGaps.notAButton.length === 0, "and it goes straight to that day's list, with no mode to arm first");
+ok(tryItGaps.goHijacked.length === 0, "while the start button still starts the workout");
+const tryVM = tvm.buildTodayVM({ selectedDay: launchDays[0], expanded: {}, isWide: true });
 ok(/min-height:48px/.test(tryVM.practiceBtnStyle), "with a 48px tap target — the old link was ~16px");
+ok(tryVM.practiceMode === undefined, "and there is no armed state left for a screen to read");
 
 /* TRY-IT IS NOT A WORKOUT. It used to run the entire session engine — Body
    Check, traffic light, rounds, timers, clean-checks, a finish screen —
    behind a purple banner, so a kid could complete a whole workout that was
    never going to count. It is a list of moves now. */
-launchDays.forEach(d => {
-  const dv = tvm.buildTodayVM({ selectedDay: d, expanded: {}, practiceMode: true, isWide: true }).dayView;
-  if (!(dv.isActive || dv.isDone || dv.isMissed || dv.isPreview)) return;
-  ok(dv.ctaAction === "goTryIt", "with try-it armed, " + d + "'s start button opens the move list, not a session");
-});
 const tryItVM = tryvm.buildTryItVM({ selectedDay: "monday", isWide: true, detailOverlay: false, detailEx: null });
 const tryItHtml = tryscreen.tryItScreen(tryItVM);
 ok(tryItVM.moves.length > 0, "the try-it screen lists the day's moves");
@@ -1708,14 +1701,6 @@ ok(store.xpForSession({ sessionType: "spa", xpVersion: store.XP_VERSION }) === 0
 /* ============================================================
    PHASE 3 — interaction state repairs
    ============================================================ */
-
-/* --- A. Try-It arming (the action layer that clears it: test/actions.mjs) --- */
-localStorage.clear(); store.migrate();
-store.setTryIt(true);
-ok(store.tryItArmed() === true, "Try-It arms");
-ok(store.setTryIt(false) === false && store.tryItArmed() === false, "and can be disarmed");
-store.setTryIt(true);
-ok(store.clearTryIt() === true && store.tryItArmed() === false, "clearTryIt disarms it too");
 
 /* --- B. the form check is its own phase, and rest waits for it --- */
 localStorage.clear(); store.migrate();
