@@ -72,7 +72,7 @@ export const UNGATED_ACTIONS = [
   "reflectNext", "quizPick", "exitSession",
   "openDetail", "openDetailCur", "openDetailAt", "watchVideo", "closeDetail", "resumeFromDetail",
   // her body check (the two adult decisions inside it are gated by name)
-  "rAnswer", "rSameYesterday", "rPickZone", "rSetZoneSev", "rClosePopup",
+  "rAnswer", "rPickZone", "rSetZoneSev", "rClosePopup",
   "rGoBack", "rExit", "rResultCta", "rResultSecondary",
   // things she has earned
   "startQuizDeck", "answerQuizDeck", "nextQuizDeck", "exitQuizDeck",

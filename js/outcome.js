@@ -27,9 +27,16 @@ export const OUTCOME_VERSION = 2;
    actually asked for. A red day's plan is a third the size of a green one, and
    75% of it is 75% either way: a light day is a smaller ask, never a harder one.
 
-   Recovery is held to the whole thing. Its menu is short and gentle, so
-   finishing it is the honest signal that she showed up and did the care work —
-   and reporting soreness must never cost her the streak. */
+   The fraction is of the DOSE, not of the row count — see streakCredit below.
+   Counting rows was the hole this bar was supposed to close: a `partial` row
+   counted as one whole unit, so three seconds of a thirty-second hold, fifteen
+   times over, cleared 75% of a twenty-move session.
+
+   Recovery does not earn a streak day at all; it FREEZES the one she has. Its
+   menu is care, not training, so it cannot add to a training streak — but
+   reporting soreness honestly must never break one either. The whole menu is
+   what buys that protection: a recovery pass abandoned after two moves is not
+   a day's care. */
 export const STREAK_WORK_FRACTION = 0.75;
 export const RECOVERY_STREAK_FRACTION = 1;
 
@@ -44,6 +51,37 @@ function rowIsWork(row, countPartial) {
   if (!row) return false;
   if (row.status === "done") return true;
   return countPartial && row.status === "partial";
+}
+
+/* How much of a work unit a row is WORTH to the streak.
+
+   `rowIsWork` above answers "was this move performed at all", which is the
+   right question for "did she train" and must stay that way. It is the wrong
+   question for the streak: it made a three-second rep of a thirty-second hold
+   worth exactly as much as the hold. The engine already raised the bar for
+   calling a timed dose `done` (DONE_WORK_FRACTION in js/engine.js) — this
+   applies the same honesty one level up, by paying a partial row the fraction
+   of the dose it actually produced.
+
+   The numbers come off the ledger row itself (see recordExercise in
+   js/engine.js), so nothing new has to be measured or stored. A partial row
+   whose dose cannot be computed — no denominator, or a shape from before these
+   fields existed — scores ZERO: the streak is the app's loudest claim about
+   effort, and a dose we cannot prove is not one we pay for. */
+export function streakCredit(row, countPartial = true) {
+  if (!row) return 0;
+  if (row.status === "done") return 1;
+  if (!countPartial || row.status !== "partial") return 0;
+  const frac = (got, planned) =>
+    Number.isFinite(Number(planned)) && Number(planned) > 0
+      ? Number(got) / Number(planned) : null;
+  const byReps = frac(row.repsCounted, row.repsPlanned);
+  const byTime = frac(row.actualSecs, row.plannedSecs);
+  const f = row.driver === "reps" ? byReps
+    : row.driver === "time" ? byTime
+    : (byReps !== null ? byReps : byTime);   // driver missing: whichever it kept
+  if (!Number.isFinite(f)) return 0;
+  return Math.min(1, Math.max(0, f));
 }
 
 /* Legacy rows (no ledger at all) fall back to the per-move shape. */
@@ -160,17 +198,26 @@ export function deriveSessionOutcome(input = {}) {
      because a rule changed underneath her, which is exactly the kind of thing
      the streak must never do. */
   const streakJudged = Number(outcomeVersion) >= 2;
-  const workRatio = expected !== null && expected > 0 ? workRows / expected : null;
+  const streakWork = rows.reduce((a, l) => a + streakCredit(l, countPartial), 0);
+  const workRatio = expected !== null && expected > 0 ? streakWork / expected : null;
   let countsForStreak;
   if (!streakJudged || workRatio === null) {
     countsForStreak = isTraining;                   // the old reading, unchanged
   } else if (state === "recovery") {
-    countsForStreak = workRatio >= RECOVERY_STREAK_FRACTION;
+    countsForStreak = false;                        // care freezes, never counts
   } else if (isTraining) {
     countsForStreak = workRatio >= STREAK_WORK_FRACTION;
   } else {
     countsForStreak = false;                        // no work, or a safety stop
   }
+
+  /* A finished recovery pass HOLDS the streak without adding to it, so a sore
+     day costs her nothing and buys her nothing. Judged on the same dose ratio,
+     so brushing at every move on the menu is not a day of care — which is what
+     counting rows made it. Pre-v2 records keep the old reading and are left
+     alone; the freeze is only ever offered, never required. */
+  const streakFreeze = streakJudged && state === "recovery"
+    && workRatio !== null && workRatio >= RECOVERY_STREAK_FRACTION;
 
   return {
     state,
@@ -182,6 +229,7 @@ export function deriveSessionOutcome(input = {}) {
     roundsDisagree,
     countsAsTraining: isTraining,
     countsForStreak,
+    streakFreeze,
     // What the streak was judged on, so a screen can say "3 more moves" rather
     // than leaving her to guess why a day she worked at did not count.
     workRatio,

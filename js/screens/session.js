@@ -177,17 +177,35 @@ const COMPLETION = {
     title: "Session Complete!", mantra: true,
     note: ""
   },
-  partial: {
+  /* One "partial" said the same thing to a day that earned the streak and a day
+     that fell short of it — true about the work, silent about the one thing she
+     is standing on. They are separate rows now, and the short one says how far. */
+  "partial-streak": {
+    bg: "var(--sun-wash)", ink: "var(--sun-ink)", pose: "keepgoing", poseH: 190,
+    title: "Part of the way — and today counts.", mantra: false,
+    noteStyle: "color:var(--mint-ink);background:var(--mint-wash);",
+    note: "You didn't finish the whole thing, and everything you DID do is saved — the moves, the minutes and the XP for them. You did enough of today's plan to keep your streak. 🔥"
+  },
+  "partial-short": {
     bg: "var(--sun-wash)", ink: "var(--sun-ink)", pose: "keepgoing", poseH: 190,
     title: "Part of the way — and it counts.", mantra: false,
     noteStyle: "color:var(--sun-ink);background:var(--sun-wash);",
-    note: "You didn't finish the whole thing, and everything you DID do is saved — the moves, the minutes and the XP for them. Coming back and finishing the rest is how it's meant to work. 💛"
+    note: "You didn't finish the whole thing, and everything you DID do is saved — the moves, the minutes and the XP for them. Today didn't reach the streak, and it doesn't erase anything either. Coming back and finishing the rest is how it's meant to work. 💛"
   },
-  recovery: {
+  /* The freeze is earned by finishing the menu, so only the finished pass may
+     promise it. A recovery run abandoned after two moves is not a day's care,
+     and telling her it held the streak would be a promise the streak breaks. */
+  "recovery-held": {
     bg: "var(--aqua-wash)", ink: "var(--aqua-ink)", pose: "breath", poseH: 200,
     title: "Recovery done. That was care.", mantra: false,
     noteStyle: "color:var(--aqua-ink);background:var(--aqua-wash);",
-    note: "Recovery isn't a workout, so it doesn't take a training day or a streak day — and it isn't supposed to. Listening to your body is the whole point, and you did it. ❄️"
+    note: "Recovery isn't a workout, so it doesn't add a training day or a streak day — and it isn't supposed to. It holds your streak right where it is. Listening to your body is the whole point, and you did it. ❄️"
+  },
+  "recovery-short": {
+    bg: "var(--aqua-wash)", ink: "var(--aqua-ink)", pose: "breath", poseH: 200,
+    title: "Some care is better than none.", mantra: false,
+    noteStyle: "color:var(--aqua-ink);background:var(--aqua-wash);",
+    note: "You started the recovery menu and stopped partway. What you did is saved. Finishing the whole menu is what keeps your streak safe on a sore day — it's short and gentle, and it's worth coming back for. ❄️"
   },
   "safety-stop": {
     bg: "var(--stop-wash)", ink: "var(--stop-ink)", pose: "seeyou", poseH: 170,
@@ -210,7 +228,7 @@ const COMPLETION = {
 };
 
 function completeScreen(vm) {
-  const c = COMPLETION[vm.completionState] || COMPLETION.none;
+  const c = COMPLETION[vm.completionKey] || COMPLETION[vm.completionState] || COMPLETION.none;
   return `
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:16px;padding:40px;text-align:center;background:${c.bg};overflow-y:auto;">
     <img src="assets/poses/${c.pose}.png" alt="" style="height:${c.poseH}px;object-fit:contain;flex-shrink:0;">

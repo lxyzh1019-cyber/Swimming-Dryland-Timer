@@ -46,13 +46,13 @@ function stopsCard(a, scopeLabel) {
   </div>`;
 }
 
-function readinessCard(a, scopeLabel, withSub) {
+function lightReportCard(title, sub, rows, has, withSub) {
   return card(`
-    ${secTitle("Readiness → completion · " + scopeLabel)}
-    ${withSub ? `<div style="font-size:13px;color:var(--ink-faint);margin:4px 0 14px;line-height:1.3;">Did the traffic-light call predict how the session actually went? Bar = % of those sessions finished.</div>` : `<div style="margin-bottom:14px;"></div>`}
-    ${a.hasReadiness ? `
+    ${secTitle(title)}
+    ${withSub ? `<div style="font-size:13px;color:var(--ink-faint);margin:4px 0 14px;line-height:1.3;">${sub}</div>` : `<div style="margin-bottom:14px;"></div>`}
+    ${has ? `
     <div style="display:flex;flex-direction:column;gap:12px;">
-      ${a.readinessOutcome.map(ro => `
+      ${rows.map(ro => `
         <div>
           <div style="display:flex;align-items:center;gap:11px;">
             <span style="${ro.dotStyle}"></span>
@@ -63,6 +63,60 @@ function readinessCard(a, scopeLabel, withSub) {
           <div style="font-size:12px;font-weight:700;color:var(--ink-faint);margin:3px 0 0 85px;line-height:1.3;">${ro.note}</div>
         </div>`).join("")}
     </div>` : `<div style="font-size:14px;font-weight:700;color:var(--ink-faint);">Not enough sessions yet — this fills in as the log grows.</div>`}`);
+}
+
+/* Two reports, deliberately separate. Grouping both by the executed light made
+   an overridden day answer for the body check that it contradicted. */
+function readinessCard(a, scopeLabel, withSub) {
+  return lightReportCard(
+    "Body Check → completion · " + scopeLabel,
+    "Grouped by what her BODY asked for, before any grown-up moved it. Did the check read the day right? Bar = % of those sessions finished.",
+    a.readinessOutcome, a.hasReadiness, withSub);
+}
+
+function loadCard(a, scopeLabel, withSub) {
+  return lightReportCard(
+    "Load actually trained · " + scopeLabel,
+    "Grouped by the light the session actually RAN. What work did she really do? Bar = % of those sessions finished.",
+    a.loadOutcome, a.hasLoadReport, withSub);
+}
+
+/* Where the two disagree — the override log. */
+function overrideCard(a, scopeLabel) {
+  if (!a.hasOverrides) return "";
+  return card(`
+    ${secTitle("Overrides · " + scopeLabel)}
+    <div style="font-size:13px;color:var(--ink-faint);margin:4px 0 14px;line-height:1.3;">Days a grown-up moved the light off what the body check suggested.</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      ${a.overrideRows.map(o => `
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="font-size:12px;font-weight:800;color:var(--ink-soft);width:64px;flex-shrink:0;">${o.date}</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:900;color:var(--ink);">
+            <span style="width:10px;height:10px;border-radius:50%;background:${o.fromColor};"></span>${o.from}
+            <span style="color:var(--ink-faint);">→</span>
+            <span style="width:10px;height:10px;border-radius:50%;background:${o.toColor};"></span>${o.to}
+          </span>
+          <span style="font-size:12px;font-weight:700;color:${o.raised ? "var(--stop)" : "var(--ink-faint)"};flex:1 1 200px;">${o.note}</span>
+        </div>`).join("")}
+    </div>`);
+}
+
+/* The body map as history rather than a control — which is all it was while a
+   single saved check was overwritten every morning. */
+function bodyMapCard(a, scopeLabel) {
+  if (!a.hasBodyMap) return "";
+  return card(`
+    ${secTitle("Body map · where it keeps hurting")}
+    <div style="font-size:13px;color:var(--ink-faint);margin:4px 0 14px;line-height:1.3;">Zones she has marked, most often first. A spot that keeps coming back is worth a coach's eye.</div>
+    <div style="display:flex;flex-direction:column;gap:9px;">
+      ${a.bodyMapTrend.map(z => `
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="${z.dotStyle}"></span>
+          <span style="font-size:14px;font-weight:900;color:var(--ink);flex:1 1 auto;">${z.label}</span>
+          <span style="font-size:12px;font-weight:700;color:var(--ink-soft);">${z.note}</span>
+          <span style="font-size:12px;font-weight:700;color:var(--ink-faint);width:64px;text-align:right;flex-shrink:0;">${z.last}</span>
+        </div>`).join("")}
+    </div>`);
 }
 
 function overviewTab(vm) {
@@ -345,6 +399,9 @@ function analyticsTab(vm) {
 
     ${divider("⭐ Quality &amp; readiness")}
     ${readinessCard(a, vm.scopeLabel, true)}
+    ${loadCard(a, vm.scopeLabel, true)}
+    ${overrideCard(a, vm.scopeLabel)}
+    ${bodyMapCard(a, vm.scopeLabel)}
 
     ${card(`
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;">

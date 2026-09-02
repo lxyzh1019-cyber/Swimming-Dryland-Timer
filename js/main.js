@@ -8,12 +8,12 @@
 
 import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS } from "./store.js";
 import { edmontonDayKey, escapeHtml } from "./util.js";
-import { restoreFromCloud, publishJourney } from "./sync.js";
+import { restoreFromCloud, publishJourney, publishReadiness } from "./sync.js";
 import { downloadBackup, restoreBackupFile } from "./backup.js";
 import { buildTodayVM, journeyPathScrollIntoView } from "./vm/today.js";
 import { todayWide, todayNarrow } from "./screens/today.js";
 import { page, shellWithRail, bottomNav } from "./screens/shell.js";
-import { newReadinessFlow, answerQuestion, sameAsYesterday, setZoneSev, resetBodyCheck, confirmGrownup, buildReadinessVM } from "./vm/readiness.js";
+import { newReadinessFlow, answerQuestion, setZoneSev, resetBodyCheck, confirmGrownup, buildReadinessVM } from "./vm/readiness.js";
 import { readinessScreen } from "./screens/readiness.js";
 import * as engine from "./engine.js";
 import { buildSessionVM, sessionQuizFor } from "./vm/session.js";
@@ -392,7 +392,6 @@ Object.assign(RAW, {
     answerQuestion(state.readiness, id, val);
     render();
   },
-  rSameYesterday() { sameAsYesterday(state.readiness); render(); },
   rPickZone(arg) { state.readiness.pendingZone = Number(arg); render(); },
   rSetZoneSev(arg) {
     const [num, level] = arg.split("|").map(Number);
@@ -423,10 +422,15 @@ Object.assign(RAW, {
     // Storing only the final light is what made a grown-up's override
     // indistinguishable from the body's own answer in the history.
     const suggested = r.suggestedLight || r.light || "green";
-    saveReadiness({ answers: r.answers, zoneSev: r.zoneSev, light: r.light,
-                    suggestedLight: suggested, overridden: r.light !== suggested });
+    const check = { answers: r.answers, zoneSev: r.zoneSev, light: r.light,
+                    suggestedLight: suggested, severity: r.severity,
+                    resultSource: r.resultSource, overridden: r.light !== suggested };
+    saveReadiness(check);
+    // A sore or non-green morning belongs on the grown-up's other device, and it
+    // must get there whether or not a session follows this tap.
+    publishReadiness();
     startPendingSession({ light: r.light || "green", dayKey: r.dayKey,
-                          suggestedLight: suggested });
+                          suggestedLight: suggested, readiness: check });
   },
   rResultSecondary(arg) {
     if (arg === "retry") { resetBodyCheck(state.readiness); render(); }

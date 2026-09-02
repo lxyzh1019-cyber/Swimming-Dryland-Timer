@@ -153,17 +153,24 @@ export function readinessScreen(vm) {
     <div style="${vm.bodyContentStyle}">
       <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:720px;">
         ${vm.hasYesterday ? `
-          <button type="button" data-action="rSameYesterday" style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--aqua-wash);border:3px solid var(--aqua);border-radius:var(--radius-pill);padding:13px 20px;cursor:pointer;font-weight:900;font-size:16px;color:var(--aqua-ink);min-height:56px;">
-            <span style="font-size:20px;">🔁</span> Feel the same as yesterday? One tap!
-          </button>` : ""}
+          <div style="display:flex;align-items:center;gap:8px;font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);padding:0 4px;">
+            <span style="font-size:15px;">📋</span> Yesterday — for reference. Today still needs your answer.
+          </div>` : ""}
         ${vm.questions.map(q => `
           <div style="background:var(--bg);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:16px 18px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 16px;">
-            <div style="flex:1 1 220px;font-weight:700;font-size:17px;line-height:1.4;color:var(--ink);">${q.text}</div>
+            <div style="flex:1 1 200px;font-weight:700;font-size:17px;line-height:1.4;color:var(--ink);">${q.text}</div>
+            ${vm.hasYesterday ? `
+              <div style="flex-shrink:0;min-width:92px;text-align:center;opacity:0.62;">
+                <div style="font-size:10px;font-weight:900;letter-spacing:0.05em;text-transform:uppercase;color:var(--ink-soft);">Yesterday</div>
+                <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:2px;">${q.yesterday}</div>
+              </div>` : ""}
             <div style="display:flex;gap:8px;flex-shrink:0;">
               <button type="button" data-action="rAnswer" data-arg="${q.id}|yes" style="${q.yesStyle}">${q.yesLabel}</button>
               <button type="button" data-action="rAnswer" data-arg="${q.id}|no" style="${q.noStyle}">${q.noLabel}</button>
             </div>
           </div>`).join("")}
+        ${vm.hasYesterday && vm.yesterdayZoneLine ? `
+          <div style="font-size:13px;font-weight:700;color:var(--ink-soft);opacity:0.75;padding:0 4px;">${vm.yesterdayZoneLine}</div>` : ""}
         <div style="text-align:center;font-family:var(--font-hand);font-size:20px;font-weight:700;color:var(--ink-soft);padding-top:4px;">No wrong answers — Coach picks the right workout for today.</div>
       </div>
       ${vm.showInlineReadinessResult ? resultCard(vm) : ""}

@@ -5,17 +5,33 @@
    thin history gets honest empty/partial states, never mock data.
    ============================================================ */
 
-import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl, fmtXp } from "../data.js";
+import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, BODY_ZONES, videoSearchUrl, fmtXp } from "../data.js";
 import { redeemedPrizesForReview } from "../store.js";
 import { gateUnlocked, GATE_REASON } from "../gate.js";
 import { passkeySupported, hasPasskey } from "../passkey.js";
 import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal, outcomeOf,
          sessionRounds as sessionRoundsDone, sessionRoundsPlanned,
-         monthKeyOf, formVerdicts, latestFormVerdicts } from "../store.js";
+         monthKeyOf, formVerdicts, latestFormVerdicts, loadReadinessLog } from "../store.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
 import { sessionEffort, effortSummary } from "../effort.js";
 
 const LIGHT_COLORS = { green: "var(--mint)", yellow: "var(--sun)", red: "var(--stop)", recovery: "var(--grape)" };
+
+/* TWO DIFFERENT QUESTIONS, and they were being answered with one field.
+
+   `lightResult` is what the session RAN. `suggestedLight` is what her body
+   asked for. They differ exactly when a grown-up overrode the check — which is
+   the one case worth reading about, and the one case the old code could not
+   see: it grouped everything by the executed light, so a body-check Red
+   overridden to Green was filed under Green and raised no flag at all.
+
+   Records written before suggestedLight existed fall back to the executed
+   light, which is what they were read as before. */
+const bodyLight = (s) => s.suggestedLight || s.lightResult || s.light || "green";
+const ranLight  = (s) => s.lightResult || s.light || "green";
+// How much work each light lets through, so "a grown-up raised it" is decidable.
+const LIGHT_RANK = { recovery: 0, red: 1, yellow: 2, green: 3 };
+const wasRaised = (s) => (LIGHT_RANK[ranLight(s)] ?? 0) > (LIGHT_RANK[bodyLight(s)] ?? 0);
 const MOOD_EMOJI = { great: "😀", okay: "🙂", tired: "😴" };
 const LIGHT_BEFORE = { green: "😀", yellow: "🙂", red: "😮‍💨", recovery: "😴" };
 const MOOD_RANK = { "😀": 3, "🙂": 2, "😮‍💨": 1, "😴": 1 };
@@ -71,11 +87,15 @@ export function buildGrownupVM(state) {
     note: "Stopped for pain after " + mins(s) + " min — check in before the next session."
   }));
   const earlyEnds = sessions.filter(s => s.endedEarly && !s.pain);
-  const yellowRed = sessions.filter(s => ["yellow", "red"].includes(s.lightResult));
+  // Filtered on the executed light, this missed every day a grown-up moved —
+  // so a body that reported Red and was sent out Green flagged nothing.
+  const yellowRed = sessions.filter(s => ["yellow", "red"].includes(bodyLight(s)));
+  const raised = sessions.filter(wasRaised);
   const flags = [
     ...stops.map(s => ({ icon: "🛑", rowStyle: alertRow("stop"), text: "Stopped for pain during “" + (s.dayTitle || "session") + "” (" + dstr(s.isoDate) + ")." })),
     ...(earlyEnds.length ? [{ icon: "⏱", rowStyle: alertRow("sun"), text: earlyEnds.length + " session" + (earlyEnds.length === 1 ? "" : "s") + " ended early — " + earlyEnds.map(s => dstr(s.isoDate)).join(", ") + "." }] : []),
-    ...(yellowRed.length ? [{ icon: "💛", rowStyle: alertRow("sun"), text: yellowRed.length + " yellow/red-light day" + (yellowRed.length === 1 ? "" : "s") + " — she felt tired or sore; rounds were capped." }] : [])
+    ...(yellowRed.length ? [{ icon: "💛", rowStyle: alertRow("sun"), text: yellowRed.length + " yellow/red-light day" + (yellowRed.length === 1 ? "" : "s") + " — her body check asked for a lighter session." }] : []),
+    ...(raised.length ? [{ icon: "🔓", rowStyle: alertRow("sun"), text: raised.length + " session" + (raised.length === 1 ? "" : "s") + " where a grown-up raised the light above the body check — " + raised.map(s => bodyLight(s) + "→" + ranLight(s) + " (" + dstr(s.isoDate) + ")").join(", ") + "." }] : [])
   ];
   const guAlerts = flags.length ? flags : [{ icon: "✅", rowStyle: alertRow("sun"), text: "Nothing to flag " + scopeLabel.toLowerCase() + " — sessions ran clean." }];
 
@@ -97,21 +117,73 @@ export function buildGrownupVM(state) {
   const adherence = Math.min(100, Math.round((trainedDaySet.size / Math.max(1, scheduled)) * 100));
   const avgMins = trainingRows.length ? Math.round(totalMins / trainingRows.length) : 0;
 
-  /* ---- readiness → completion ---- */
-  const readinessOutcome = ["green", "yellow", "red", "recovery"].map(light => {
-    const ss = sessions.filter(s => (s.lightResult || s.light) === light);
-    const completed = ss.filter(s => outcomeOf(s).state === "complete").length;
+  /* ---- two light reports, because there are two questions ----
+     "Did the body check read the day right?" is answered by the SUGGESTED
+     light. "What load did she actually train?" is answered by the light that
+     RAN. One field was doing both jobs and therefore neither: every overridden
+     day was filed under the light the grown-up chose, so the check could never
+     be scored against what followed it. */
+  const lightReport = (pick, noteFor) => ["green", "yellow", "red", "recovery"].map(light => {
+    const ss = sessions.filter(s => pick(s) === light);
     if (!ss.length) return null;
+    const completed = ss.filter(s => outcomeOf(s).state === "complete").length;
     return {
       light: light[0].toUpperCase() + light.slice(1), color: LIGHT_COLORS[light],
       sessions: ss.length, completed,
-      note: completed === ss.length ? "Every " + light + "-light session finished — the call matched the day."
-        : (ss.length - completed) + " of " + ss.length + " didn’t finish — worth a look at how " + light + " days are loaded.",
+      note: noteFor(light, completed, ss.length),
       dotStyle: "width:12px;height:12px;border-radius:50%;flex-shrink:0;background:" + LIGHT_COLORS[light] + ";",
       barStyle: "height:100%;border-radius:6px;background:" + LIGHT_COLORS[light] + ";width:" + Math.round((completed / ss.length) * 100) + "%;",
       ratio: completed + "/" + ss.length + " finished"
     };
   }).filter(Boolean);
+
+  const readinessOutcome = lightReport(bodyLight, (light, done, total) =>
+    done === total ? "Every session her body called " + light + " finished — the check read the day right."
+      : (total - done) + " of " + total + " didn’t finish — the " + light + " call may be reading the day too lightly.");
+
+  const loadOutcome = lightReport(ranLight, (light, done, total) =>
+    done === total ? "Every " + light + " session finished — that load is landing well."
+      : (total - done) + " of " + total + " didn’t finish — worth a look at how " + light + " days are loaded.");
+
+  /* Where the two disagree, named. This is the override log a grown-up needs:
+     not that an override happened, but which way it went and what came of it. */
+  const overrideRows = sessions.filter(s => bodyLight(s) !== ranLight(s)).map(s => ({
+    date: dstr(s.isoDate),
+    from: bodyLight(s), to: ranLight(s),
+    raised: wasRaised(s),
+    fromColor: LIGHT_COLORS[bodyLight(s)], toColor: LIGHT_COLORS[ranLight(s)],
+    finished: outcomeOf(s).state === "complete",
+    note: (wasRaised(s) ? "Raised above the body check" : "Lowered below the body check")
+      + " — " + (outcomeOf(s).state === "complete" ? "the session finished." : "the session did not finish.")
+  }));
+
+  /* ---- body map, over time ----
+     The check used to be one overwritten record, so "left shoulder, three days
+     running" was not a thing anyone could see. The log makes it countable. */
+  const zoneCounts = new Map();
+  loadReadinessLog().forEach(r => {
+    Object.entries(r.zoneSev || {}).forEach(([n, sev]) => {
+      const key = Number(n);
+      const cur = zoneCounts.get(key) || { n: key, times: 0, worst: 0, last: 0 };
+      cur.times += 1;
+      cur.worst = Math.max(cur.worst, Number(sev) || 0);
+      cur.last = Math.max(cur.last, r.at || 0);
+      zoneCounts.set(key, cur);
+    });
+  });
+  const SEV_WORD = { 2: "tired", 3: "not right", 4: "pain" };
+  const bodyMapTrend = [...zoneCounts.values()]
+    .sort((a, b) => b.times - a.times || b.worst - a.worst)
+    .slice(0, 6)
+    .map(z => ({
+      label: (BODY_ZONES.find(b => b.n === z.n) || {}).label || ("Zone " + z.n),
+      times: z.times,
+      worst: SEV_WORD[z.worst] || "marked",
+      last: dstr(new Date(z.last).toISOString()),
+      note: z.times + " check" + (z.times === 1 ? "" : "s") + " · worst: " + (SEV_WORD[z.worst] || "marked"),
+      dotStyle: "width:10px;height:10px;border-radius:50%;flex-shrink:0;background:"
+        + (z.worst >= 4 ? "var(--stop)" : z.worst >= 3 ? "var(--coral)" : "var(--sun)") + ";"
+    }));
 
   /* ---- consistency cells ---- */
   // A day is only coloured in if something was actually trained on it. A GO
@@ -626,6 +698,9 @@ export function buildGrownupVM(state) {
       hasStops: stopEvents.length > 0, noStops: stopEvents.length === 0, stopEvents,
       adherence, sessions: done.length, scheduled, avgMins, totalMins,
       readinessOutcome, hasReadiness: readinessOutcome.length > 0,
+      loadOutcome, hasLoadReport: loadOutcome.length > 0,
+      overrideRows, hasOverrides: overrideRows.length > 0,
+      bodyMapTrend, hasBodyMap: bodyMapTrend.length > 0,
       consistency: consistencyView,
       loadTitle, loadSubtitle, loadHeadline, loadTrend,
       acwr: acwrView,
