@@ -7,7 +7,8 @@
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, videoSearchUrl, fmtXp } from "../data.js";
 import { redeemedPrizesForReview } from "../store.js";
-import { gateChallenge, gateUnlocked, GATE_REASON } from "../gate.js";
+import { gateUnlocked, GATE_REASON } from "../gate.js";
+import { passkeySupported, hasPasskey } from "../passkey.js";
 import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal, outcomeOf,
          sessionRounds as sessionRoundsDone, sessionRoundsPlanned,
          monthKeyOf, formVerdicts, latestFormVerdicts } from "../store.js";
@@ -674,10 +675,21 @@ export function buildGrownupVM(state) {
     walletRepairNote: state.walletRepairNote || "",
     // The grown-up gate, and the redeemed prizes it protects.
     gateAsk: state.gateAsk || null,
-    gateQuestion: state.gateAsk ? gateChallenge().question : "",
     gateError: state.gateError || "",
     gateReason: GATE_REASON[state.gateAsk] || "",
     grownupUnlocked: gateUnlocked(),
+    /* The passkey row in Settings. A PIN with no passkey behind it has no reset
+       at all, so the state of this is something a parent has to be able to see
+       rather than find out the day they forget the PIN. */
+    passkeySupported: passkeySupported(),
+    hasPasskey: hasPasskey(),
+    passkeyLine: !passkeySupported()
+      ? "This browser has no passkey support. The PIN works, but a forgotten PIN cannot be reset here — write it down."
+      : hasPasskey()
+        ? "A passkey is set up on this device. If the PIN is ever forgotten, this is how you get back in."
+        : "No passkey yet. Set one up — without it a forgotten PIN cannot be reset, and the only way back would be restoring a backup.",
+    passkeyNote: state.passkeyNote || "",
+    passkeyNoteOk: !!state.passkeyNoteOk,
     prizeReviewOpen: !!state.prizeReviewOpen,
     redeemedPrizes: (state.prizeReviewOpen ? redeemedPrizesForReview() : []).map(p => ({
       id: p.id, label: p.label,

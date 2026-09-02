@@ -27,22 +27,29 @@
 
    ---- What the secret is, and what it is honestly worth ----
 
-   A parent-set PIN (4–8 digits), stored device-level and salted-digested, never
+   A parent-set PIN (4-8 digits), stored device-level as a salted digest, never
    exported in a backup and never mirrored to the cloud (js/store.js).
 
-   With, deliberately, the generated arithmetic question as a "Forgot PIN"
-   fallback. That fallback is only child-deterrence — a determined 10-year-old
-   with a calculator gets through it — and it is here anyway, because the
-   alternative is a parent locked out of the only live copy of their child's
-   training history by a PIN they set once and forgot. Losing that history is a
-   worse outcome than a child who finds a way to change her own rest timer.
+   Behind it, a WebAuthn PASSKEY — Face ID, Touch ID, the device passcode — is
+   what authorizes setting or resetting that PIN. It replaced a generated
+   two-digit multiplication, which a 10-year-old answers in her head and which
+   was authorizing both the first PIN and every reset: the PIN was worth exactly
+   that sum, however carefully it was stored. js/passkey.js is candid about what
+   the passkey is and is not worth (no server, so no signature verification; and
+   only as strong as whose biometrics are enrolled on the device).
 
-   The unlock is held in memory only. It expires, it dies with the tab, and it
-   is dropped the moment she leaves the Zone.
+   The first PIN on a device with NO training history can be set freely, the way
+   a device passcode is — there is nothing yet to protect and nobody to ask.
+   Once she has trained even once, setting or changing the PIN needs the
+   passkey. That is the case that matters: a child reaching the Zone first on a
+   phone that has been in use for months, and locking her parent out of a
+   history the device holds the only live copy of.
+
    ============================================================ */
 
-import { hasGrownupPin, verifyGrownupPin, setGrownupPin,
+import { hasGrownupPin, verifyGrownupPin, setGrownupPin, loadSessions,
          isValidPinFormat, PIN_MIN_DIGITS, PIN_MAX_DIGITS } from "./store.js";
+import { hasPasskey, passkeySupported } from "./passkey.js";
 
 export { hasGrownupPin, isValidPinFormat, PIN_MIN_DIGITS, PIN_MAX_DIGITS };
 
@@ -52,8 +59,10 @@ export const GATE_UNLOCK_MS = 5 * 60 * 1000;   // five minutes, then ask again
    Deny-by-default: adding an action here is a deliberate decision to expose it,
    and forgetting to add one only ever makes the app safer. */
 export const UNGATED_ACTIONS = [
-  // moving around the app
-  "nav", "selectDay", "toggleBlock", "logScope", "progressScope",
+  // moving around the app. NOTE `nav` is deliberately absent: whether it is
+  // child-safe depends on WHERE she is navigating, so it is decided by
+  // CHILD_MAY in js/main.js. An action named in both places would be a bug.
+  "selectDay", "toggleBlock", "logScope", "progressScope",
   "setGuTab", "setGsScope", "formCheckMonth", "dismissStorageError",
   // her own session, start to finish
   "goSession", "startMini", "goTryIt", "exitTryIt", "tryItDetail",
@@ -68,15 +77,19 @@ export const UNGATED_ACTIONS = [
   // things she has earned
   "startQuizDeck", "answerQuizDeck", "nextQuizDeck", "exitQuizDeck",
   "openPrizeDraw", "pickPrize", "claimPrize", "redeemPrize",
-  // the gate's own controls
-  "cancelGate", "submitGate", "answerGate", "forgotPin", "closePrizeReview",
-  "cancelRestore"
+  // the gate's own controls — these ARE the authorization, so gating them
+  // would be circular. None of them mutates anything on its own.
+  "cancelGate", "submitGate", "answerGate", "forgotPin", "unlockWithPasskey",
+  "enrollPasskey", "closePrizeReview", "cancelRestore"
 ];
 
 /* What the grown-up is being asked to approve, in their own words — shown with
    the question, so an adult handed the phone knows what they are agreeing to. */
 export const GATE_REASON = {
-  grownupZone:    "open the Grown-up Zone",
+  nav:            "open the Grown-up Zone",
+  renameAthlete:  "change the athlete's name",
+  restoreBackup:  "write a backup over her live history",
+  forgetPasskey:  "remove the grown-up passkey from this device",
   severity3:      "clear a pain report that changed how she moves",
   lightOverride:  "override the light her body check produced",
   safetySettings: "change the safety settings",
@@ -105,94 +118,74 @@ export const GATE_REASON = {
 };
 
 let unlockedAt = 0;
-let challenge = null;
-/* Set only by answering the fallback question correctly. It is what buys the
-   right to CHOOSE a PIN — without it, "no PIN is set" would itself be the way
-   in, and clearing the PIN would be a bypass rather than a recovery. */
+/* Set only by a successful passkey ceremony, or by the device having no history
+   at all. It is what buys the right to CHOOSE a PIN — without it, "no PIN is
+   set" would itself be the way in. */
 let mayChoosePin = false;
-
-/* Deliberately awkward for a child and trivial for an adult: a two-digit
-   number times a single digit, neither of them 0, 1 or 10. */
-function newChallenge(rnd = Math.random) {
-  const a = 12 + Math.floor(rnd() * 87);          // 12..98
-  const b = 3 + Math.floor(rnd() * 7);            // 3..9
-  return { a, b, answer: a * b, question: a + " × " + b + " = ?" };
-}
-
-/* The question to put in front of the grown-up. Stable until it is answered or
-   explicitly reset, so a re-render does not change the sum mid-typing. */
-export function gateChallenge(rnd = Math.random) {
-  if (!challenge) challenge = newChallenge(rnd);
-  return { question: challenge.question };
-}
 
 export function gateUnlocked(now = Date.now()) {
   return unlockedAt > 0 && (now - unlockedAt) < GATE_UNLOCK_MS;
 }
 
-/* How the app should ask right now:
-     "pin"    — a PIN is set; type it
-     "math"   — the fallback question: first run, or Forgot-PIN
-     "setPin" — the question has just been answered; choose the PIN
+/* A device with no training on it yet has nothing to protect and nobody to ask,
+   so the first PIN goes on the way a device passcode does. The moment there is
+   history, the passkey is the only way to set or change one. */
+export function isFreshDevice() { return (loadSessions() || []).length === 0; }
 
-   Note the ordering. On a device with no PIN yet, the FIRST thing asked is the
-   arithmetic question, not the PIN form — otherwise "no PIN is set" would be the
-   easiest way in of all, and the child would simply set her own. */
-export function gateMode(fallback = false) {
+/* How the app should ask right now:
+     "setPin"  — allowed to choose a PIN (fresh device, or the passkey just said so)
+     "pin"     — a PIN is set; type it
+     "passkey" — no PIN may be chosen and none is set to type, or she asked to
+                 reset one: the ceremony is the only way through */
+export function gateMode(wantsNewPin = false) {
   if (mayChoosePin) return "setPin";
-  if (fallback || !hasGrownupPin()) return "math";
-  return "pin";
+  if (!hasGrownupPin() && isFreshDevice()) { mayChoosePin = true; return "setPin"; }
+  if (wantsNewPin) return "passkey";
+  return hasGrownupPin() ? "pin" : "passkey";
 }
+
+/* Why a PIN was refused — shown under the field, so "nothing happened" never
+   has to be guessed at. */
+export function pinRefusalReason() {
+  if (!mayChoosePin) {
+    return hasPasskey()
+      ? "Confirm a grown-up first."
+      : passkeySupported()
+        ? "This device already has training on it, so setting a PIN needs a grown-up passkey. Set one up first."
+        : "This device already has training on it and this browser has no passkey, so the PIN cannot be changed here. Restore a backup on a fresh device instead.";
+  }
+  return "A PIN is " + PIN_MIN_DIGITS + "-" + PIN_MAX_DIGITS + " digits.";
+}
+
+/* Called by the app after a successful passkey ceremony. */
+export function allowPinChoice() { mayChoosePin = true; }
+export function clearPinChoice() { mayChoosePin = false; }
 
 /* Unlock by PIN. A wrong PIN unlocks nothing and says nothing about why. */
 export function answerPin(input, now = Date.now()) {
   if (!verifyGrownupPin(input)) return false;
-  challenge = null;
   unlockedAt = now;
   return true;
 }
 
-/* Answer the fallback question. This does NOT unlock: it earns the right to
-   choose a PIN, and unlocking happens when one is chosen. A wrong answer draws
-   a fresh question, so the same sum cannot be brute-forced by guessing. */
-export function answerGate(input) {
-  if (!challenge) challenge = newChallenge();
-  const given = Number(String(input).trim());
-  if (!Number.isFinite(given) || given !== challenge.answer) {
-    challenge = newChallenge();
-    return false;
-  }
-  challenge = null;
-  mayChoosePin = true;
-  return true;
-}
+/* The passkey ceremony itself lives in js/passkey.js (it is async); this is
+   what the app calls once it has succeeded. */
+export function unlockByPasskey(now = Date.now()) { unlockedAt = now; }
 
 /* Choose the PIN and unlock in the same step, so setting one is never a dead
-   end that immediately asks for it. Refused unless the fallback question has
-   just been answered — which is what stops clearGrownupPin from being a way in
-   rather than a way back. */
+   end that immediately asks for it. Refused unless a grown-up has been
+   established — which is what stops "no PIN set" from being a way in. */
 export function choosePin(pin, now = Date.now()) {
   if (!mayChoosePin) return false;
   if (!setGrownupPin(pin)) return false;      // overwrites any existing PIN
-  challenge = null;
   mayChoosePin = false;
   unlockedAt = now;
   return true;
-}
-
-/* "Forgot the PIN?" — switch to the fallback question. The existing PIN is
-   deliberately left in place until a new one actually replaces it: clearing it
-   up front would mean cancelling here left the app with no PIN at all, which is
-   a bypass, not a recovery. */
-export function beginPinReset() {
-  challenge = null;
-  mayChoosePin = false;
 }
 
 /* Called on leaving the Grown-up Zone, and any time the unlock should end. */
 export function lockGate() {
   unlockedAt = 0;
-  challenge = null;
   mayChoosePin = false;
 }
 

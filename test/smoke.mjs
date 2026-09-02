@@ -35,8 +35,80 @@ const fakeEl = () => ({
   getBoundingClientRect: () => ({ top: 0, left: 0, width: 0, height: 0 }),
   style: {}, classList: { add() {}, remove() {}, toggle() {} }, dataset: {}, value: ""
 });
+/* ---- a DOM stub real enough to DRIVE THE LISTENERS -----------------------
+   The old stub returned a NEW element from every getElementById and made
+   addEventListener a no-op, so js/main.js's click / input / change listeners
+   were never executed by any test — every test called main.actions.x() and the
+   path a real tap takes was unproven. This one keeps a single `root`, records
+   what is registered on it, and can fire a synthetic event at it. */
+const listeners = {};
+function makeRoot() {
+  const el = fakeEl();
+  el.addEventListener = (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); };
+  el.contains = () => true;
+  return el;
+}
+const testRoot = makeRoot();
+/* Fire a real event at the real listener. `target` is what e.target will be —
+   normally a stub element carrying the dataset / value the handler reads. */
+globalThis.fireEvent = (type, target) => {
+  let defaultPrevented = false;
+  const ev = { type, target, preventDefault: () => { defaultPrevented = true; } };
+  (listeners[type] || []).forEach(fn => fn(ev));
+  return defaultPrevented;
+};
+/* An element as the delegated click listener expects to find it. */
+globalThis.clickTarget = (action, arg) => {
+  const el = fakeEl();
+  el.dataset = { action, ...(arg === undefined ? {} : { arg }) };
+  el.closest = sel => (sel === "[data-action]" ? el : null);
+  el.tagName = "BUTTON";
+  el.getAttribute = () => null;
+  return el;
+};
+/* An input as the input / change listeners expect to find it. */
+globalThis.inputTarget = (name, value, files) => {
+  const el = fakeEl();
+  el.matches = sel => sel === `[data-input="${name}"]`;
+  el.value = value == null ? "" : value;
+  if (files) el.files = files;
+  return el;
+};
+
+/* WebAuthn. `passkeyStub.mode` decides what the platform does:
+     "ok"     — the ceremony succeeds
+     "cancel" — the grown-up dismisses the prompt (a rejected promise)
+     "none"   — no platform authenticator at all */
+globalThis.passkeyStub = { mode: "ok", id: "test-credential-id", creates: 0, gets: 0 };
+const credId = () => new Uint8Array([...globalThis.passkeyStub.id].map(c => c.charCodeAt(0)));
+const navStub = {
+  credentials: {
+    create: async () => {
+      globalThis.passkeyStub.creates++;
+      if (globalThis.passkeyStub.mode === "cancel") throw new Error("NotAllowedError");
+      return { rawId: credId(), id: globalThis.passkeyStub.id };
+    },
+    get: async () => {
+      globalThis.passkeyStub.gets++;
+      if (globalThis.passkeyStub.mode === "cancel") throw new Error("NotAllowedError");
+      return { rawId: credId(), id: globalThis.passkeyStub.id };
+    }
+  }
+};
+// Node 22 defines globalThis.navigator as a getter, so it has to be replaced.
+Object.defineProperty(globalThis, "navigator", { value: navStub, configurable: true, writable: true });
+globalThis.window.PublicKeyCredential = function PublicKeyCredential() {};
+globalThis.PublicKeyCredential = globalThis.window.PublicKeyCredential;
+/* passkeySupported() reads window.*, so unsupported means removing it. */
+globalThis.setPasskeySupport = on => {
+  if (on) globalThis.window.PublicKeyCredential = globalThis.PublicKeyCredential;
+  else delete globalThis.window.PublicKeyCredential;
+};
+globalThis.btoa = globalThis.btoa || (s => Buffer.from(s, "binary").toString("base64"));
+globalThis.atob = globalThis.atob || (s => Buffer.from(s, "base64").toString("binary"));
+
 globalThis.document = {
-  getElementById: () => fakeEl(), createElement: () => fakeEl(),
+  getElementById: () => testRoot, createElement: () => fakeEl(),
   addEventListener() {}, removeEventListener() {},
   querySelector: () => null, querySelectorAll: () => [],
   body: fakeEl(), documentElement: fakeEl()
@@ -63,21 +135,34 @@ const tryvm   = await import(base + "vm/tryit.js");
 const tryscreen = await import(base + "screens/tryit.js");
 const outcome = await import(base + "outcome.js");
 const gate    = await import(base + "gate.js");
+const passkey = await import(base + "passkey.js");
 
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
 
-/* The Grown-up Zone is gated now, so anything that renders it or drives an
-   action inside it has to be an adult first. Walks the real flow: answer the
-   fallback question, choose a PIN, which unlocks. */
+/* Become the grown-up by walking the REAL flow: the device passkey confirms an
+   adult, which earns the right to choose a PIN, which unlocks. There is no
+   arithmetic question any more — that is the point of this round. */
 const TEST_PIN = "4821";
-function unlockGrownup() {
+async function unlockGrownup() {
   gate.lockGate();
-  const [a, b] = gate.gateChallenge().question.match(/\d+/g).map(Number);
-  if (!gate.answerGate(String(a * b))) throw new Error("FAIL: test could not answer the gate challenge");
-  if (!gate.choosePin(TEST_PIN)) throw new Error("FAIL: test could not set the grown-up PIN");
+  globalThis.passkeyStub.mode = "ok";
+  setPasskeySupport(true);
+  await enrollPasskeyForTest();
+  if (!await passkey.verifyPasskey()) throw new Error("FAIL: test passkey did not verify");
+  gate.allowPinChoice();
+  if (!gate.choosePin(TEST_PIN)) throw new Error("FAIL: could not set the grown-up PIN");
+  resetGateState();
 }
+async function enrollPasskeyForTest() {
+  if (!passkey.hasPasskey() && !await passkey.enrollPasskey("test")) {
+    throw new Error("FAIL: test passkey did not enrol");
+  }
+}
+/* smoke.mjs never imports js/main.js (boot() does not compose with the
+   fake-clock session tests), so there is no view state to clear here. */
+function resetGateState() {}
 
 /* --- refTime is single-sourced (engine re-exports util's) --- */
 ok(engine.refTime === util.refTime, "engine.refTime === util.refTime");
@@ -333,7 +418,7 @@ const fcInd = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics", is
   .analytics.indicators.find(i => i.label === "Form · you verified");
 ok(fcInd.total === "1 of 1", "the indicator board reports verified form beside self-reported form");
 ok(fc.prevMonth < fc.month && fc.nextMonth > fc.month, "the month stepper moves in both directions");
-unlockGrownup();   // the Zone renders its tabs only to a grown-up
+await unlockGrownup();   // the Zone renders its tabs only to a grown-up
 ok(/Form check/.test(gscreen.grownupScreen(gvm.buildGrownupVM(fcState))), "the Form Check tab renders");
 const fcXpBefore = store.loadJourney().xp;
 store.recordFormVerdict("Dead Bug", true);
@@ -382,7 +467,7 @@ ok(gAll.indicators.length === 11 && gAll.indicators.every(i => i.total !== undef
    "the indicator board reports every category as a total and an average");
 ok(gWeek.indicators[1].total !== gAll.indicators[1].total, "and its numbers move when the period changes");
 ok(gAll.isSheTrying.avg != null && gAll.isSheTrying.lines.length >= 2, "the 'Is she trying?' card has a score and its plain-English lines");
-unlockGrownup();
+await unlockGrownup();
 ok(/Is she trying/.test(gscreen.grownupScreen(gvm.buildGrownupVM({ gsScope: "all", grownupTab: "analytics", isWide: true }))),
    "and it renders on the Analytics tab");
 
@@ -1492,78 +1577,112 @@ ok(checkedMoves.length >= engine.SPOT_CHECK_MIN,
    only if it is named as child-safe. */
 localStorage.clear(); store.migrate();
 gate.lockGate();
+setPasskeySupport(true);
+globalThis.passkeyStub.mode = "ok";
+
 ok(gate.gateUnlocked() === false, "the gate starts locked");
 ok(gate.requireGrownup("severity3") === false, "a gated action is refused while locked");
-ok(gate.requireGrownup("grownupZone") === false, "so is opening the Grown-up Zone at all");
-ok(gate.requireGrownup("toggleCoachVoice") === false, "so is every settings toggle inside it");
+ok(gate.requireGrownup("nav") === false,
+   "`nav` is NOT on the child-safe list — where she is going decides, and that is CHILD_MAY's job in main.js");
+ok(gate.requireGrownup("selectDay") === true, "picking a day to look at is hers");
+ok(gate.requireGrownup("toggleCoachVoice") === false, "every settings toggle inside the Zone is gated");
 ok(gate.requireGrownup("downloadBackup") === false, "so is downloading her whole history");
+ok(gate.requireGrownup("renameAthlete") === false, "so is renaming the athlete — that used to be a raw input listener");
+ok(gate.requireGrownup("restoreBackup") === false, "so is restoring a backup — that used to be a raw change listener");
 ok(gate.requireGrownup("somethingNobodyHasWrittenYet") === false,
-   "and an action nobody has classified yet is DENIED, not allowed — a new grown-up "
-   + "action is protected by omission instead of exposed by it");
+   "and an action nobody has classified is DENIED by the predicate. (What actually "
+   + "proves this is the dispatcher test in test/actions.mjs — a predicate an "
+   + "action never calls protects nothing.)");
 ok(gate.requireGrownup("advance") === true, "her own session controls are hers");
 ok(gate.requireGrownup("pickMood") === true, "and so is answering how it felt");
 
-/* --- first run: the PIN cannot simply be set by whoever gets there first --- */
-ok(gate.hasGrownupPin() === false, "a fresh device has no PIN");
-ok(gate.gateMode() === "math", "so the FIRST thing asked is the fallback question, not the PIN form");
-ok(gate.choosePin("1234") === false,
-   "and a PIN cannot be chosen without answering it — otherwise 'no PIN is set' would be the way in");
-ok(gate.gateUnlocked() === false, "nothing was unlocked");
+/* --- NO ARITHMETIC ANYWHERE --- */
+ok(gate.gateChallenge === undefined && gate.answerGate === undefined,
+   "the arithmetic challenge is gone: a sum a 10-year-old does in her head was "
+   + "authorizing both the first PIN and every reset, so the PIN was worth exactly that sum");
 
-const gateQ = gate.gateChallenge();
-ok(/^\d+ × \d+ = \?$/.test(gateQ.question), "it asks a generated arithmetic question");
-ok(gate.gateChallenge().question === gateQ.question, "stable across re-renders while unanswered");
-const [gateQa, gateQb] = gateQ.question.match(/\d+/g).map(Number);
-ok(gate.answerGate(gateQa * gateQb - 1) === false, "a wrong answer gets nowhere");
-ok(gate.gateChallenge().question !== gateQ.question, "and draws a NEW question");
-const gateQ2 = gate.gateChallenge();
-const [gateQ2a, gateQ2b] = gateQ2.question.match(/\d+/g).map(Number);
-ok(gate.answerGate(gateQ2a * gateQ2b) === true, "the right answer is accepted");
-ok(gate.gateUnlocked() === false,
-   "but answering it does NOT unlock on its own — it earns the right to choose the PIN");
-ok(gate.gateMode() === "setPin", "which is what the card asks for next");
-ok(gate.choosePin("12") === false, "a two-digit PIN is refused");
+/* --- first run on a FRESH device: the PIN goes on like a device passcode --- */
+ok(gate.hasGrownupPin() === false, "a fresh device has no PIN");
+ok(gate.isFreshDevice() === true, "and no training on it either");
+ok(gate.gateMode() === "setPin", "so the first PIN can simply be chosen — there is nothing yet to protect");
+ok(gate.choosePin("12") === false, "a two-digit PIN is still refused");
 ok(gate.choosePin("4821") === true, "a real one is set");
 ok(gate.gateUnlocked() === true, "and setting it unlocks in the same step");
-ok(gate.requireGrownup("prizeRepair") === true, "every gated action is now allowed");
 ok(gate.hasGrownupPin() === true, "the PIN is remembered for next time");
+gate.lockGate();
+ok(gate.gateMode() === "pin", "coming back asks for the PIN");
+
+/* --- once she has TRAINED, the PIN cannot be replaced without a grown-up ---
+   This is the case that matters: a child reaching the Zone first on a phone
+   that has been in use for months, and locking her parent out of a history the
+   device holds the only live copy of. */
+store.saveSession({ app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+                    ledger: [{ name: "x", status: "done" }], completedFully: true });
+ok(gate.isFreshDevice() === false, "the device now has training on it");
+gate.lockGate();
+ok(gate.choosePin("0000") === false, "so a new PIN cannot just be chosen");
+ok(gate.answerPin("0000") === false, "and a guessed PIN unlocks nothing");
+ok(gate.answerPin("4821") === true, "the real PIN still works");
+gate.lockGate();
+
+/* --- the passkey is what authorizes a reset --- */
+ok(passkey.hasPasskey() === false, "no passkey enrolled yet");
+ok(gate.gateMode(true) === "passkey", "'forgot the PIN' asks for the device passkey");
+ok(gate.choosePin("5150") === false, "and with no passkey there is simply no reset path");
+ok(/passkey/i.test(gate.pinRefusalReason()) && /training on it/i.test(gate.pinRefusalReason()),
+   "which the refusal says out loud — why it was refused and what to do — rather than failing silently");
+
+ok(await passkey.enrollPasskey("parent") === true, "a passkey enrols");
+ok(passkey.hasPasskey() === true, "and is remembered on the device");
+ok(await passkey.verifyPasskey() === true, "the ceremony confirms a grown-up");
+gate.allowPinChoice();
+ok(gate.choosePin("5150") === true, "which lets a new PIN replace the old one");
+ok(gate.answerPin("5150") === true && gate.answerPin("4821") === false,
+   "and it is the new PIN that works from then on");
+
+/* A DIFFERENT credential is not this device's grown-up. Without this check the
+   ceremony would accept any passkey the platform happened to hand back. */
+const enrolledId = globalThis.passkeyStub.id;
+globalThis.passkeyStub.id = "some-other-credential";
+ok(await passkey.verifyPasskey() === false,
+   "a ceremony that returns a credential this device never enrolled confirms nobody");
+globalThis.passkeyStub.id = enrolledId;
+ok(await passkey.verifyPasskey() === true, "and the enrolled one still does");
+
+/* A cancelled ceremony proves nothing. */
+gate.lockGate();
+globalThis.passkeyStub.mode = "cancel";
+ok(await passkey.verifyPasskey() === false, "a dismissed prompt confirms nobody");
+ok(gate.gateUnlocked() === false, "and unlocks nothing");
+globalThis.passkeyStub.mode = "ok";
+
+/* A browser with no passkey support says so rather than pretending. */
+setPasskeySupport(false);
+ok(passkey.passkeySupported() === false, "an unsupported browser is detected");
+ok(await passkey.enrollPasskey("parent") === false, "enrolment fails cleanly, never throws");
+setPasskeySupport(true);
+
+/* --- neither secret ever leaves the device --- */
+ok(!store.PROFILE_KEYS.includes(store.LS_GROWNUP_PIN),
+   "the PIN is NOT a profile key, so downloadBackup can never write it into a file she can open");
+ok(!store.PROFILE_KEYS.includes(store.LS_GROWNUP_PASSKEY), "nor is the passkey credential");
+const exported = JSON.stringify(store.exportProfileData());
+ok(!exported.includes("5150"), "no export contains the PIN");
+ok(!exported.includes("swim_grownup"), "and no export mentions either secret at all");
+ok(localStorage.getItem(store.LS_GROWNUP_PIN) !== null, "the PIN is stored");
+ok(!String(localStorage.getItem(store.LS_GROWNUP_PIN)).includes("5150"),
+   "but the PIN itself is not what is stored — only a salted digest of it");
 
 /* it expires */
+gate.lockGate();
+gate.allowPinChoice();
+gate.choosePin("4821");
 ok(gate.gateUnlocked(Date.now() + gate.GATE_UNLOCK_MS + 1) === false,
    "the unlock expires after five minutes");
 ok(gate.gateUnlocked(Date.now() + 1000) === true, "but not before");
 gate.lockGate();
 ok(gate.gateUnlocked() === false, "leaving the Grown-up Zone locks it again");
-ok(gate.gateMode() === "pin", "and coming back asks for the PIN this time");
-
-/* --- the PIN itself --- */
-ok(gate.answerPin("0000") === false, "a wrong PIN unlocks nothing");
-ok(gate.gateUnlocked() === false, "still locked");
-ok(gate.answerPin("4821") === true, "the right PIN unlocks");
-gate.lockGate();
-
-/* --- Forgot PIN: a recovery, never a bypass --- */
-gate.beginPinReset();
-ok(gate.hasGrownupPin() === true,
-   "the old PIN survives the 'forgot' tap — clearing it up front would mean cancelling here left NO pin at all");
-ok(gate.gateUnlocked() === false, "and nothing is unlocked by asking");
-ok(gate.choosePin("9999") === false, "a new PIN still cannot be set without answering the question");
-const fq = gate.gateChallenge().question.match(/\d+/g).map(Number);
-gate.answerGate(String(fq[0] * fq[1]));
-ok(gate.choosePin("5150") === true, "answering it lets a new PIN replace the old one");
-ok(gate.answerPin("5150") === true && gate.answerPin("4821") === false,
-   "and it is the new PIN that works from then on");
-gate.lockGate();
-
-/* --- the PIN never leaves the device --- */
-ok(!store.PROFILE_KEYS.includes(store.LS_GROWNUP_PIN),
-   "the PIN is NOT a profile key, so downloadBackup can never write it into a file she can open");
-ok(!JSON.stringify(store.exportProfileData()).includes("5150"),
-   "and no export contains it");
-ok(localStorage.getItem(store.LS_GROWNUP_PIN) !== null, "it is stored");
-ok(!String(localStorage.getItem(store.LS_GROWNUP_PIN)).includes("5150"),
-   "but the PIN itself is not what is stored — only a salted digest of it");
-unlockGrownup();
+await unlockGrownup();
 
 /* --- prize repair: IDs are fixed automatically, redemption is NOT --- */
 localStorage.clear(); store.migrate();

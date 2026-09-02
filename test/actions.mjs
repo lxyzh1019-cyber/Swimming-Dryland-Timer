@@ -34,8 +34,80 @@ const fakeEl = () => ({
   getBoundingClientRect: () => ({ top: 0, left: 0, width: 0, height: 0 }),
   style: {}, classList: { add() {}, remove() {}, toggle() {} }, dataset: {}, value: ""
 });
+/* ---- a DOM stub real enough to DRIVE THE LISTENERS -----------------------
+   The old stub returned a NEW element from every getElementById and made
+   addEventListener a no-op, so js/main.js's click / input / change listeners
+   were never executed by any test — every test called main.actions.x() and the
+   path a real tap takes was unproven. This one keeps a single `root`, records
+   what is registered on it, and can fire a synthetic event at it. */
+const listeners = {};
+function makeRoot() {
+  const el = fakeEl();
+  el.addEventListener = (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); };
+  el.contains = () => true;
+  return el;
+}
+const testRoot = makeRoot();
+/* Fire a real event at the real listener. `target` is what e.target will be —
+   normally a stub element carrying the dataset / value the handler reads. */
+globalThis.fireEvent = (type, target) => {
+  let defaultPrevented = false;
+  const ev = { type, target, preventDefault: () => { defaultPrevented = true; } };
+  (listeners[type] || []).forEach(fn => fn(ev));
+  return defaultPrevented;
+};
+/* An element as the delegated click listener expects to find it. */
+globalThis.clickTarget = (action, arg) => {
+  const el = fakeEl();
+  el.dataset = { action, ...(arg === undefined ? {} : { arg }) };
+  el.closest = sel => (sel === "[data-action]" ? el : null);
+  el.tagName = "BUTTON";
+  el.getAttribute = () => null;
+  return el;
+};
+/* An input as the input / change listeners expect to find it. */
+globalThis.inputTarget = (name, value, files) => {
+  const el = fakeEl();
+  el.matches = sel => sel === `[data-input="${name}"]`;
+  el.value = value == null ? "" : value;
+  if (files) el.files = files;
+  return el;
+};
+
+/* WebAuthn. `passkeyStub.mode` decides what the platform does:
+     "ok"     — the ceremony succeeds
+     "cancel" — the grown-up dismisses the prompt (a rejected promise)
+     "none"   — no platform authenticator at all */
+globalThis.passkeyStub = { mode: "ok", id: "test-credential-id", creates: 0, gets: 0 };
+const credId = () => new Uint8Array([...globalThis.passkeyStub.id].map(c => c.charCodeAt(0)));
+const navStub = {
+  credentials: {
+    create: async () => {
+      globalThis.passkeyStub.creates++;
+      if (globalThis.passkeyStub.mode === "cancel") throw new Error("NotAllowedError");
+      return { rawId: credId(), id: globalThis.passkeyStub.id };
+    },
+    get: async () => {
+      globalThis.passkeyStub.gets++;
+      if (globalThis.passkeyStub.mode === "cancel") throw new Error("NotAllowedError");
+      return { rawId: credId(), id: globalThis.passkeyStub.id };
+    }
+  }
+};
+// Node 22 defines globalThis.navigator as a getter, so it has to be replaced.
+Object.defineProperty(globalThis, "navigator", { value: navStub, configurable: true, writable: true });
+globalThis.window.PublicKeyCredential = function PublicKeyCredential() {};
+globalThis.PublicKeyCredential = globalThis.window.PublicKeyCredential;
+/* passkeySupported() reads window.*, so unsupported means removing it. */
+globalThis.setPasskeySupport = on => {
+  if (on) globalThis.window.PublicKeyCredential = globalThis.PublicKeyCredential;
+  else delete globalThis.window.PublicKeyCredential;
+};
+globalThis.btoa = globalThis.btoa || (s => Buffer.from(s, "binary").toString("base64"));
+globalThis.atob = globalThis.atob || (s => Buffer.from(s, "base64").toString("binary"));
+
 globalThis.document = {
-  getElementById: () => fakeEl(), createElement: () => fakeEl(),
+  getElementById: () => testRoot, createElement: () => fakeEl(),
   addEventListener() {}, removeEventListener() {},
   querySelector: () => null, querySelectorAll: () => [],
   body: fakeEl(), documentElement: fakeEl()
@@ -44,27 +116,42 @@ globalThis.document = {
 const base = new URL("../js/", import.meta.url).href;
 const store  = await import(base + "store.js");
 const engine = await import(base + "engine.js");
-const gate   = await import(base + "gate.js");
+const gate    = await import(base + "gate.js");
+const passkey = await import(base + "passkey.js");
 const main   = await import(base + "main.js");
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
 
-/* Become the grown-up, by walking the real flow: answer the fallback question,
-   which earns the right to choose a PIN, which unlocks. */
+/* Become the grown-up by walking the REAL flow: the device passkey confirms an
+   adult, which earns the right to choose a PIN, which unlocks. There is no
+   arithmetic question any more — that is the point of this round. */
 const TEST_PIN = "4821";
-function unlockGrownup() {
+async function unlockGrownup() {
   gate.lockGate();
-  const [a, b] = gate.gateChallenge().question.match(/\d+/g).map(Number);
-  if (!gate.answerGate(String(a * b))) throw new Error("FAIL: could not answer the gate challenge");
+  globalThis.passkeyStub.mode = "ok";
+  setPasskeySupport(true);
+  await enrollPasskeyForTest();
+  if (!await passkey.verifyPasskey()) throw new Error("FAIL: test passkey did not verify");
+  gate.allowPinChoice();
   if (!gate.choosePin(TEST_PIN)) throw new Error("FAIL: could not set the grown-up PIN");
-  main.state.gateAsk = null; main.state.gateError = ""; main.state.gateFallback = false;
+  resetGateState();
+}
+async function enrollPasskeyForTest() {
+  if (!passkey.hasPasskey() && !await passkey.enrollPasskey("test")) {
+    throw new Error("FAIL: test passkey did not enrol");
+  }
+}
+function resetGateState() {
+  main.state.gateAsk = null; main.state.gateError = "";
+  main.state.pendingAction = null; main.state.gatePayload = null;
+  main.state.gateWantsNewPin = false; main.state.gateBusy = false;
 }
 
 /* ---- A. Try-It is ONE look, then it is over ---------------------------- */
 localStorage.clear(); store.migrate();
 // Arming Try-It stops the next run being recorded, so it is a grown-up's switch.
-unlockGrownup();
+await unlockGrownup();
 
 main.actions.togglePractice();
 ok(store.tryItArmed() === true, "the Try-It toggle arms it");
@@ -122,149 +209,236 @@ main.actions.openDetail({ name: "Superman" });
 main.actions.closeDetail();
 ok(engine.sess.paused === true, "a session already paused stays paused through a read");
 
-/* ---- Phase 4: a child cannot self-authorize a grown-up decision ---------
-   These drive the ACTIONS directly, which is the only thing that proves
-   anything: an action is reachable whether or not a button for it was
-   rendered, so asserting that a control is hidden proves nothing at all. */
+/* ============================================================
+   A CHILD CANNOT SELF-AUTHORIZE ANYTHING
+
+   These drive the ACTIONS and the real DOM LISTENERS. That is the only thing
+   that proves anything: an action is reachable whether or not a button for it
+   was rendered, so asserting that a control is hidden proves nothing — and
+   asserting that requireGrownup("unknown") returns false proves nothing either,
+   because an action that never calls it is not protected by it.
+   ============================================================ */
 localStorage.clear(); store.migrate();
-gate.lockGate();
+await unlockGrownup();          // set the PIN + passkey once, as a parent would
+gate.lockGate();                // then be the child
 
 /* --- the door: the Zone itself was never gated --- */
 main.state.nav = "today";
 main.actions.nav("grownup");
 ok(main.state.nav !== "grownup",
    "a child tapping 🧑 does NOT get into the Grown-up Zone — it used to open for anyone");
-ok(main.state.gateAsk === "grownupZone", "it asks for a grown-up first");
+ok(main.state.gateAsk === "nav", "it asks for a grown-up first");
 main.actions.cancelGate();
 ok(main.state.nav === "today", "cancelling leaves her where she was");
+ok(main.state.pendingAction === null, "and forgets what she was trying to do");
 
-/* --- and every mutating action re-checks, whatever screen it came from ---
-   Each of these was reachable by anyone holding the phone. Snapshot the store,
-   invoke the action, and require that NOTHING changed. */
-unlockGrownup();                                  // set the PIN once, as a parent would
-gate.lockGate();                                  // then become the child again
+/* --- EVERY mutating action, enumerated from the LIVE table ----------------
+   Not a hand-written list that a new action can be forgotten out of: this walks
+   whatever main.js actually registered. The day someone adds an action and does
+   not think about authorization, THIS test fails. */
 const snapshot = () => JSON.stringify({
   settings: { ...store.settings },
   gate: store.loadGate(), ladder: store.loadLadderRungs(),
   tracker: store.loadTracker(), journey: store.loadJourney(),
-  verdicts: store.formVerdicts(), tryIt: store.tryItArmed()
+  verdicts: store.formVerdicts(), tryIt: store.tryItArmed(),
+  sessions: store.loadSessions().length, profile: store.activeProfileId()
 });
-const CHILD_CANNOT = [
-  ["toggleGate", undefined],           ["toggleCoachVoice", undefined],
-  ["toggleTimerSounds", undefined],    ["toggleSafetyVoice", undefined],
-  ["setVoiceStyle", "fun"],            ["bumpRest", "exerciseRestSeconds|5|3|120"],
-  ["togglePractice", undefined],       ["setLadderRung", "Box Jump|3"],
-  ["formCheckPass", "Dead Bug"],       ["formCheckFail", "Dead Bug"],
-  ["pickEngagement", "yes"],           ["repairWallet", undefined],
-  ["addPrizePoolItem", undefined],     ["removePrizePoolItem", "0"],
-  ["resetPrizePool", undefined],       ["saveTrackerWeek", undefined],
-  ["reviewPrizes", undefined],         ["restorePrize", "some-id"],
-  ["downloadBackup", undefined],       ["exportCsv", undefined],
-  ["addAthlete", undefined],           ["pickAthlete", "someone-else"]
-];
-CHILD_CANNOT.forEach(([name, arg]) => {
+/* Arguments that would really change something, so "nothing happened" means the
+   guard stopped it rather than the argument being inert. */
+const ARG = {
+  setVoiceStyle: "fun", bumpRest: "exerciseRestSeconds|5|3|120",
+  setLadderRung: "Box Jump|3", formCheckPass: "Dead Bug", formCheckFail: "Dead Bug",
+  pickEngagement: "yes", restorePrize: "some-id", removePrizePoolItem: "0",
+  pickAthlete: "someone-else", renameAthlete: "Hacked", nav: "grownup",
+  rPickLight: "green", restoreBackup: null
+};
+const gatedNames = main.actionNames().filter(n => !gate.UNGATED_ACTIONS.includes(n));
+ok(gatedNames.length > 20, "there are " + gatedNames.length + " gated actions to check");
+gatedNames.forEach(name => {
   gate.lockGate();
-  main.state.gateAsk = null;
+  resetGateState();
+  main.state.readiness = { answers: {}, zoneSev: {}, grownupOk: false, light: "red", overridden: false };
   const before = snapshot();
-  main.actions[name](arg);
+  main.actions[name](ARG[name]);
   ok(snapshot() === before, `a locked ${name} changes nothing at all`);
-  ok(main.state.gateAsk === name || main.state.gateAsk !== null,
-     `and ${name} asks for a grown-up`);
+  ok(main.state.gateAsk !== null, `and ${name} asks for a grown-up`);
 });
+resetGateState();
+
+/* --- an action NOBODY REMEMBERED TO GATE is blocked by the dispatcher -----
+   The real claim. `defineAction` is the only way an action gets into the table,
+   and the guard is on dispatch rather than on registration, so a brand-new
+   mutating action written by someone who never heard of requireGrownup is
+   refused anyway. This is what the old
+   `requireGrownup("somethingNobodyHasWrittenYet") === false` assertion looked
+   like it was proving and was not. */
+let canaryRan = false;
+main.defineAction("canaryMutation", () => { canaryRan = true; });
+gate.lockGate(); resetGateState();
+main.actions.canaryMutation();
+ok(canaryRan === false,
+   "a newly added action nobody gated NEVER RUNS while locked — deny-by-default is applied "
+   + "at the dispatcher, not remembered action by action");
+ok(main.state.gateAsk === "canaryMutation", "the dispatcher put the challenge up for it by name");
+main.actions.answerGate(TEST_PIN);
+ok(canaryRan === true, "and a grown-up who unlocks gets the action she asked for, unchanged");
+
+/* An argument survives the round trip through the challenge. */
+let canaryArg = null;
+main.defineAction("canaryArg", a => { canaryArg = a; });
+gate.lockGate(); resetGateState();
+main.actions.canaryArg("the-argument");
+ok(canaryArg === null, "the deferred action has not run");
+main.actions.answerGate(TEST_PIN);
+ok(canaryArg === "the-argument", "and it re-runs with the argument she originally gave");
+
+/* --- the DISPATCHER PATH itself, not just direct calls -------------------
+   js/main.js's click listener used to look the function up and invoke it with
+   no check of its own. Until now no test ever executed it at all. */
+gate.lockGate(); resetGateState();
+const gateBefore = store.loadGate().unlocked;
+fireEvent("click", clickTarget("toggleGate"));
+ok(store.loadGate().unlocked === gateBefore, "a real TAP on a gated control changes nothing");
+ok(main.state.gateAsk === "toggleGate", "the click dispatcher asks for a grown-up");
+main.actions.answerGate(TEST_PIN);
+ok(store.loadGate().unlocked === !gateBefore, "and the tap she made is carried out after unlocking");
+
+/* An unknown data-action is simply ignored — it must not raise a challenge for
+   an action that does not exist. */
+gate.lockGate(); resetGateState();
+fireEvent("click", clickTarget("noSuchActionAtAll"));
+ok(main.state.gateAsk === null, "a typo'd data-action asks nobody for anything");
+
+/* --- the two handlers that bypassed the action layer completely ----------
+   The athlete-name field and the backup-file picker were raw DOM listeners
+   calling straight into the store. Restoring a backup OVER LIVE HISTORY asked
+   nobody at all. */
+gate.lockGate(); resetGateState();
+const nameBefore = store.settings.athleteName;
+fireEvent("input", inputTarget("athleteName", "Renamed By The Child"));
+ok(store.settings.athleteName === nameBefore,
+   "typing in the athlete-name field renames nobody while locked — it used to rename her instantly");
+ok(main.state.gateAsk === "renameAthlete", "it asks for a grown-up");
+
+gate.lockGate(); resetGateState();
+let restoreAttempted = false;
+const fakeFile = { name: "backup.json", __fake: true };
+const fileInput = inputTarget("restoreBackup", "", [fakeFile]);
+fireEvent("change", fileInput);
+ok(main.state.gateAsk === "restoreBackup",
+   "choosing a backup file asks for a grown-up — writing a backup over her live history used to ask NOBODY");
+ok(main.state.backupNote === "" || !/Restored/.test(main.state.backupNote), "and no restore was started");
 main.actions.cancelGate();
 
-/* The valgus gate decides whether she is jumping at all. */
-gate.lockGate();
-const gateBefore = store.loadGate().unlocked;
-main.actions.toggleGate();
-ok(store.loadGate().unlocked === gateBefore,
-   "tapping the valgus gate while locked changes NOTHING");
-ok(main.state.gateAsk === "toggleGate", "it asks for a grown-up instead");
+/* --- the unlock EXPIRES while she is sitting in the Zone -----------------
+   The Zone does not re-render on a timer, so after five minutes every control
+   is still on screen and still tappable. None of them may work. */
+await unlockGrownup();
+main.state.nav = "grownup";
+ok(gate.gateUnlocked() === true, "a grown-up is in the Zone");
+const realNow = Date.now;
+Date.now = () => realNow() + gate.GATE_UNLOCK_MS + 1000;      // six minutes pass
+ok(gate.gateUnlocked() === false, "the unlock has expired");
+ok(main.state.nav === "grownup", "but the Zone is still open and every control is still drawn");
+gatedNames.forEach(name => {
+  resetGateState();
+  main.state.readiness = { answers: {}, zoneSev: {}, grownupOk: false, light: "red", overridden: false };
+  const before = snapshot();
+  main.actions[name](ARG[name]);
+  ok(snapshot() === before, `${name} does nothing once the unlock has expired, Zone open or not`);
+});
+/* And the same for the two listener paths and the click dispatcher. */
+resetGateState();
+const nameAtExpiry = store.settings.athleteName;
+fireEvent("input", inputTarget("athleteName", "Renamed After Expiry"));
+ok(store.settings.athleteName === nameAtExpiry, "the name field is dead once the unlock expires too");
+resetGateState();
+const gateAtExpiry = store.loadGate().unlocked;
+fireEvent("click", clickTarget("toggleGate"));
+ok(store.loadGate().unlocked === gateAtExpiry, "and so is a tap on a control still on screen");
+Date.now = realNow;
+resetGateState();
 
-/* A wrong PIN does not let it through. */
+/* --- the PIN, the passkey, and the reset, driven through the actions ---- */
+await unlockGrownup();
+gate.lockGate(); resetGateState();
+main.actions.toggleGate();
+ok(main.state.gateAsk === "toggleGate", "a gated tap raises the challenge");
 main.actions.answerGate("0000");
-ok(store.loadGate().unlocked === gateBefore, "a wrong PIN still changes nothing");
-ok(main.state.gateAsk === "toggleGate", "and the question stays up");
+ok(main.state.gateAsk === "toggleGate", "a wrong PIN leaves it up");
 ok(main.state.gateError !== "", "with a visible retry message");
-
-/* The right PIN performs the action she originally asked for. */
 main.actions.answerGate(TEST_PIN);
-ok(main.state.gateAsk === null, "the question closes");
-ok(store.loadGate().unlocked === !gateBefore,
-   "and the action she asked for is carried out, so she does not have to find it again");
+ok(main.state.gateAsk === null, "the right PIN closes it");
 
-/* While unlocked, gated actions go straight through. */
-main.actions.toggleGate();
-ok(store.loadGate().unlocked === gateBefore, "a second change inside the unlock window is not re-challenged");
-
-/* An action carrying an ARGUMENT re-runs with that argument, not without it. */
-gate.lockGate();
-main.actions.setVoiceStyle("fun");
-ok(store.settings.voiceStyle !== "fun", "the style is not changed while locked");
-main.actions.answerGate(TEST_PIN);
-ok(store.settings.voiceStyle === "fun",
-   "and after unlocking it is the style she picked that is applied, not a default");
-
-/* Forgot the PIN: the fallback question, then a new PIN. */
-gate.lockGate();
+/* Forgot the PIN: the passkey is the only way through, and the old PIN survives
+   merely being asked about — clearing it up front would make "forgot" a bypass. */
+gate.lockGate(); resetGateState();
 main.actions.toggleGate();
 main.actions.forgotPin();
 ok(gate.hasGrownupPin() === true, "the old PIN is not thrown away just for asking");
-const fbq = gate.gateChallenge().question.match(/\d+/g).map(Number);
-main.actions.answerGate(String(fbq[0] * fbq[1]));
-ok(main.state.gateAsk === "toggleGate", "answering the fallback does not itself perform the action");
-ok(gate.gateUnlocked() === false, "nor unlock");
+ok(gate.gateMode(main.state.gateWantsNewPin) === "passkey", "the device passkey is what is asked for");
+globalThis.passkeyStub.mode = "cancel";
+await main.actions.unlockWithPasskey();
+await new Promise(r => setTimeout(r, 0));
+ok(gate.gateUnlocked() === false, "a dismissed prompt unlocks nothing");
+globalThis.passkeyStub.mode = "ok";
+main.actions.unlockWithPasskey();
+await new Promise(r => setTimeout(r, 0));
+ok(gate.gateMode(main.state.gateWantsNewPin) === "setPin", "a confirmed grown-up may then choose a new PIN");
 main.actions.answerGate("7788");
-ok(gate.gateUnlocked() === true, "choosing a new PIN unlocks");
+ok(gate.gateUnlocked() === true, "choosing it unlocks");
 ok(gate.answerPin("7788") === true, "and the new PIN is the one that works from now on");
+resetGateState();
 
-/* Cancelling abandons the action. */
-gate.lockGate();
-const beforeCancel = store.loadGate().unlocked;
-main.actions.toggleGate();
+/* Leaving the Grown-up Zone drops the unlock — she cannot walk out, hand the
+   phone back, and have the next tap on 🧑 still be authorized. */
+await unlockGrownup();
+main.state.nav = "grownup";
+main.actions.nav("today");
+ok(gate.gateUnlocked() === false, "walking out re-locks it immediately");
+ok(main.state.nav === "today", "leaving is never itself blocked");
+main.actions.nav("grownup");
+ok(main.state.nav !== "grownup" && main.state.gateAsk === "nav", "so coming back asks again");
 main.actions.cancelGate();
-ok(main.state.gateAsk === null, "cancelling closes the question");
-ok(store.loadGate().unlocked === beforeCancel, "and performs nothing");
 
 /* The severity-3 confirmation is no longer a checkbox she can tick herself. */
-unlockGrownup(); gate.lockGate();
+await unlockGrownup(); gate.lockGate(); resetGateState();
 main.state.readiness = { answers: {}, zoneSev: {}, grownupOk: false, light: "green", overridden: false };
 main.actions.rGrownupOk();
 ok(main.state.readiness.grownupOk === false,
    "a child cannot clear her own severity-3 pain report by tapping the checkbox");
-ok(main.state.gateAsk === "severity3", "it asks for a grown-up");
+ok(main.state.gateAsk === "rGrownupOk", "it asks for a grown-up");
 main.actions.answerGate(TEST_PIN);
 ok(main.state.readiness.grownupOk === true, "a grown-up who is actually there can clear it");
 /* Un-ticking it again does not need the grown-up back. */
+gate.lockGate(); resetGateState();
 main.actions.rGrownupOk();
 ok(main.state.readiness.grownupOk === false, "and withdrawing the confirmation is always allowed");
 
 /* Overriding the light the body check produced is an adult decision. */
-gate.lockGate();
+gate.lockGate(); resetGateState();
 main.state.readiness = { answers: {}, zoneSev: {}, grownupOk: false, light: "red", overridden: false };
 main.actions.rPickLight("green");
 ok(main.state.readiness.light === "red", "a red light cannot be overridden to green by the child");
-ok(main.state.gateAsk === "lightOverride", "it asks for a grown-up");
+ok(main.state.gateAsk === "rPickLight", "it asks for a grown-up");
 main.actions.answerGate(TEST_PIN);
 ok(main.state.readiness.light === "green" && main.state.readiness.overridden === true,
    "and a grown-up can, with the override recorded");
 
-/* Leaving the Grown-up Zone drops the unlock — she cannot walk out, hand the
-   phone back, and have the next tap on 🧑 still be authorized. */
-unlockGrownup();
-main.state.nav = "grownup";
-ok(gate.gateUnlocked() === true, "a grown-up is in the Zone");
-main.actions.nav("today");
-ok(gate.gateUnlocked() === false, "and walking out re-locks it immediately");
-ok(main.state.nav === "today", "leaving is never itself blocked");
-main.actions.nav("grownup");
-ok(main.state.nav !== "grownup" && main.state.gateAsk === "grownupZone",
-   "so coming back asks again");
+/* Turning the safety voice back ON is always hers; turning it off is not. */
+gate.lockGate(); resetGateState();
+store.updateSettings({ safetyVoiceOn: false });
+main.actions.toggleSafetyVoice();
+ok(store.settings.safetyVoiceOn === true, "she may always turn the safety voice back ON");
+gate.lockGate(); resetGateState();
+main.actions.toggleSafetyVoice();
+ok(store.settings.safetyVoiceOn === true, "but she may not turn it off");
+ok(main.state.gateAsk === "toggleSafetyVoice", "that asks for a grown-up");
 main.actions.cancelGate();
 
 /* ---- the repair message says what actually happened -------------------- */
 localStorage.clear(); store.migrate();
-unlockGrownup();
+await unlockGrownup();
 store.saveJourney({ ...(store.loadJourney() || {}), xp: 0, pendingDraws: 0, prizesWon: [
   { id: "a", label: "Movie night", date: "2026-01-05", redeemed: true },
   { id: "a", label: "Ice cream", date: "2026-01-06", redeemed: true }
