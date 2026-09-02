@@ -236,10 +236,6 @@ function dayPane(vm, wide) {
         <span style="font-size:22px;">${dv.ctaIcon}</span> ${dv.ctaLabel}
       </button>
       ${dv.ctaSubtext ? `<div style="text-align:center;font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.8;padding-top:8px;">${dv.ctaSubtext}</div>` : ""}` : ""}
-    ${dv.showMini ? `
-      <div style="display:flex;justify-content:center;padding-top:10px;">
-        <button type="button" data-action="startMini" data-arg="${vm.selectedKey}" style="min-height:44px;background:rgba(255,255,255,0.18);border:none;border-radius:var(--radius-pill);padding:0 ${wide ? 20 : 18}px;color:#fff;font-size:${wide ? 14 : 13}px;font-weight:800;cursor:pointer;font-family:inherit;">Short on time? Do a 10-min mini ⚡</button>
-      </div>` : ""}
     ${dv.showTryIt ? `
       <div style="padding-top:${wide ? 10 : 8}px;">
         <button type="button" data-action="togglePractice" aria-pressed="${vm.practiceMode}" style="${vm.practiceBtnStyle}">

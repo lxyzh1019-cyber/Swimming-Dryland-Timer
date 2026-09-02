@@ -1209,18 +1209,27 @@ ok(store.countsAsTrained({ ...painStop, perExercise: [{ name: "x" }] }) === true
    store.countsAsTrained({ ...painStop, perExercise: [{ name: "x" }] }) === false,
    "and countsAsTrained has an explicit answer for it");
 
-/* --- a mini is a subset, not the day --- */
+/* --- Mini cannot be started any more, and its history still reads -----------
+   The button promised "10 minutes" and nothing measured it; the traffic light
+   is the one dial that shortens a session now. A stale caller still asking for
+   one must not get a quietly shortened workout back. */
 localStorage.clear();
 let s3 = await runSession({ dayKey: "monday", light: "green", mini: true, gateUnlocked: true });
-ok(s3.mode === "mini", "a mini runs as its own mode");
-ok(s3.roundsPlanned === 1, "and plans one round however green the light was");
+ok(s3.mode === "normal", "asking for a mini gets an ordinary session, not a mini");
+ok(s3.roundsPlanned === 3, "planned against the light's own rounds");
 const rec3 = store.loadSessions()[0];
-ok(rec3.sessionType === "mini", "the record says mini");
-ok(store.sessionXp(rec3) <= 180, "so it is priced as a one-round day at most");
-const week = tvm.weekStatuses();
-ok(week.monday !== "done", "and a mini never ticks the whole day off");
-ok(store.loadSessions().length === 1 && JSON.parse(localStorage.getItem("swim_day_progress") || "{}"),
-   "while the rest of the day's progress is left standing");
+ok(rec3.sessionType === "main", "and the record says main");
+ok(rec3.mini === undefined, "with no mini flag written on it");
+
+/* A record written when Mini existed is still priced, labelled and counted as
+   the subset it was — history is not re-scored underneath her. */
+const oldMini = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION,
+  sessionType: "mini", mini: true, roundsDone: 1, roundsPlanned: 3,
+  completedFully: true, ledger: [{ name: "x", block: "main", round: 1, status: "done" }] };
+ok(store.sessionRoundsPlanned(oldMini) === 1, "a historical mini still asks for one round");
+ok(store.xpForSession(oldMini) === 180, "and is still priced as a one-round day");
+ok(pvm.logEntryView(oldMini).lightLabel === "MINI", "the log still labels it MINI");
 
 /* --- the Coach's Quiz pays once, not twice --------------------------------
    Reproduces the report exactly: 360 session + 30 quiz should read 390 after
@@ -1624,12 +1633,11 @@ ok(store.outcomeOf(recRow).countsForStreak === false, "and does not increase the
 ok(store.currentStreak(store.loadSessions().filter(store.countsAsTrained)) === 0,
    "a week of recovery alone leaves the training streak at zero");
 
-/* --- a Mini that resolves to Recovery becomes recovery, not warm-up + main --- */
-const sMiniRec = await runSession({ dayKey: "tuesday", light: "recovery", mini: true, gateUnlocked: true });
-ok(sMiniRec.mode === "recovery", "a recovery Mini is a recovery session");
-ok(sMiniRec.mini === false, "it is not run as a shortened workout");
+/* --- a weekday that resolves to Recovery gets recovery, not warm-up + main --- */
+const sMiniRec = await runSession({ dayKey: "tuesday", light: "recovery", gateUnlocked: true });
+ok(sMiniRec.mode === "recovery", "it is a recovery session");
 ok(sMiniRec.ledger.every(l => !WORKOUT_BLOCKS.includes(l.block)), "and never reaches a main circuit");
-ok(store.loadSessions()[0].sessionType === "recovery", "the recovery-mini is recorded as recovery");
+ok(store.loadSessions()[0].sessionType === "recovery", "recorded as recovery");
 
 /* --- the care credit: recovery pays a flat show-up credit, and no round XP --- */
 ok(store.xpForSession({ ...recRow }) === store.XP_SHOWED_UP,

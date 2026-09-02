@@ -53,7 +53,7 @@ export const state = {
   tryIt: null,                  // dayKey while the Try-It browse screen is open
   inSession: false,
   readiness: null,              // active readiness-check flow state (null = not in flow)
-  pendingSession: null,         // { light, dayKey, mini? } — readiness → session handoff
+  pendingSession: null,         // { light, dayKey } — readiness → session handoff
   quizDeck: null,
   prizeDraw: null,
   detailOverlay: false,
@@ -369,17 +369,6 @@ Object.assign(RAW, {
     state.detailEx = ex; state.detailOverlay = true;
     render();
   },
-  startMini(arg) {
-    const dayKey = arg || state.selectedDay || edmontonDayKey();
-    if (state.practiceMode) { actions.goTryIt(dayKey); return; }
-    // A mini goes through Body Check like any other session and uses the light
-    // it resolves to. Skipping readiness and forcing green is how a sore day
-    // still handed her a workout nobody had checked.
-    const r = newReadinessFlow(dayKey);
-    r.mini = true;
-    state.readiness = r;
-    render();
-  },
   startQuizDeck() {
     state.quizDeck = buildQuizDeck(8);
     render();
@@ -451,7 +440,7 @@ Object.assign(RAW, {
     const suggested = r.suggestedLight || r.light || "green";
     saveReadiness({ answers: r.answers, zoneSev: r.zoneSev, light: r.light,
                     suggestedLight: suggested, overridden: r.light !== suggested });
-    startPendingSession({ light: r.light || "green", dayKey: r.dayKey, mini: !!r.mini,
+    startPendingSession({ light: r.light || "green", dayKey: r.dayKey,
                           suggestedLight: suggested });
   },
   rResultSecondary(arg) {

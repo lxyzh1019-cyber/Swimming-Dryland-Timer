@@ -62,10 +62,11 @@ function blankSession() {
     currentDirection: 0, totalDirections: 0,
     repInSegment: 0, repsInSegment: 0,
     currentSegment: 0, totalSegments: 0,
-    // "normal" | "mini" | "tryit" — practice/mini are kept as mirrors so the
-    // screens and view-models that read them keep working.
+    // "normal" | "recovery". Mini is gone as a thing that can be STARTED — the
+    // traffic light is the one dial that shortens a session now — but records
+    // written when it existed are still read everywhere they are reported.
     mode: "normal",
-    dayKey: null, light: "green", practice: false, mini: false, spa: false, recovery: false,
+    dayKey: null, light: "green", practice: false, spa: false, recovery: false,
     endedEarly: false, xpEarned: 0, leveledUp: false,
     mood: null, wentWell: null, nextTime: null, quizPick: null, quizXp: 0,
     savedEntry: false, saveFailed: false, savedKey: null, fsId: null
@@ -116,7 +117,7 @@ export function assembleCircuits(dayKey, light, opts = {}) {
   const rounds = roundsForLight(light);
   const skipBlocks = opts.skip || [];
   const circuits = [];
-  const order = opts.mini ? ["warmup", "main"] : BLOCK_ORDER;
+  const order = BLOCK_ORDER;
   order.forEach(bk => {
     if (skipBlocks.includes(bk)) return;
     let exs = (day.blocks[bk] || []).slice();
@@ -136,8 +137,8 @@ export function assembleCircuits(dayKey, light, opts = {}) {
     }
     if (!exs.length) return;
     circuits.push({ name: BLOCK_LABEL[bk], block: bk,
-      rounds: bk === "main" && !opts.mini ? rounds : 1, exercises: exs });
-    if (bk === "main" && !opts.mini && day.prepMenu && day.prepMenu.length && !skipBlocks.includes("prep")) {
+      rounds: bk === "main" ? rounds : 1, exercises: exs });
+    if (bk === "main" && day.prepMenu && day.prepMenu.length && !skipBlocks.includes("prep")) {
       circuits.push({ name: BLOCK_LABEL.prep, block: "prep", rounds: 1, exercises: day.prepMenu });
     }
   });
@@ -756,7 +757,7 @@ function microLoopPrompt() {
 /* ============================================================
    MAIN RUNNER
    ============================================================ */
-export async function startSession({ dayKey, light = "green", mini = false, mode = null, suggestedLight = null }) {
+export async function startSession({ dayKey, light = "green", mode = null, suggestedLight = null }) {
   if (sess.running) return;
   // Try-It never reaches the engine any more — it is a browse screen with no
   // timer, no rounds and no record (see js/vm/tryit.js). Refuse it here so a
@@ -766,18 +767,18 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
   const day = DAYS[dayKey];
   if (!day) return;
 
-  // Recovery is an explicit MODE, not a light with zero rounds. A Mini that
-  // resolves to Recovery becomes recovery too — the whole point of the check is
-  // that a sore day gets recovery, and "a shortened workout" is still a workout.
+  // Recovery is an explicit MODE, not a light with zero rounds — the whole
+  // point of the check is that a sore day gets recovery rather than a shortened
+  // workout, because "a shortened workout" is still a workout.
   const resolvedLight = day.spa ? "recovery" : light;
   // Sunday is recovery because the CALENDAR says so, not because anyone
   // overrode the check — so there is no override to record on a spa day.
   const resolvedSuggestion = day.spa ? "recovery" : (suggestedLight || resolvedLight);
   const isRecovery = resolvedLight === "recovery";
-  const sessionMode = isRecovery ? "recovery" : (mode || (mini ? "mini" : "normal"));
+  const sessionMode = isRecovery ? "recovery" : (mode || "normal");
   Object.assign(sess, blankSession(), {
     running: true, dayKey, mode: sessionMode,
-    mini: sessionMode === "mini", practice: false,
+    practice: false,
     light: resolvedLight,
     // What the readiness check produced, before any grown-up moved it. Kept so
     // readiness analytics can read the body's answer and executed-load
@@ -791,15 +792,12 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
   // does not even READ the training day's progress — see isCareSession.
   const prog = isCareSession() ? null : loadDayProgress(dayKey);
   const skipBlocks = (prog && prog.done) || [];
-  sess.circuits = assembleCircuits(dayKey, sess.light, { mini: sess.mini, skip: isCareSession() ? [] : skipBlocks });
+  sess.circuits = assembleCircuits(dayKey, sess.light, { skip: isCareSession() ? [] : skipBlocks });
   if (!sess.circuits.length) { sess.running = false; return; }
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
   sess.expectedWork = countExpectedWork(sess.circuits);
-  // A mini is one shortened round however the light was set; everything else
-  // is priced and reported against the light's own round count.
-  sess.roundsPlanned = (sess.spa || sess.recovery) ? 0
-    : sess.mini ? 1
-    : roundsForLight(sess.light);
+  // Every session is priced and reported against its light's own round count.
+  sess.roundsPlanned = (sess.spa || sess.recovery) ? 0 : roundsForLight(sess.light);
   sess.spotChecks = pickSpotChecks(sess.circuits);
 
   logEvent("session_start", { day: dayKey, light: sess.light, mode: sessionMode });
@@ -1001,11 +999,9 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
     if (sess.abort) return finalize(false);
   }
 
-  // A MINI is a subset, not the day. Clearing day progress here is what let a
-  // 10-minute mini wipe the rest of the plan and tick the whole day off. A CARE
-  // session is not the day either — finishing a Recovery pass must leave a
+  // A CARE session is not the day — finishing a Recovery pass must leave a
   // half-trained Monday exactly as it found it.
-  if (!sess.mini && !isCareSession()) clearDayProgress(sess.dayKey);
+  if (!isCareSession()) clearDayProgress(sess.dayKey);
   finalize(true);
 }
 
@@ -1043,7 +1039,7 @@ export function finalize(completed) {
     session: "morning",
     planVersion: "2026.2",
     xpVersion: XP_VERSION,     // marks a row whose XP counted the rounds trained
-    sessionType: sess.recovery && !sess.spa ? "recovery" : sess.spa ? "spa" : sess.mini ? "mini" : "main",
+    sessionType: sess.recovery && !sess.spa ? "recovery" : sess.spa ? "spa" : "main",
     lightResult: sess.light,
     suggestedLight: sess.suggestedLight || sess.light,
     wasOverridden: (sess.suggestedLight || sess.light) !== sess.light,   // a grown-up moved it
@@ -1064,7 +1060,7 @@ export function finalize(completed) {
     plannedSecs: sess.plannedSecs,
     clean: sess.cleanCount, wobbly: sess.wobblyCount,
     formChecks: sess.formChecks || [],       // per-move verdicts from this run's spot-checks
-    light: sess.light, mini: sess.mini,
+    light: sess.light,
     pain: safetyStop,
     endedEarly: !completed,
     // The loop reaching its end is NOT the same as the work being done. The

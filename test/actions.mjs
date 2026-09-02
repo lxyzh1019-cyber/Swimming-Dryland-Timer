@@ -174,13 +174,13 @@ ok(main.state.readiness !== null, "the next GO opens Body Check");
 ok(main.state.tryIt === null, "not Try-It again");
 ok(store.loadSessions().length === 0, "and Try-It wrote no session record at all");
 
-/* A Mini is not a way around it either. */
+/* Mini is gone as a thing that can be started, so there is no second door into
+   a session that skips the arming rules — or into a shortened workout at all. */
+ok(main.actionNames().includes("startMini") === false, "there is no startMini action left");
 main.state.readiness = null;
-main.actions.togglePractice();
 main.actions.startMini("monday");
-ok(main.state.tryIt === "monday" && main.state.readiness === null, "an armed Mini also opens Try-It");
-main.actions.exitTryIt();
-ok(store.tryItArmed() === false, "and leaving it disarms it just the same");
+ok(main.state.readiness === null && main.state.tryIt === null,
+   "and dispatching the retired name does nothing at all");
 
 /* ---- C. closing the instructions is not resuming the workout ----------- */
 localStorage.clear(); store.migrate();

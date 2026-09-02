@@ -298,7 +298,6 @@ export function buildSessionVM(state) {
     isRecovery:   completionState === "recovery",
     isSafetyStop: completionState === "safety-stop",
     noWorkDone:   completionState === "none",
-    mini: sess.mode === "mini",
     saveFailed: completionState === "save-failed",
     sessionMantra: day.mantra || "",
     sessionMinutes: Math.round(sess.elapsed / 60),
@@ -307,9 +306,7 @@ export function buildSessionVM(state) {
     // into one number and labelled "rounds". A care session trains no rounds at
     // all, so it says nothing rather than "0 of 0".
     showRoundsLine: completionState !== "recovery",
-    roundsLine: (sess.mode === "mini")
-      ? `mini · ${sess.roundsCompleted || 0} of 1 main round`
-      : `${sess.roundsCompleted || 0} of ${sess.roundsPlanned || 0} main round${(sess.roundsPlanned || 0) === 1 ? "" : "s"}`,
+    roundsLine: `${sess.roundsCompleted || 0} of ${sess.roundsPlanned || 0} main round${(sess.roundsPlanned || 0) === 1 ? "" : "s"}`,
     xpEarned: sess.xpEarned, leveledUp: sess.leveledUp,
     moodOpts, moodAck: sess.mood ? MOOD_ACK[sess.mood] : "", showReflection: sessionDone && !!sess.mood, reflectWellOpts, reflectNextOpts,
     quizQuestion: QZ.q, quizOpts, quizAnswered, quizWhy: QZ.why,

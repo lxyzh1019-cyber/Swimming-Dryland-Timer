@@ -423,9 +423,6 @@ export function buildTodayVM(state) {
     dayView.ctaSubtext = "Try-it — instructions and videos only, no timer.";
   }
   if (dayView.isActive && !dayView.ctaSubtext) dayView.ctaSubtext = (dayView.movesLabel || "") + " · about " + (dayView.mins || "?") + " min · that’s the whole thing — no surprises.";
-  if (dayView.isActive && !practiceMode && !isSpaDay) {
-    dayView.showMini = true;
-  }
   dayView.showBlocksList = !!(dayView.isActive || dayView.isDone || dayView.isPreview || dayView.isMissed) && !isSpaDay;
   dayView.blocksHint = dayView.isDone ? "REVIEW WHAT YOU DID 👀" : dayView.isPreview ? "PEEK AT WHAT'S COMING 👀" : dayView.isMissed ? "READY WHEN YOU ARE — PEEK INSIDE 👀" : "TAP A BLOCK TO PEEK INSIDE 👀";
   dayView.showFocus = !!(dayView.isActive || dayView.isPreview) && !isSpaDay;
