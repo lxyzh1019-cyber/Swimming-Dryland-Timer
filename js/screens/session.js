@@ -161,16 +161,63 @@ export function detailOverlayHtml(vm) {
   </div>`;
 }
 
+/* ------------------------------------------------------------------
+   How the finish screen looks, per OUTCOME state. One row per state,
+   chosen by vm.completionState, which comes from the saved record via
+   outcomeOf() — never from `endedEarly === false`, which only ever meant
+   "the loop reached its end" and so called a Recovery pass, and a session
+   of nothing but skips, a completed workout.
+
+   `mantra` is the celebratory line: it belongs to a day that was actually
+   trained, and would read as praise she did not earn on the others.
+   ------------------------------------------------------------------ */
+const COMPLETION = {
+  complete: {
+    bg: "var(--mint-wash)", ink: "var(--mint-ink)", pose: "celebrate", poseH: 230,
+    title: "Session Complete!", mantra: true,
+    note: ""
+  },
+  partial: {
+    bg: "var(--sun-wash)", ink: "var(--sun-ink)", pose: "keepgoing", poseH: 190,
+    title: "Part of the way — and it counts.", mantra: false,
+    noteStyle: "color:var(--sun-ink);background:var(--sun-wash);",
+    note: "You didn't finish the whole thing, and everything you DID do is saved — the moves, the minutes and the XP for them. Coming back and finishing the rest is how it's meant to work. 💛"
+  },
+  recovery: {
+    bg: "var(--aqua-wash)", ink: "var(--aqua-ink)", pose: "breath", poseH: 200,
+    title: "Recovery done. That was care.", mantra: false,
+    noteStyle: "color:var(--aqua-ink);background:var(--aqua-wash);",
+    note: "Recovery isn't a workout, so it doesn't take a training day or a streak day — and it isn't supposed to. Listening to your body is the whole point, and you did it. ❄️"
+  },
+  "safety-stop": {
+    bg: "var(--stop-wash)", ink: "var(--stop-ink)", pose: "seeyou", poseH: 170,
+    title: "You stopped. That was the right call.", mantra: false,
+    noteStyle: "color:var(--stop-ink);background:var(--stop-wash);border:2px solid var(--stop);",
+    note: "Good call stopping. Tell a grown-up how it felt — that's what champions do."
+  },
+  none: {
+    bg: "var(--sun-wash)", ink: "var(--sun-ink)", pose: "seeyou", poseH: 170,
+    title: "Nothing logged this time.", mantra: false,
+    noteStyle: "color:var(--sun-ink);background:var(--sun-wash);",
+    note: "Every move got skipped, so there's nothing to record — no XP and no streak day. That's fine! Come back when you've got the energy and do it for real. 💛"
+  },
+  "save-failed": {
+    bg: "var(--stop-wash)", ink: "var(--stop-ink)", pose: "seeyou", poseH: 170,
+    title: "Session finished — but not saved.", mantra: false, alert: true,
+    noteStyle: "color:var(--stop-ink);background:var(--stop-wash);border:2px solid var(--stop);",
+    note: "⚠️ This device is out of storage, so this session could NOT be saved. Show a grown-up — they can free up space so your next one counts."
+  }
+};
+
 function completeScreen(vm) {
+  const c = COMPLETION[vm.completionState] || COMPLETION.none;
   return `
-  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:16px;padding:40px;text-align:center;background:${vm.endedEarly ? "var(--sun-wash)" : "var(--mint-wash)"};overflow-y:auto;">
-    <img src="assets/poses/${vm.endedEarly ? "seeyou" : "celebrate"}.png" alt="" style="height:${vm.endedEarly ? 170 : 230}px;object-fit:contain;flex-shrink:0;">
-    <div style="font-family:var(--font-display);font-weight:600;font-size:34px;color:${vm.endedEarly ? "var(--sun-ink)" : "var(--mint-ink)"};">${vm.saveFailed ? "Session finished — but not saved." : vm.noWorkDone ? "Nothing logged this time." : vm.endedEarly ? "Stopped early — progress saved." : "Session Complete!"}</div>
-    ${vm.saveFailed ? `<div role="alert" style="font-size:15px;font-weight:800;color:var(--stop-ink);background:var(--stop-wash);border:2px solid var(--stop);border-radius:16px;padding:10px 16px;max-width:480px;">⚠️ This device is out of storage, so this session could NOT be saved. Show a grown-up — they can free up space so your next one counts.</div>` : ""}
-    ${vm.noWorkDone && !vm.painFlag ? `<div style="font-size:15px;font-weight:800;color:var(--sun-ink);background:var(--sun-wash);border-radius:16px;padding:10px 16px;max-width:480px;line-height:1.45;">Every move got skipped, so there's nothing to record — no XP and no streak day. That's fine! Come back when you've got the energy and do it for real. 💛</div>` : ""}
-    ${vm.painFlag ? `<div style="font-size:16px;font-weight:800;color:var(--stop-ink);background:var(--stop-wash);border:2px solid var(--stop);border-radius:16px;padding:10px 16px;max-width:480px;">Good call stopping. Tell a grown-up how it felt — that's what champions do.</div>` : ""}
-    ${vm.sessionMantra && !vm.endedEarly ? `<div style="font-family:var(--font-hand);font-size:26px;font-weight:700;color:var(--aqua-ink);line-height:1.2;">${vm.sessionMantra}</div>` : ""}
-    <div style="font-size:16px;font-weight:700;color:var(--ink-soft);">${vm.sessionDayTitle} · ${vm.sessionMinutes} min · ${vm.roundsLine}${vm.xpEarned ? ` · ⭐ +${vm.xpEarned} XP` : ""}</div>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:16px;padding:40px;text-align:center;background:${c.bg};overflow-y:auto;">
+    <img src="assets/poses/${c.pose}.png" alt="" style="height:${c.poseH}px;object-fit:contain;flex-shrink:0;">
+    <div style="font-family:var(--font-display);font-weight:600;font-size:34px;color:${c.ink};">${c.title}</div>
+    ${c.note ? `<div${c.alert ? ` role="alert"` : ""} style="font-size:15px;font-weight:800;${c.noteStyle}border-radius:16px;padding:10px 16px;max-width:480px;line-height:1.45;">${c.note}</div>` : ""}
+    ${vm.sessionMantra && c.mantra ? `<div style="font-family:var(--font-hand);font-size:26px;font-weight:700;color:var(--aqua-ink);line-height:1.2;">${vm.sessionMantra}</div>` : ""}
+    <div style="font-size:16px;font-weight:700;color:var(--ink-soft);">${vm.sessionDayTitle} · ${vm.sessionMinutes} min${vm.showRoundsLine ? ` · ${vm.roundsLine}` : ""}${vm.xpEarned ? ` · ⭐ +${vm.xpEarned} XP` : ""}</div>
     ${vm.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="display:flex;align-items:center;gap:10px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:14px 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
     ${vm.sessionDone ? `
     <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;">

@@ -676,8 +676,23 @@ function coachingTab(vm) {
   </div>`;
 }
 
+/* Shown when the unlock has expired while the Zone was left open. It is
+   REINFORCEMENT, not the boundary: every action behind this screen re-checks for
+   itself (js/gate.js), because an action is reachable whether or not a button
+   for it was drawn, and hiding controls has never been authorization. */
+function lockedZone() {
+  return `
+    <div style="flex:1;min-width:0;padding:24px 26px;overflow-y:auto;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;">
+      <img src="assets/poses/remember.png" alt="" style="height:150px;object-fit:contain;">
+      <div style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);">Grown-up Zone 🧑</div>
+      <div style="font-size:15px;font-weight:800;color:var(--ink-soft);line-height:1.5;max-width:380px;">This part is for a grown-up. The unlock has timed out — tap 🧑 again and enter the PIN.</div>
+      <button type="button" data-action="nav" data-arg="grownup" style="min-height:46px;border:none;border-radius:var(--radius-pill);background:var(--aqua);color:#fff;font-weight:900;font-size:15px;padding:0 22px;cursor:pointer;font-family:inherit;">Unlock</button>
+    </div>`;
+}
+
 export function grownupScreen(vm) {
   const tab = vm.guTab;
+  if (!vm.grownupUnlocked) return lockedZone();
   return `
     <div style="flex:1;min-width:0;padding:24px 26px;overflow-y:auto;box-sizing:border-box;">
       <div style="font-family:var(--font-display);font-weight:600;font-size:32px;color:var(--ink);margin-bottom:18px;">Grown-up Zone 🧑</div>

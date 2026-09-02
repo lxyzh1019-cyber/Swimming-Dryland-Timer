@@ -7,7 +7,7 @@ import { sess, refTime, screenRepsDetail } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork, videoSearchUrl } from "../data.js";
 import { fmtMMSS, exercisePhotoUrl } from "../util.js";
 import { loadSessions } from "../store.js";
-import { deriveSessionOutcome, OUTCOME_VERSION } from "../outcome.js";
+import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION } from "../outcome.js";
 
 /* What changes at the end of this segment — named before she gets there, so the
    switch is never a surprise she hears about only if the voice is on. */
@@ -78,17 +78,30 @@ export function buildSessionVM(state) {
   const phase = sess.phase;
 
   const sessionDone = phase === "done";
-  // The finish screen asks the same authority the saved record will be judged
-  // by, so what she is told matches what the reports will say tomorrow.
-  const liveOutcome = deriveSessionOutcome({
-    ledger: sess.ledger || [],
-    expectedWork: Number.isFinite(sess.expectedWork) ? sess.expectedWork : null,
-    safetyStop: !!sess.painFlag,
-    explicitAbort: sess.endedEarly === true,
-    sessionType: sess.mode === "recovery" ? "recovery" : sess.spa ? "spa" : null,
-    outcomeVersion: OUTCOME_VERSION,
-    completedFully: !sess.endedEarly
-  });
+  /* The finish screen reads THE SAVED RECORD. Not `endedEarly === false`, which
+     only ever meant "the loop reached its end" and therefore called a Recovery
+     pass, and a session of nothing but skips, a completed workout. The record is
+     what the week strip, the streak and the parent reports will be built from
+     tomorrow, so it is what she is told about tonight.
+
+     While the session is still running there is no saved row yet, so the same
+     authority is asked about the live ledger instead. */
+  const liveOutcome = sess.savedEntry
+    ? outcomeOf(sess.savedEntry)
+    : deriveSessionOutcome({
+        ledger: sess.ledger || [],
+        expectedWork: Number.isFinite(sess.expectedWork) ? sess.expectedWork : null,
+        safetyStop: !!sess.painFlag,
+        explicitAbort: sess.endedEarly === true,
+        sessionType: sess.mode === "recovery" ? "recovery" : sess.spa ? "spa" : null,
+        outcomeVersion: OUTCOME_VERSION,
+        completedFully: !sess.endedEarly
+      });
+
+  /* The one value the finish screen switches on. Six states, in priority order:
+     a failed save outranks everything (nothing was recorded, so nothing may be
+     claimed), then safety, then care, then what the ledger can actually prove. */
+  const completionState = sess.saveFailed ? "save-failed" : liveOutcome.state;
   const isResting = phase === "rest" || phase === "roundRest" || phase === "sectionRest";
   const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath" || phase === "formcheck";
   const isBigRest = phase === "roundRest" || phase === "sectionRest";
@@ -276,17 +289,24 @@ export function buildSessionVM(state) {
 
     // complete screen
     endedEarly: sess.endedEarly, painFlag: sess.painFlag,
-    // Reaching the end having skipped everything is not "Session Complete!".
-    // Asked of the one authority rather than re-derived here, so the finish
-    // screen can never claim more (or less) than the record it just saved.
-    noWorkDone: liveOutcome.state === "none",
+    /* Six mutually exclusive states, each with its own words. The screen may
+       switch on THIS and on nothing else — `endedEarly === false` is not proof
+       that anything was finished. */
+    completionState,
+    isComplete:   completionState === "complete",
+    isPartial:    completionState === "partial",
+    isRecovery:   completionState === "recovery",
+    isSafetyStop: completionState === "safety-stop",
+    noWorkDone:   completionState === "none",
     mini: sess.mode === "mini",
-    saveFailed: !!sess.saveFailed,
+    saveFailed: completionState === "save-failed",
     sessionMantra: day.mantra || "",
     sessionMinutes: Math.round(sess.elapsed / 60),
     roundsCompleted: sess.roundsCompleted || 0,
     // "N of M main rounds", not a count of every block plus every round added
-    // into one number and labelled "rounds".
+    // into one number and labelled "rounds". A care session trains no rounds at
+    // all, so it says nothing rather than "0 of 0".
+    showRoundsLine: completionState !== "recovery",
     roundsLine: (sess.mode === "mini")
       ? `mini · ${sess.roundsCompleted || 0} of 1 main round`
       : `${sess.roundsCompleted || 0} of ${sess.roundsPlanned || 0} main round${(sess.roundsPlanned || 0) === 1 ? "" : "s"}`,
