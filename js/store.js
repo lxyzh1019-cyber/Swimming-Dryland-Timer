@@ -180,40 +180,20 @@ export const DEFAULT_SETTINGS = {
   safetyVoiceOn: true,      // pain checks, safety stops, form warnings
   athleteName: "Jess",      // NEW: editable in Grown-up Settings
   prizePool: null,          // NEW: null = default PRIZE_POOL
-  cloudMirror: true,        // NEW: privacy — mirror completed sessions to Firestore
-  tryItArmed: false,        // NEW: try-it mode, armed for ONE run (see below)
-  tryItArmedAt: 0
+  cloudMirror: true         // NEW: privacy — mirror completed sessions to Firestore
 };
 
-/* ---- try-it mode ----------------------------------------------------------
-   A try-it run is for testing a movement and is deliberately never recorded.
-   The flag used to live only in memory, which failed in both directions: a
-   reload silently disarmed it (so a run meant as a demo was recorded for real),
-   and nothing ever cleared it (so one forgotten arm threw away every session
-   after it — she trains, finishes, and her streak doesn't move).
+/* ---- looking at the moves is not a mode -----------------------------------
+   Try-It used to be ARMED: a grown-up flipped a persistent setting, and while
+   it was on, GO opened the move list instead of starting a workout. The flag
+   went through several repairs — it lived only in memory, so a reload disarmed
+   it silently; then nothing cleared it, so one forgotten arm threw away every
+   session after it; then it expired after two hours.
 
-   Try-It no longer runs a session at all: armed, GO opens the move list
-   (js/screens/tryit.js) instead of starting a workout, so a forgotten arm is
-   visible immediately and can't silently discard training. It still expires
-   after two hours, so a toggle left on overnight isn't waiting for her. */
-export const TRY_IT_EXPIRY_MS = 2 * 60 * 60 * 1000;
-
-export function tryItArmed() {
-  if (!settings.tryItArmed) return false;
-  const at = settings.tryItArmedAt || 0;
-  if (at && Date.now() - at > TRY_IT_EXPIRY_MS) { clearTryIt(); return false; }
-  return true;
-}
-export function setTryIt(on) {
-  updateSettings(on ? { tryItArmed: true, tryItArmedAt: Date.now() }
-                    : { tryItArmed: false, tryItArmedAt: 0 });
-  return !!on;
-}
-export function clearTryIt() {
-  if (!settings.tryItArmed && !settings.tryItArmedAt) return false;
-  updateSettings({ tryItArmed: false, tryItArmedAt: 0 });
-  return true;
-}
+   None of that is needed to read an instruction. Every launchable day now has
+   its own "Explore the moves" button straight to the list, GO always means GO,
+   and there is no state to leave switched on. The settings keys are gone with
+   it; an old saved value simply goes unread.  */
 
 export let settings = loadSettings();
 
@@ -371,6 +351,15 @@ export function countsAsTrained(s) {
 }
 /* Trained, but not all the way through — rendered as a softer ✓. */
 export function isPartialSession(s) { return outcomeOf(s).state === "partial"; }
+
+/* Whether a session earns a STREAK day, which is a stricter question than
+   whether she trained — see js/outcome.js. The streak used to be filtered on
+   countsAsTrained, so one recorded move kept the flame; countsForStreak was
+   computed right next to it and read by nobody. */
+export function countsForStreak(s) {
+  if (!s || s.practice) return false;
+  return outcomeOf(s).countsForStreak;
+}
 
 export function daysAgoCount(sessions, days) {
   const cutoff = Date.now() - days * DAY_MS;
@@ -974,29 +963,96 @@ const DAY_XP_RETENTION = 60;                       // days of budget rows kept
 export function dayXpCap(entry) {
   return XP_SHOWED_UP + XP_PER_ROUND * sessionRoundsPlanned(entry);
 }
+
+/* The budget belongs to the REAL DAY, not to the weekday card that was run.
+   The key used to be `dayKey|date`, which gave every weekday card its own
+   budget on the same date — and running two cards on one date is a single tap:
+   "Catch Up Now" on a missed day and "Start Early" on an upcoming one both hand
+   the engine a different dayKey. Monday's catch-up plus Tuesday's card on a
+   Tuesday paid 720 XP for one day of training.
+
+   No profile in the key: the journey doc is already stored per athlete
+   (see nsKey), so two athletes on one device never share these rows. */
 function dayXpKey(entry) {
-  return String(entry.dayKey || "") + "|" + edmontonISO(entry.isoDate || Date.now());
+  return edmontonISO(entry.isoDate || Date.now());
 }
+
+/* A budget row is { spent, cap }. Rows written before the key changed were a
+   bare number under the old `dayKey|date` key — they can never match a new key,
+   so they age out over the 60-day retention rather than being migrated. The
+   number form is still read because one can arrive from an older BACKUP
+   restored onto a device with no journey of its own (restoreBackup keeps the
+   local journey where there is one, so this is the fresh-device case).
+
+   The budget is device-local: journeySnapshot does not carry it, so two devices
+   finalizing sessions on the same date each grant their own. That gap predates
+   this key and is not closed here — closing it needs the spend derived from the
+   synced log rather than banked per device. */
+function dayXpRow(map, key) {
+  const raw = map && map[key];
+  if (typeof raw === "number") return { spent: raw, cap: 0 };
+  if (raw && typeof raw === "object") {
+    return { spent: Number(raw.spent) || 0, cap: Number(raw.cap) || 0 };
+  }
+  return { spent: 0, cap: 0 };
+}
+
 function pruneDayXp(map) {
   const keys = Object.keys(map || {});
   if (keys.length <= DAY_XP_RETENTION) return map || {};
-  const keep = keys.sort((a, b) => a.split("|")[1].localeCompare(b.split("|")[1])).slice(-DAY_XP_RETENTION);
+  // The key IS the date now, so it sorts directly.
+  const keep = keys.sort((a, b) => a.localeCompare(b)).slice(-DAY_XP_RETENTION);
   const out = {};
   keep.forEach(k => { out[k] = map[k]; });
   return out;
 }
 
 /* What this session may actually be paid, after the day's budget. Records the
-   draw, so calling it twice for one session does not pay twice. */
+   draw, so calling it twice for one session does not pay twice.
+
+   The day's ceiling is the LARGEST cap any session run on that date warrants,
+   not the first one claimed. Taking the first would let a Recovery morning
+   (cap 90) hold down a real session trained that afternoon; taking the largest
+   still refuses a second full day's pay, because the cap is on the date's TOTAL
+   spend. A partial and its resume share one budget exactly as before. */
+/* What the training LOG already says about a date, for the sessions this device
+   can see — which includes every session synced from her other device.
+
+   The banked row alone is a fact about one device: train on the tablet in the
+   morning and the phone in the afternoon and each grants a full day, because
+   neither has ever seen the other's row (the budget is deliberately not
+   published — see dayXpRow). Every session record, however, DOES sync, and
+   since finalize stamps what each one was actually paid, the day's spend can be
+   read back off the log. So the log is used as a floor under the banked value:
+   whichever knows about more spending wins.
+
+   Only the STAMPED amount counts. Re-pricing a row here would count the session
+   being finalized right now — it is already in the log by this point, and its
+   stamp is written a moment later — at full value against its own budget. */
+function loggedDayXp(key, entry) {
+  const rows = loadSessions().filter(s =>
+    s && !s.practice && edmontonISO(s.isoDate) === key);
+  let spent = 0;
+  let cap = dayXpCap(entry);
+  rows.forEach(s => {
+    if (Number.isFinite(s.xpEarned)) spent += Math.max(0, s.xpEarned);
+    cap = Math.max(cap, dayXpCap(s));
+  });
+  return { spent, cap };
+}
+
 export function claimSessionXp(entry) {
   const want = xpForSession(entry);
   if (want <= 0) return 0;
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
   const key = dayXpKey(entry);
-  const spent = (j.dayXpPaid && j.dayXpPaid[key]) || 0;
-  const grant = Math.max(0, Math.min(want, dayXpCap(entry) - spent));
+  const banked = dayXpRow(j.dayXpPaid, key);
+  const logged = loggedDayXp(key, entry);
+  const spent = Math.max(banked.spent, logged.spent);
+  const cap = Math.max(banked.cap, logged.cap);
+  const grant = Math.max(0, Math.min(want, cap - spent));
   if (grant > 0) {
-    j.dayXpPaid = pruneDayXp({ ...(j.dayXpPaid || {}), [key]: spent + grant });
+    j.dayXpPaid = pruneDayXp({ ...(j.dayXpPaid || {}), [key]: { spent: spent + grant, cap } });
     saveJourney(j);
   }
   return grant;

@@ -119,6 +119,8 @@ const engine = await import(base + "engine.js");
 const gate    = await import(base + "gate.js");
 const passkey = await import(base + "passkey.js");
 const main   = await import(base + "main.js");
+const rvm    = await import(base + "vm/readiness.js");
+const data   = await import(base + "data.js");
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
@@ -148,37 +150,37 @@ function resetGateState() {
   main.state.gateWantsNewPin = false; main.state.gateBusy = false;
 }
 
-/* ---- A. Try-It is ONE look, then it is over ---------------------------- */
+/* ---- A. looking at the moves is a button, not a mode -------------------- */
 localStorage.clear(); store.migrate();
-// Arming Try-It stops the next run being recorded, so it is a grown-up's switch.
 await unlockGrownup();
+gate.lockGate(); resetGateState();
 
-main.actions.togglePractice();
-ok(store.tryItArmed() === true, "the Try-It toggle arms it");
-ok(main.state.practiceMode === true, "and the screen knows it is armed");
-
-main.actions.goSession("monday");
-ok(main.state.tryIt === "monday", "while armed, GO opens the Try-It move list");
-ok(main.state.readiness === null, "and not a real session");
+/* Straight to the list, with no grown-up and nothing to arm first. Reading an
+   instruction was never something a child should need an adult to unlock. */
+main.actions.goTryIt("monday");
+ok(main.state.gateAsk === null, "a child can look at the moves on her own");
+ok(main.state.tryIt === "monday", "the move list opens on the day she asked for");
+ok(main.state.readiness === null, "with no Body Check in the way");
 
 main.actions.exitTryIt();
-ok(store.tryItArmed() === false,
-   "Done Looking DISARMS Try-It — it used to stay armed, so every later GO reopened it");
-ok(main.state.practiceMode === false, "and practice mode is cleared with it");
-ok(main.state.tryIt === null, "the move list is closed");
+ok(main.state.tryIt === null, "closing it closes it");
 
+/* ...and closing it leaves nothing behind. The old arm flag survived the close,
+   so every later GO reopened Try-It and she could not reach a real session
+   without finding the toggle again. */
 main.actions.goSession("monday");
 ok(main.state.readiness !== null, "the next GO opens Body Check");
-ok(main.state.tryIt === null, "not Try-It again");
-ok(store.loadSessions().length === 0, "and Try-It wrote no session record at all");
+ok(main.state.tryIt === null, "not the move list again");
+ok(store.loadSessions().length === 0, "and looking at the moves wrote no session record at all");
+ok(main.actionNames().includes("togglePractice") === false, "there is no mode left to toggle");
 
-/* A Mini is not a way around it either. */
+/* Mini is gone as a thing that can be started, so there is no second door into
+   a session that skips the arming rules — or into a shortened workout at all. */
+ok(main.actionNames().includes("startMini") === false, "there is no startMini action left");
 main.state.readiness = null;
-main.actions.togglePractice();
 main.actions.startMini("monday");
-ok(main.state.tryIt === "monday" && main.state.readiness === null, "an armed Mini also opens Try-It");
-main.actions.exitTryIt();
-ok(store.tryItArmed() === false, "and leaving it disarms it just the same");
+ok(main.state.readiness === null && main.state.tryIt === null,
+   "and dispatching the retired name does nothing at all");
 
 /* ---- C. closing the instructions is not resuming the workout ----------- */
 localStorage.clear(); store.migrate();
@@ -240,7 +242,7 @@ const snapshot = () => JSON.stringify({
   settings: { ...store.settings },
   gate: store.loadGate(), ladder: store.loadLadderRungs(),
   tracker: store.loadTracker(), journey: store.loadJourney(),
-  verdicts: store.formVerdicts(), tryIt: store.tryItArmed(),
+  verdicts: store.formVerdicts(),
   sessions: store.loadSessions().length, profile: store.activeProfileId()
 });
 /* Arguments that would really change something, so "nothing happened" means the
@@ -424,6 +426,68 @@ ok(main.state.gateAsk === "rPickLight", "it asks for a grown-up");
 main.actions.answerGate(TEST_PIN);
 ok(main.state.readiness.light === "green" && main.state.readiness.overridden === true,
    "and a grown-up can, with the override recorded");
+
+/* ---- and the whole result card follows the light the grown-up picked ------
+   The card used to keep taking its description and its button from the body
+   check's SEVERITY, which an override never touches. Overriding a sore-shoulder
+   Yellow to Green drew a green "Full power!" header directly above "2 rounds
+   max", a button reading "Start easy — Yellow light", and then ran three
+   rounds. */
+gate.lockGate(); resetGateState();
+main.state.readiness = rvm.newReadinessFlow("monday");
+rvm.answerQuestion(main.state.readiness, "q_pain", "no");     // "a bit sore" → body map
+main.actions.rSetZoneSev("2|2");                              // shoulders, tired but controlled
+let rv = rvm.buildReadinessVM(main.state.readiness, true);
+ok(main.state.readiness.light === "yellow", "a severity-2 mark suggests Yellow");
+ok(rv.suggestedLight === "yellow" && rv.wasOverridden === false, "and nothing has been overridden yet");
+ok(/2 rounds/.test(rv.resultDesc), "the card describes the yellow dose");
+
+main.actions.rPickLight("green");
+ok(main.state.gateAsk === "rPickLight", "moving it asks for a grown-up");
+main.actions.answerGate(TEST_PIN);
+rv = rvm.buildReadinessVM(main.state.readiness, true);
+ok(main.state.readiness.light === "green", "the grown-up's light is the one that stands");
+ok(rv.wasOverridden === true, "the card knows it was overridden");
+ok(rv.resultDesc === data.LIGHT_META.green.desc, "the description follows the final light, not the severity");
+ok(rv.resultCta.label === data.LIGHT_META.green.btnLabel, "and so does the button");
+ok(rv.resultCta.action === "continue", "which starts the session");
+ok(/suggested Yellow — 2 rounds/.test(rv.suggestionLine) &&
+   /selected Green — 3 rounds/.test(rv.suggestionLine),
+   "and both decisions are shown, so the override is never mistaken for the body's answer");
+
+/* Picking the suggested light back out of the list is not an override. */
+gate.lockGate(); resetGateState();
+main.actions.rPickLight("yellow");
+main.actions.answerGate(TEST_PIN);
+rv = rvm.buildReadinessVM(main.state.readiness, true);
+ok(rv.wasOverridden === false, "returning to the suggested light clears the override");
+ok(rv.suggestionLine === "", "and the two-decision line goes away with it");
+ok(/2 rounds/.test(rv.resultDesc), "the body-check wording comes back");
+
+/* Severity 4 carries action "back". Overriding it used to leave a button that
+   EXITED instead of starting — dead on the one path a grown-up most needs. */
+gate.lockGate(); resetGateState();
+main.state.readiness = rvm.newReadinessFlow("monday");
+rvm.answerQuestion(main.state.readiness, "q_pain", "no");
+main.actions.rSetZoneSev("2|4");
+rv = rvm.buildReadinessVM(main.state.readiness, true);
+ok(main.state.readiness.light === "recovery", "a severity-4 mark suggests Recovery");
+ok(rv.resultCta.action === "back", "and on its own the button sends her back to Today");
+main.actions.rPickLight("green");
+main.actions.answerGate(TEST_PIN);
+rv = rvm.buildReadinessVM(main.state.readiness, true);
+ok(rv.resultCta.action === "continue",
+   "a grown-up who overrides a pain report gets a button that actually starts");
+ok(rv.resultCta.label === data.LIGHT_META.green.btnLabel, "and it is labelled for the light they chose");
+
+/* A fresh mark on the body map replaces the override — the body gets the last
+   word on its own answer. */
+main.actions.rSetZoneSev("3|3");
+rv = rvm.buildReadinessVM(main.state.readiness, true);
+ok(main.state.readiness.light === "recovery" && rv.wasOverridden === false,
+   "marking another sore area re-suggests from the body, clearing the stale override");
+ok(rv.resultCta.action === "back", "so the pain result governs again until a grown-up says otherwise");
+main.actions.cancelGate();
 
 /* Turning the safety voice back ON is always hers; turning it off is not. */
 gate.lockGate(); resetGateState();

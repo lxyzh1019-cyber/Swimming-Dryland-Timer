@@ -547,48 +547,41 @@ ok([...spotSizes].every(n => n >= 2 && n <= 3), "the app watches 2–3 moves a r
 ok(!spotWarmup, "and never a warm-up move — main and prep only");
 ok(spotSeen.size === 6, "the picks vary run to run, so she can't know which move is watched");
 
-/* --- try-it mode: a real control, one-shot, and pain still reports ---------
-   The mode's isolation was already right; its control and lifecycle were not.
-   It was a 12px underlined text link (~16px tall) on the "today" card only, it
-   never turned itself off, and it lived in memory so a reload silently flipped
-   it — recording a run meant as a test. */
+/* --- looking at the moves is a button, not a mode --------------------------
+   Try-It used to be ARMED: a grown-up flipped a persistent setting and, while
+   it was on, GO opened the move list instead of starting a workout. That flag
+   went through three repairs (memory-only, then never cleared, then a two-hour
+   expiry) and none of them were needed to read an instruction. Every launchable
+   day has its own button straight to the list now. */
 localStorage.clear();
 store.migrate();
-ok(store.tryItArmed() === false, "try-it starts disarmed");
-store.setTryIt(true);
-ok(store.tryItArmed() === true, "arming is persisted, so a reload can't disarm it");
-store.updateSettings({ tryItArmedAt: Date.now() - 3 * 60 * 60 * 1000 });
-ok(store.tryItArmed() === false, "an arm left unused for hours expires on its own");
-store.setTryIt(true);
-store.clearTryIt();
-ok(store.tryItArmed() === false, "and a finished run disarms it — one run, not forever");
+ok(store.tryItArmed === undefined && store.setTryIt === undefined,
+   "the arming machinery is gone from the store entirely");
+ok(store.loadSettings().tryItArmed === undefined, "and so is its setting");
 
-store.setTryIt(true);
 const launchDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-const tryItGaps = { noButton: [], noBadge: [], notAButton: [] };
+const tryItGaps = { noButton: [], notAButton: [], goHijacked: [] };
 launchDays.forEach(d => {
-  const vm = tvm.buildTodayVM({ selectedDay: d, expanded: {}, practiceMode: true, isWide: true });
+  const vm = tvm.buildTodayVM({ selectedDay: d, expanded: {}, isWide: true });
   const dv = vm.dayView;
   if (!(dv.isActive || dv.isDone || dv.isMissed || dv.isPreview)) return;   // nothing to launch
   if (!dv.showTryIt) tryItGaps.noButton.push(d);
-  if (!dv.showTryBadge) tryItGaps.noBadge.push(d);
-  if (!/data-action="togglePractice"/.test(tscreen.todayWide(vm))) tryItGaps.notAButton.push(d);
+  const html = tscreen.todayWide(vm);
+  if (!new RegExp('data-action="goTryIt" data-arg="' + d + '"').test(html)) tryItGaps.notAButton.push(d);
+  // GO always means GO — nothing can re-point it at the move list.
+  if (dv.showCta && dv.ctaAction === "goTryIt" && !dv.isDone && !dv.isRest) tryItGaps.goHijacked.push(d);
 });
-ok(tryItGaps.noButton.length === 0, "the try-it control renders on every day a run can start from");
-ok(tryItGaps.noBadge.length === 0, "and the 🧪 badge does too, so a catch-up day can't run as a test silently");
-ok(tryItGaps.notAButton.length === 0, "it is a real button, not the old text link");
-const tryVM = tvm.buildTodayVM({ selectedDay: launchDays[0], expanded: {}, practiceMode: true, isWide: true });
+ok(tryItGaps.noButton.length === 0, "every day a run can start from offers a direct look at the moves");
+ok(tryItGaps.notAButton.length === 0, "and it goes straight to that day's list, with no mode to arm first");
+ok(tryItGaps.goHijacked.length === 0, "while the start button still starts the workout");
+const tryVM = tvm.buildTodayVM({ selectedDay: launchDays[0], expanded: {}, isWide: true });
 ok(/min-height:48px/.test(tryVM.practiceBtnStyle), "with a 48px tap target — the old link was ~16px");
+ok(tryVM.practiceMode === undefined, "and there is no armed state left for a screen to read");
 
 /* TRY-IT IS NOT A WORKOUT. It used to run the entire session engine — Body
    Check, traffic light, rounds, timers, clean-checks, a finish screen —
    behind a purple banner, so a kid could complete a whole workout that was
    never going to count. It is a list of moves now. */
-launchDays.forEach(d => {
-  const dv = tvm.buildTodayVM({ selectedDay: d, expanded: {}, practiceMode: true, isWide: true }).dayView;
-  if (!(dv.isActive || dv.isDone || dv.isMissed || dv.isPreview)) return;
-  ok(dv.ctaAction === "goTryIt", "with try-it armed, " + d + "'s start button opens the move list, not a session");
-});
 const tryItVM = tryvm.buildTryItVM({ selectedDay: "monday", isWide: true, detailOverlay: false, detailEx: null });
 const tryItHtml = tryscreen.tryItScreen(tryItVM);
 ok(tryItVM.moves.length > 0, "the try-it screen lists the day's moves");
@@ -964,6 +957,65 @@ ok(tvm.planStats("tuesday").moves === new Set(engine.assembleCircuits("tuesday",
      .flatMap(c => c.exercises.map(e => e.name))).size,
    "and its move count includes the prepMenu moves the session actually inserts");
 
+/* --- the light sets the whole session, not just the round count -----------
+   A "red light" day used to run a full warm-up, full coordination, the prep
+   pair, a finisher and swim-skill — 65-72% of that weekday's green session,
+   which is not a light day. One policy now decides the blocks AND the rounds,
+   and everything downstream is derived from the circuits it produces. */
+const TRAINING_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const blocksOf = (day, light) => engine.assembleCircuits(day, light).map(c => c.block);
+const mainRoundsOf = (day, light) => {
+  const m = engine.assembleCircuits(day, light).find(c => c.block === "main");
+  return m ? m.rounds : 0;
+};
+TRAINING_DAYS.forEach(d => {
+  const green = blocksOf(d, "green"), yellow = blocksOf(d, "yellow"), red = blocksOf(d, "red");
+
+  ok(mainRoundsOf(d, "green") === 3 && mainRoundsOf(d, "yellow") === 2 && mainRoundsOf(d, "red") === 1,
+     d + ": the main rounds still follow the light");
+
+  // Green is the whole authored plan.
+  ok(green.includes("warmup") && green.includes("main") && green.includes("swimskill"),
+     d + ": green runs the full plan");
+
+  // Yellow drops prep and the finisher; keeps coordination.
+  ok(!yellow.includes("prep") && !yellow.includes("finisher"),
+     d + ": yellow drops the prep pair and the finisher");
+  ok(yellow.includes("coordination") === green.includes("coordination"),
+     d + ": yellow keeps coordination");
+
+  // Red drops coordination too.
+  ok(!red.includes("coordination") && !red.includes("prep") && !red.includes("finisher"),
+     d + ": red drops coordination, prep and the finisher");
+
+  // Warm-up and swim-skill survive every light — one prepares the body, the
+  // other is technique at almost no load.
+  ok(red.includes("warmup") && red.includes("swimskill"),
+     d + ": red still warms up and still does swim-skill");
+
+  // A lighter light is never a LONGER session.
+  const g = engine.estimateSessionSecs(engine.assembleCircuits(d, "green"));
+  const y = engine.estimateSessionSecs(engine.assembleCircuits(d, "yellow"));
+  const r = engine.estimateSessionSecs(engine.assembleCircuits(d, "red"));
+  ok(g > y && y > r, d + ": green is longer than yellow, which is longer than red");
+  // Red has to be a genuinely light day, not a green day minus two rounds.
+  ok(r / g < 0.62, d + ": red is well under two thirds of green (" + Math.round(r / g * 100) + "%)");
+  ok(y / g <= 0.85, d + ": yellow is a real step down too (" + Math.round(y / g * 100) + "%)");
+
+  // Expected work is counted off the same circuits the runner walks, so
+  // completion is judged against the light that actually ran.
+  ok(engine.countExpectedWork(engine.assembleCircuits(d, "red"))
+     < engine.countExpectedWork(engine.assembleCircuits(d, "green")),
+     d + ": a red plan expects less work than a green one");
+});
+
+/* Recovery is its own content, whatever weekday it lands on. */
+ok(blocksOf("monday", "recovery").every(b => b === "recovery"),
+   "a weekday that resolves to Recovery runs recovery content only");
+ok(data.LIGHT_ROUNDS.green === 3 && data.LIGHT_ROUNDS.recovery === 0,
+   "the round counts are derived from the one policy object");
+ok(Object.keys(data.LIGHT_SESSION_POLICY).length === 4, "which covers all four lights");
+
 /* ---- a real session on a fake clock -------------------------------------- */
 /* The engine is timestamp-driven (setInterval + Date.now), so the harness
    moves both together and lets the microtask queue drain between ticks. */
@@ -1067,6 +1119,23 @@ const rec2 = store.loadSessions()[0];
 ok(rec2.roundsDone === 0, "the record says zero rounds, not the light's three");
 ok(store.sessionXp(rec2) === 0, "and an untouched session pays nothing");
 
+/* --- timed work has to actually be there ---------------------------------
+   The bar used to be half the dose, so a thirty-second hold abandoned at
+   fifteen seconds was recorded DONE and paid for a full round. Rep work has
+   always demanded the whole rep count. */
+const st = engine.timedExerciseStatus;
+ok(engine.DONE_WORK_FRACTION === 0.8, "timed work needs four fifths of its dose");
+ok(st(0, 30) === "skipped", "an instant tap is not an exercise");
+ok(st(2, 30) === "skipped", "and neither is two seconds");
+ok(st(3, 30) === "partial", "three seconds is real work, saved as partial");
+ok(st(15, 30) === "partial", "half a thirty-second hold is partial now, not done");
+ok(st(23, 30) === "partial", "and so is 76% of it");
+ok(st(24, 30) === "done", "exactly 80% is done");
+ok(st(30, 30) === "done", "and the full dose certainly is");
+ok(st(15, 20) === "partial" && st(16, 20) === "done", "a 20-second dose turns over at 16");
+ok(st(35, 45) === "partial" && st(36, 45) === "done", "a 45-second dose turns over at 36");
+ok(st(40, 0) === "done", "an exercise with no planned time is judged only on showing up");
+
 /* --- one training day pays for one training day --------------------------
    The reproduction from the report: stop partway (half XP on the planned
    three rounds = 180), come back, finish the resumed green session (360).
@@ -1083,6 +1152,151 @@ ok(firstPay === 180, "the partial pays for the one round it finished");
 ok(firstPay + secondPay === 360, "and the resume tops it up to exactly one full day, never 540");
 ok(store.claimSessionXp(resumed) === 0, "a third attempt on the same day pays nothing at all");
 
+/* --- one REAL date pays for one real date --------------------------------
+   The budget used to be keyed by the weekday card as well as the date, so two
+   cards run on one date drew two full budgets. Both routes into a second card
+   are one tap: "Catch Up Now" on a missed day and "Start Early" on an upcoming
+   one. */
+localStorage.clear();
+store.migrate();
+const oneDate = new Date().toISOString();
+const mondayCard = { app: "swimming", dayKey: "monday", isoDate: oneDate,
+  xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main",
+  roundsDone: 3, roundsPlanned: 3, completedFully: true,
+  ledger: [{ name: "x", block: "main", round: 1, status: "done" }] };
+const tuesdayCard = { ...mondayCard, dayKey: "tuesday" };
+const mondayPay = store.claimSessionXp(mondayCard);
+const tuesdayPay = store.claimSessionXp(tuesdayCard);
+ok(mondayPay === 360, "the first card run on a date pays a full day");
+ok(tuesdayPay === 0, "a second weekday card on the SAME real date pays nothing more");
+ok(mondayPay + tuesdayPay === 360, "so one real date is still worth exactly one day, never 720");
+
+/* Crossing Edmonton midnight is a new date, and a new budget. */
+const tomorrowIso = new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString();
+ok(store.claimSessionXp({ ...mondayCard, isoDate: tomorrowIso }) === 360,
+   "the next real date opens a fresh budget");
+
+/* The ceiling is the LARGEST session the date warrants, not the first claimed:
+   a Recovery morning must not hold down training done that afternoon. */
+localStorage.clear();
+store.migrate();
+const recoveryFirst = { ...mondayCard, sessionType: "recovery", roundsDone: 0, roundsPlanned: 0 };
+const recPay = store.claimSessionXp(recoveryFirst);
+const trainedAfter = store.claimSessionXp(mondayCard);
+ok(recPay === store.XP_SHOWED_UP, "a recovery session pays its show-up credit");
+ok(recPay + trainedAfter === 360,
+   "and training later the same date still reaches one full day, no more");
+
+/* ...and the reverse order does not let the day exceed one full day either. */
+localStorage.clear();
+store.migrate();
+const bigFirst = store.claimSessionXp(mondayCard);
+const smallAfter = store.claimSessionXp({ ...mondayCard, dayKey: "wednesday", roundsDone: 1 });
+ok(bigFirst + smallAfter === 360, "a lighter card after a full one adds nothing");
+
+/* The cap has to survive a REBUILD. XP is derived from the log on every boot
+   (rebuildJourneyXp), and sessionXp() re-prices any row that does not carry
+   what it was actually paid — so a record the cap granted nothing to must
+   still say so, out loud, as xpEarned: 0. Otherwise the second card comes
+   back at full price the next time the app is opened. */
+localStorage.clear();
+store.migrate();
+const spentDay = await runSession({ dayKey: "monday", light: "red", gateUnlocked: true,
+  // The day's budget is already gone when this session finishes, so the cap
+  // grants it nothing — exactly the second-card-on-one-date case.
+  seed: () => store.claimSessionXp({ app: "swimming", dayKey: "tuesday",
+    isoDate: new Date().toISOString(), xpVersion: store.XP_VERSION,
+    outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main",
+    roundsDone: 3, roundsPlanned: 3, completedFully: true,
+    ledger: [{ name: "x", block: "main", round: 1, status: "done" }] })
+});
+ok(spentDay.xpEarned === 0, "a session run after the day's budget is spent is granted nothing");
+const spentRow = store.loadSessions().find(x => x.dayKey === "monday");
+ok(spentRow && spentRow.xpEarned === 0,
+   "and the record SAYS it was paid nothing, instead of leaving the field off");
+ok(store.sessionXp(spentRow) === 0,
+   "so a rebuild reads zero from it rather than re-pricing it at full value");
+
+/* --- and the day holds across her two devices -----------------------------
+   The banked budget row is deliberately not published, so it is a fact about
+   ONE device: train on the tablet in the morning and the phone in the
+   afternoon and each used to grant a full day, neither having seen the other's
+   row. Every session record does sync though, and each one carries what it was
+   paid — so the log is read as a floor under the banked value. */
+localStorage.clear();
+store.migrate();
+const fromOtherDevice = { ...mondayCard, xpEarned: 360, isoDate: new Date().toISOString() };
+store.mergeSessions([fromOtherDevice]);       // arrives from the cloud mirror
+ok(store.loadJourney() === null || !(store.loadJourney() || {}).dayXpPaid,
+   "this device has banked nothing for the date");
+ok(store.claimSessionXp(tuesdayCard) === 0,
+   "a session finished on the other device still spends this device's budget");
+
+/* A lighter session synced in does not cap a bigger one trained here. */
+localStorage.clear();
+store.migrate();
+store.mergeSessions([{ ...mondayCard, sessionType: "recovery", roundsDone: 0,
+  roundsPlanned: 0, xpEarned: store.XP_SHOWED_UP }]);
+ok(store.claimSessionXp(tuesdayCard) === 360 - store.XP_SHOWED_UP,
+   "a recovery session synced from the other device leaves the rest of the day available");
+
+/* Budgets are per athlete: the journey doc is namespaced, so switching athletes
+   must not hand the second one a spent budget. */
+localStorage.clear();
+store.migrate();
+ok(store.claimSessionXp(mondayCard) === 360, "athlete one draws her day's budget");
+const firstAthlete = store.activeProfileId();
+store.switchProfile(store.addProfile("Second"));
+store.migrate();
+ok(store.claimSessionXp(mondayCard) === 360, "a different athlete has her own budget for the same date");
+// Put the first athlete back: everything after this reads her namespace.
+store.switchProfile(firstAthlete);
+localStorage.clear();
+store.migrate();
+
+/* --- the streak asks for a session, not a piece of one --------------------
+   It used to be filtered on countsAsTrained, which ONE recorded move satisfies:
+   warm up, do a single thing, walk away, keep the flame. Training, adherence
+   and XP still count any real work — only the streak got stricter. */
+const streakRow = (doneCount, expected, extra = {}) => ({
+  app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION,
+  sessionType: "main", roundsDone: 1, roundsPlanned: 3, expectedWork: expected,
+  ledger: Array.from({ length: doneCount }, (_, i) => ({
+    name: "m" + i, block: "main", round: 1, status: "done" })),
+  ...extra
+});
+ok(outcome.STREAK_WORK_FRACTION === 0.75, "a training day needs three quarters of its plan");
+ok(store.countsForStreak(streakRow(1, 20)) === false, "one move out of twenty is not a training day");
+ok(store.countsForStreak(streakRow(14, 20)) === false, "nor is 70% of it");
+ok(store.countsForStreak(streakRow(15, 20)) === true, "exactly 75% earns the day");
+ok(store.countsForStreak(streakRow(20, 20)) === true, "and a full session certainly does");
+ok(store.countsAsTrained(streakRow(1, 20)) === true,
+   "while a single move is still real training that saves and pays");
+ok(store.xpForSession(streakRow(1, 20)) > 0, "and is still worth XP — only the streak got stricter");
+
+/* The bar is a fraction of the LIGHT'S OWN plan, so a light day is a smaller
+   ask and never a harder one. */
+const redPlan = engine.countExpectedWork(engine.assembleCircuits("monday", "red"));
+const greenPlan = engine.countExpectedWork(engine.assembleCircuits("monday", "green"));
+ok(redPlan < greenPlan, "a red plan is smaller than a green one");
+ok(store.countsForStreak(streakRow(Math.ceil(redPlan * 0.75), redPlan)) === true,
+   "three quarters of a red day earns the streak");
+ok(store.countsForStreak(streakRow(Math.ceil(redPlan * 0.75), greenPlan)) === false,
+   "the same amount of work against a green plan does not — the ask scales with the light");
+
+/* A safety stop still buys nothing, however much came before it. */
+ok(store.countsForStreak(streakRow(20, 20, { safetyStop: true, pain: true })) === false,
+   "a pain stop earns no streak day, whatever was done first");
+
+/* Going forward only: records written before the bar keep their old reading, so
+   the number she is standing on tonight cannot fall because a rule changed. */
+const legacy = { ...streakRow(1, 20), outcomeVersion: 1 };
+ok(store.countsForStreak(legacy) === true,
+   "a session recorded before the bar existed still counts, exactly as it did");
+ok(outcome.deriveSessionOutcome({ ledger: legacy.ledger, expectedWork: 20, outcomeVersion: 1 }).streakJudged === false,
+   "and says plainly that it was never judged against the bar");
+
 /* --- a pain stop is a safety event, not a short workout --- */
 const painStop = { ...partial, safetyStop: true, pain: true, roundsDone: 1 };
 ok(store.xpForSession(painStop) === 0, "a pain stop pays no XP");
@@ -1090,18 +1304,27 @@ ok(store.countsAsTrained({ ...painStop, perExercise: [{ name: "x" }] }) === true
    store.countsAsTrained({ ...painStop, perExercise: [{ name: "x" }] }) === false,
    "and countsAsTrained has an explicit answer for it");
 
-/* --- a mini is a subset, not the day --- */
+/* --- Mini cannot be started any more, and its history still reads -----------
+   The button promised "10 minutes" and nothing measured it; the traffic light
+   is the one dial that shortens a session now. A stale caller still asking for
+   one must not get a quietly shortened workout back. */
 localStorage.clear();
 let s3 = await runSession({ dayKey: "monday", light: "green", mini: true, gateUnlocked: true });
-ok(s3.mode === "mini", "a mini runs as its own mode");
-ok(s3.roundsPlanned === 1, "and plans one round however green the light was");
+ok(s3.mode === "normal", "asking for a mini gets an ordinary session, not a mini");
+ok(s3.roundsPlanned === 3, "planned against the light's own rounds");
 const rec3 = store.loadSessions()[0];
-ok(rec3.sessionType === "mini", "the record says mini");
-ok(store.sessionXp(rec3) <= 180, "so it is priced as a one-round day at most");
-const week = tvm.weekStatuses();
-ok(week.monday !== "done", "and a mini never ticks the whole day off");
-ok(store.loadSessions().length === 1 && JSON.parse(localStorage.getItem("swim_day_progress") || "{}"),
-   "while the rest of the day's progress is left standing");
+ok(rec3.sessionType === "main", "and the record says main");
+ok(rec3.mini === undefined, "with no mini flag written on it");
+
+/* A record written when Mini existed is still priced, labelled and counted as
+   the subset it was — history is not re-scored underneath her. */
+const oldMini = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION,
+  sessionType: "mini", mini: true, roundsDone: 1, roundsPlanned: 3,
+  completedFully: true, ledger: [{ name: "x", block: "main", round: 1, status: "done" }] };
+ok(store.sessionRoundsPlanned(oldMini) === 1, "a historical mini still asks for one round");
+ok(store.xpForSession(oldMini) === 180, "and is still priced as a one-round day");
+ok(pvm.logEntryView(oldMini).lightLabel === "MINI", "the log still labels it MINI");
 
 /* --- the Coach's Quiz pays once, not twice --------------------------------
    Reproduces the report exactly: 360 session + 30 quiz should read 390 after
@@ -1177,6 +1400,28 @@ ok(rvm.hasRecentReadiness() === false, "a check from two months ago cannot");
 const staleFlow = rvm.newReadinessFlow("monday");
 rvm.sameAsYesterday(staleFlow);
 ok(staleFlow.readinessDone === false, "so “same as yesterday” does nothing and she has to answer");
+
+/* --- and it can never re-apply yesterday's grown-up decision ---------------
+   The saved check stores the light that actually RAN, which is the
+   post-override one. Copying it re-applied a grown-up's override today with no
+   grown-up present, and cleared the override flag on the way through — so
+   nothing recorded that it had happened. */
+localStorage.clear();
+store.migrate();
+store.saveReadiness({
+  // Two "not great" answers: on their own these are a Yellow day.
+  answers: { q_pain: "yes", q_sleep: "yes", q_light: "yes", q_ready: "no" },
+  light: "green", suggestedLight: "yellow", overridden: true
+});
+const reused = rvm.newReadinessFlow("monday");
+rvm.sameAsYesterday(reused);
+ok(reused.readinessDone === true, "a recent check can still be reused");
+ok(reused.light === "yellow", "but the light is re-derived from the answers, not copied");
+ok(reused.suggestedLight === "yellow", "so the suggestion is the body's own answer");
+ok(reused.overridden === false, "and yesterday's override does not come with it");
+const reusedVm = rvm.buildReadinessVM(reused, true);
+ok(reusedVm.wasOverridden === false && reusedVm.suggestionLine === "",
+   "the card shows no override, because none was made today");
 
 /* --- reading the instructions stops the clock --- */
 localStorage.clear();
@@ -1479,16 +1724,21 @@ const recRow = store.loadSessions()[0];
 ok(recRow.sessionType === "recovery", "the record is typed as recovery");
 ok(recRow.roundsDone === 0 && recRow.roundsPlanned === 0, "with zero rounds done and zero planned");
 ok(store.countsAsTrained(recRow) === false, "recovery does not complete the normal scheduled day");
-ok(store.outcomeOf(recRow).countsForStreak === false, "and does not increase the streak or adherence");
+/* It does keep the flame, though — but only when the whole menu is finished.
+   Reporting soreness honestly must not cost her the streak; a recovery session
+   abandoned after two moves is not a day's care. */
+ok(store.countsForStreak(recRow) === true,
+   "a COMPLETED recovery day earns the streak day, so honesty costs her nothing");
+ok(store.countsForStreak({ ...recRow, ledger: (recRow.ledger || []).slice(0, 2) }) === false,
+   "but a recovery run abandoned partway does not");
 ok(store.currentStreak(store.loadSessions().filter(store.countsAsTrained)) === 0,
    "a week of recovery alone leaves the training streak at zero");
 
-/* --- a Mini that resolves to Recovery becomes recovery, not warm-up + main --- */
-const sMiniRec = await runSession({ dayKey: "tuesday", light: "recovery", mini: true, gateUnlocked: true });
-ok(sMiniRec.mode === "recovery", "a recovery Mini is a recovery session");
-ok(sMiniRec.mini === false, "it is not run as a shortened workout");
+/* --- a weekday that resolves to Recovery gets recovery, not warm-up + main --- */
+const sMiniRec = await runSession({ dayKey: "tuesday", light: "recovery", gateUnlocked: true });
+ok(sMiniRec.mode === "recovery", "it is a recovery session");
 ok(sMiniRec.ledger.every(l => !WORKOUT_BLOCKS.includes(l.block)), "and never reaches a main circuit");
-ok(store.loadSessions()[0].sessionType === "recovery", "the recovery-mini is recorded as recovery");
+ok(store.loadSessions()[0].sessionType === "recovery", "recorded as recovery");
 
 /* --- the care credit: recovery pays a flat show-up credit, and no round XP --- */
 ok(store.xpForSession({ ...recRow }) === store.XP_SHOWED_UP,
@@ -1500,14 +1750,6 @@ ok(store.xpForSession({ sessionType: "spa", xpVersion: store.XP_VERSION }) === 0
 /* ============================================================
    PHASE 3 — interaction state repairs
    ============================================================ */
-
-/* --- A. Try-It arming (the action layer that clears it: test/actions.mjs) --- */
-localStorage.clear(); store.migrate();
-store.setTryIt(true);
-ok(store.tryItArmed() === true, "Try-It arms");
-ok(store.setTryIt(false) === false && store.tryItArmed() === false, "and can be disarmed");
-store.setTryIt(true);
-ok(store.clearTryIt() === true && store.tryItArmed() === false, "clearTryIt disarms it too");
 
 /* --- B. the form check is its own phase, and rest waits for it --- */
 localStorage.clear(); store.migrate();

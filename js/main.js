@@ -6,7 +6,7 @@
    delegated click listener below.
    ============================================================ */
 
-import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS, tryItArmed, setTryIt } from "./store.js";
+import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS } from "./store.js";
 import { edmontonDayKey, escapeHtml } from "./util.js";
 import { restoreFromCloud, publishJourney } from "./sync.js";
 import { downloadBackup, restoreBackupFile } from "./backup.js";
@@ -49,11 +49,10 @@ export const state = {
   formCheckMonth: null,         // 'YYYY-MM' — Form Check month being reviewed (null = current)
   expanded: {},                 // day-card block expansion
   selectedDay: null,            // monday..sunday
-  practiceMode: false,
   tryIt: null,                  // dayKey while the Try-It browse screen is open
   inSession: false,
   readiness: null,              // active readiness-check flow state (null = not in flow)
-  pendingSession: null,         // { light, dayKey, mini? } — readiness → session handoff
+  pendingSession: null,         // { light, dayKey } — readiness → session handoff
   quizDeck: null,
   prizeDraw: null,
   detailOverlay: false,
@@ -330,20 +329,10 @@ Object.assign(RAW, {
     updateSettings({ safetyVoiceOn: settings.safetyVoiceOn === false });
     render();
   },
-  togglePractice() {
-    // Arming Try-It means the next run is NOT recorded. A child who can arm it
-    // can quietly erase her own training day, so this is a grown-up's switch.
-    // Backed by settings, not memory: a reload used to disarm it silently and
-    // record a run meant as a test.
-    setTryIt(!state.practiceMode);
-    state.practiceMode = tryItArmed();
-    render();
-  },
   goSession(arg) {
     const dayKey = arg || state.selectedDay || edmontonDayKey();
-    // Try-It is a different destination, not a flavour of the workout. It used
-    // to run Body Check and the whole session engine behind a banner.
-    if (state.practiceMode) { actions.goTryIt(dayKey); return; }
+    // GO always means GO. Looking at the moves has its own button, so nothing
+    // can re-point this one at the move list behind her.
     state.readiness = newReadinessFlow(dayKey);
     render();
   },
@@ -353,11 +342,7 @@ Object.assign(RAW, {
     render();
   },
   exitTryIt() {
-    // Try-It is ONE look, then it is over. Closing the move list used to leave
-    // the arm flag set, so every later GO reopened Try-It instead of Body Check
-    // and she could never get back to a real session without finding the toggle.
-    setTryIt(false);
-    state.practiceMode = false;
+    // Closing the list is the whole of leaving: there is no mode to stand down.
     state.tryIt = null;
     state.detailOverlay = false; state.detailEx = null;
     render();
@@ -367,17 +352,6 @@ Object.assign(RAW, {
     const ex = moves[Number(arg)];
     if (!ex) return;
     state.detailEx = ex; state.detailOverlay = true;
-    render();
-  },
-  startMini(arg) {
-    const dayKey = arg || state.selectedDay || edmontonDayKey();
-    if (state.practiceMode) { actions.goTryIt(dayKey); return; }
-    // A mini goes through Body Check like any other session and uses the light
-    // it resolves to. Skipping readiness and forcing green is how a sore day
-    // still handed her a workout nobody had checked.
-    const r = newReadinessFlow(dayKey);
-    r.mini = true;
-    state.readiness = r;
     render();
   },
   startQuizDeck() {
@@ -445,8 +419,14 @@ Object.assign(RAW, {
     if (arg === "retry") { resetBodyCheck(r); render(); return; }
     // continue: persist the check (try-it runs don't overwrite the real day's
     // check), then hand the resolved light to the session
-    saveReadiness({ answers: r.answers, zoneSev: r.zoneSev, light: r.light, overridden: r.overridden });
-    startPendingSession({ light: r.light || "green", dayKey: r.dayKey, mini: !!r.mini });
+    // Both decisions are saved: what the check produced, and what actually ran.
+    // Storing only the final light is what made a grown-up's override
+    // indistinguishable from the body's own answer in the history.
+    const suggested = r.suggestedLight || r.light || "green";
+    saveReadiness({ answers: r.answers, zoneSev: r.zoneSev, light: r.light,
+                    suggestedLight: suggested, overridden: r.light !== suggested });
+    startPendingSession({ light: r.light || "green", dayKey: r.dayKey,
+                          suggestedLight: suggested });
   },
   rResultSecondary(arg) {
     if (arg === "retry") { resetBodyCheck(state.readiness); render(); }
@@ -783,7 +763,6 @@ Object.assign(RAW, {
     engine.exitSession();
     // The engine disarms try-it when a run finalizes; mirror that into the view
     // state so the button and badges are right the moment we leave the session.
-    state.practiceMode = tryItArmed();
     state.inSession = false;
     state.pendingSession = null;
     state.detailOverlay = false;
@@ -883,7 +862,6 @@ function boot() {
   migrate();
   // Try-it survives a reload now (it lives in settings), and expires on its own
   // if it was armed hours ago and never used.
-  state.practiceMode = tryItArmed();
   if (!state.selectedDay) state.selectedDay = edmontonDayKey();
   render();
   fetchWeather();

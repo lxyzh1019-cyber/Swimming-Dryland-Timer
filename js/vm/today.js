@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overloadWeek } from "../data.js";
-import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress, countsAsTrained, sessionXp, outcomeOf } from "../store.js";
+import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress, countsAsTrained, countsForStreak, sessionXp, outcomeOf } from "../store.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
 import { assembleCircuits, estimateSessionSecs } from "../engine.js";
 
@@ -231,7 +231,9 @@ export function buildTodayVM(state) {
 
   const weekDoneCount = WEEK_ORDER.filter(k => statuses[k] === "done" || statuses[k] === "partial").length;
   const statChips = [
-    { icon: "🔥", value: String(currentStreak(sessions.filter(countsAsTrained))), label: "day streak", color: "var(--ink)" },
+    // The streak asks a stricter question than "did she train" — a day has to be
+    // a session, not a piece of one. Everything else here still counts any work.
+    { icon: "🔥", value: String(currentStreak(sessions.filter(countsForStreak))), label: "day streak", color: "var(--ink)" },
     { icon: "✅", value: weekDoneCount + "/7", label: "this week", color: "var(--mint-ink)" },
     { icon: "🏊", value: String(sessions.length), label: "sessions", color: "var(--sea)" }
   ];
@@ -300,7 +302,6 @@ export function buildTodayVM(state) {
   ];
 
   // ---- Right-pane day view ----
-  const practiceMode = state.practiceMode;
   const fullDay = DAYS[selectedKey];
   // One computed number, not the authored timeLo/timeHi. Those were written
   // against a runner that counted 10 reps for every prescription, so the card
@@ -322,9 +323,7 @@ export function buildTodayVM(state) {
       mins: stats.mins, movesLabel: plural(stats.moves, "move"),
       showChips: true, isActive: true, showCta: true, showSettings: true, ctaAction: "goSession"
     };
-    dayView = practiceMode
-      ? { ...base, ctaLabel: "Start Try-It Run", ctaIcon: "🧪" }
-      : { ...base, ctaLabel: isSpaDay ? "Start Recovery" : "Let's go!", ctaIcon: isSpaDay ? "🧘" : "▶️" };
+    dayView = { ...base, ctaLabel: isSpaDay ? "Start Recovery" : "Let's go!", ctaIcon: isSpaDay ? "🧘" : "▶️" };
     if (isSpaDay) { dayView.isRest = true; dayView.isActive = true;
       dayView.recoveryItems = (fullDay.recovery || []).slice(0, 3).map(r => ({ text: r.name + (r.dose ? " · " + r.dose : "") })); }
   } else if (status === "done") {
@@ -410,22 +409,13 @@ export function buildTodayVM(state) {
      it at all. It is a real button now, in the start stack, on every card you
      can launch a run from. */
   const canLaunch = !!(dayView.isActive || dayView.isDone || dayView.isMissed || dayView.isPreview);
+  /* Looking at the moves is its own button, straight to the list. It used to be
+     a MODE: a grown-up armed a setting, which re-pointed the GO button at the
+     move list until something disarmed it again. Arming a mode to read an
+     instruction is a lot of machinery for "what does this one look like?", and
+     while it was armed the real GO button was not where she left it. */
   dayView.showTryIt = canLaunch;
-  // The badge belongs on every launchable card too: with try-it armed, "Finish
-  // remaining moves" runs as a test, and nothing on screen used to say so.
-  dayView.showTryBadge = canLaunch && practiceMode;
-  // ...and so does the button label, so what you're about to start is never
-  // ambiguous. With Try-It armed the button opens the move list, not a workout.
-  if (canLaunch && practiceMode && dayView.ctaAction === "goSession") {
-    dayView.ctaAction = "goTryIt";
-    dayView.ctaLabel = "Look at the moves";
-    dayView.ctaIcon = "🧪";
-    dayView.ctaSubtext = "Try-it — instructions and videos only, no timer.";
-  }
   if (dayView.isActive && !dayView.ctaSubtext) dayView.ctaSubtext = (dayView.movesLabel || "") + " · about " + (dayView.mins || "?") + " min · that’s the whole thing — no surprises.";
-  if (dayView.isActive && !practiceMode && !isSpaDay) {
-    dayView.showMini = true;
-  }
   dayView.showBlocksList = !!(dayView.isActive || dayView.isDone || dayView.isPreview || dayView.isMissed) && !isSpaDay;
   dayView.blocksHint = dayView.isDone ? "REVIEW WHAT YOU DID 👀" : dayView.isPreview ? "PEEK AT WHAT'S COMING 👀" : dayView.isMissed ? "READY WHEN YOU ARE — PEEK INSIDE 👀" : "TAP A BLOCK TO PEEK INSIDE 👀";
   dayView.showFocus = !!(dayView.isActive || dayView.isPreview) && !isSpaDay;
@@ -435,14 +425,10 @@ export function buildTodayVM(state) {
 
   const coachIconBtnStyle = "width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;flex-shrink:0;font-size:15px;display:flex;align-items:center;justify-content:center;"
     + (settings.coachVoiceOn ? "background:#fff;color:var(--aqua-deep);" : "background:rgba(255,255,255,0.18);color:#fff;");
-  const practiceLinkLabel = practiceMode ? "Try-it mode is ON" : "🧪 Try-it mode";
-  const practiceHintLine = practiceMode
-    ? "GO opens the move list — instructions and videos, no timer."
-    : "Look at the moves without starting a workout.";
+  const practiceLinkLabel = "🧪 Explore the moves";
+  const practiceHintLine = "Instructions and videos — no timer, nothing recorded.";
   const practiceBtnStyle = "width:100%;min-height:48px;display:flex;align-items:center;justify-content:center;gap:9px;border-radius:var(--radius-pill);cursor:pointer;font-family:inherit;font-weight:900;font-size:14px;padding:0 18px;"
-    + (practiceMode
-      ? "background:#fff;color:var(--aqua-deep);border:2px solid #fff;"
-      : "background:rgba(255,255,255,0.14);color:#fff;border:2px solid rgba(255,255,255,0.45);");
+    + "background:rgba(255,255,255,0.14);color:#fff;border:2px solid rgba(255,255,255,0.45);";
 
   // Echo-back: her own last "next time" promise, remembered on the day card.
   const lastSaid = sessions.slice().reverse().map(h => h.nextTime).find(Boolean);
@@ -467,7 +453,7 @@ export function buildTodayVM(state) {
     athleteName: settings.athleteName || "Jess",
     dateLine, statChips, journey, blocks, week, legend, dayView,
     gearLabel, focusCue, coachIconBtnStyle, practiceLinkLabel, practiceHintLine, practiceBtnStyle,
-    practiceMode, echoLine, weather,
+    echoLine, weather,
     selectedKey, todayKey,
     railToday: railNav(state.nav === "today"),
     railProgress: railNav(state.nav === "progress"),

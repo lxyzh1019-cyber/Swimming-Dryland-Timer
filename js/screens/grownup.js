@@ -561,13 +561,6 @@ function settingsTab(vm) {
       </div>
     </div>`).join("")}
     <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Try-it mode 🧪</div>
-        <button type="button" data-action="togglePractice" aria-label="Toggle try-it mode" style="${vm.practiceTrack}"><span style="${vm.practiceKnob}"></span></button>
-      </div>
-      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;">${vm.practiceHint}</div>
-    </div>
-    <div>
       <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Prize pool 🎁 ${vm.isDefaultPool ? '<span style="color:var(--ink-faint);">(default)</span>' : ""}</div>
       <div class="list-wrap">
         <div data-list="1" style="max-height:240px;display:flex;flex-direction:column;gap:6px;padding-bottom:8px;">

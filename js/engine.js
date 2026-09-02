@@ -9,7 +9,7 @@
    ============================================================ */
 
 import { deriveSessionOutcome, mainRoundsFromLedger, OUTCOME_VERSION } from "./outcome.js";
-import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA,
+import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA,
          exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
          VALGUS_FLOOR, VALGUS_PROGRESSIONS } from "./data.js";
 import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent,
@@ -62,10 +62,11 @@ function blankSession() {
     currentDirection: 0, totalDirections: 0,
     repInSegment: 0, repsInSegment: 0,
     currentSegment: 0, totalSegments: 0,
-    // "normal" | "mini" | "tryit" — practice/mini are kept as mirrors so the
-    // screens and view-models that read them keep working.
+    // "normal" | "recovery". Mini is gone as a thing that can be STARTED — the
+    // traffic light is the one dial that shortens a session now — but records
+    // written when it existed are still read everywhere they are reported.
     mode: "normal",
-    dayKey: null, light: "green", practice: false, mini: false, spa: false, recovery: false,
+    dayKey: null, light: "green", practice: false, spa: false, recovery: false,
     endedEarly: false, xpEarned: 0, leveledUp: false,
     mood: null, wentWell: null, nextTime: null, quizPick: null, quizXp: 0,
     savedEntry: false, saveFailed: false, savedKey: null, fsId: null
@@ -116,7 +117,12 @@ export function assembleCircuits(dayKey, light, opts = {}) {
   const rounds = roundsForLight(light);
   const skipBlocks = opts.skip || [];
   const circuits = [];
-  const order = opts.mini ? ["warmup", "main"] : BLOCK_ORDER;
+  /* The light decides which blocks run, not just how many main rounds. One
+     policy object drives assembly, and everything downstream — the duration
+     estimate, the preview, expected work, completion — is derived from the
+     circuits this returns, so none of them can disagree with it. */
+  const policy = LIGHT_SESSION_POLICY[light] || LIGHT_SESSION_POLICY.green;
+  const order = BLOCK_ORDER.filter(bk => policy.blocks.includes(bk));
   order.forEach(bk => {
     if (skipBlocks.includes(bk)) return;
     let exs = (day.blocks[bk] || []).slice();
@@ -136,8 +142,9 @@ export function assembleCircuits(dayKey, light, opts = {}) {
     }
     if (!exs.length) return;
     circuits.push({ name: BLOCK_LABEL[bk], block: bk,
-      rounds: bk === "main" && !opts.mini ? rounds : 1, exercises: exs });
-    if (bk === "main" && !opts.mini && day.prepMenu && day.prepMenu.length && !skipBlocks.includes("prep")) {
+      rounds: bk === "main" ? rounds : 1, exercises: exs });
+    if (bk === "main" && policy.blocks.includes("prep")
+        && day.prepMenu && day.prepMenu.length && !skipBlocks.includes("prep")) {
       circuits.push({ name: BLOCK_LABEL.prep, block: "prep", rounds: 1, exercises: day.prepMenu });
     }
   });
@@ -561,7 +568,21 @@ function setUpNext(circuits, ci, r, ei) {
    It reads from these rows instead: one per exercise per round, saying what
    was actually done. */
 export const MIN_EXERCISE_SECS = 3;       // under this it wasn't done, it was tapped
-export const DONE_WORK_FRACTION = 0.5;    // timed work under half its dose is partial
+
+/* How much of a timed dose has to be there before it counts as DONE.
+   This was half, which meant a thirty-second hold abandoned at fifteen seconds
+   was recorded as done and paid for a full round. Rep work has always demanded
+   the whole prescribed rep count, so timed work was the lax half of the pair.
+   The work under the bar is not lost — it is saved as `partial`, which is real
+   work everywhere the outcome authority reads it. */
+export const DONE_WORK_FRACTION = 0.8;
+
+/* The timed rule on its own, pure and exported so the boundary can be checked
+   directly instead of inferred from a whole simulated session. */
+export function timedExerciseStatus(actualSecs, plannedSecs) {
+  if (actualSecs < MIN_EXERCISE_SECS) return "skipped";
+  return plannedSecs > 0 && actualSecs < plannedSecs * DONE_WORK_FRACTION ? "partial" : "done";
+}
 
 function exerciseStatus(ex, wasSkipped, actualSecs, plannedSecs) {
   if (wasSkipped) return "skipped";
@@ -575,8 +596,7 @@ function exerciseStatus(ex, wasSkipped, actualSecs, plannedSecs) {
     if (!sess.repsCounted || actualSecs < MIN_EXERCISE_SECS) return "skipped";
     return sess.repsCounted >= sess.repsTarget ? "done" : "partial";
   }
-  if (actualSecs < MIN_EXERCISE_SECS) return "skipped";
-  return plannedSecs > 0 && actualSecs < plannedSecs * DONE_WORK_FRACTION ? "partial" : "done";
+  return timedExerciseStatus(actualSecs, plannedSecs);
 }
 
 function recordExercise(ex, circuit, ci, ei, r, wasSkipped) {
@@ -743,7 +763,7 @@ function microLoopPrompt() {
 /* ============================================================
    MAIN RUNNER
    ============================================================ */
-export async function startSession({ dayKey, light = "green", mini = false, mode = null }) {
+export async function startSession({ dayKey, light = "green", mode = null, suggestedLight = null }) {
   if (sess.running) return;
   // Try-It never reaches the engine any more — it is a browse screen with no
   // timer, no rounds and no record (see js/vm/tryit.js). Refuse it here so a
@@ -753,16 +773,23 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
   const day = DAYS[dayKey];
   if (!day) return;
 
-  // Recovery is an explicit MODE, not a light with zero rounds. A Mini that
-  // resolves to Recovery becomes recovery too — the whole point of the check is
-  // that a sore day gets recovery, and "a shortened workout" is still a workout.
+  // Recovery is an explicit MODE, not a light with zero rounds — the whole
+  // point of the check is that a sore day gets recovery rather than a shortened
+  // workout, because "a shortened workout" is still a workout.
   const resolvedLight = day.spa ? "recovery" : light;
+  // Sunday is recovery because the CALENDAR says so, not because anyone
+  // overrode the check — so there is no override to record on a spa day.
+  const resolvedSuggestion = day.spa ? "recovery" : (suggestedLight || resolvedLight);
   const isRecovery = resolvedLight === "recovery";
-  const sessionMode = isRecovery ? "recovery" : (mode || (mini ? "mini" : "normal"));
+  const sessionMode = isRecovery ? "recovery" : (mode || "normal");
   Object.assign(sess, blankSession(), {
     running: true, dayKey, mode: sessionMode,
-    mini: sessionMode === "mini", practice: false,
+    practice: false,
     light: resolvedLight,
+    // What the readiness check produced, before any grown-up moved it. Kept so
+    // readiness analytics can read the body's answer and executed-load
+    // analytics can read what was actually trained.
+    suggestedLight: resolvedSuggestion,
     recovery: isRecovery,
     spa: !!day.spa
   });
@@ -771,15 +798,12 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
   // does not even READ the training day's progress — see isCareSession.
   const prog = isCareSession() ? null : loadDayProgress(dayKey);
   const skipBlocks = (prog && prog.done) || [];
-  sess.circuits = assembleCircuits(dayKey, sess.light, { mini: sess.mini, skip: isCareSession() ? [] : skipBlocks });
+  sess.circuits = assembleCircuits(dayKey, sess.light, { skip: isCareSession() ? [] : skipBlocks });
   if (!sess.circuits.length) { sess.running = false; return; }
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
   sess.expectedWork = countExpectedWork(sess.circuits);
-  // A mini is one shortened round however the light was set; everything else
-  // is priced and reported against the light's own round count.
-  sess.roundsPlanned = (sess.spa || sess.recovery) ? 0
-    : sess.mini ? 1
-    : roundsForLight(sess.light);
+  // Every session is priced and reported against its light's own round count.
+  sess.roundsPlanned = (sess.spa || sess.recovery) ? 0 : roundsForLight(sess.light);
   sess.spotChecks = pickSpotChecks(sess.circuits);
 
   logEvent("session_start", { day: dayKey, light: sess.light, mode: sessionMode });
@@ -981,11 +1005,9 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
     if (sess.abort) return finalize(false);
   }
 
-  // A MINI is a subset, not the day. Clearing day progress here is what let a
-  // 10-minute mini wipe the rest of the plan and tick the whole day off. A CARE
-  // session is not the day either — finishing a Recovery pass must leave a
+  // A CARE session is not the day — finishing a Recovery pass must leave a
   // half-trained Monday exactly as it found it.
-  if (!sess.mini && !isCareSession()) clearDayProgress(sess.dayKey);
+  if (!isCareSession()) clearDayProgress(sess.dayKey);
   finalize(true);
 }
 
@@ -1023,8 +1045,10 @@ export function finalize(completed) {
     session: "morning",
     planVersion: "2026.2",
     xpVersion: XP_VERSION,     // marks a row whose XP counted the rounds trained
-    sessionType: sess.recovery && !sess.spa ? "recovery" : sess.spa ? "spa" : sess.mini ? "mini" : "main",
+    sessionType: sess.recovery && !sess.spa ? "recovery" : sess.spa ? "spa" : "main",
     lightResult: sess.light,
+    suggestedLight: sess.suggestedLight || sess.light,
+    wasOverridden: (sess.suggestedLight || sess.light) !== sess.light,   // a grown-up moved it
     // What was actually trained, and what the day asked for — two different
     // numbers. Storing only the planned one is what paid 150% for one day.
     roundsDone: (sess.spa || sess.recovery) ? 0 : sess.roundsCompleted,
@@ -1042,7 +1066,7 @@ export function finalize(completed) {
     plannedSecs: sess.plannedSecs,
     clean: sess.cleanCount, wobbly: sess.wobblyCount,
     formChecks: sess.formChecks || [],       // per-move verdicts from this run's spot-checks
-    light: sess.light, mini: sess.mini,
+    light: sess.light,
     pain: safetyStop,
     endedEarly: !completed,
     // The loop reaching its end is NOT the same as the work being done. The
@@ -1108,14 +1132,21 @@ export function finalize(completed) {
   // for a session that failed to save — XP with no record behind it is how a
   // total drifts away from the history that is supposed to explain it.
   sess.xpEarned = (!saved || safetyStop) ? 0 : claimSessionXp(entry);
-  if (sess.xpEarned > 0) {
+  /* Stamp what was ACTUALLY paid — including nothing. sessionXp() reads this
+     field in preference to re-pricing the row, and rebuildJourneyXp sums
+     sessionXp on every boot, so a record left unstamped is re-priced at FULL
+     value the next time the app opens. A day's cap that granted zero was
+     therefore handed straight back at the next launch. */
+  if (saved) {
     entry.xpEarned = sess.xpEarned;   // the cloud copy must carry it too
+    patchSession(sess.savedKey, { xpEarned: sess.xpEarned });
+  }
+  if (sess.xpEarned > 0) {
     const { leveledUp } = addXp(sess.xpEarned);
     // Only celebrate a level-up that actually owes a prize, so the button can
     // never be a dead tap (openPrizeDraw refuses when nothing is pending).
     sess.leveledUp = leveledUp && pendingDrawCount() > 0;
     noteSessionXpAwarded(sess.xpEarned);
-    patchSession(sess.savedKey, { xpEarned: sess.xpEarned });
   }
 
   // Cloud mirror — keep the doc ID so mood/reflection can patch it later.

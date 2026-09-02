@@ -6,7 +6,7 @@
 
 import { LADDER, RANK_LORE, RANK_TEASE, fmtXp } from "../data.js";
 import { sessionXp, levelFromXp, sessionRounds, sessionRoundsPlanned } from "../store.js";
-import { loadSessions, loadJourney, currentStreak, redeemPrize, countsAsTrained, prizeUndoOpen, outcomeOf } from "../store.js";
+import { loadSessions, loadJourney, currentStreak, redeemPrize, countsAsTrained, countsForStreak, prizeUndoOpen, outcomeOf } from "../store.js";
 import { edmontonWeekISODates, edmontonISO, DAY_MS } from "../util.js";
 import { buildJourney } from "./today.js";
 
@@ -150,7 +150,8 @@ export function buildProgressVM(state) {
   }));
 
   const weekSessions = trained.filter(s => Object.values(isoDates).includes(edmontonISO(s.isoDate)));
-  const streak = currentStreak(trained);
+  // Streak days are the ones that cleared the bar, not every day with work on it.
+  const streak = currentStreak(sessions.filter(countsForStreak));
   const avgMins = weekSessions.length ? Math.round(weekSessions.reduce((a, s) => a + (s.durationSecs || 0), 0) / weekSessions.length / 60) : 0;
 
   // Milestones — real, honest chips (only what's actually been earned).

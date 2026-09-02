@@ -65,7 +65,7 @@ export const UNGATED_ACTIONS = [
   "selectDay", "toggleBlock", "logScope", "progressScope",
   "setGuTab", "setGsScope", "formCheckMonth", "dismissStorageError",
   // her own session, start to finish
-  "goSession", "startMini", "goTryIt", "exitTryIt", "tryItDetail",
+  "goSession", "goTryIt", "exitTryIt", "tryItDetail",
   "advance", "pauseTimer", "skipEx", "stopNow", "resumeFromStop", "endFromStop",
   "askEnd", "cancelEnd", "confirmEndEarly", "pickIntent", "answerMicro",
   "pickClean", "pickWobbly", "skipFormCheck", "pickMood", "reflectWell",
@@ -101,7 +101,6 @@ export const GATE_REASON = {
   toggleTimerSounds: "change the coaching settings",
   setVoiceStyle:  "change the coach's voice",
   bumpRest:       "change how long her rests are",
-  togglePractice: "arm Try-It, so the next run is not recorded",
   pickAthlete:    "switch to a different athlete",
   addAthlete:     "add a new athlete to this device",
   setLadderRung:  "change where she is on the independence ladder",
