@@ -130,6 +130,7 @@ const pscreen = await import(base + "screens/progress.js");
 const gvm     = await import(base + "vm/grownup.js");
 const gscreen = await import(base + "screens/grownup.js");
 const rscreen = await import(base + "screens/readiness.js");
+const sync    = await import(base + "sync.js");
 const overlays = await import(base + "screens/overlays.js");
 const tryvm   = await import(base + "vm/tryit.js");
 const tryscreen = await import(base + "screens/tryit.js");
@@ -1297,6 +1298,85 @@ ok(store.countsForStreak(legacy) === true,
 ok(outcome.deriveSessionOutcome({ ledger: legacy.ledger, expectedWork: 20, outcomeVersion: 1 }).streakJudged === false,
    "and says plainly that it was never judged against the bar");
 
+/* --- THE STREAK IS PAID BY THE DOSE, NOT BY THE ROW ------------------------
+   The bar above was counting ROWS: a `partial` row scored one whole work unit,
+   exactly like a finished one. So three seconds of a thirty-second hold, done
+   fifteen times, cleared 75% of a twenty-move session and kept the flame. The
+   engine had already raised the bar for calling a timed dose done
+   (DONE_WORK_FRACTION); this applies the same honesty to the streak. */
+const doseRow = (rows, expected, extra = {}) => ({
+  app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION,
+  sessionType: "main", roundsDone: 1, roundsPlanned: 3, expectedWork: expected,
+  ledger: rows, ...extra
+});
+const timedPartial = (n, actual, planned) => Array.from({ length: n }, (_, i) => ({
+  name: "t" + i, block: "main", round: 1, driver: "time",
+  status: "partial", actualSecs: actual, plannedSecs: planned
+}));
+const repPartial = (n, got, target) => Array.from({ length: n }, (_, i) => ({
+  name: "r" + i, block: "main", round: 1, driver: "reps",
+  status: "partial", repsCounted: got, repsPlanned: target, actualSecs: 20, plannedSecs: 0
+}));
+
+ok(outcome.streakCredit({ status: "done" }) === 1, "a finished move is worth a whole unit");
+ok(outcome.streakCredit({ status: "skipped" }) === 0, "a skipped one is worth nothing");
+ok(Math.abs(outcome.streakCredit(timedPartial(1, 15, 30)[0]) - 0.5) < 1e-9,
+   "half a timed dose is worth half a unit");
+ok(Math.abs(outcome.streakCredit(repPartial(1, 6, 8)[0]) - 0.75) < 1e-9,
+   "six of eight reps is worth three quarters");
+ok(outcome.streakCredit({ status: "partial", driver: "time", actualSecs: 40, plannedSecs: 30 }) === 1,
+   "and overrunning the dose is capped at one, never a bonus");
+
+/* The audit's own reproduction, which used to earn the streak. */
+ok(store.countsForStreak(doseRow(timedPartial(15, 3, 30), 20)) === false,
+   "three seconds of fifteen thirty-second holds is NOT a training day");
+ok(store.countsForStreak(doseRow(repPartial(15, 1, 10), 20)) === false,
+   "nor is one rep of fifteen ten-rep sets");
+ok(store.countsAsTrained(doseRow(timedPartial(15, 3, 30), 20)) === true,
+   "both are still real training that saves and pays — only the streak got honest");
+ok(store.xpForSession(doseRow(timedPartial(15, 3, 30), 20)) > 0,
+   "and both are still worth XP");
+
+/* Enough dose still earns it, whether it arrives whole or in parts. */
+ok(store.countsForStreak(doseRow(timedPartial(20, 24, 30), 20)) === true,
+   "twenty moves at four fifths of the dose clears the bar on dose alone");
+ok(store.countsForStreak(doseRow(timedPartial(20, 21, 30), 20)) === false,
+   "and seventy percent of every dose does not");
+
+/* A dose we cannot prove is not a dose we pay for. */
+ok(outcome.streakCredit({ status: "partial", driver: "time", actualSecs: 10, plannedSecs: 0 }) === 0,
+   "a partial row with no denominator scores zero rather than a whole unit");
+ok(store.countsForStreak(doseRow(
+     Array.from({ length: 20 }, (_, i) => ({ name: "x" + i, block: "main", round: 1, status: "partial" })), 20)) === false,
+   "so a ledger of shapeless partials cannot buy a streak day");
+
+/* --- RECOVERY FREEZES THE STREAK, IT DOES NOT PAY INTO IT ------------------
+   Care is not training, so it must not add a day. But the morning she reports
+   soreness honestly must not be the morning the flame goes out. */
+const recRows = (n, status) => Array.from({ length: n }, (_, i) => ({
+  name: "rec" + i, block: "recovery", round: 1, driver: "time",
+  status, actualSecs: status === "done" ? 30 : 4, plannedSecs: 30
+}));
+const recDone = doseRow(recRows(8, "done"), 8, { sessionType: "recovery", roundsDone: 0, roundsPlanned: 0 });
+const recBrushed = doseRow(recRows(8, "partial"), 8, { sessionType: "recovery", roundsDone: 0, roundsPlanned: 0 });
+ok(store.countsForStreak(recDone) === false, "a finished recovery day adds no training streak day");
+ok(store.freezesStreak(recDone) === true, "it freezes the streak instead");
+ok(store.freezesStreak(recBrushed) === false,
+   "and brushing at every move on the menu freezes nothing — that was a row count too");
+ok(store.countsForStreak(recBrushed) === false, "nor does it earn one");
+
+/* The freeze bridges the gap rather than spending it. */
+const agoIso = (d) => new Date(Date.now() - d * 86400000).toISOString();
+const train = (d) => ({ ...streakRow(20, 20), isoDate: agoIso(d) });
+const rest  = (d) => ({ ...recDone, isoDate: agoIso(d) });
+const runOf = [train(6), rest(5), rest(4), rest(3), train(2), train(1), train(0)];
+ok(store.currentStreak(runOf.filter(store.countsForStreak)) === 3,
+   "without the freeze, three recovery days read as a break and the run is just the last three");
+ok(store.currentStreak(runOf.filter(store.countsForStreak), store.streakFreezeDates(runOf)) === 4,
+   "with it the earlier training day is bridged in — the care days hold, without counting");
+ok(store.streakFreezeDates(runOf).size === 3, "and only the finished recovery days are freeze days");
+
 /* --- a pain stop is a safety event, not a short workout --- */
 const painStop = { ...partial, safetyStop: true, pain: true, roundsDone: 1 };
 ok(store.xpForSession(painStop) === 0, "a pain stop pays no XP");
@@ -1388,40 +1468,176 @@ const g2 = store.creditValgusWeek({ isoDate: "2026-04-09T10:00:00.000Z",
   ledger: [{ name: "Drop-and-Stick", status: "done" }], formChecks: [{ name: "Drop-and-Stick", clean: true }] });
 ok(g2.unlocked === true, "two separate clean weeks unlock it, exactly as the screen promises");
 
-/* --- readiness can't reuse a check from months ago --- */
+/* --- yesterday is SHOWN, never reused --------------------------------------
+   The one-tap "same as yesterday" copied sleep, muscle freshness and energy
+   wholesale, so on a clean yesterday today's light could be produced without
+   her answering anything. It is a read-only column now: visible, never
+   fillable, and still bounded by the freshness window. */
 localStorage.clear();
 store.migrate();
-store.saveReadiness({ answers: { q_pain: "yes", q_sleep: "yes", q_light: "yes", q_ready: "yes" }, light: "green" });
-ok(rvm.hasRecentReadiness() === true, "a check from today can be reused");
+store.saveReadiness({ answers: { q_pain: "yes", q_sleep: "yes", q_light: "no", q_ready: "yes" }, light: "yellow" });
+ok(typeof rvm.sameAsYesterday === "undefined", "the one-tap reuse is gone entirely");
+ok(rvm.yesterdayCheck() !== null, "a check from today is close enough to show");
+
+const todayFlow = rvm.newReadinessFlow("monday");
+const shownVm = rvm.buildReadinessVM(todayFlow, true);
+ok(shownVm.hasYesterday === true, "so the yesterday column is offered");
+ok(shownVm.questions.find(q => q.id === "q_light").yesterday === "😮‍💨 Tired",
+   "and renders yesterday's answer in that question's own words");
+ok(shownVm.questions.find(q => q.id === "q_sleep").yesterday === "😴 Good",
+   "each question using its own labels, not a bare yes/no");
+ok(todayFlow.readinessDone === false && Object.keys(todayFlow.answers).length === 0,
+   "showing it fills in nothing — today still has to be answered");
+
 const stale = JSON.parse(localStorage.getItem("swim_readiness"));
 stale.when = Date.now() - 60 * 86400000;
 localStorage.setItem("swim_readiness", JSON.stringify(stale));
-ok(rvm.hasRecentReadiness() === false, "a check from two months ago cannot");
-const staleFlow = rvm.newReadinessFlow("monday");
-rvm.sameAsYesterday(staleFlow);
-ok(staleFlow.readinessDone === false, "so “same as yesterday” does nothing and she has to answer");
+ok(rvm.yesterdayCheck() === null, "a check from two months ago is not 'yesterday'");
+ok(rvm.buildReadinessVM(rvm.newReadinessFlow("monday"), true).hasYesterday === false,
+   "so no column is shown at all");
 
-/* --- and it can never re-apply yesterday's grown-up decision ---------------
-   The saved check stores the light that actually RAN, which is the
-   post-override one. Copying it re-applied a grown-up's override today with no
-   grown-up present, and cleared the override flag on the way through — so
-   nothing recorded that it had happened. */
+/* An empty column reads as an em dash rather than a missing row. */
 localStorage.clear();
 store.migrate();
-store.saveReadiness({
-  // Two "not great" answers: on their own these are a Yellow day.
-  answers: { q_pain: "yes", q_sleep: "yes", q_light: "yes", q_ready: "no" },
-  light: "green", suggestedLight: "yellow", overridden: true
-});
-const reused = rvm.newReadinessFlow("monday");
-rvm.sameAsYesterday(reused);
-ok(reused.readinessDone === true, "a recent check can still be reused");
-ok(reused.light === "yellow", "but the light is re-derived from the answers, not copied");
-ok(reused.suggestedLight === "yellow", "so the suggestion is the body's own answer");
-ok(reused.overridden === false, "and yesterday's override does not come with it");
-const reusedVm = rvm.buildReadinessVM(reused, true);
-ok(reusedVm.wasOverridden === false && reusedVm.suggestionLine === "",
-   "the card shows no override, because none was made today");
+store.saveReadiness({ answers: { q_pain: "yes", q_sleep: "yes" }, light: "green" });
+ok(rvm.buildReadinessVM(rvm.newReadinessFlow("monday"), true)
+     .questions.find(q => q.id === "q_ready").yesterday === "—",
+   "a question yesterday never answered shows an em dash");
+
+/* The body map gets one line, not a second diagram. */
+localStorage.clear();
+store.migrate();
+store.saveReadiness({ answers: { q_pain: "no" }, zoneSev: { 2: 3 }, light: "red", severity: 3 });
+const zoneLine = rvm.yesterdayZoneLine();
+ok(zoneLine.includes("Shoulders") && zoneLine.includes("not right"),
+   "yesterday's marked zones read back in her own words");
+localStorage.clear();
+store.migrate();
+store.saveReadiness({ answers: { q_pain: "yes" }, zoneSev: {}, light: "green" });
+ok(rvm.yesterdayZoneLine() === "Yesterday: no sore spots.",
+   "and a clean yesterday says so plainly");
+
+/* --- THE BODY'S ANSWER AND THE GROWN-UP'S ARE DIFFERENT QUESTIONS ----------
+   The analytics grouped every session by the light that RAN, under a heading
+   that promised readiness. So a body check that said Red, overridden to Green,
+   was filed as a Green readiness day: the check could never be scored against
+   what followed it, and the yellow/red safety flag — the one a parent reads —
+   went silent on exactly the day it most needed to speak. */
+localStorage.clear();
+store.migrate();
+const overridden = {
+  app: "swimming", dayKey: "monday", dayTitle: "Monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main",
+  suggestedLight: "red", lightResult: "green", light: "green", wasOverridden: true,
+  roundsDone: 3, roundsPlanned: 3, expectedWork: 4, durationSecs: 1800,
+  ledger: Array.from({ length: 4 }, (_, i) => ({ name: "m" + i, block: "main", round: 1, status: "done" }))
+};
+store.saveSession(overridden);
+const gFull = gvm.buildGrownupVM({ grownupTab: "analytics", gsScope: "month", isWide: true });
+const ga = gFull.analytics;
+ok(ga.readinessOutcome.some(r => r.light === "Red"),
+   "the Body Check report files the day under the light her BODY asked for");
+ok(!ga.readinessOutcome.some(r => r.light === "Green"),
+   "and never under the one a grown-up chose");
+ok(ga.loadOutcome.some(r => r.light === "Green"),
+   "while the load report files it under the light actually trained");
+ok(!ga.loadOutcome.some(r => r.light === "Red"), "and only there");
+ok(ga.hasOverrides && ga.overrideRows.length === 1, "the override itself is listed");
+ok(ga.overrideRows[0].from === "red" && ga.overrideRows[0].to === "green" && ga.overrideRows[0].raised === true,
+   "named in both directions, and marked as RAISED above the body check");
+ok(gFull.guAlerts.some(a => /raised the light/.test(a.text)),
+   "and it raises a flag — an overridden Red used to raise none at all");
+ok(gFull.guAlerts.some(a => /yellow\/red-light day/.test(a.text)),
+   "the tired-or-sore flag counts it too, because her body did say Red");
+ok(/Body Check → completion/.test(gscreen.grownupScreen(
+     gvm.buildGrownupVM({ grownupTab: "analytics", gsScope: "month", isWide: true }))),
+   "and the heading no longer promises readiness while showing something else");
+
+/* --- the body map is a RECORD now, not just a control ----------------------
+   One saved check, overwritten every morning, could set today's rounds and
+   nothing else: "left shoulder, three days running" was not a thing the app
+   could notice. The log keeps every check; the mirror carries only the ones
+   worth a grown-up's attention. */
+localStorage.clear();
+store.migrate();
+store.saveReadiness({ answers: { q_pain: "no" }, zoneSev: { 2: 3 }, severity: 3,
+                      light: "red", suggestedLight: "red", resultSource: "bodycheck" });
+store.saveReadiness({ answers: { q_pain: "yes", q_sleep: "yes", q_light: "yes", q_ready: "yes" },
+                      zoneSev: {}, light: "green", suggestedLight: "green", resultSource: "readiness" });
+const log = store.loadReadinessLog();
+ok(log.length === 2, "a later check no longer overwrites the earlier one");
+ok(JSON.stringify(log[0].zoneSev) === JSON.stringify({ "2": 3 }),
+   "yesterday's marked zones are still readable after today's check");
+ok(store.loadReadiness().zoneSev && Object.keys(store.loadReadiness().zoneSev).length === 0,
+   "while the single 'latest check' the session reads is still just the latest");
+
+ok(log[0].abnormal === true, "a marked zone makes a check abnormal");
+ok(log[1].abnormal === false, "an all-green check is not");
+ok(store.isAbnormalCheck({ zoneSev: { 4: 2 }, suggestedLight: "green" }) === true,
+   "severity 2 on any zone is enough on its own");
+ok(store.isAbnormalCheck({ zoneSev: {}, suggestedLight: "yellow" }) === true,
+   "and so is a non-green light with no zone marked — a tired day still counts");
+ok(store.isAbnormalCheck({ zoneSev: {}, suggestedLight: "green" }) === false,
+   "only a clean, green check stays on the device");
+
+const trend = gvm.buildGrownupVM({ grownupTab: "analytics", gsScope: "month", isWide: true })
+  .analytics.bodyMapTrend;
+ok(trend.length === 1 && /Shoulder/i.test(trend[0].label),
+   "and the Grown-up Zone can finally show where it keeps hurting");
+
+/* Rows from the other device merge in without duplicating. */
+const remote = [{ ...log[0], at: log[0].at + 5000 }];
+ok(store.mergeReadinessLog(remote) === 1, "a check from the other device merges in");
+ok(store.mergeReadinessLog(remote) === 0, "and merging it again adds nothing");
+ok(store.loadReadinessLog().length === 3, "so the log holds each check exactly once");
+
+/* --- ONLY A SESSION IS A SESSION -------------------------------------------
+   The shared cloud collection holds more than sessions: the journey mirror
+   lives there, and now the readiness mirror does too. The restore filtered them
+   with `kind !== "journey"` — an exclude-BY-NAME list, which admits every kind
+   nobody thought to name. The next document type added would have been merged
+   as a training record and had her XP rebuilt from it. */
+ok(sync.isSessionDoc({ isoDate: "2026-04-01T10:00:00.000Z" }) === true,
+   "an untagged document is a session, as every existing record is");
+ok(sync.isSessionDoc({ kind: "session" }) === true, "and so is one that says so");
+ok(sync.isSessionDoc({ kind: "journey" }) === false, "the journey mirror is not a session");
+ok(sync.isSessionDoc({ kind: "readiness", checks: [] }) === false,
+   "and neither is the readiness mirror — under the old rule this WOULD have merged");
+ok(sync.isSessionDoc(null) === false, "nothing is not a session either");
+
+/* --- the finish screen says whether the streak was earned ------------------
+   Every partial got the same words — "Part of the way, and it counts" — which
+   is true of the work and silent about the one number she is standing on. The
+   values to tell the two apart were computed all along and read by nobody. */
+const partialVm = (ledger, expectedWork) => {
+  engine.exitSession();
+  Object.assign(engine.sess, {
+    running: false, phase: "done", dayKey: "monday", light: "green", mode: "normal",
+    ledger, expectedWork, roundsCompleted: 2, roundsPlanned: 3, endedEarly: true,
+    elapsed: 900, savedEntry: null, spa: false, recovery: false
+  });
+  return svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+};
+const doneRows = (n) => Array.from({ length: n }, (_, i) => ({
+  name: "m" + i, block: "main", round: 1, driver: "time", status: "done",
+  actualSecs: 30, plannedSecs: 30 }));
+const earned = partialVm(doneRows(16), 20);
+const missed = partialVm(doneRows(4), 20);
+ok(earned.completionState === "partial" && missed.completionState === "partial",
+   "both are partial sessions, and used to be shown identical words");
+ok(earned.completionKey === "partial-streak", "the one that cleared the bar is its own outcome");
+ok(missed.completionKey === "partial-short", "and the one that fell short is another");
+ok(earned.streakEarned === true && missed.streakEarned === false,
+   "with the streak answer carried explicitly rather than left to be guessed");
+ok(Number.isFinite(missed.streakShortBy) && missed.streakShortBy > 0,
+   "and the short one knows how far short it fell");
+ok(/today counts/i.test(sscreen.sessionScreen(earned)),
+   "the screen tells her plainly when the day counted");
+ok(/didn.t reach the streak/i.test(sscreen.sessionScreen(missed)),
+   "and just as plainly when it did not — without taking the work away");
+ok(/everything you DID do is saved/i.test(sscreen.sessionScreen(missed)),
+   "the work is still hers either way");
+engine.exitSession();
 
 /* --- reading the instructions stops the clock --- */
 localStorage.clear();
@@ -1724,13 +1940,19 @@ const recRow = store.loadSessions()[0];
 ok(recRow.sessionType === "recovery", "the record is typed as recovery");
 ok(recRow.roundsDone === 0 && recRow.roundsPlanned === 0, "with zero rounds done and zero planned");
 ok(store.countsAsTrained(recRow) === false, "recovery does not complete the normal scheduled day");
-/* It does keep the flame, though — but only when the whole menu is finished.
-   Reporting soreness honestly must not cost her the streak; a recovery session
-   abandoned after two moves is not a day's care. */
-ok(store.countsForStreak(recRow) === true,
-   "a COMPLETED recovery day earns the streak day, so honesty costs her nothing");
+/* Care FREEZES the streak rather than paying into it. A recovery day must not
+   add to a training streak — it is not training — but reporting soreness
+   honestly must not break one either, so it holds the flame instead. The whole
+   menu is what buys that protection: a recovery run abandoned after two moves
+   is not a day's care. */
+ok(store.countsForStreak(recRow) === false,
+   "a completed recovery day does NOT add a training streak day");
+ok(store.freezesStreak(recRow) === true,
+   "it freezes the streak instead, so honesty costs her nothing");
+ok(store.freezesStreak({ ...recRow, ledger: (recRow.ledger || []).slice(0, 2) }) === false,
+   "but a recovery run abandoned partway protects nothing");
 ok(store.countsForStreak({ ...recRow, ledger: (recRow.ledger || []).slice(0, 2) }) === false,
-   "but a recovery run abandoned partway does not");
+   "and still earns no streak day either");
 ok(store.currentStreak(store.loadSessions().filter(store.countsAsTrained)) === 0,
    "a week of recovery alone leaves the training streak at zero");
 
@@ -2168,6 +2390,89 @@ ok(an8.rounds.planned === 4, "a mini asks for one round, not the light's three")
    rendered markup, the saved record or the engine's own counters said any of
    them was happening. Each of these drives the real thing.
    ============================================================ */
+
+/* --- an abnormal check travels with the session; a clean one stays home -----
+   The session record is mirrored wholesale to a SHARED cloud collection, so
+   what goes on it is a privacy decision and not just a data one. An abnormal
+   check is what a grown-up on the other device needs; an all-green one tells
+   them nothing and is the one shape kept off the wire entirely. */
+const soreCheck = { answers: { q_pain: "no" }, zoneSev: { 2: 3 }, severity: 3,
+                    light: "red", suggestedLight: "red", resultSource: "bodycheck" };
+const soreRun = await runSession({ dayKey: "tuesday", light: "red", suggestedLight: "red",
+                                   readiness: soreCheck, gateUnlocked: true });
+const soreEntry = soreRun.savedEntry;
+ok(soreEntry && JSON.stringify(soreEntry.zoneSev) === JSON.stringify({ "2": 3 }),
+   "an abnormal check puts the marked zones on the session record");
+ok(soreEntry.severity === 3 && soreEntry.resultSource === "bodycheck",
+   "with the severity and where the call came from");
+ok(soreEntry.readinessAnswers && soreEntry.readinessAnswers.q_pain === "no",
+   "and the answers behind it");
+
+const cleanCheck = { answers: { q_pain: "yes", q_sleep: "yes", q_light: "yes", q_ready: "yes" },
+                     zoneSev: {}, severity: null, light: "green",
+                     suggestedLight: "green", resultSource: "readiness" };
+const cleanRun = await runSession({ dayKey: "tuesday", light: "green", suggestedLight: "green",
+                                    readiness: cleanCheck, gateUnlocked: true });
+const cleanEntry = cleanRun.savedEntry;
+ok(cleanEntry.zoneSev === undefined && cleanEntry.readinessAnswers === undefined,
+   "an all-green check puts NOTHING extra on the record — it never leaves the device");
+ok(cleanEntry.suggestedLight === "green" && cleanEntry.lightResult === "green",
+   "while the three light fields it always carried are untouched");
+ok(store.loadReadinessLog().every(r => r.abnormal === false) ||
+   store.loadReadinessLog().length === 0,
+   "and the local log is still the place the clean check is kept");
+
+/* The grown-up's privacy opt-out governs the readiness mirror too. */
+store.updateSettings({ cloudMirror: false });
+ok(await sync.publishReadiness() === false,
+   "with the cloud mirror off, an abnormal check is not published at all");
+store.updateSettings({ cloudMirror: false });
+
+/* --- A RAISED LIGHT STILL OWES ITS MAIN ROUNDS -----------------------------
+   Day progress stored the bare block name "main", and a resume dropped every
+   block on that list from the new plan without ever comparing the two lights.
+   So: train under Red, finish its ONE main round, stop before swim-skill; come
+   back under Green and the block holding Green's three rounds was skipped as
+   already finished. The resumed session ran no main set at all, and could then
+   be called complete against a plan that had never included one.
+
+   Main is the one block whose SIZE is set by the light, so its progress is a
+   count of rounds, not a name on a list. */
+const redThenGreen = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true,
+  seed: () => store.saveDayProgress("tuesday",
+    { done: ["warmup", "main"], light: "red", mainRoundsCompleted: 1 })
+});
+const rgMain = redThenGreen.circuits.find(c => c.block === "main");
+ok(!!rgMain, "resuming a Red day under Green still runs a main block — it used to run none");
+ok(rgMain.rounds === 2, "and asks for the TWO rounds Green still owes, not three and not zero");
+ok(redThenGreen.roundsPlanned === 2,
+   "the session is planned against what it actually owes, so the finished round is not billed twice");
+ok(!redThenGreen.circuits.some(c => c.block === "warmup"),
+   "a genuinely finished block is still skipped — the resume itself was never the bug");
+
+const yellowThenGreen = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true,
+  seed: () => store.saveDayProgress("tuesday",
+    { done: ["warmup", "main"], light: "yellow", mainRoundsCompleted: 2 })
+});
+ok((yellowThenGreen.circuits.find(c => c.block === "main") || {}).rounds === 1,
+   "two rounds banked under Yellow leaves exactly one owed under Green");
+
+/* Lowering the light owes nothing: three rounds banked covers Red's one. */
+const greenThenRed = await runSession({ dayKey: "tuesday", light: "red", gateUnlocked: true,
+  seed: () => store.saveDayProgress("tuesday",
+    { done: ["warmup", "main"], light: "green", mainRoundsCompleted: 3 })
+});
+ok(!greenThenRed.circuits.some(c => c.block === "main"),
+   "and a light LOWERED after the work is done owes no main rounds at all");
+
+/* The rounds are banked even when the block is not yet retired, so a session
+   that stops mid-main is not read as having finished the block. */
+const partialMain = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true,
+  seed: () => store.saveDayProgress("tuesday",
+    { done: ["warmup"], light: "green", mainRoundsCompleted: 1 })
+});
+ok((partialMain.circuits.find(c => c.block === "main") || {}).rounds === 2,
+   "one round banked under Green leaves two owed, with the block never retired");
 
 /* --- 1. Recovery must not touch the training day's progress ---------------
    The reproduction: half a Monday, then a body check that says Recovery. The

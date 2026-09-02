@@ -7,7 +7,7 @@ import { sess, refTime, screenRepsDetail } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork, videoSearchUrl } from "../data.js";
 import { fmtMMSS, exercisePhotoUrl } from "../util.js";
 import { loadSessions } from "../store.js";
-import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION } from "../outcome.js";
+import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION } from "../outcome.js";
 
 /* What changes at the end of this segment — named before she gets there, so the
    switch is never a surprise she hears about only if the voice is on. */
@@ -102,6 +102,24 @@ export function buildSessionVM(state) {
      a failed save outranks everything (nothing was recorded, so nothing may be
      claimed), then safety, then care, then what the ledger can actually prove. */
   const completionState = sess.saveFailed ? "save-failed" : liveOutcome.state;
+
+  /* A partial is not one outcome, it is two: the day that cleared the streak
+     bar and the day that did not. Both were shown the same words — "part of the
+     way, and it counts" — which is true of the work and silent about the thing
+     she actually wants to know. The numbers to say which have been computed all
+     along (js/outcome.js surfaces workRatio precisely so a screen can say how
+     far short it fell) and were read by nobody. */
+  const streakEarned = !!liveOutcome.countsForStreak;
+  const streakFrozen = !!liveOutcome.streakFreeze;
+  const ratio = Number(liveOutcome.workRatio);
+  const streakShortBy = Number.isFinite(ratio)
+    ? Math.max(1, Math.round((STREAK_WORK_FRACTION - ratio) * (sess.expectedWork || 0)))
+    : null;
+  const completionKey = completionState === "partial"
+    ? (streakEarned ? "partial-streak" : "partial-short")
+    : completionState === "recovery"
+    ? (streakFrozen ? "recovery-held" : "recovery-short")
+    : completionState;
   const isResting = phase === "rest" || phase === "roundRest" || phase === "sectionRest";
   const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath" || phase === "formcheck";
   const isBigRest = phase === "roundRest" || phase === "sectionRest";
@@ -293,6 +311,10 @@ export function buildSessionVM(state) {
        switch on THIS and on nothing else — `endedEarly === false` is not proof
        that anything was finished. */
     completionState,
+    // What the finish screen actually switches on — the state, split where a
+    // single state hides an answer she is owed.
+    completionKey,
+    streakEarned, streakFrozen, streakShortBy,
     isComplete:   completionState === "complete",
     isPartial:    completionState === "partial",
     isRecovery:   completionState === "recovery",

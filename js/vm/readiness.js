@@ -46,35 +46,40 @@ function maybeFinish(r) {
    last month can never be reused. */
 export const SAME_AS_YESTERDAY_MAX_MS = 36 * 60 * 60 * 1000;
 
-/* Is there a check recent enough to reuse? The button asks "same as
-   yesterday?" but the app only ever checked that SOME previous record
-   existed — so a check from months ago answered yes. */
-export function hasRecentReadiness(now = Date.now()) {
+/* Yesterday is SHOWN, never reused.
+
+   This was a one-tap "feel the same as yesterday?" button that copied the
+   answers wholesale. It had already been narrowed twice — a freshness window,
+   then a re-ask of the soreness question when yesterday reported any — and the
+   hole it left was still the whole point of the screen: on a clean yesterday,
+   sleep, muscle freshness and energy all carried over, so today's light could
+   be produced entirely from yesterday's body without her answering anything.
+
+   A check that reads yesterday's body is not a check. So yesterday now sits
+   BESIDE today as a read-only column: she can see what she said, and she still
+   has to say what is true now. The freshness window survives — a check from
+   last month is not "yesterday" — the copying does not. */
+export function yesterdayCheck(now = Date.now()) {
   const prev = loadReadiness();
-  if (!prev || !prev.answers || !Number.isFinite(prev.when)) return false;
-  return now - prev.when <= SAME_AS_YESTERDAY_MAX_MS;
+  if (!prev || !prev.answers || !Number.isFinite(prev.when)) return null;
+  if (now - prev.when > SAME_AS_YESTERDAY_MAX_MS) return null;
+  return prev;
 }
 
-export function sameAsYesterday(r) {
-  const prev = loadReadiness();
-  if (!prev || !prev.answers) return;
-  if (!hasRecentReadiness()) return;   // stale: she has to actually answer
-  if (prev.answers.q_pain === "no") {
-    // Yesterday had sore spots — don't silently reuse; soreness must be re-checked today.
-    r.answers = { ...prev.answers, q_pain: null };
-    r.step = "questions";
-    answerQuestion(r, "q_pain", "no");
-    return;
-  }
-  r.answers = { ...prev.answers };
-  /* The light is RE-DERIVED from the answers, never copied. The saved check
-     stores the light that actually ran, which is the post-override one — so
-     copying it re-applied yesterday's grown-up decision today with no grown-up
-     present, and cleared the override flag on the way through, leaving nothing
-     to say it had happened. A reused check can only ever produce the light its
-     own answers imply; moving it still takes an adult, today. */
-  r.overridden = false;
-  maybeFinish(r);
+/* One line for the body map: the zones she marked, in her own words. Not a
+   second diagram — the map is busy enough with today's marks on it. */
+export function yesterdayZoneLine(now = Date.now()) {
+  const prev = yesterdayCheck(now);
+  if (!prev) return "";
+  const sev = prev.zoneSev || {};
+  const nums = Object.keys(sev).map(Number).filter(n => Number.isFinite(sev[n]));
+  if (!nums.length) return "Yesterday: no sore spots.";
+  const SEV_WORD = { 2: "tired", 3: "not right", 4: "pain" };
+  const named = nums.map(n => {
+    const z = BODY_ZONES.find(b => b.n === n);
+    return (z ? z.label : "Zone " + n) + " — " + (SEV_WORD[sev[n]] || "marked");
+  });
+  return "Yesterday: " + named.join(", ") + ".";
 }
 
 export function setZoneSev(r, num, level) {
@@ -114,13 +119,20 @@ export function buildReadinessVM(r, isWide) {
   const step = r.step;
   const baseBtn = "min-width:58px;min-height:44px;border-radius:var(--radius-pill);border:2px solid;font-weight:900;font-size:13px;cursor:pointer;background:var(--surface);";
 
+  /* Yesterday's answers, rendered with each question's OWN words — "😴 Good"
+     rather than a bare yes, so the column reads as an answer and not as a
+     verdict. An em dash where there is nothing recent to show. */
+  const prevCheck = yesterdayCheck();
   const questions = READINESS_QS.map(q => {
     const v = ans[q.id];
+    const prevV = prevCheck ? prevCheck.answers[q.id] : null;
     return {
       id: q.id,
       text: q.text,
       yesLabel: q.yesLabel || "✓ Yes",
       noLabel: q.noLabel || "✗ No",
+      yesterday: prevV === "yes" ? (q.yesLabel || "✓ Yes")
+        : prevV === "no" ? (q.noLabel || "✗ No") : "—",
       yesStyle: baseBtn + (v === "yes" ? "border-color:var(--mint);background:var(--mint-wash);color:var(--mint-ink);" : "border-color:var(--hairline);color:var(--ink-soft);"),
       noStyle: baseBtn + (v === "no" ? "border-color:var(--sun);background:var(--sun-wash);color:var(--sun-ink);" : "border-color:var(--hairline);color:var(--ink-soft);")
     };
@@ -266,7 +278,8 @@ export function buildReadinessVM(r, isWide) {
     // Only offer the one-tap reuse when there is genuinely a recent check to
     // reuse. It used to appear whenever ANY previous record existed, so
     // "same as yesterday" could copy a body check from months ago.
-    hasYesterday: hasRecentReadiness() && step === "questions" && !showInlineReadinessResult,
+    hasYesterday: !!prevCheck && step === "questions" && !showInlineReadinessResult,
+    yesterdayZoneLine: yesterdayZoneLine(),
     areaLabel: BODY_ZONES.filter(z => zoneSev[z.n]).map(z => z.label + " — " + SEV_SHORT[zoneSev[z.n]]).join(" · "),
     zoneHighlight, zoneBadge, zoneBadgeBg, legendRows,
     showZonePopup: !!pz,

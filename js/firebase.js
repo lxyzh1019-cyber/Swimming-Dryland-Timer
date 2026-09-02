@@ -94,6 +94,44 @@ export async function fsGetJourney(athlete) {
   }
 }
 
+/* ---- readiness mirror ------------------------------------------------------
+   The body map was a control and never a record: one saved check, overwritten
+   the next morning. Now that it IS a record, the abnormal ones have to reach
+   the grown-up's other device — and crucially they must do so whether or not a
+   session follows. A Red or Recovery morning she does not go on to train
+   produces no session document at all, so riding the session mirror would have
+   dropped exactly the check most worth seeing.
+
+   Same collection, so no new Firestore rule; tagged kind:"readiness" so the
+   session readers skip it; keyed per athlete because the collection is shared.
+   All-green checks are never sent — they stay on the device that wrote them. */
+const readinessDocId = (athlete) => "readiness-" + String(athlete || "legacy");
+
+export async function fsSaveReadiness(athlete, rows) {
+  const f = await fb();
+  if (!f) return false;
+  try {
+    await f.setDoc(f.doc(f.db, SESSIONS_COL, readinessDocId(athlete)),
+                   { kind: "readiness", athlete, checks: rows, savedAt: f.serverTimestamp() });
+    return true;
+  } catch (e) {
+    console.warn("Readiness mirror write failed:", e);
+    return false;
+  }
+}
+
+export async function fsGetReadiness(athlete) {
+  const f = await fb();
+  if (!f) return null;
+  try {
+    const snap = await f.getDoc(f.doc(f.db, SESSIONS_COL, readinessDocId(athlete)));
+    return snap.exists() ? snap.data() : null;
+  } catch (e) {
+    console.warn("Readiness mirror read failed:", e);
+    return null;
+  }
+}
+
 export async function fsGetRecent(n = 7) {
   const f = await fb();
   if (!f) return [];

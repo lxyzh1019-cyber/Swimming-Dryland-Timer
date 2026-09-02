@@ -14,6 +14,7 @@ export const PROGRESS_KEY     = "swimTrainingProgressV2";
 export const SKIP_HISTORY_KEY = "swimTrainingSkipHistoryV2";
 export const ENGAGE_KEY       = "swimEngagementPickV2";
 export const LS_READINESS     = "swim_readiness";      // v2 schema (4-Q + body map)
+export const LS_READINESS_LOG = "swim_readiness_log_v1"; // every check, kept as history
 export const LS_DAYPROG       = "swim_day_progress";
 export const LS_LEARNING      = "swim_learning_records";
 export const LS_LADDER        = "swim_ladder_rungs";
@@ -361,6 +362,20 @@ export function countsForStreak(s) {
   return outcomeOf(s).countsForStreak;
 }
 
+/* Whether a session HOLDS the streak without adding to it — a finished recovery
+   pass. Care is not training, so it cannot pay into a training streak; but the
+   day she reports soreness honestly must not be the day the flame goes out. */
+export function freezesStreak(s) {
+  if (!s || s.practice) return false;
+  return outcomeOf(s).streakFreeze;
+}
+
+/* The dates those passes cover, ready to hand to currentStreak/longestStreak. */
+export function streakFreezeDates(sessions) {
+  return new Set((sessions || []).filter(freezesStreak)
+    .map(s => edmontonISO(s.isoDate)).filter(Boolean));
+}
+
 export function daysAgoCount(sessions, days) {
   const cutoff = Date.now() - days * DAY_MS;
   return sessions.filter(s => s.isoDate && new Date(s.isoDate).getTime() >= cutoff);
@@ -386,32 +401,57 @@ function dayGap(fromISO, toISO) {
 function activeDays(sessions) {
   return [...new Set(sessions.map(s => edmontonISO(s.isoDate)).filter(Boolean))].sort();
 }
+// Same UTC-noon anchoring as dayGap, for the same DST reason.
+function shiftISO(iso, days) {
+  const d = new Date(iso + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+/* Is every day BETWEEN these two a freeze day? STREAK_MAX_GAP forgives a rest
+   day or two on its own; this forgives a run of honest recovery of any length,
+   because the alternative is that a sore week reads exactly like a week off —
+   which is the pressure the traffic light exists to remove. */
+function allFrozenBetween(fromISO, toISO, freeze) {
+  if (!freeze || !freeze.size) return false;
+  const gap = dayGap(fromISO, toISO);
+  if (gap < 1) return false;
+  for (let i = 1; i < gap; i++) if (!freeze.has(shiftISO(fromISO, i))) return false;
+  return true;
+}
+// One rule, used by both streak functions: adjacent enough, or bridged by care.
+function gapHolds(fromISO, toISO, freeze) {
+  const gap = dayGap(fromISO, toISO);
+  return gap >= 1 && (gap <= STREAK_MAX_GAP || allFrozenBetween(fromISO, toISO, freeze));
+}
 
 // Longest run of active days under the same freeze rule as currentStreak —
 // otherwise "best" can read lower than the streak the kid is standing on.
-export function longestStreak(sessions) {
+export function longestStreak(sessions, freezeDays = null) {
   const days = activeDays(sessions);
+  const freeze = freezeDays instanceof Set ? freezeDays : new Set(freezeDays || []);
   let best = 0, run = 0, prev = null;
   days.forEach(d => {
-    const gap = prev ? dayGap(prev, d) : null;
-    run = (gap !== null && gap >= 1 && gap <= STREAK_MAX_GAP) ? run + 1 : 1;
+    run = (prev !== null && gapHolds(prev, d, freeze)) ? run + 1 : 1;
     prev = d; if (run > best) best = run;
   });
   return best;
 }
 // Current streak (Edmonton). Compares date STRINGS — Date objects here would
 // mix UTC-parsed and local clocks and break the streak every morning.
-export function currentStreak(sessions) {
+export function currentStreak(sessions, freezeDays = null) {
   const days = activeDays(sessions);
   if (!days.length) return 0;
+  const freeze = freezeDays instanceof Set ? freezeDays : new Set(freezeDays || []);
   const last = days[days.length - 1];
-  // A rest day today is still inside the freeze — same gap rule as below.
-  if (dayGap(last, todayISODate()) > STREAK_MAX_GAP) return 0;
+  const today = todayISODate();
+  // A rest day today is still inside the freeze — same gap rule as below, plus
+  // the care days themselves, so a stretch of recovery holds rather than ends.
+  if (dayGap(last, today) > STREAK_MAX_GAP && !allFrozenBetween(last, today, freeze)) return 0;
   let streak = 1;
   let cur = last;
   for (let i = days.length - 2; i >= 0; i--) {
-    const gap = dayGap(days[i], cur);
-    if (gap >= 1 && gap <= STREAK_MAX_GAP) { streak++; cur = days[i]; } else break;
+    if (!gapHolds(days[i], cur, freeze)) break;
+    streak++; cur = days[i];
   }
   return streak;
 }
@@ -450,8 +490,82 @@ export function loadReadiness() {
   const r = readStorage(LS_READINESS, null);
   return r && r.version === 2 ? r : null;   // old 8-Q payloads are ignored
 }
+
+/* ---- the readiness LOG ------------------------------------------------------
+   `LS_READINESS` holds ONE check — the latest — because that is all the session
+   about to start needs. That made the body map a control and nothing else: the
+   next morning's check overwrote the zones she marked, so "left shoulder, three
+   days running" was never a thing the app could notice or a grown-up could see.
+
+   This log is the record. It keeps every check, green ones included, and it is
+   append-only: a check is a thing that happened, not a value to overwrite. */
+const READINESS_LOG_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;  // a full season
+const READINESS_LOG_CAP = 500;
+
+/* Is there anything on this check worth a grown-up's attention? Any marked
+   zone, or any answer set that did not come out green. An all-green check is
+   still logged — it is what makes a trend readable — but it is the one shape
+   that never leaves the device. */
+export function isAbnormalCheck(check) {
+  if (!check) return false;
+  const worst = Math.max(0, ...Object.values(check.zoneSev || {}).map(Number).filter(Number.isFinite));
+  if (worst >= 2) return true;
+  return (check.suggestedLight || check.light || "green") !== "green";
+}
+
+export function loadReadinessLog() {
+  const cutoff = Date.now() - READINESS_LOG_RETENTION_MS;
+  return readStorage(LS_READINESS_LOG, []).filter(r => r && (r.at || 0) >= cutoff);
+}
+
+function writeReadinessLog(rows) {
+  const trimmed = rows.slice(Math.max(0, rows.length - READINESS_LOG_CAP));
+  writeStorage(LS_READINESS_LOG, trimmed);
+  return trimmed;
+}
+
+export function appendReadinessLog(check) {
+  const row = {
+    at: Date.now(),
+    answers: { ...(check.answers || {}) },
+    zoneSev: { ...(check.zoneSev || {}) },
+    severity: check.severity ?? null,
+    suggestedLight: check.suggestedLight || check.light || "green",
+    finalLight: check.light || null,
+    wasOverridden: !!check.overridden,
+    resultSource: check.resultSource || null,
+    abnormal: isAbnormalCheck(check)
+  };
+  writeReadinessLog([...loadReadinessLog(), row]);
+  return row;
+}
+
+/* The check is saved BEFORE the session starts, so what actually ran is known
+   only afterwards. Stamp it onto the newest row rather than writing a second. */
+export function stampReadinessOutcome(finalLight, wasOverridden) {
+  const rows = loadReadinessLog();
+  if (!rows.length) return null;
+  const last = rows[rows.length - 1];
+  last.finalLight = finalLight || last.finalLight;
+  last.wasOverridden = !!wasOverridden;
+  writeReadinessLog(rows);
+  return last;
+}
+
+/* Rows pulled back from the other device. Keyed on `at`, which is a millisecond
+   stamp from the device that wrote it — two checks cannot share one. */
+export function mergeReadinessLog(remoteRows) {
+  const seen = new Set(loadReadinessLog().map(r => r.at));
+  const added = (remoteRows || []).filter(r => r && Number.isFinite(r.at) && !seen.has(r.at));
+  if (!added.length) return 0;
+  const all = [...loadReadinessLog(), ...added].sort((a, b) => a.at - b.at);
+  writeReadinessLog(all);
+  return added.length;
+}
+
 export function saveReadiness(check) {
   writeStorage(LS_READINESS, { version: 2, when: Date.now(), ...check });
+  appendReadinessLog(check);
 }
 
 /* ---- day progress (same-day resume; No-Debt: partials never carry over) ----
@@ -1646,7 +1760,7 @@ export const BACKUP_SCHEMA = 1;
 
 /* Every key that belongs to an athlete. */
 export const PROFILE_KEYS = [
-  SETTINGS_KEY, PROGRESS_KEY, SKIP_HISTORY_KEY, ENGAGE_KEY, LS_READINESS, LS_DAYPROG,
+  SETTINGS_KEY, PROGRESS_KEY, SKIP_HISTORY_KEY, ENGAGE_KEY, LS_READINESS, LS_READINESS_LOG, LS_DAYPROG,
   LS_LEARNING, LS_LADDER, LS_QUIZ, LS_GATE, LS_SESSIONS, LS_TRACKER, LS_EVENTS,
   LS_PRLOG, LS_JOURNEY, LS_FORMCHECK
 ];

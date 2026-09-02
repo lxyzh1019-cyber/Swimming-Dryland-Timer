@@ -15,7 +15,7 @@ import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SID
 import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent,
          loadDayProgress, saveDayProgress, clearDayProgress, gateLocked, creditValgusWeek, addSkipRecord,
          addXp, pendingDrawCount, claimSessionXp, athleteId, noteSessionXpAwarded, patchSession, sessionKey,
-         XP_VERSION, flaggedMoves } from "./store.js";
+         XP_VERSION, flaggedMoves, isAbnormalCheck, stampReadinessOutcome } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn, speakSafety } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
 import { recoveryDoseSecs, refTime } from "./util.js";
@@ -114,7 +114,11 @@ export function assembleCircuits(dayKey, light, opts = {}) {
   // Sunday is recovery by design; any other day becomes recovery when the
   // readiness check says so.
   if (day.spa || light === "recovery") return assembleRecoveryCircuit(dayKey);
-  const rounds = roundsForLight(light);
+  /* Normally the light sets the main rounds. A RESUME overrides it with what is
+     still owed, so a day already part-trained asks for the remainder instead of
+     the whole thing again — see startSession. */
+  const rounds = Number.isFinite(opts.mainRounds)
+    ? Math.max(0, opts.mainRounds) : roundsForLight(light);
   const skipBlocks = opts.skip || [];
   const circuits = [];
   /* The light decides which blocks run, not just how many main rounds. One
@@ -141,6 +145,7 @@ export function assembleCircuits(dayKey, light, opts = {}) {
       if (floor && !exs.includes(floor)) exs.push(floor);
     }
     if (!exs.length) return;
+    if (bk === "main" && rounds <= 0) return;   // nothing owed: the block is done
     circuits.push({ name: BLOCK_LABEL[bk], block: bk,
       rounds: bk === "main" ? rounds : 1, exercises: exs });
     if (bk === "main" && policy.blocks.includes("prep")
@@ -679,7 +684,23 @@ function recordBlockDone(blockKey, ci) {
   if (!blockKey || blockKey === "prep" || sess.mode === "tryit") return;
   if (isCareSession()) return;     // care never touches the training day's record
   if (!blockHadWork(ci)) return;   // skipping everything doesn't finish a block
-  const prog = loadDayProgress(sess.dayKey) || { done: [], light: sess.light };
+  const prog = loadDayProgress(sess.dayKey)
+    || { done: [], light: sess.light, mainRoundsCompleted: 0 };
+  /* MAIN is the one block whose SIZE depends on the light, so "done" is not a
+     yes-or-no about the block — it is a count of rounds. Storing the bare name
+     meant a Red day's single round retired Main outright: come back under Green
+     and the block holding Green's three rounds was skipped as already finished,
+     leaving a session with no main set in it at all. Bank the rounds; write the
+     name only once the light's own count has actually been met. */
+  if (blockKey === "main") {
+    prog.mainRoundsCompleted = (Number(prog.mainRoundsCompleted) || 0)
+      + (sess.roundsCompleted || 0);
+    if (prog.mainRoundsCompleted < roundsForLight(sess.light)) {
+      prog.light = sess.light;
+      saveDayProgress(sess.dayKey, prog);
+      return;
+    }
+  }
   if (!prog.done.includes(blockKey)) prog.done.push(blockKey);
   prog.light = sess.light;
   saveDayProgress(sess.dayKey, prog);
@@ -763,7 +784,7 @@ function microLoopPrompt() {
 /* ============================================================
    MAIN RUNNER
    ============================================================ */
-export async function startSession({ dayKey, light = "green", mode = null, suggestedLight = null }) {
+export async function startSession({ dayKey, light = "green", mode = null, suggestedLight = null, readiness = null }) {
   if (sess.running) return;
   // Try-It never reaches the engine any more — it is a browse screen with no
   // timer, no rounds and no record (see js/vm/tryit.js). Refuse it here so a
@@ -791,19 +812,43 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     // analytics can read what was actually trained.
     suggestedLight: resolvedSuggestion,
     recovery: isRecovery,
-    spa: !!day.spa
+    spa: !!day.spa,
+    /* The body check behind this session, carried onto the record so the zones
+       she marked travel with the training log instead of being overwritten by
+       tomorrow's check. Only an ABNORMAL check is carried: an all-green one adds
+       nothing a grown-up would read, and this record is mirrored to a shared
+       cloud collection, so it is the one shape not worth putting on the wire. */
+    readinessDetail: readiness && isAbnormalCheck(readiness) ? {
+      readinessAnswers: { ...(readiness.answers || {}) },
+      zoneSev: { ...(readiness.zoneSev || {}) },
+      severity: readiness.severity ?? null,
+      resultSource: readiness.resultSource || null
+    } : null
   });
+  // What actually ran, back onto the check that suggested it.
+  stampReadinessOutcome(resolvedLight, resolvedSuggestion !== resolvedLight);
 
   // Same-day resume: blocks already completed today are skipped. A care session
   // does not even READ the training day's progress — see isCareSession.
   const prog = isCareSession() ? null : loadDayProgress(dayKey);
   const skipBlocks = (prog && prog.done) || [];
-  sess.circuits = assembleCircuits(dayKey, sess.light, { skip: isCareSession() ? [] : skipBlocks });
+  /* Main resumes by ROUNDS, never by name. A finished-block list cannot say that
+     one round of a Red day is banked while a Green day still wants two more, so
+     a raised light dropped Main outright and ran a session with no main set. */
+  const bankedRounds = (prog && Number(prog.mainRoundsCompleted)) || 0;
+  const mainOwed = Math.max(0, roundsForLight(sess.light) - bankedRounds);
+  sess.circuits = isCareSession()
+    ? assembleCircuits(dayKey, sess.light, { skip: [] })
+    : assembleCircuits(dayKey, sess.light, {
+        skip: skipBlocks.filter(b => !(b === "main" && mainOwed > 0)),
+        mainRounds: mainOwed
+      });
   if (!sess.circuits.length) { sess.running = false; return; }
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
   sess.expectedWork = countExpectedWork(sess.circuits);
-  // Every session is priced and reported against its light's own round count.
-  sess.roundsPlanned = (sess.spa || sess.recovery) ? 0 : roundsForLight(sess.light);
+  // Every session is priced and reported against what THIS run was asked for —
+  // for a resume that is the remainder, so a finished half is not billed twice.
+  sess.roundsPlanned = (sess.spa || sess.recovery) ? 0 : mainOwed;
   sess.spotChecks = pickSpotChecks(sess.circuits);
 
   logEvent("session_start", { day: dayKey, light: sess.light, mode: sessionMode });
@@ -1049,6 +1094,7 @@ export function finalize(completed) {
     lightResult: sess.light,
     suggestedLight: sess.suggestedLight || sess.light,
     wasOverridden: (sess.suggestedLight || sess.light) !== sess.light,   // a grown-up moved it
+    ...(sess.readinessDetail || {}),   // zones + answers, abnormal checks only
     // What was actually trained, and what the day asked for — two different
     // numbers. Storing only the planned one is what paid 150% for one day.
     roundsDone: (sess.spa || sess.recovery) ? 0 : sess.roundsCompleted,

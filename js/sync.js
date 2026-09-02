@@ -25,7 +25,12 @@
    ============================================================ */
 
 import { settings, mergeSessions, loadSessions, sessionKey, belongsToAthlete, athleteId, athleteAliases,
-         journeySnapshot, mergeCloudJourney, rebuildJourneyXp, logEvent } from "./store.js";
+         journeySnapshot, mergeCloudJourney, rebuildJourneyXp, logEvent,
+         loadReadinessLog, mergeReadinessLog } from "./store.js";
+
+/* Exported so the rule itself can be tested, rather than inferred from a whole
+   simulated sync. */
+export const isSessionDoc = (d) => !!d && (!d.kind || d.kind === "session");
 
 let _done = false;
 
@@ -45,12 +50,19 @@ export async function restoreFromCloud() {
   // and reading would contradict the setting the grown-up chose.
   if (settings.cloudMirror === false) return idle;
   try {
-    const { fsGetAll, fsAddSession, fsGetJourney, fsSaveJourney } = await import("./firebase.js");
+    const { fsGetAll, fsAddSession, fsGetJourney, fsSaveJourney,
+            fsGetReadiness, fsSaveReadiness } = await import("./firebase.js");
     const me = athleteId();
     const remote = await fsGetAll();
-    // The collection is shared between the athletes, so filter to this one's
-    // sessions. The journey docs live here too and are skipped by kind.
-    const mine = (remote || []).filter(d => d && d.kind !== "journey" && belongsToAthlete(d));
+    /* The collection is shared between the athletes, so filter to this one's
+       sessions. Other document kinds live here too — the journey mirror, and
+       the readiness mirror — and must never be merged as training records.
+
+       This was an exclude-by-name list (`kind !== "journey"`), which is the
+       wrong shape for the job: it admits every kind nobody thought to name, so
+       the next document type added to this collection would have been merged
+       as a session and rebuilt her XP from it. Only a session is a session. */
+    const mine = (remote || []).filter(d => isSessionDoc(d) && belongsToAthlete(d));
 
     // 1. pull
     const added = mergeSessions(mine);
@@ -79,8 +91,19 @@ export async function restoreFromCloud() {
     await fsSaveJourney(me, journeySnapshot());
     const xp = rebuildJourneyXp();
 
-    if (added || uploaded || journeyChanged) {
-      logEvent("cloud_sync", { added, uploaded, xp });
+    /* 4. readiness — the abnormal checks, merged both ways under the same
+       aliases as the journey so a past rename cannot strand a sore-shoulder
+       history under a key nothing reads. Merging only ever adds rows. */
+    let checksAdded = 0;
+    for (const id of athleteAliases()) {
+      const doc = await fsGetReadiness(id);
+      if (doc && Array.isArray(doc.checks)) checksAdded += mergeReadinessLog(doc.checks);
+    }
+    const myChecks = loadReadinessLog().filter(r => r && r.abnormal);
+    if (myChecks.length) await fsSaveReadiness(me, myChecks.slice(-READINESS_MIRROR_CAP));
+
+    if (added || uploaded || journeyChanged || checksAdded) {
+      logEvent("cloud_sync", { added, uploaded, xp, checks: checksAdded });
     }
     return { added, uploaded, xp };
   } catch (e) {
@@ -104,6 +127,25 @@ export function publishJourney(delaySecs = 2) {
   _publishTimer = setTimeout(() => { _publishTimer = null; flushJourney(); }, Math.max(0, delaySecs) * 1000);
   return true;
 }
+
+/* Push the ABNORMAL readiness checks — a sore or non-green morning is the one a
+   grown-up on the other device needs to see, and it must travel whether or not
+   a session followed it. All-green checks never leave the device. Never throws;
+   an offline device keeps its log and the next boot sync carries it up. */
+export async function publishReadiness() {
+  if (settings.cloudMirror === false) return false;
+  try {
+    const rows = loadReadinessLog().filter(r => r && r.abnormal);
+    if (!rows.length) return false;
+    const { fsSaveReadiness } = await import("./firebase.js");
+    // Bounded so one document can never approach Firestore's size limit.
+    return await fsSaveReadiness(athleteId(), rows.slice(-READINESS_MIRROR_CAP));
+  } catch (e) {
+    console.warn("Readiness publish skipped:", e);
+    return false;
+  }
+}
+const READINESS_MIRROR_CAP = 60;
 
 /* Push now, skipping the debounce. Never throws: an offline device just keeps
    its change locally, and the next boot sync carries it up. */
