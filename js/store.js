@@ -531,7 +531,17 @@ export const GATE_MOVE = "Drop-and-Stick";
    cryptographic. It stops a curious 10-year-old from reading the PIN over her
    parent's shoulder in the stored data — which is the actual threat model. It
    would not stop an adult who wanted in, and it is not meant to. */
-export const LS_GROWNUP_PIN = "swim_grownup_pin_v1";   // NOT in PROFILE_KEYS — see above
+export const LS_GROWNUP_PIN     = "swim_grownup_pin_v1";       // NOT in PROFILE_KEYS — see above
+export const LS_GROWNUP_PASSKEY = "swim_grownup_passkey_v1";  // likewise
+
+/* Device-level storage: no profile namespace, and never in PROFILE_KEYS, so
+   neither exportProfileData() nor the Firestore mirror can carry it. Both the
+   PIN digest and the passkey credential id live here. */
+export function readDeviceKey(key, fallback) { return readRaw(key, fallback); }
+export function writeDeviceKey(key, value) { return writeRaw(key, value); }
+export function clearDeviceKey(key) {
+  try { localStorage.removeItem(key); return true; } catch { return false; }
+}
 
 /* A small non-cryptographic digest (FNV-1a, salted). See the caveat above. */
 function pinDigest(pin, salt) {
@@ -559,7 +569,7 @@ export function isValidPinFormat(pin) {
 }
 
 export function hasGrownupPin() {
-  const rec = readRaw(LS_GROWNUP_PIN, null);
+  const rec = readDeviceKey(LS_GROWNUP_PIN, null);
   return !!(rec && rec.hash && rec.salt);
 }
 
@@ -568,20 +578,18 @@ export function setGrownupPin(pin) {
   const clean = String(pin || "").trim();
   if (!isValidPinFormat(clean)) return false;
   const salt = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-  return writeRaw(LS_GROWNUP_PIN, { hash: pinDigest(clean, salt), salt, setAt: Date.now() });
+  return writeDeviceKey(LS_GROWNUP_PIN, { hash: pinDigest(clean, salt), salt, setAt: Date.now() });
 }
 
 export function verifyGrownupPin(pin) {
-  const rec = readRaw(LS_GROWNUP_PIN, null);
+  const rec = readDeviceKey(LS_GROWNUP_PIN, null);
   if (!rec || !rec.hash || !rec.salt) return false;
   return pinDigest(String(pin || "").trim(), rec.salt) === rec.hash;
 }
 
 /* Used by the "Forgot PIN" path, which clears the old one so a new one can be
    set. Never called from anything the child can reach without the fallback. */
-export function clearGrownupPin() {
-  try { localStorage.removeItem(LS_GROWNUP_PIN); return true; } catch { return false; }
-}
+export function clearGrownupPin() { return clearDeviceKey(LS_GROWNUP_PIN); }
 
 export function loadGate() {
   const g = readStorage(LS_GATE, { unlocked: false, cleanWeeks: [] });

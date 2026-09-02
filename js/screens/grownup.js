@@ -500,6 +500,14 @@ function settingsTab(vm) {
   return `
   <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:22px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:22px;max-width:520px;">
     <div>
+      <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Grown-up passkey 🔐</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:9px;line-height:1.5;">${vm.passkeyLine}</div>
+      ${vm.passkeySupported ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" data-action="${vm.hasPasskey ? "forgetPasskey" : "enrollPasskey"}" style="min-height:42px;border:2px solid var(--hairline);border-radius:var(--radius-pill);background:${vm.hasPasskey ? "transparent" : "var(--aqua-wash)"};color:${vm.hasPasskey ? "var(--ink-soft)" : "var(--aqua-ink)"};font-weight:900;font-size:14px;padding:0 16px;cursor:pointer;font-family:inherit;">${vm.hasPasskey ? "Remove the passkey" : "Set up a passkey"}</button>
+      </div>` : ""}
+      ${vm.passkeyNote ? `<div style="margin-top:8px;font-size:13px;font-weight:800;line-height:1.45;color:${vm.passkeyNoteOk ? "var(--mint-ink)" : "var(--stop-ink)"};">${escapeHtml(vm.passkeyNote)}</div>` : ""}
+    </div>
+    <div>
       <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Athlete name</div>
       <input type="text" value="${escapeHtml(vm.settingsName)}" data-input="athleteName" style="width:100%;padding:13px 15px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:16px;font-weight:700;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">
     </div>
