@@ -1251,6 +1251,28 @@ const staleFlow = rvm.newReadinessFlow("monday");
 rvm.sameAsYesterday(staleFlow);
 ok(staleFlow.readinessDone === false, "so “same as yesterday” does nothing and she has to answer");
 
+/* --- and it can never re-apply yesterday's grown-up decision ---------------
+   The saved check stores the light that actually RAN, which is the
+   post-override one. Copying it re-applied a grown-up's override today with no
+   grown-up present, and cleared the override flag on the way through — so
+   nothing recorded that it had happened. */
+localStorage.clear();
+store.migrate();
+store.saveReadiness({
+  // Two "not great" answers: on their own these are a Yellow day.
+  answers: { q_pain: "yes", q_sleep: "yes", q_light: "yes", q_ready: "no" },
+  light: "green", suggestedLight: "yellow", overridden: true
+});
+const reused = rvm.newReadinessFlow("monday");
+rvm.sameAsYesterday(reused);
+ok(reused.readinessDone === true, "a recent check can still be reused");
+ok(reused.light === "yellow", "but the light is re-derived from the answers, not copied");
+ok(reused.suggestedLight === "yellow", "so the suggestion is the body's own answer");
+ok(reused.overridden === false, "and yesterday's override does not come with it");
+const reusedVm = rvm.buildReadinessVM(reused, true);
+ok(reusedVm.wasOverridden === false && reusedVm.suggestionLine === "",
+   "the card shows no override, because none was made today");
+
 /* --- reading the instructions stops the clock --- */
 localStorage.clear();
 const detailVm = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: true,

@@ -67,10 +67,14 @@ export function sameAsYesterday(r) {
     return;
   }
   r.answers = { ...prev.answers };
-  r.light = prev.light || "green";
-  r.readinessDone = true;
+  /* The light is RE-DERIVED from the answers, never copied. The saved check
+     stores the light that actually ran, which is the post-override one — so
+     copying it re-applied yesterday's grown-up decision today with no grown-up
+     present, and cleared the override flag on the way through, leaving nothing
+     to say it had happened. A reused check can only ever produce the light its
+     own answers imply; moving it still takes an adult, today. */
   r.overridden = false;
-  r.resultSource = "readiness";
+  maybeFinish(r);
 }
 
 export function setZoneSev(r, num, level) {
