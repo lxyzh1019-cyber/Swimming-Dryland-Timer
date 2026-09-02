@@ -5,14 +5,17 @@
      severity, light, overridden, resultSource, readinessDone }
    ============================================================ */
 
-import { READINESS_QS, BODY_ZONES, SEVERITY_LEVELS, LIGHT_META, BODY_RESULTS } from "../data.js";
+import { READINESS_QS, BODY_ZONES, SEVERITY_LEVELS, LIGHT_META, BODY_RESULTS, LIGHT_ROUNDS } from "../data.js";
 import { settings, loadReadiness } from "../store.js";
 
 export function newReadinessFlow(dayKey, practice) {
   return {
     dayKey, practice: !!practice,
     answers: {}, step: "questions", zoneSev: {}, pendingZone: null,
-    severity: null, light: "green", overridden: false,
+    // `light` is the FINAL light — what the session actually runs. `suggestedLight`
+    // is what the check itself produced, kept so the app can show both decisions
+    // and so a grown-up's override is never mistaken for the body's own answer.
+    severity: null, light: "green", suggestedLight: "green", overridden: false,
     resultSource: "readiness", readinessDone: false, grownupOk: false
   };
 }
@@ -33,6 +36,7 @@ function maybeFinish(r) {
   if (!need.every(k => r.answers[k] != null) || r.answers.q_pain !== "yes") return;
   const yes = ["q_sleep", "q_light", "q_ready"].filter(k => r.answers[k] === "yes").length;
   r.light = yes >= 3 ? "green" : yes === 2 ? "yellow" : yes === 1 ? "red" : "recovery";
+  r.suggestedLight = r.light;
   r.readinessDone = true;
   r.resultSource = "readiness";
 }
@@ -78,16 +82,28 @@ export function setZoneSev(r, num, level) {
   r.pendingZone = null;
   r.severity = worst || null;
   r.light = worst ? map[worst] : "green";
+  r.suggestedLight = r.light;      // a new mark replaces any earlier override
+  r.overridden = false;
   r.resultSource = worst ? "bodycheck" : "readiness";
   r.grownupOk = false;   // any change re-requires the grown-up confirm
 }
 
 export function resetBodyCheck(r) {
   // "Rest 1–2 min, then re-check": clear the marks so she can redo the body check.
-  r.severity = null; r.zoneSev = {}; r.resultSource = "readiness"; r.light = "green"; r.grownupOk = false;
+  r.severity = null; r.zoneSev = {}; r.resultSource = "readiness";
+  r.light = "green"; r.suggestedLight = "green"; r.overridden = false; r.grownupOk = false;
 }
 
 /* ---- view-model ---- */
+
+const LIGHT_NAME = { green: "Green", yellow: "Yellow", red: "Red", recovery: "Recovery" };
+
+/* "Yellow — 2 rounds", and "Recovery — recovery only" rather than "0 rounds". */
+function lightWord(key) {
+  const n = LIGHT_ROUNDS[key];
+  const dose = n ? n + (n === 1 ? " round" : " rounds") : "recovery only";
+  return (LIGHT_NAME[key] || key) + " — " + dose;
+}
 
 export function buildReadinessVM(r, isWide) {
   const ans = r.answers;
@@ -162,13 +178,36 @@ export function buildReadinessVM(r, isWide) {
   const sevLevel = r.severity || 1;
   const BR = BODY_RESULTS[sevLevel];
   const isBodyResultPath = r.resultSource === "bodycheck";
-  const resultDesc = isBodyResultPath ? BR.desc : light.desc;
+
+  /* Did a grown-up actually move the light? Derived from the two values rather
+     than trusted from the `overridden` flag, so picking the suggested light back
+     out of the list is not recorded as an override. */
+  const suggested = r.suggestedLight || lightKey;
+  const wasOverridden = lightKey !== suggested;
+
+  /* The whole card follows the FINAL light once a grown-up has moved it.
+     It used to keep taking the description and the button from the body-check
+     SEVERITY, which never changes on an override — so overriding a sore-shoulder
+     Yellow to Green drew a green "Full power!" header directly above "2 rounds
+     max" and a button reading "Start easy — Yellow light", and then ran three
+     rounds. Worse, severity 4 carries action "back": overriding a pain report
+     left a button that quietly EXITED instead of starting, which is the one
+     case a grown-up is most likely to be using the override for. */
+  const showBodyResult = isBodyResultPath && !wasOverridden;
+  const resultDesc = showBodyResult ? BR.desc : light.desc;
   // action encoded for the delegated handler: continue | retry | back
-  const resultCta = isBodyResultPath
+  const resultCta = showBodyResult
     ? { color: BR.ctaColor, deep: BR.ctaDeep, text: BR.ctaText || "#fff", icon: BR.ctaIcon, label: BR.cta,
         action: BR.action, secondaryLabel: BR.secondaryLabel || "", secondaryAction: BR.secondary || "" }
     : { color: light.btnColor, deep: light.btnDeep, text: light.btnText || "#fff", icon: light.btnIcon, label: light.btnLabel,
         action: "continue", secondaryLabel: "", secondaryAction: "" };
+
+  /* Two decisions were made, so the card says both. Hiding the suggestion would
+     make the grown-up's choice look like the body's own answer. */
+  const suggestionLine = wasOverridden
+    ? (isBodyResultPath ? "Body Check" : "Quick check") + " suggested " + lightWord(suggested)
+      + ". Grown-up selected " + lightWord(lightKey) + "."
+    : "";
 
   const showInlineReadinessResult = step === "questions" && r.readinessDone && !isBodyResultPath;
   const showInlineBodyResult = step === "bodyArea" && r.severity != null && selectedNums.length > 0;
@@ -214,6 +253,7 @@ export function buildReadinessVM(r, isWide) {
     showInlineReadinessResult, showInlineBodyResult,
     noZonesYet: step === "bodyArea" && selectedNums.length === 0,
     isBodyResultPath, resultDesc, resultCta,
+    suggestionLine, wasOverridden, suggestedLight: suggested,
     // Pain severity 3 ("changed movement") must not be self-cleared: require an
     // explicit grown-up confirmation before the Continue button is enabled.
     needsGrownupConfirm: isBodyResultPath && !!BR.needsGrownup,

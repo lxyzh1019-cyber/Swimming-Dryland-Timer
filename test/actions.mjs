@@ -119,6 +119,8 @@ const engine = await import(base + "engine.js");
 const gate    = await import(base + "gate.js");
 const passkey = await import(base + "passkey.js");
 const main   = await import(base + "main.js");
+const rvm    = await import(base + "vm/readiness.js");
+const data   = await import(base + "data.js");
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
@@ -424,6 +426,68 @@ ok(main.state.gateAsk === "rPickLight", "it asks for a grown-up");
 main.actions.answerGate(TEST_PIN);
 ok(main.state.readiness.light === "green" && main.state.readiness.overridden === true,
    "and a grown-up can, with the override recorded");
+
+/* ---- and the whole result card follows the light the grown-up picked ------
+   The card used to keep taking its description and its button from the body
+   check's SEVERITY, which an override never touches. Overriding a sore-shoulder
+   Yellow to Green drew a green "Full power!" header directly above "2 rounds
+   max", a button reading "Start easy — Yellow light", and then ran three
+   rounds. */
+gate.lockGate(); resetGateState();
+main.state.readiness = rvm.newReadinessFlow("monday");
+rvm.answerQuestion(main.state.readiness, "q_pain", "no");     // "a bit sore" → body map
+main.actions.rSetZoneSev("2|2");                              // shoulders, tired but controlled
+let rv = rvm.buildReadinessVM(main.state.readiness, true);
+ok(main.state.readiness.light === "yellow", "a severity-2 mark suggests Yellow");
+ok(rv.suggestedLight === "yellow" && rv.wasOverridden === false, "and nothing has been overridden yet");
+ok(/2 rounds/.test(rv.resultDesc), "the card describes the yellow dose");
+
+main.actions.rPickLight("green");
+ok(main.state.gateAsk === "rPickLight", "moving it asks for a grown-up");
+main.actions.answerGate(TEST_PIN);
+rv = rvm.buildReadinessVM(main.state.readiness, true);
+ok(main.state.readiness.light === "green", "the grown-up's light is the one that stands");
+ok(rv.wasOverridden === true, "the card knows it was overridden");
+ok(rv.resultDesc === data.LIGHT_META.green.desc, "the description follows the final light, not the severity");
+ok(rv.resultCta.label === data.LIGHT_META.green.btnLabel, "and so does the button");
+ok(rv.resultCta.action === "continue", "which starts the session");
+ok(/suggested Yellow — 2 rounds/.test(rv.suggestionLine) &&
+   /selected Green — 3 rounds/.test(rv.suggestionLine),
+   "and both decisions are shown, so the override is never mistaken for the body's answer");
+
+/* Picking the suggested light back out of the list is not an override. */
+gate.lockGate(); resetGateState();
+main.actions.rPickLight("yellow");
+main.actions.answerGate(TEST_PIN);
+rv = rvm.buildReadinessVM(main.state.readiness, true);
+ok(rv.wasOverridden === false, "returning to the suggested light clears the override");
+ok(rv.suggestionLine === "", "and the two-decision line goes away with it");
+ok(/2 rounds/.test(rv.resultDesc), "the body-check wording comes back");
+
+/* Severity 4 carries action "back". Overriding it used to leave a button that
+   EXITED instead of starting — dead on the one path a grown-up most needs. */
+gate.lockGate(); resetGateState();
+main.state.readiness = rvm.newReadinessFlow("monday");
+rvm.answerQuestion(main.state.readiness, "q_pain", "no");
+main.actions.rSetZoneSev("2|4");
+rv = rvm.buildReadinessVM(main.state.readiness, true);
+ok(main.state.readiness.light === "recovery", "a severity-4 mark suggests Recovery");
+ok(rv.resultCta.action === "back", "and on its own the button sends her back to Today");
+main.actions.rPickLight("green");
+main.actions.answerGate(TEST_PIN);
+rv = rvm.buildReadinessVM(main.state.readiness, true);
+ok(rv.resultCta.action === "continue",
+   "a grown-up who overrides a pain report gets a button that actually starts");
+ok(rv.resultCta.label === data.LIGHT_META.green.btnLabel, "and it is labelled for the light they chose");
+
+/* A fresh mark on the body map replaces the override — the body gets the last
+   word on its own answer. */
+main.actions.rSetZoneSev("3|3");
+rv = rvm.buildReadinessVM(main.state.readiness, true);
+ok(main.state.readiness.light === "recovery" && rv.wasOverridden === false,
+   "marking another sore area re-suggests from the body, clearing the stale override");
+ok(rv.resultCta.action === "back", "so the pain result governs again until a grown-up says otherwise");
+main.actions.cancelGate();
 
 /* Turning the safety voice back ON is always hers; turning it off is not. */
 gate.lockGate(); resetGateState();

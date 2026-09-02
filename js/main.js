@@ -445,8 +445,14 @@ Object.assign(RAW, {
     if (arg === "retry") { resetBodyCheck(r); render(); return; }
     // continue: persist the check (try-it runs don't overwrite the real day's
     // check), then hand the resolved light to the session
-    saveReadiness({ answers: r.answers, zoneSev: r.zoneSev, light: r.light, overridden: r.overridden });
-    startPendingSession({ light: r.light || "green", dayKey: r.dayKey, mini: !!r.mini });
+    // Both decisions are saved: what the check produced, and what actually ran.
+    // Storing only the final light is what made a grown-up's override
+    // indistinguishable from the body's own answer in the history.
+    const suggested = r.suggestedLight || r.light || "green";
+    saveReadiness({ answers: r.answers, zoneSev: r.zoneSev, light: r.light,
+                    suggestedLight: suggested, overridden: r.light !== suggested });
+    startPendingSession({ light: r.light || "green", dayKey: r.dayKey, mini: !!r.mini,
+                          suggestedLight: suggested });
   },
   rResultSecondary(arg) {
     if (arg === "retry") { resetBodyCheck(state.readiness); render(); }

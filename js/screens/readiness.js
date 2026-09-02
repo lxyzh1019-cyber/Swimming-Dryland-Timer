@@ -90,6 +90,10 @@ function resultCard(vm, { areaLabel = "" } = {}) {
         <div style="font-size:15px;font-weight:700;color:var(--ink-soft);margin-top:5px;line-height:1.45;">${vm.resultDesc}</div>
       </div>
     </div>
+    ${vm.suggestionLine ? `<div style="display:flex;align-items:flex-start;gap:8px;background:var(--surface-2);border-left:4px solid ${vm.light.color};border-radius:10px;padding:10px 12px;margin-bottom:16px;">
+      <span style="font-size:14px;flex-shrink:0;line-height:1.45;" aria-hidden="true">🧑</span>
+      <span style="font-size:13px;font-weight:800;color:var(--ink-soft);line-height:1.45;">${vm.suggestionLine}</span>
+    </div>` : ""}
     <div style="background:var(--surface-2);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:18px;">
       <div style="font-size:12px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Coach suggests this light — a grown-up can change it:</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">

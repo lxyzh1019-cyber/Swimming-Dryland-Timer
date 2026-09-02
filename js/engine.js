@@ -743,7 +743,7 @@ function microLoopPrompt() {
 /* ============================================================
    MAIN RUNNER
    ============================================================ */
-export async function startSession({ dayKey, light = "green", mini = false, mode = null }) {
+export async function startSession({ dayKey, light = "green", mini = false, mode = null, suggestedLight = null }) {
   if (sess.running) return;
   // Try-It never reaches the engine any more — it is a browse screen with no
   // timer, no rounds and no record (see js/vm/tryit.js). Refuse it here so a
@@ -757,12 +757,19 @@ export async function startSession({ dayKey, light = "green", mini = false, mode
   // resolves to Recovery becomes recovery too — the whole point of the check is
   // that a sore day gets recovery, and "a shortened workout" is still a workout.
   const resolvedLight = day.spa ? "recovery" : light;
+  // Sunday is recovery because the CALENDAR says so, not because anyone
+  // overrode the check — so there is no override to record on a spa day.
+  const resolvedSuggestion = day.spa ? "recovery" : (suggestedLight || resolvedLight);
   const isRecovery = resolvedLight === "recovery";
   const sessionMode = isRecovery ? "recovery" : (mode || (mini ? "mini" : "normal"));
   Object.assign(sess, blankSession(), {
     running: true, dayKey, mode: sessionMode,
     mini: sessionMode === "mini", practice: false,
     light: resolvedLight,
+    // What the readiness check produced, before any grown-up moved it. Kept so
+    // readiness analytics can read the body's answer and executed-load
+    // analytics can read what was actually trained.
+    suggestedLight: resolvedSuggestion,
     recovery: isRecovery,
     spa: !!day.spa
   });
@@ -1025,6 +1032,8 @@ export function finalize(completed) {
     xpVersion: XP_VERSION,     // marks a row whose XP counted the rounds trained
     sessionType: sess.recovery && !sess.spa ? "recovery" : sess.spa ? "spa" : sess.mini ? "mini" : "main",
     lightResult: sess.light,
+    suggestedLight: sess.suggestedLight || sess.light,
+    wasOverridden: (sess.suggestedLight || sess.light) !== sess.light,   // a grown-up moved it
     // What was actually trained, and what the day asked for — two different
     // numbers. Storing only the planned one is what paid 150% for one day.
     roundsDone: (sess.spa || sess.recovery) ? 0 : sess.roundsCompleted,
