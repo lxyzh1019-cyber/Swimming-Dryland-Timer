@@ -561,7 +561,21 @@ function setUpNext(circuits, ci, r, ei) {
    It reads from these rows instead: one per exercise per round, saying what
    was actually done. */
 export const MIN_EXERCISE_SECS = 3;       // under this it wasn't done, it was tapped
-export const DONE_WORK_FRACTION = 0.5;    // timed work under half its dose is partial
+
+/* How much of a timed dose has to be there before it counts as DONE.
+   This was half, which meant a thirty-second hold abandoned at fifteen seconds
+   was recorded as done and paid for a full round. Rep work has always demanded
+   the whole prescribed rep count, so timed work was the lax half of the pair.
+   The work under the bar is not lost — it is saved as `partial`, which is real
+   work everywhere the outcome authority reads it. */
+export const DONE_WORK_FRACTION = 0.8;
+
+/* The timed rule on its own, pure and exported so the boundary can be checked
+   directly instead of inferred from a whole simulated session. */
+export function timedExerciseStatus(actualSecs, plannedSecs) {
+  if (actualSecs < MIN_EXERCISE_SECS) return "skipped";
+  return plannedSecs > 0 && actualSecs < plannedSecs * DONE_WORK_FRACTION ? "partial" : "done";
+}
 
 function exerciseStatus(ex, wasSkipped, actualSecs, plannedSecs) {
   if (wasSkipped) return "skipped";
@@ -575,8 +589,7 @@ function exerciseStatus(ex, wasSkipped, actualSecs, plannedSecs) {
     if (!sess.repsCounted || actualSecs < MIN_EXERCISE_SECS) return "skipped";
     return sess.repsCounted >= sess.repsTarget ? "done" : "partial";
   }
-  if (actualSecs < MIN_EXERCISE_SECS) return "skipped";
-  return plannedSecs > 0 && actualSecs < plannedSecs * DONE_WORK_FRACTION ? "partial" : "done";
+  return timedExerciseStatus(actualSecs, plannedSecs);
 }
 
 function recordExercise(ex, circuit, ci, ei, r, wasSkipped) {

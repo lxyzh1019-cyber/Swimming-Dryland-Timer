@@ -1067,6 +1067,23 @@ const rec2 = store.loadSessions()[0];
 ok(rec2.roundsDone === 0, "the record says zero rounds, not the light's three");
 ok(store.sessionXp(rec2) === 0, "and an untouched session pays nothing");
 
+/* --- timed work has to actually be there ---------------------------------
+   The bar used to be half the dose, so a thirty-second hold abandoned at
+   fifteen seconds was recorded DONE and paid for a full round. Rep work has
+   always demanded the whole rep count. */
+const st = engine.timedExerciseStatus;
+ok(engine.DONE_WORK_FRACTION === 0.8, "timed work needs four fifths of its dose");
+ok(st(0, 30) === "skipped", "an instant tap is not an exercise");
+ok(st(2, 30) === "skipped", "and neither is two seconds");
+ok(st(3, 30) === "partial", "three seconds is real work, saved as partial");
+ok(st(15, 30) === "partial", "half a thirty-second hold is partial now, not done");
+ok(st(23, 30) === "partial", "and so is 76% of it");
+ok(st(24, 30) === "done", "exactly 80% is done");
+ok(st(30, 30) === "done", "and the full dose certainly is");
+ok(st(15, 20) === "partial" && st(16, 20) === "done", "a 20-second dose turns over at 16");
+ok(st(35, 45) === "partial" && st(36, 45) === "done", "a 45-second dose turns over at 36");
+ok(st(40, 0) === "done", "an exercise with no planned time is judged only on showing up");
+
 /* --- one training day pays for one training day --------------------------
    The reproduction from the report: stop partway (half XP on the planned
    three rounds = 180), come back, finish the resumed green session (360).
