@@ -990,9 +990,12 @@ function dayXpKey(entry) {
 
 /* A budget row is { spent, cap }. Rows written before the key changed were a
    bare number under the old `dayKey|date` key — they can never match a new key,
-   so they are simply pruned away over the next 60 days rather than migrated.
-   The number form is still read here because a row can also arrive from an
-   older device through the journey merge. */
+   so they age out over the 60-day retention rather than being migrated. The
+   number form is still read because one can arrive from an older BACKUP
+   restored onto a device with no journey of its own (restoreBackup keeps the
+   local journey where there is one, so this is the fresh-device case). It never
+   travels through the cloud: journeySnapshot does not carry the budget at all,
+   which is correct — a day's budget is a fact about one device's clock. */
 function dayXpRow(map, key) {
   const raw = map && map[key];
   if (typeof raw === "number") return { spent: raw, cap: 0 };

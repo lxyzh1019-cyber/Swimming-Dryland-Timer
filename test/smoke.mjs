@@ -1142,6 +1142,29 @@ const bigFirst = store.claimSessionXp(mondayCard);
 const smallAfter = store.claimSessionXp({ ...mondayCard, dayKey: "wednesday", roundsDone: 1 });
 ok(bigFirst + smallAfter === 360, "a lighter card after a full one adds nothing");
 
+/* The cap has to survive a REBUILD. XP is derived from the log on every boot
+   (rebuildJourneyXp), and sessionXp() re-prices any row that does not carry
+   what it was actually paid — so a record the cap granted nothing to must
+   still say so, out loud, as xpEarned: 0. Otherwise the second card comes
+   back at full price the next time the app is opened. */
+localStorage.clear();
+store.migrate();
+const spentDay = await runSession({ dayKey: "monday", light: "red", gateUnlocked: true,
+  // The day's budget is already gone when this session finishes, so the cap
+  // grants it nothing — exactly the second-card-on-one-date case.
+  seed: () => store.claimSessionXp({ app: "swimming", dayKey: "tuesday",
+    isoDate: new Date().toISOString(), xpVersion: store.XP_VERSION,
+    outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main",
+    roundsDone: 3, roundsPlanned: 3, completedFully: true,
+    ledger: [{ name: "x", block: "main", round: 1, status: "done" }] })
+});
+ok(spentDay.xpEarned === 0, "a session run after the day's budget is spent is granted nothing");
+const spentRow = store.loadSessions().find(x => x.dayKey === "monday");
+ok(spentRow && spentRow.xpEarned === 0,
+   "and the record SAYS it was paid nothing, instead of leaving the field off");
+ok(store.sessionXp(spentRow) === 0,
+   "so a rebuild reads zero from it rather than re-pricing it at full value");
+
 /* Budgets are per athlete: the journey doc is namespaced, so switching athletes
    must not hand the second one a spent budget. */
 localStorage.clear();

@@ -1130,14 +1130,21 @@ export function finalize(completed) {
   // for a session that failed to save — XP with no record behind it is how a
   // total drifts away from the history that is supposed to explain it.
   sess.xpEarned = (!saved || safetyStop) ? 0 : claimSessionXp(entry);
-  if (sess.xpEarned > 0) {
+  /* Stamp what was ACTUALLY paid — including nothing. sessionXp() reads this
+     field in preference to re-pricing the row, and rebuildJourneyXp sums
+     sessionXp on every boot, so a record left unstamped is re-priced at FULL
+     value the next time the app opens. A day's cap that granted zero was
+     therefore handed straight back at the next launch. */
+  if (saved) {
     entry.xpEarned = sess.xpEarned;   // the cloud copy must carry it too
+    patchSession(sess.savedKey, { xpEarned: sess.xpEarned });
+  }
+  if (sess.xpEarned > 0) {
     const { leveledUp } = addXp(sess.xpEarned);
     // Only celebrate a level-up that actually owes a prize, so the button can
     // never be a dead tap (openPrizeDraw refuses when nothing is pending).
     sess.leveledUp = leveledUp && pendingDrawCount() > 0;
     noteSessionXpAwarded(sess.xpEarned);
-    patchSession(sess.savedKey, { xpEarned: sess.xpEarned });
   }
 
   // Cloud mirror — keep the doc ID so mood/reflection can patch it later.
