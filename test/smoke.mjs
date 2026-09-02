@@ -1941,27 +1941,51 @@ localStorage.clear(); store.migrate();
    It used to set sess.paused bare, with no syncClock, so up to a second of real
    work landed in `pausedMs` on the way in and a second of standing still landed
    in `activeMs` on the way out. Opening it also counted as HER pausing. */
-const probe = {};
-const sStop = await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
-  onTick: (ms, sess) => {
-    if (ms === 6000)  { probe.beforeStop = engine.readClock(); probe.pausesBefore = sess.pauseCount || 0; engine.openStopOverlay(); }
-    if (ms === 14000) { probe.duringStop = engine.readClock(); engine.resumeFromStop(); }
-    if (ms === 16000) { probe.afterStop = engine.readClock(); engine.pauseSession("instructions"); }
-    if (ms === 24000) { probe.duringRead = engine.readClock(); engine.resumeSession("instructions"); }
-  }
-});
-ok(probe.beforeStop > 0, "the session clock was running before the stop overlay opened");
-ok(probe.duringStop === probe.beforeStop,
-   "eight seconds with the stop overlay up added NOTHING to the session clock");
-ok(probe.duringRead === probe.afterStop,
-   "and neither did eight seconds reading the instructions");
-ok(sStop.pauseCount === probe.pausesBefore,
-   "neither the stop overlay nor a read counts as her pausing — only the Pause button does");
-const stopRow = store.loadSessions()[0];
-ok(stopRow.pausedSecs >= 15,
-   "the paused time is recorded in full (" + stopRow.pausedSecs + "s), in the right bucket");
-ok(stopRow.durationSecs < stopRow.pausedSecs + stopRow.durationSecs,
-   "and the session duration excludes it");
+/* Driven directly rather than through runSession: the bug is a SUB-SECOND
+   misattribution, and a probe that only fires on whole-second boundaries lands
+   exactly where the redraw interval has just synced the clock and so can never
+   see it. Here nothing syncs unless a transition does. */
+const clk = makeClock();
+engine.exitSession();
+ok((engine.sess.pauseCount || 0) === 0,
+   "a fresh session starts with no pauses — the count used to survive exitSession and be written into the NEXT session's record");
+Object.assign(engine.sess, { running: true, paused: false, pauseReasons: [],
+  clockAt: Date.now(), activeMs: 0, pausedMs: 0, exMs: 0, phase: "work" });
+
+await clk.advance(600);            // 600ms of real work
+engine.openStopOverlay();
+const activeAtStop = engine.sess.activeMs;
+await clk.advance(4000);           // 4s with the overlay up, doing nothing
+engine.resumeFromStop();
+const pausedAtResume = engine.sess.pausedMs;
+await clk.advance(700);            // back to work
+engine.readClock();
+const activeAtEnd = engine.sess.activeMs;
+const pauseCountAfterStop = engine.sess.pauseCount || 0;
+
+/* And the same for the instructions overlay. */
+await clk.advance(500);
+engine.pauseSession("instructions");
+const activeAtRead = engine.sess.activeMs;
+await clk.advance(3000);
+engine.resumeSession("instructions");
+const pausedAtCloseRead = engine.sess.pausedMs;
+const pauseCountAfterRead = engine.sess.pauseCount || 0;
+clk.restore();
+
+ok(activeAtStop === 600,
+   "opening the stop overlay closes the working span at the exact moment of the tap ("
+   + activeAtStop + "ms) — it used to flip the flag with no clock sync at all");
+ok(pausedAtResume === 4000,
+   "the eight seconds she stood there are filed as PAUSED, to the millisecond (" + pausedAtResume + "ms)");
+ok(activeAtEnd === 1300,
+   "so the session clock counts only the work: 600 + 700 (" + activeAtEnd + "ms), never the wait");
+ok(pauseCountAfterStop === 0,
+   "and the stop overlay is not counted as her pausing — the parent report would have read a stop as a breather");
+ok(activeAtRead === 1800, "reading the instructions closes the span the same way (" + activeAtRead + "ms)");
+ok(pausedAtCloseRead === 7000, "and the reading time is paused time (" + pausedAtCloseRead + "ms)");
+ok(pauseCountAfterRead === 0, "reading a move description is not a pause she took");
+engine.exitSession();
 
 /* A pause she took HERSELF is not released by closing an overlay she opened
    on top of it — the reason set has to empty first. */

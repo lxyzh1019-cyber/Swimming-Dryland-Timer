@@ -33,7 +33,8 @@ export const sess = blankSession();
 
 function blankSession() {
   return {
-    running: false, paused: false, pauseReasons: [], abort: false, skipExercise: false, forceDone: false, forceDoneAt: 0,
+    running: false, paused: false, pauseReasons: [], pauseCount: 0,
+    abort: false, skipExercise: false, forceDone: false, forceDoneAt: 0,
     byRepsResolver: null, intentResolver: null, microResolver: null,
     currentEx: null, skipped: [], perExercise: [], justSkipped: false,
     phase: "greeting",           // greeting|getready|work|reps|sideswitch|rest|roundRest|sectionRest|intent|microloop|breath|done
