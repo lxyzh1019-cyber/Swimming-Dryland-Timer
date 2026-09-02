@@ -16,7 +16,22 @@
 /* Records written from this version carry `outcomeVersion`, which is what lets
    partial work count as work. Rows written before it keep the old done-only
    reading, so her existing history is not re-scored underneath her. */
-export const OUTCOME_VERSION = 1;
+export const OUTCOME_VERSION = 2;
+
+/* How much of a session has to actually be there before the day counts toward
+   the streak. Deliberately high: the streak is the app's loudest claim about
+   effort, and it used to be bought by a SINGLE recorded move — warm up, do one
+   thing, walk away, keep the flame. That is not a training day.
+
+   The fraction is of the FINAL LIGHT'S OWN plan, so it scales with what the day
+   actually asked for. A red day's plan is a third the size of a green one, and
+   75% of it is 75% either way: a light day is a smaller ask, never a harder one.
+
+   Recovery is held to the whole thing. Its menu is short and gentle, so
+   finishing it is the honest signal that she showed up and did the care work —
+   and reporting soreness must never cost her the streak. */
+export const STREAK_WORK_FRACTION = 0.75;
+export const RECOVERY_STREAK_FRACTION = 1;
 
 export const OUTCOME_STATES = ["none", "partial", "complete", "safety-stop", "recovery"];
 
@@ -133,6 +148,30 @@ export function deriveSessionOutcome(input = {}) {
   // training day, a streak day, or a point of adherence.
   const isTraining = state === "complete" || state === "partial";
 
+  /* THE STREAK IS A SEPARATE QUESTION FROM "DID SHE TRAIN".
+
+     Training, adherence and XP all still count any real work — a partial day is
+     a real day and is paid for. The streak asks something stricter: was this a
+     session, or a piece of one? It was answered by `countsAsTraining` until
+     now, which one recorded move satisfied.
+
+     The bar only applies to records written with it (outcomeVersion 2+).
+     Re-judging her history would drop the number she is standing on tonight
+     because a rule changed underneath her, which is exactly the kind of thing
+     the streak must never do. */
+  const streakJudged = Number(outcomeVersion) >= 2;
+  const workRatio = expected !== null && expected > 0 ? workRows / expected : null;
+  let countsForStreak;
+  if (!streakJudged || workRatio === null) {
+    countsForStreak = isTraining;                   // the old reading, unchanged
+  } else if (state === "recovery") {
+    countsForStreak = workRatio >= RECOVERY_STREAK_FRACTION;
+  } else if (isTraining) {
+    countsForStreak = workRatio >= STREAK_WORK_FRACTION;
+  } else {
+    countsForStreak = false;                        // no work, or a safety stop
+  }
+
   return {
     state,
     meaningfulWork,
@@ -142,7 +181,11 @@ export function deriveSessionOutcome(input = {}) {
     // dependency-free (store.js imports IT), so the caller does the logging.
     roundsDisagree,
     countsAsTraining: isTraining,
-    countsForStreak: isTraining,
+    countsForStreak,
+    // What the streak was judged on, so a screen can say "3 more moves" rather
+    // than leaving her to guess why a day she worked at did not count.
+    workRatio,
+    streakJudged,
     xpEligible: isTraining || state === "recovery"
   };
 }

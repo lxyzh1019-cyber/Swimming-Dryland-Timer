@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overloadWeek } from "../data.js";
-import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress, countsAsTrained, sessionXp, outcomeOf } from "../store.js";
+import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress, countsAsTrained, countsForStreak, sessionXp, outcomeOf } from "../store.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
 import { assembleCircuits, estimateSessionSecs } from "../engine.js";
 
@@ -231,7 +231,9 @@ export function buildTodayVM(state) {
 
   const weekDoneCount = WEEK_ORDER.filter(k => statuses[k] === "done" || statuses[k] === "partial").length;
   const statChips = [
-    { icon: "🔥", value: String(currentStreak(sessions.filter(countsAsTrained))), label: "day streak", color: "var(--ink)" },
+    // The streak asks a stricter question than "did she train" — a day has to be
+    // a session, not a piece of one. Everything else here still counts any work.
+    { icon: "🔥", value: String(currentStreak(sessions.filter(countsForStreak))), label: "day streak", color: "var(--ink)" },
     { icon: "✅", value: weekDoneCount + "/7", label: "this week", color: "var(--mint-ink)" },
     { icon: "🏊", value: String(sessions.length), label: "sessions", color: "var(--sea)" }
   ];

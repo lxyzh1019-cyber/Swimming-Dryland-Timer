@@ -352,6 +352,15 @@ export function countsAsTrained(s) {
 /* Trained, but not all the way through — rendered as a softer ✓. */
 export function isPartialSession(s) { return outcomeOf(s).state === "partial"; }
 
+/* Whether a session earns a STREAK day, which is a stricter question than
+   whether she trained — see js/outcome.js. The streak used to be filtered on
+   countsAsTrained, so one recorded move kept the flame; countsForStreak was
+   computed right next to it and read by nobody. */
+export function countsForStreak(s) {
+  if (!s || s.practice) return false;
+  return outcomeOf(s).countsForStreak;
+}
+
 export function daysAgoCount(sessions, days) {
   const cutoff = Date.now() - days * DAY_MS;
   return sessions.filter(s => s.isoDate && new Date(s.isoDate).getTime() >= cutoff);

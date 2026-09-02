@@ -1254,6 +1254,49 @@ store.switchProfile(firstAthlete);
 localStorage.clear();
 store.migrate();
 
+/* --- the streak asks for a session, not a piece of one --------------------
+   It used to be filtered on countsAsTrained, which ONE recorded move satisfies:
+   warm up, do a single thing, walk away, keep the flame. Training, adherence
+   and XP still count any real work — only the streak got stricter. */
+const streakRow = (doneCount, expected, extra = {}) => ({
+  app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION,
+  sessionType: "main", roundsDone: 1, roundsPlanned: 3, expectedWork: expected,
+  ledger: Array.from({ length: doneCount }, (_, i) => ({
+    name: "m" + i, block: "main", round: 1, status: "done" })),
+  ...extra
+});
+ok(outcome.STREAK_WORK_FRACTION === 0.75, "a training day needs three quarters of its plan");
+ok(store.countsForStreak(streakRow(1, 20)) === false, "one move out of twenty is not a training day");
+ok(store.countsForStreak(streakRow(14, 20)) === false, "nor is 70% of it");
+ok(store.countsForStreak(streakRow(15, 20)) === true, "exactly 75% earns the day");
+ok(store.countsForStreak(streakRow(20, 20)) === true, "and a full session certainly does");
+ok(store.countsAsTrained(streakRow(1, 20)) === true,
+   "while a single move is still real training that saves and pays");
+ok(store.xpForSession(streakRow(1, 20)) > 0, "and is still worth XP — only the streak got stricter");
+
+/* The bar is a fraction of the LIGHT'S OWN plan, so a light day is a smaller
+   ask and never a harder one. */
+const redPlan = engine.countExpectedWork(engine.assembleCircuits("monday", "red"));
+const greenPlan = engine.countExpectedWork(engine.assembleCircuits("monday", "green"));
+ok(redPlan < greenPlan, "a red plan is smaller than a green one");
+ok(store.countsForStreak(streakRow(Math.ceil(redPlan * 0.75), redPlan)) === true,
+   "three quarters of a red day earns the streak");
+ok(store.countsForStreak(streakRow(Math.ceil(redPlan * 0.75), greenPlan)) === false,
+   "the same amount of work against a green plan does not — the ask scales with the light");
+
+/* A safety stop still buys nothing, however much came before it. */
+ok(store.countsForStreak(streakRow(20, 20, { safetyStop: true, pain: true })) === false,
+   "a pain stop earns no streak day, whatever was done first");
+
+/* Going forward only: records written before the bar keep their old reading, so
+   the number she is standing on tonight cannot fall because a rule changed. */
+const legacy = { ...streakRow(1, 20), outcomeVersion: 1 };
+ok(store.countsForStreak(legacy) === true,
+   "a session recorded before the bar existed still counts, exactly as it did");
+ok(outcome.deriveSessionOutcome({ ledger: legacy.ledger, expectedWork: 20, outcomeVersion: 1 }).streakJudged === false,
+   "and says plainly that it was never judged against the bar");
+
 /* --- a pain stop is a safety event, not a short workout --- */
 const painStop = { ...partial, safetyStop: true, pain: true, roundsDone: 1 };
 ok(store.xpForSession(painStop) === 0, "a pain stop pays no XP");
@@ -1681,7 +1724,13 @@ const recRow = store.loadSessions()[0];
 ok(recRow.sessionType === "recovery", "the record is typed as recovery");
 ok(recRow.roundsDone === 0 && recRow.roundsPlanned === 0, "with zero rounds done and zero planned");
 ok(store.countsAsTrained(recRow) === false, "recovery does not complete the normal scheduled day");
-ok(store.outcomeOf(recRow).countsForStreak === false, "and does not increase the streak or adherence");
+/* It does keep the flame, though — but only when the whole menu is finished.
+   Reporting soreness honestly must not cost her the streak; a recovery session
+   abandoned after two moves is not a day's care. */
+ok(store.countsForStreak(recRow) === true,
+   "a COMPLETED recovery day earns the streak day, so honesty costs her nothing");
+ok(store.countsForStreak({ ...recRow, ledger: (recRow.ledger || []).slice(0, 2) }) === false,
+   "but a recovery run abandoned partway does not");
 ok(store.currentStreak(store.loadSessions().filter(store.countsAsTrained)) === 0,
    "a week of recovery alone leaves the training streak at zero");
 
