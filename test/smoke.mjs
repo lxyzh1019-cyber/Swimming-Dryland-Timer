@@ -3550,6 +3550,61 @@ ok(progMarkup.includes("&lt;img") && progMarkup.includes("&quot;"),
 ok(!/data-arg="[^"]*"[^>]*onerror/i.test(progMarkup),
    "and an id carrying a quote cannot climb out of the attribute it is written into");
 
+/* --- 14. A RESUMED DAY IS ONE SESSION ON THE BOARD, NOT TWO --------------
+   Every rate on the progress board was computed per RECORD, and a day trained
+   in two goes writes two. So coming back to finish made the session count go
+   up, the average duration go down and the completion rate fall: the
+   denominator grew by one for work that was really one day's, and a parent
+   reading "1 of 2 finished" was shown a number that punished her for
+   finishing. */
+localStorage.clear(); store.migrate();
+const splitIso = new Date().toISOString();
+const splitDay = (suffix, rows, done) => ({
+  isoDate: splitIso.replace(/\dZ$/, suffix + "Z"), dayKey: "tuesday",
+  workoutInstanceId: "one-workout", lightResult: "green",
+  outcomeVersion: outcome.OUTCOME_VERSION, xpVersion: 5,
+  roundsDone: done, roundsPlanned: 3, dayRoundsPlanned: 3, expectedWork: 12,
+  completedFully: rows === 6, durationSecs: 900, xpEarned: done * 90,
+  ledger: Array.from({ length: rows }, (_, i) => ({
+    block: "main", round: 1 + (i % 3), name: "m" + suffix + i, status: "done",
+    driver: "time", plannedSecs: 30, actualSecs: 30 }))
+});
+store.saveSession(splitDay("1", 6, 1));
+store.saveSession(splitDay("2", 6, 2));
+const splitVm = pvm.buildProgressVM({ progressScope: "4w", logScope: "week" });
+const sessionsRow = splitVm.periodStats.rows.find(r => r.label === "Completion status");
+ok(/ of 1$/.test(sessionsRow.total),
+   "two sittings of one day count as one session on the board (" + sessionsRow.total + ")");
+ok(/^1 session$/.test(splitVm.sessionsLabel),
+   "and as one in the week summary — it used to read two");
+const timeRow = splitVm.periodStats.rows.find(r => r.label === "Time");
+ok(/30 min \/ session/.test(timeRow.avg),
+   "with the day's whole duration as one session's average, not halved (" + timeRow.avg + ")");
+
+/* --- 13. A FAILED SAVE OFFERS NO CONTROLS THAT CANNOT WORK ---------------
+   Mood, reflection and the quiz all write through patchSession, which finds
+   the row by its key — and when the save failed there is no row. They rendered
+   anyway, took her taps, acknowledged them on screen and dropped every one.
+   Asking a ten-year-old how it felt and then losing the answer is worse than
+   not asking, and it happened exactly when she was already being told
+   something had gone wrong. */
+const failedVm = { ...svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null }),
+                   sessionDone: true, saveFailed: true, showCompletionExtras: false,
+                   showReflection: false, leveledUp: false };
+const failedMarkup = sscreen.sessionScreen(failedVm);
+ok(!/data-action="pickMood"/.test(failedMarkup),
+   "a failed save offers no mood buttons — they had nothing to write to");
+ok(!/data-action="quizPick"/.test(failedMarkup), "and no quiz, which could not have paid its XP either");
+ok(!/data-action="reflectWell"/.test(failedMarkup), "and no reflection to lose");
+ok(/didn't save/i.test(failedMarkup) && /grown-up/i.test(failedMarkup),
+   "it says what happened and who can fix it instead");
+ok(/pick this session back up/i.test(failedMarkup),
+   "and that the work is still resumable — which it now is, because the progress was kept");
+
+const okVm = { ...failedVm, saveFailed: false, showCompletionExtras: true };
+ok(/data-action="pickMood"/.test(sscreen.sessionScreen(okVm)),
+   "a session that DID save still asks how it felt, exactly as before");
+
 /* --- MALFORMED ROWS ARE QUARANTINED, NOT MERGED --------------------------
    Everything merged arrives from a collection with no sign-in in front of it,
    or a JSON file picked off a disk. A row that is merely the wrong shape does

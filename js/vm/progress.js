@@ -7,6 +7,7 @@
 import { LADDER, RANK_LORE, RANK_TEASE, fmtXp } from "../data.js";
 import { sessionXp, levelFromXp, sessionRounds, plannedRoundsAcrossDays } from "../store.js";
 import { loadSessions, loadJourney, currentStreak, redeemPrize, countsAsTrained, countsForStreak, streakFreezeDates, prizeUndoOpen, outcomeOf } from "../store.js";
+import { workoutInstances } from "../outcome.js";
 import { edmontonWeekISODates, edmontonISO, DAY_MS } from "../util.js";
 import { buildJourney } from "./today.js";
 
@@ -154,7 +155,12 @@ export function buildProgressVM(state) {
   // Recovery days are handed over separately: they hold the run together without
   // being counted in it.
   const streak = currentStreak(sessions.filter(countsForStreak), streakFreezeDates(sessions));
-  const avgMins = weekSessions.length ? Math.round(weekSessions.reduce((a, s) => a + (s.durationSecs || 0), 0) / weekSessions.length / 60) : 0;
+  /* Per WORKOUT, not per record — a day finished in two goes is one workout of
+     thirty minutes, not two of fifteen. */
+  const weekWorkouts = workoutInstances(weekSessions);
+  const avgMins = weekWorkouts.length
+    ? Math.round(weekSessions.reduce((a, s) => a + (s.durationSecs || 0), 0) / weekWorkouts.length / 60)
+    : 0;
 
   // Milestones — real, honest chips (only what's actually been earned).
   const chip = (bg, ink) => "background:" + bg + ";color:" + ink + ";border-radius:var(--radius-pill);padding:8px 14px;font-weight:900;font-size:13px;";
@@ -203,7 +209,21 @@ export function buildProgressVM(state) {
   // and a GO-and-quit are not training, and counting them dragged every
   // average on the board toward a session that never happened.
   const pSessions = sessions.filter(s => inRange(s) && countsAsTrained(s));
-  const pDone = pSessions.filter(s => outcomeOf(s).state === "complete");
+  /* A WORKOUT, NOT A SITTING.
+
+     A day trained in two goes writes two records, and every rate on this board
+     was computed per RECORD. So resuming a day made the session count go up,
+     the average duration go down and the completion rate fall — the denominator
+     grew by one for work that was really one day's, and a parent reading
+     "4 of 7 finished" was being shown a number that punished her for coming
+     back to finish. Sums (minutes, rounds, XP) are correct across fragments and
+     stay as they are; anything with a session as its DENOMINATOR, or that asks
+     whether a workout was completed, is asked of the whole workout.
+
+     See workoutInstances in js/outcome.js. */
+  const pWorkouts = workoutInstances(pSessions);
+  const pDone = pWorkouts.filter(w => w.outcome.state === "complete");
+  const pCount = pWorkouts.length;
   const days = isoSpan(range.from, range.to);
   const weeks = Math.max(1, days.length / 7);
 
@@ -211,7 +231,7 @@ export function buildProgressVM(state) {
   // roundsDone is what she actually finished now, so a partial contributes the
   // rounds it really did instead of being left out of the total entirely.
   const pRounds = pSessions.reduce((a, s) => a + sessionRounds(s), 0);
-  const pPartial = pSessions.length - pDone.length;
+  const pPartial = pCount - pDone.length;
   // What those days actually asked for — green 3, yellow 2, red 1, mini 1 —
   // rather than three apiece regardless of the light, and counted once per day
   // rather than once per sitting: a day trained in two goes asked for its
@@ -227,12 +247,15 @@ export function buildProgressVM(state) {
     else { a.asked += (s.clean || 0) + (s.wobbly || 0); a.clean += (s.clean || 0); }
     return a;
   }, { asked: 0, clean: 0 });
+  /* One answer per workout: she is asked how it felt once, at the end. Counting
+     both fragments of a resumed day made a single "tired" into two. */
+  const pMoodOf = w => (w.fragments.map(f => f.mood).filter(Boolean).pop() || null);
   const pMoods = { great: 0, okay: 0, tired: 0 };
-  pSessions.forEach(s => { if (pMoods[s.mood] != null) pMoods[s.mood] += 1; });
-  const pMoodUnanswered = pSessions.filter(s => pMoods[s.mood] == null).length;
+  pWorkouts.forEach(w => { const m = pMoodOf(w); if (pMoods[m] != null) pMoods[m] += 1; });
+  const pMoodUnanswered = pWorkouts.filter(w => pMoods[pMoodOf(w)] == null).length;
   const topMood = Object.entries(pMoods).sort((a, b) => b[1] - a[1])[0];
-  const pTough = pSessions.filter(s => ["yellow", "red"].includes(s.lightResult || s.light));
-  const pToughDone = pTough.filter(s => outcomeOf(s).state === "complete").length;
+  const pTough = pWorkouts.filter(w => ["yellow", "red"].includes(w.lightResult));
+  const pToughDone = pTough.filter(w => w.outcome.state === "complete").length;
 
   const per = (n, d, unit) => d > 0 ? (Math.round((n / d) * 10) / 10) + " " + unit : "—";
   const periodStats = {
@@ -244,25 +267,25 @@ export function buildProgressVM(state) {
       ? new Date(range.from + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Edmonton" })
         + " – " + new Date(range.to + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Edmonton" })
       : "Nothing logged in this window yet",
-    hasData: pSessions.length > 0,
+    hasData: pCount > 0,
     rows: [
       { label: "Sessions finished", total: String(pDone.length), avg: per(pDone.length, weeks, "/ week") },
-      { label: "Completion status", total: pDone.length + " of " + pSessions.length,
-        avg: pSessions.length ? Math.round((pDone.length / pSessions.length) * 100) + "%" : "—" },
+      { label: "Completion status", total: pDone.length + " of " + pCount,
+        avg: pCount ? Math.round((pDone.length / pCount) * 100) + "%" : "—" },
       { label: "Time", total: pMins >= 60 ? Math.floor(pMins / 60) + "h " + (pMins % 60) + "m" : pMins + "m",
-        avg: per(pMins, pSessions.length, "min / session") },
+        avg: per(pMins, pCount, "min / session") },
       { label: "Main rounds", total: pRounds + " of " + pPlannedRounds + (pPartial ? "  (" + pPartial + " partial)" : ""),
-        avg: per(pRounds, pSessions.length, "/ session") },
-      { label: "XP earned", total: fmtXp(pXp), avg: per(pXp, pSessions.length, "/ session") },
+        avg: per(pRounds, pCount, "/ session") },
+      { label: "XP earned", total: fmtXp(pXp), avg: per(pXp, pCount, "/ session") },
       { label: "Levels upgraded", total: "+" + pLevels,
-        avg: pLevels ? "one every " + per(pSessions.length, pLevels, "sessions") : "—" },
+        avg: pLevels ? "one every " + per(pCount, pLevels, "sessions") : "—" },
       { label: "Clean form", total: pForm.asked ? pForm.clean + " of " + pForm.asked : "—",
         avg: pForm.asked ? Math.round((pForm.clean / pForm.asked) * 100) + "%" : "—" },
       { label: "How I felt", total: "😀" + pMoods.great + "  🙂" + pMoods.okay + "  😴" + pMoods.tired
         + (pMoodUnanswered ? "  · " + pMoodUnanswered + " not answered" : ""),
         avg: topMood && topMood[1] ? "mostly " + MOOD_EMOJI[topMood[0]] : "—" },
       { label: "Tough days finished", total: String(pToughDone),
-        avg: pSessions.length ? Math.round((pToughDone / pSessions.length) * 100) + "% of sessions" : "—" }
+        avg: pCount ? Math.round((pToughDone / pCount) * 100) + "% of sessions" : "—" }
     ],
     // One bar per day: a good run and a dead patch are both obvious at a glance.
     xpByDay: (() => {
@@ -286,7 +309,7 @@ export function buildProgressVM(state) {
     prizesWon, hasPrizes: prizesWon.length > 0,
     dayStreakVal: String(streak),
     sessionsVal: String(weekSessions.length),
-    sessionsLabel: weekSessions.length + " session" + (weekSessions.length === 1 ? "" : "s"),
+    sessionsLabel: weekWorkouts.length + " session" + (weekWorkouts.length === 1 ? "" : "s"),
     minAvgVal: String(avgMins)
   };
 }

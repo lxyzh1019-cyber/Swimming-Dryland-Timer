@@ -24,12 +24,20 @@ the **Splash — Kids Swim Training** design system.
 
 ## XP rules
 
-- **Training** is the open-ended way up: a finished session pays a flat rate
-  for the rounds trained — **1 round 180, 2 rounds 270, 3 rounds 360** (half for
-  one ended early, nothing for a spa day). An easy day is worth half a full one,
-  and the number no longer wobbles with the move count of that weekday. A mini
-  is priced as a 1-round day however the light was set. Sessions logged before
-  this rule keep the value they were awarded.
+- **Training** is the open-ended way up: a session pays a flat rate for the
+  rounds actually trained — **0 rounds 90 (showing up), 1 round 180, 2 rounds
+  270, 3 rounds 360**, and nothing for Sunday's spa day or a session stopped for
+  pain. A session ended early is not halved: it is paid for the rounds it
+  finished, which is what "half for one ended early" used to approximate badly.
+  An easy day is worth half a full one, and the number no longer wobbles with
+  the move count of that weekday. Sessions logged before this rule keep the
+  value they were awarded.
+- **A day pays for a day.** The ceiling is the day's, not the sitting's, so a
+  green day trained in two goes pays 360 in total rather than 360 twice. Since
+  two devices offline at once cannot see each other's budget, the total is
+  settled per calendar date when the log is rebuilt — and a prize draw waits
+  while a device is offline with a mirror it has previously reached, because
+  prizes are drawn off a total that is not final until both devices have met.
 - **Quiz XP pays for learning, not repetition.** Only the day's first completed
   deck pays at all; each question pays at most once *ever* (+5 the first time it
   is attempted, +25 the first time it is answered right — a question missed the
@@ -78,7 +86,17 @@ build step.
 - Everything the kid earns lives in `localStorage` (sessions, XP, prizes,
   quiz mastery, trackers) — nothing earned ever vanishes on reload.
 - Completed sessions are also mirrored to Firebase Firestore when online
-  (`js/firebase.js`); the app works fully offline.
+  (`js/firebase.js`); the app works fully offline. A versioned service worker
+  (`sw.js`) precaches the app shell, so an Add-to-Home-Screen launch with no
+  network still boots and can run a whole workout — bump `CACHE_VERSION` on
+  every release. Nothing from the mirror is ever cached: it carries body-map
+  notes and readiness answers, and a stale copy of current data is worse than
+  none.
+- **A workout has an identity.** A day trained in two goes writes two session
+  records carrying the same `workoutInstanceId` (minted when the plan starts,
+  carried on the day's progress record so a resume keeps it). Every report
+  aggregates on it before counting, so resuming a day does not turn it into two
+  sessions with half the duration each.
 - **The mirror syncs both ways on every boot** (`js/sync.js`), all of it
   additive — nothing is overwritten or deleted on either side:
   1. *pull* — any session this browser is missing is merged into the local log,
@@ -121,10 +139,24 @@ session rows (no `kind`), one `journey-<athlete>` doc, and one
 was a deliberate choice — a second would have meant a second rule to get wrong.
 
 `firestore.rules` confines the app to that collection, rejects anything that is
-not one of the three shapes, caps document size, and forbids deletion outright
-so a mis-tap or a stale client can never take her history with it. It does not
-authenticate: the app has no sign-in, and the whole point of the mirror is that
-two phones in one family see the same log.
+not one of the three shapes, caps the number of fields in a document, and
+forbids deletion outright so a mis-tap or a stale client can never take her
+history with it.
+
+**The mirror is not secure, and nothing here should be read as saying it is.**
+It has no sign-in, so reads are public and writes are unauthenticated: anyone
+who can reach the Firebase project can read training and body-map data and
+write forged records. That is an accepted trade — the whole point of the mirror
+is that two phones in one family see the same log without an account — and it
+rests on the assumption that nobody outside the family knows the project
+exists. The rules confine a MISBEHAVING client; they do nothing about a hostile
+one. The app defends itself separately by rendering every stored string as text
+(`js/screens/progress.js`, `js/screens/overlays.js`) and turning away malformed
+rows at the merge (`mergeSessions` in `js/store.js`), so nothing that comes back
+off the wire can execute or break a screen.
+
+The deferred upgrade is Firebase Authentication with family-owned document
+paths and server-side ownership rules. It is not implemented.
 
 Deploy it with the Firebase CLI, from the repository root:
 

@@ -391,7 +391,22 @@ export function buildSessionVM(state) {
        short the whole time and simply never said. */
     roundShortNotes,
     xpEarned: sess.xpEarned, leveledUp: sess.leveledUp,
-    moodOpts, moodAck: sess.mood ? MOOD_ACK[sess.mood] : "", showReflection: sessionDone && !!sess.mood, reflectWellOpts, reflectNextOpts,
+    /* MOOD, REFLECTION AND THE QUIZ ONLY EXIST IF THERE IS A RECORD TO PUT
+       THEM ON.
+
+       All three write through patchSession, which finds the row by its key —
+       and when the save failed there IS no row. So the controls rendered, took
+       her taps, acknowledged them on screen, and dropped every one: the quiz
+       could not pay its XP either. Asking a kid how it felt and then losing the
+       answer is worse than not asking, and it happens exactly when she is
+       already being told something went wrong.
+
+       A failed save shows what to do about it instead — see the recovery block
+       on the finish screen. */
+    showCompletionExtras: sessionDone && completionState !== "save-failed",
+    moodOpts, moodAck: sess.mood ? MOOD_ACK[sess.mood] : "",
+    showReflection: sessionDone && completionState !== "save-failed" && !!sess.mood,
+    reflectWellOpts, reflectNextOpts,
     quizQuestion: QZ.q, quizOpts, quizAnswered, quizWhy: QZ.why,
     quizFeedback,
     quizFeedbackColor: quizCorrect ? "var(--mint-ink)" : "var(--coral)"

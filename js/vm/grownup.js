@@ -13,7 +13,7 @@ import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQU
          sessionRounds as sessionRoundsDone, sessionRoundsPlanned, plannedRoundsAcrossDays,
          monthKeyOf, formVerdicts, latestFormVerdicts, loadReadinessLog } from "../store.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
-import { sessionEffort, effortSummary } from "../effort.js";
+import { sessionEffort, effortSummary, EFFORT_CAVEAT } from "../effort.js";
 
 const LIGHT_COLORS = { green: "var(--mint)", yellow: "var(--sun)", red: "var(--stop)", recovery: "var(--grape)" };
 
@@ -494,7 +494,9 @@ export function buildGrownupVM(state) {
   const indicators = [
     { label: "Days trained",   total: trainedDays + " of " + availableDays, avg: availableDays ? Math.round((trainedDays / availableDays) * 100) + "%" : "—" },
     { label: "Total time",     total: totalMins >= 60 ? Math.floor(totalMins / 60) + "h " + (totalMins % 60) + "m" : totalMins + "m", avg: avg1(totalMins, trainingRows.length, "min / session") },
-    { label: "Effort level",   total: effort.avg == null ? "—" : String(effort.avg), avg: effort.band },
+    // Labelled for what it is on the row itself, so the number is never read as
+    // a measurement of the child by someone skimming the table.
+    { label: "Effort level (rough)", total: effort.avg == null ? "—" : String(effort.avg), avg: effort.band },
     { label: "Rounds",         total: String(boardRounds), avg: avg1(boardRounds, done.length, "/ session") },
     { label: "Safety",         total: (stops.length ? stops.length + " stop" + (stops.length === 1 ? "" : "s") : "no stops") + (earlyEnds.length ? " · " + earlyEnds.length + " early" : ""), avg: stops.length ? "needs a conversation" : "clean" },
     { label: "Completed",      total: done.length + " of " + trainingRows.length, avg: trainingRows.length ? Math.round((done.length / trainingRows.length) * 100) + "%" : "—" },
@@ -525,7 +527,12 @@ export function buildGrownupVM(state) {
         + (i === arr.length - 1 ? "var(--aqua)" : "color-mix(in srgb, var(--aqua) 45%, #fff)") + ";"
     })),
     hasTrend: effort.trend.length > 1,
-    note: "Effort is scored on what she controls — finishing the day's own target, showing up on a hard day, not skipping, not rushing, and the random form spot-checks. A pain stop never costs her anything."
+    note: "Effort is scored on what she controls — finishing the day's own target, showing up on a hard day, not skipping, not rushing, and the random form spot-checks. A pain stop never costs her anything.",
+    /* Shown with the number, not tucked away: the weights behind it were chosen
+       rather than validated against anything, so the components below are the
+       real content and the score is a rough summary of them. Nothing in the app
+       reads it to make a decision, and neither should a parent. */
+    caveat: EFFORT_CAVEAT
   };
 
   const periodCovered = (() => {
