@@ -91,6 +91,9 @@ export function buildSessionVM(state) {
     : deriveSessionOutcome({
         ledger: sess.ledger || [],
         expectedWork: Number.isFinite(sess.expectedWork) ? sess.expectedWork : null,
+        // The finish screen has to agree with the row that gets saved: on a
+        // resume both are judged against the whole day, credit included.
+        bankedCredit: sess.bankedCredit || 0,
         safetyStop: !!sess.painFlag,
         explicitAbort: sess.endedEarly === true,
         sessionType: sess.mode === "recovery" ? "recovery" : sess.spa ? "spa" : null,

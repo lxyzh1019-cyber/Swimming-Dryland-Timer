@@ -150,8 +150,22 @@ export function deriveSessionOutcome(input = {}) {
   const {
     ledger = [], expectedWork = null, safetyStop = false, explicitAbort = false,
     sessionType = null, practice = false, outcomeVersion = null,
-    expectedByRound = null, roundsDone = null
+    expectedByRound = null, roundsDone = null, bankedCredit = 0
   } = input;
+
+  /* WORK ALREADY BANKED TODAY, before this sitting started.
+
+     A day can be trained in two goes. The second used to be judged against its
+     own leftovers alone, which cut both ways: a sitting that finished everything
+     still owed could not read as completing the DAY, and a two-move sitting on a
+     barely-started day cleared 75% of two moves and bought the streak.
+
+     So `expectedWork` is the whole day's ask, and this is what the day has
+     already been paid. Only FINISHED moves are banked (see bankMove in
+     js/engine.js), and a finished move is worth exactly 1, so the count is the
+     credit. Zero for a first sitting and for every record written before this,
+     which is what keeps their scores identical. */
+  const banked = Math.max(0, Number(bankedCredit) || 0);
 
   const rows = ledger || [];
   const countPartial = Number(outcomeVersion) >= 1;
@@ -182,9 +196,11 @@ export function deriveSessionOutcome(input = {}) {
   // Completion is "every expected instance was DONE" — never "the loop ended".
   // Partial rows do not complete a session even though they are real work.
   const expected = Number.isFinite(expectedWork) ? expectedWork : null;
+  // `allRowsDone` stays about THIS sitting: a sitting with a skipped move in it
+  // is not a finished sitting, however much of the day was banked before it.
   const allRowsDone = rows.length > 0 && rows.every(l => l && l.status === "done");
   const completedFully = expected !== null
-    ? (doneRows >= expected && rows.length >= expected && allRowsDone)
+    ? (doneRows + banked >= expected && rows.length + banked >= expected && allRowsDone)
     : rows.length ? allRowsDone
     : input.completedFully === true;
 
@@ -215,7 +231,7 @@ export function deriveSessionOutcome(input = {}) {
      because a rule changed underneath her, which is exactly the kind of thing
      the streak must never do. */
   const streakJudged = Number(outcomeVersion) >= 2;
-  const streakWork = rows.reduce((a, l) => a + streakCredit(l, countPartial), 0);
+  const streakWork = banked + rows.reduce((a, l) => a + streakCredit(l, countPartial), 0);
   const workRatio = expected !== null && expected > 0 ? streakWork / expected : null;
   let countsForStreak;
   if (!streakJudged || workRatio === null) {
@@ -265,6 +281,7 @@ export function outcomeOf(entry) {
     expectedWork: Number.isFinite(entry.expectedWork) ? entry.expectedWork : null,
     expectedByRound: entry.expectedByRound || null,
     roundsDone: Number.isFinite(entry.roundsDone) ? entry.roundsDone : null,
+    bankedCredit: Number.isFinite(entry.bankedCredit) ? entry.bankedCredit : 0,
     safetyStop: !!(entry.safetyStop || entry.pain),
     explicitAbort: entry.endedEarly === true,
     sessionType: entry.sessionType || (entry.spa ? "spa" : null),

@@ -52,6 +52,9 @@ function blankSession() {
     // actually done. Rounds, XP and every report derive from it.
     // `roundsBanked` is how many of `roundsCompleted` have already been written
     // into the day's progress record — see bankMainRounds.
+    // Credit for moves finished EARLIER TODAY, carried in so a resumed sitting is
+    // judged against the whole day rather than its own leftovers.
+    bankedCredit: 0, dayExpectedWork: 0,
     ledger: [], roundsCompleted: 0, roundsBanked: 0, roundsPlanned: 0, blocksCompleted: 0,
     repsCounted: 0, repsTarget: 0, segmentsDone: 0, segmentsPlanned: 0,
     sideLabel: "", segmentLabel: "",
@@ -122,6 +125,12 @@ export function assembleCircuits(dayKey, light, opts = {}) {
   const rounds = Number.isFinite(opts.mainRounds)
     ? Math.max(0, opts.mainRounds) : roundsForLight(light);
   const skipBlocks = opts.skip || [];
+  /* A resume drops the moves already banked today (see bankMove), by name.
+     `mainPartialRound` is the subset banked inside a main round that never
+     finished — main is the one block whose remainder is a RAGGED ROUND rather
+     than a shorter block, so it is handled separately below. */
+  const skipMoves = opts.skipMoves || {};
+  const mainPartial = opts.mainPartialRound || [];
   const circuits = [];
   /* The light decides which blocks run, not just how many main rounds. One
      policy object drives assembly, and everything downstream — the duration
@@ -146,13 +155,47 @@ export function assembleCircuits(dayKey, light, opts = {}) {
       exs = exs.filter(ex => !VALGUS_PROGRESSIONS.includes(ex.name));
       if (floor && !exs.includes(floor)) exs.push(floor);
     }
+    /* Moves finished earlier today are not asked for again. A block that empties
+       out entirely falls through the length check below and is simply not run,
+       which is the same outcome as having its name on the done list. */
+    if (bk !== "main" && (skipMoves[bk] || []).length) {
+      const banked = skipMoves[bk];
+      exs = exs.filter(ex => !banked.includes(ex.name));
+    }
     if (!exs.length) return;
-    if (bk === "main" && rounds <= 0) return;   // nothing owed: the block is done
-    circuits.push({ name: BLOCK_LABEL[bk], block: bk,
-      rounds: bk === "main" ? rounds : 1, exercises: exs });
+    if (bk === "main" && rounds <= 0 && !mainPartial.length) return;   // nothing owed
+    if (bk === "main") {
+      /* THE RAGGED ROUND.
+
+         A main round interrupted halfway is neither finished nor untouched, so
+         the resume runs what is LEFT of it as a round of its own, and only then
+         the full rounds still owed. Two circuits, and they must not both call
+         their first round "round 1": `roundBase` numbers each circuit's rounds
+         from where the day actually is, so the ledger, roundFullyDone and
+         countExpectedByRound all agree on which round a row belongs to.
+
+         That numbering is what keeps the round-completion proof honest. The
+         remainder circuit declares its OWN expected size, so finishing those
+         moves credits the interrupted round exactly once — and a remainder
+         round cut short again still cannot pass for a finished one. */
+      const remainder = exs.filter(ex => !mainPartial.includes(ex.name));
+      const base = mainPartial.length && remainder.length ? 2 : 1;
+      if (mainPartial.length && remainder.length) {
+        circuits.push({ name: BLOCK_LABEL[bk], block: bk, rounds: 1,
+                        roundBase: 1, partialRound: true, exercises: remainder });
+      }
+      if (rounds > 0) {
+        circuits.push({ name: BLOCK_LABEL[bk], block: bk, rounds,
+                        roundBase: base, exercises: exs });
+      }
+    } else {
+      circuits.push({ name: BLOCK_LABEL[bk], block: bk, rounds: 1,
+                      roundBase: 1, exercises: exs });
+    }
     if (bk === "main" && policy.blocks.includes("prep")
         && day.prepMenu && day.prepMenu.length && !skipBlocks.includes("prep")) {
-      circuits.push({ name: BLOCK_LABEL.prep, block: "prep", rounds: 1, exercises: day.prepMenu });
+      circuits.push({ name: BLOCK_LABEL.prep, block: "prep", rounds: 1,
+                      roundBase: 1, exercises: day.prepMenu });
     }
   });
   return circuits;
@@ -195,6 +238,13 @@ export function pickSpotChecks(circuits, rnd = Math.random, flagged = null) {
    completion is measured against: a session that ended early leaves rows
    MISSING from the ledger, and missing rows are not a completed session however
    cleanly the loop exited. */
+/* Which round of the DAY a circuit's local round `r` is. One place, because the
+   ledger, the completion check and the expected-count map all have to agree. */
+export function roundNumber(circuit, r) {
+  const base = Number(circuit && circuit.roundBase);
+  return (Number.isFinite(base) ? base : 1) + r - 1;
+}
+
 export function countExpectedWork(circuits) {
   let n = 0;
   (circuits || []).forEach(c => {
@@ -225,7 +275,12 @@ export function countExpectedByRound(circuits) {
     for (let r = 1; r <= c.rounds; r++) {
       let n = 0;
       c.exercises.forEach(ex => { if (!(ex.rounds && r > ex.rounds)) n++; });
-      out[r] = (out[r] || 0) + n;
+      // The ABSOLUTE round, so a resume's remainder round and the full rounds
+      // that follow it do not both claim round 1 — see roundBase in
+      // assembleCircuits. The remainder therefore declares its own smaller size,
+      // which is exactly what lets it prove itself finished.
+      const abs = roundNumber(c, r);
+      out[abs] = (out[abs] || 0) + n;
     }
   });
   return out;
@@ -691,8 +746,58 @@ function ownsDayProgress() {
 }
 
 function readDayProgress() {
-  return loadDayProgress(sess.dayKey)
+  const prog = loadDayProgress(sess.dayKey)
     || { done: [], light: sess.light, mainRoundsCompleted: 0 };
+  // Both added after the record already existed on devices, so they are filled
+  // in on read rather than migrated.
+  if (!prog.moves) prog.moves = {};
+  if (!Number.isFinite(Number(prog.bankedCredit))) prog.bankedCredit = 0;
+  return prog;
+}
+
+/* A FINISHED MOVE IS FINISHED, AND IS NEVER ASKED FOR TWICE.
+
+   Rounds were banked as they landed (see bankMainRounds below), but everything
+   else was banked only when its whole BLOCK finished — which is past the early
+   return an interrupted session takes. Stop four moves into an eight-move
+   warm-up and all four came back on the next attempt.
+
+   Moves are recorded by NAME, not by position: the same block assembles
+   differently depending on the valgus gate and on whether the day is a double
+   pool day (see assembleCircuits), so an index would come back pointing at a
+   different move.
+
+   Only a `done` row banks. A `partial` row is real work everywhere else in the
+   app and is paid for as work — but it is not a finished move, and banking it
+   would mean the move never actually gets done. It is offered again, and earns
+   its credit again, so nothing is paid for twice.
+
+   `bankedCredit` counts the rows banked today. Every banked row is `done`, and a
+   done row is worth exactly 1 to the streak (see streakCredit in js/outcome.js),
+   so the count IS the credit — which is what lets a second sitting be judged
+   against the whole day instead of against its own leftovers. */
+function bankMove(row) {
+  if (!ownsDayProgress()) return;
+  if (!row || row.status !== "done") return;
+  const block = row.block;
+  /* PREP IS THE ONE BLOCK DELIBERATELY NOT BANKED, and not because it is
+     unimportant — it is the movement prep that runs immediately before main.
+     Banking it would send a resumed session straight into main rounds cold,
+     which is the opposite of what it is for. So it is re-run in full every
+     sitting and earns its credit fresh each time.
+
+     The day's ask counts prep once, so two sittings can between them produce a
+     little more credit than the day asked for. That only ever rounds in her
+     favour on a day she actually trained twice, and the ratio is compared, not
+     displayed, so nothing reads as over 100%. */
+  if (!block || block === "prep") return;
+  const prog = readDayProgress();
+  const list = prog.moves[block] || (prog.moves[block] = []);
+  if (list.includes(row.name)) return;      // a resume must not re-bank a name
+  list.push(row.name);
+  prog.bankedCredit = Number(prog.bankedCredit) + 1;
+  prog.light = sess.light;
+  saveDayProgress(sess.dayKey, prog);
 }
 
 /* MAIN is the one block whose SIZE depends on the light, so "done" is not a
@@ -714,6 +819,10 @@ function bankMainRounds() {
   if (gained <= 0) return;
   const prog = readDayProgress();
   prog.mainRoundsCompleted = (Number(prog.mainRoundsCompleted) || 0) + gained;
+  /* The round's moves are covered by the round count now. Leaving them on the
+     list would drop them from the NEXT round too — a banked name is a name the
+     resume does not ask for, and a finished round does not excuse round three. */
+  prog.moves.main = [];
   prog.light = sess.light;
   sess.roundsBanked = sess.roundsCompleted;
   saveDayProgress(sess.dayKey, prog);
@@ -734,6 +843,8 @@ function recordBlockDone(blockKey, ci) {
   }
   const prog = readDayProgress();
   if (!prog.done.includes(blockKey)) prog.done.push(blockKey);
+  // The block is on the done list now, so its move-by-move record is redundant.
+  delete prog.moves[blockKey];
   prog.light = sess.light;
   saveDayProgress(sess.dayKey, prog);
 }
@@ -869,17 +980,34 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
      a raised light dropped Main outright and ran a session with no main set. */
   const bankedRounds = (prog && Number(prog.mainRoundsCompleted)) || 0;
   const mainOwed = Math.max(0, roundsForLight(sess.light) - bankedRounds);
+  /* Moves finished earlier today, and the credit they were worth. Both come off
+     the day's record rather than being recounted from the session log, because
+     the record is what the banking wrote and it is per-day by construction. */
+  const bankedMoves = (prog && prog.moves) || {};
+  sess.bankedCredit = isCareSession() ? 0 : (Number(prog && prog.bankedCredit) || 0);
   sess.circuits = isCareSession()
     ? assembleCircuits(dayKey, sess.light, { skip: [] })
     : assembleCircuits(dayKey, sess.light, {
         skip: skipBlocks.filter(b => !(b === "main" && mainOwed > 0)),
-        mainRounds: mainOwed
+        mainRounds: mainOwed,
+        skipMoves: bankedMoves,
+        mainPartialRound: bankedMoves.main || []
       });
   if (!sess.circuits.length) { sess.running = false; return; }
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
-  sess.expectedWork = countExpectedWork(sess.circuits);
-  // Every session is priced and reported against what THIS run was asked for —
-  // for a resume that is the remainder, so a finished half is not billed twice.
+  /* THE ASK IS THE DAY'S, NOT THIS SITTING'S.
+
+     A resume used to be priced against its own remainder, so the smaller the
+     leftover the easier the streak bar was to clear: finish a couple of moves in
+     the evening on a barely-started day and 75% of two moves bought the day. Now
+     the plan stays the whole day's, and the credit already banked today is
+     carried in beside it (see bankedCredit in js/outcome.js) — so a day finished
+     across two sittings still reads complete, and a two-move sitting on a
+     barely-started day reads exactly as short as it is. */
+  sess.dayExpectedWork = countExpectedWork(assembleCircuits(dayKey, sess.light, {}));
+  sess.expectedWork = isCareSession()
+    ? countExpectedWork(sess.circuits)
+    : Math.max(sess.dayExpectedWork, countExpectedWork(sess.circuits));
   sess.roundsPlanned = (sess.spa || sess.recovery) ? 0 : mainOwed;
   sess.spotChecks = pickSpotChecks(sess.circuits);
 
@@ -922,7 +1050,10 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
         if (ex.rounds && r > ex.rounds) continue;
         sess.skipExercise = false;
         sess.currentEx = ex;
-        sess.ci = ci; sess.ei = ei; sess.round = r;
+        // The round of the DAY, not of this circuit — a resume's remainder round
+        // is round two, and both the ledger and the screen have to say so.
+        const absRound = roundNumber(circuit, r);
+        sess.ci = ci; sess.ei = ei; sess.round = absRound;
         resetExerciseClock();
         setUpNext(circuits, ci, r, ei);
 
@@ -980,7 +1111,10 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
         // or three left no trace at all, and it inferred "done" from reaching
         // the end of the loop — so tapping Done instantly on everything still
         // produced a fully completed session.
-        const row = recordExercise(ex, circuit, ci, ei, r, wasSkipped);
+        const row = recordExercise(ex, circuit, ci, ei, absRound, wasSkipped);
+        // Banked NOW, not when the block ends — an interrupted session must keep
+        // every move it actually finished. See bankMove.
+        bankMove(row);
         sess.exStatus[key] = row.status === "skipped" ? "skipped"
           : r === circuit.rounds ? row.status : sess.exStatus[key];
 
@@ -1063,7 +1197,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
       }
       // "Rounds" means MAIN rounds trained. Every one-round block used to add
       // to this same counter, so the finish screen showed a green day as 8.
-      if (circuit.block === "main" && roundFullyDone(ci, r)) {
+      if (circuit.block === "main" && roundFullyDone(ci, roundNumber(circuit, r))) {
         sess.roundsCompleted += 1;
         // Written NOW, not at the end of the block — an interrupted session must
         // keep the rounds it actually finished. See bankMainRounds.
@@ -1161,12 +1295,17 @@ export function finalize(completed) {
     // record alone — including a record that arrives back from the cloud or a
     // backup file, where the engine that ran it is long gone.
     expectedByRound: countExpectedByRound(sess.circuits),
+    // What the day had already been paid before this sitting started. Saved on
+    // the row so the record scores the same tomorrow, and after a cloud restore,
+    // as it did on the finish screen tonight.
+    bankedCredit: (sess.spa || sess.recovery) ? 0 : (sess.bankedCredit || 0),
     outcomeVersion: OUTCOME_VERSION,
     completedFully: !!completed
   };
   const finalOutcome = deriveSessionOutcome({
     ledger: entry.ledger, expectedWork: entry.expectedWork,
     expectedByRound: entry.expectedByRound, roundsDone: entry.roundsDone,
+    bankedCredit: entry.bankedCredit,
     safetyStop, explicitAbort: !completed, sessionType: entry.sessionType,
     outcomeVersion: OUTCOME_VERSION, completedFully: !!completed
   });
