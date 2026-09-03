@@ -50,7 +50,9 @@ function blankSession() {
     exStatus: {},                // "ci-ei" -> done|partial|skipped
     // The completion ledger: one row per exercise per round, holding what was
     // actually done. Rounds, XP and every report derive from it.
-    ledger: [], roundsCompleted: 0, roundsPlanned: 0, blocksCompleted: 0,
+    // `roundsBanked` is how many of `roundsCompleted` have already been written
+    // into the day's progress record — see bankMainRounds.
+    ledger: [], roundsCompleted: 0, roundsBanked: 0, roundsPlanned: 0, blocksCompleted: 0,
     repsCounted: 0, repsTarget: 0, segmentsDone: 0, segmentsPlanned: 0,
     sideLabel: "", segmentLabel: "",
     /* Live coach state. The engine has always known all of this; it just never
@@ -680,27 +682,57 @@ export function perExerciseFromLedger(ledger) {
    thing to get wrong. */
 function isCareSession(s = sess) { return !!(s.recovery || s.spa); }
 
-function recordBlockDone(blockKey, ci) {
-  if (!blockKey || blockKey === "prep" || sess.mode === "tryit") return;
-  if (isCareSession()) return;     // care never touches the training day's record
-  if (!blockHadWork(ci)) return;   // skipping everything doesn't finish a block
-  const prog = loadDayProgress(sess.dayKey)
+/* Nothing may touch the training day's progress record from a run that is not
+   the training day: a try-it run is a rehearsal, and care is not the day at all
+   (see isCareSession above). Both guards used to live only in recordBlockDone;
+   they are shared now that rounds are banked from inside the round loop too. */
+function ownsDayProgress() {
+  return sess.mode !== "tryit" && !isCareSession();
+}
+
+function readDayProgress() {
+  return loadDayProgress(sess.dayKey)
     || { done: [], light: sess.light, mainRoundsCompleted: 0 };
-  /* MAIN is the one block whose SIZE depends on the light, so "done" is not a
-     yes-or-no about the block — it is a count of rounds. Storing the bare name
-     meant a Red day's single round retired Main outright: come back under Green
-     and the block holding Green's three rounds was skipped as already finished,
-     leaving a session with no main set in it at all. Bank the rounds; write the
-     name only once the light's own count has actually been met. */
+}
+
+/* MAIN is the one block whose SIZE depends on the light, so "done" is not a
+   yes-or-no about the block — it is a count of rounds. Storing the bare name
+   meant a Red day's single round retired Main outright: come back under Green
+   and the block holding Green's three rounds was skipped as already finished,
+   leaving a session with no main set in it at all. So the rounds are banked, and
+   the name is written only once the light's own count has actually been met.
+
+   The banking used to happen once, at the END of the main block — which is past
+   every early return in the runner. Stop a green session after a clean round one
+   and the record said `mainRoundsCompleted: 0`, so coming back made her do that
+   round again. A finished round is finished the moment it finishes; it is written
+   then, and `roundsBanked` remembers how much of `roundsCompleted` is already on
+   disk so a later flush can never pay for the same round twice. */
+function bankMainRounds() {
+  if (!ownsDayProgress()) return;
+  const gained = (sess.roundsCompleted || 0) - (sess.roundsBanked || 0);
+  if (gained <= 0) return;
+  const prog = readDayProgress();
+  prog.mainRoundsCompleted = (Number(prog.mainRoundsCompleted) || 0) + gained;
+  prog.light = sess.light;
+  sess.roundsBanked = sess.roundsCompleted;
+  saveDayProgress(sess.dayKey, prog);
+}
+
+function recordBlockDone(blockKey, ci) {
+  if (!blockKey || blockKey === "prep") return;
+  if (!ownsDayProgress()) return;
+  if (!blockHadWork(ci)) return;   // skipping everything doesn't finish a block
   if (blockKey === "main") {
-    prog.mainRoundsCompleted = (Number(prog.mainRoundsCompleted) || 0)
-      + (sess.roundsCompleted || 0);
-    if (prog.mainRoundsCompleted < roundsForLight(sess.light)) {
-      prog.light = sess.light;
-      saveDayProgress(sess.dayKey, prog);
+    bankMainRounds();              // flushes whatever the round loop has not
+    const banked = readDayProgress();
+    if ((Number(banked.mainRoundsCompleted) || 0) < roundsForLight(sess.light)) {
+      banked.light = sess.light;
+      saveDayProgress(sess.dayKey, banked);
       return;
     }
   }
+  const prog = readDayProgress();
   if (!prog.done.includes(blockKey)) prog.done.push(blockKey);
   prog.light = sess.light;
   saveDayProgress(sess.dayKey, prog);
@@ -1031,7 +1063,12 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
       }
       // "Rounds" means MAIN rounds trained. Every one-round block used to add
       // to this same counter, so the finish screen showed a green day as 8.
-      if (circuit.block === "main" && roundFullyDone(ci, r)) sess.roundsCompleted += 1;
+      if (circuit.block === "main" && roundFullyDone(ci, r)) {
+        sess.roundsCompleted += 1;
+        // Written NOW, not at the end of the block — an interrupted session must
+        // keep the rounds it actually finished. See bankMainRounds.
+        bankMainRounds();
+      }
     }
     if (blockHadWork(ci)) sess.blocksCompleted += 1;
     recordBlockDone(circuit.block, ci);

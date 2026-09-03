@@ -624,9 +624,66 @@ ok(data.LIGHT_META.green.emoji === "🟢", "unified circle light icons");
 
 /* --- readiness scoring --- */
 const scored = rvm.newReadinessFlow("monday", false);
-rvm.answerQuestion(scored, "q_pain", "yes");
 ["q_sleep", "q_light", "q_ready"].forEach(q => rvm.answerQuestion(scored, q, "yes"));
+rvm.answerQuestion(scored, "q_pain", "yes");
 ok(scored.light === "green", "all-good readiness → green");
+
+/* --- THE TWO SIGNALS ARE COMBINED, NOT SWAPPED ---------------------------
+   The body map used to overwrite the general-readiness light outright — and on
+   the sore path the readiness light was never even computed, because scoring
+   bailed unless the pain answer was "all good" and the pain question was asked
+   FIRST. So a girl who slept badly, felt tired and had no energy, with one
+   merely-tired shoulder, was handed a Yellow two-round day. Neither reading is
+   wrong; they are about different things. The session runs the smaller day. */
+ok(rvm.moreCautious("green", "red") === "red" && rvm.moreCautious("recovery", "yellow") === "recovery",
+   "the more cautious of two lights is the smaller day, whichever side it comes from");
+ok(rvm.moreCautious("yellow", null) === "yellow", "and a missing second signal decides nothing");
+ok(data.READINESS_QS[data.READINESS_QS.length - 1].id === "q_pain",
+   "the pain question is asked LAST, so the other three always get asked");
+
+const flatAndSore = rvm.newReadinessFlow("monday", false);
+["q_sleep", "q_light", "q_ready"].forEach(q => rvm.answerQuestion(flatAndSore, q, "no"));
+rvm.answerQuestion(flatAndSore, "q_pain", "no");
+ok(flatAndSore.readinessLight === "recovery",
+   "three negative answers score Recovery even on the sore path — they used to score nothing");
+ok(flatAndSore.step === "bodyArea", "and the sore answer still routes to the body map");
+rvm.setZoneSev(flatAndSore, 2, 2);
+ok(flatAndSore.bodyLight === "yellow", "a tired shoulder is Yellow on the body map's own terms");
+ok(flatAndSore.light === "recovery",
+   "but the day runs Recovery — the body map no longer overrules a flatter body");
+const flatVM = rvm.buildReadinessVM(flatAndSore, true);
+ok(/Body Check said/.test(flatVM.combinedLine) && /Quick check said/.test(flatVM.combinedLine),
+   "and the card names both readings, so Recovery over a Yellow map is not a mystery");
+
+/* The other direction is unchanged: a sore body still outranks a good night. */
+const freshButSore = rvm.newReadinessFlow("monday", false);
+["q_sleep", "q_light", "q_ready"].forEach(q => rvm.answerQuestion(freshButSore, q, "yes"));
+rvm.answerQuestion(freshButSore, "q_pain", "no");
+rvm.setZoneSev(freshButSore, 2, 3);
+ok(freshButSore.light === "red", "a good night with real pain in it is still a Red day");
+ok(rvm.buildReadinessVM(freshButSore, true).needsGrownupConfirm,
+   "and severity 3 still needs a grown-up");
+
+/* The pain gate belongs to the PAIN, not to whichever signal won the light. */
+const flatAndHurting = rvm.newReadinessFlow("monday", false);
+["q_sleep", "q_light", "q_ready"].forEach(q => rvm.answerQuestion(flatAndHurting, q, "no"));
+rvm.answerQuestion(flatAndHurting, "q_pain", "no");
+rvm.setZoneSev(flatAndHurting, 2, 3);
+ok(flatAndHurting.light === "recovery", "pain plus a flat body is Recovery, not Red");
+ok(rvm.buildReadinessVM(flatAndHurting, true).needsGrownupConfirm,
+   "and the grown-up confirm survives the readiness score taking the light past Red");
+
+/* Re-checking the body must not quietly throw the readiness answers away. */
+rvm.resetBodyCheck(flatAndHurting);
+ok(flatAndHurting.light === "recovery" && flatAndHurting.severity === null,
+   "clearing the marks clears the MARKS — a flat night is not a mark and survives");
+
+/* Nothing regresses where there is only one signal to go on. */
+const bodyOnly = rvm.newReadinessFlow("monday", false);
+rvm.answerQuestion(bodyOnly, "q_pain", "no");
+rvm.setZoneSev(bodyOnly, 2, 2);
+ok(bodyOnly.light === "yellow" && bodyOnly.readinessLight === null,
+   "with no readiness answers the body map decides alone, exactly as it always did");
 
 /* --- pain-gate: level 3 requires a grown-up confirm; level 2 does not --- */
 const r3 = rvm.newReadinessFlow("monday", false);
@@ -1267,6 +1324,8 @@ const streakRow = (doneCount, expected, extra = {}) => ({
     name: "m" + i, block: "main", round: 1, status: "done" })),
   ...extra
 });
+/* `roundsDone` is overridable because the bar must NOT be a hidden round count —
+   see the zero-round assertions below. */
 ok(outcome.STREAK_WORK_FRACTION === 0.75, "a training day needs three quarters of its plan");
 ok(store.countsForStreak(streakRow(1, 20)) === false, "one move out of twenty is not a training day");
 ok(store.countsForStreak(streakRow(14, 20)) === false, "nor is 70% of it");
@@ -1285,6 +1344,22 @@ ok(store.countsForStreak(streakRow(Math.ceil(redPlan * 0.75), redPlan)) === true
    "three quarters of a red day earns the streak");
 ok(store.countsForStreak(streakRow(Math.ceil(redPlan * 0.75), greenPlan)) === false,
    "the same amount of work against a green plan does not — the ask scales with the light");
+
+/* THE BAR IS THE DOSE, AND ONLY THE DOSE.
+   Every assertion above happens to carry `roundsDone: 1`, so none of them could
+   tell a dose rule from a dose rule with a quiet "and finish one main round"
+   stapled to it. A short Red day may not even reach the end of its single round,
+   and it still trained. State it outright, in both directions. */
+ok(store.countsForStreak(streakRow(Math.ceil(redPlan * 0.75), redPlan, { roundsDone: 0 })) === true,
+   "three quarters of a Red day earns the streak with ZERO completed main rounds");
+ok(store.countsForStreak(streakRow(Math.floor(redPlan * 0.75) - 1, redPlan, { roundsDone: 0 })) === false,
+   "and below three quarters earns nothing, rounds or no rounds");
+ok(outcome.deriveSessionOutcome({
+     ledger: streakRow(Math.ceil(redPlan * 0.75), redPlan).ledger,
+     expectedWork: redPlan, outcomeVersion: outcome.OUTCOME_VERSION,
+     sessionType: "main", roundsDone: 0
+   }).mainRoundsDone === 0,
+   "the outcome says plainly that no round was completed, and pays the day anyway");
 
 /* A safety stop still buys nothing, however much came before it. */
 ok(store.countsForStreak(streakRow(20, 20, { safetyStop: true, pain: true })) === false,
@@ -2473,6 +2548,55 @@ const partialMain = await runSession({ dayKey: "tuesday", light: "green", gateUn
 });
 ok((partialMain.circuits.find(c => c.block === "main") || {}).rounds === 2,
    "one round banked under Green leaves two owed, with the block never retired");
+
+/* --- A FINISHED MAIN ROUND SURVIVES BEING INTERRUPTED ----------------------
+   The seeded resumes above all hand the engine a progress record that ALREADY
+   says a round is banked. Nothing tested that a real session ever writes one.
+   It did not: `sess.roundsCompleted` was incremented per round, but the write to
+   day progress lived past the end of the main block's round loop — past every
+   `return finalize(false)` an interrupted session takes. So stopping a Green day
+   after a clean round one left `mainRoundsCompleted: 0`, and coming back made
+   her do that round over. The record and the streak were right the whole time;
+   only the resume threw the work away. */
+let roundsAtStop = 0;
+const stoppedMidMain = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    // Stop partway through round TWO — round one is finished, round two is not.
+    if (sess.roundsCompleted >= 1 && sess.round >= 2 && sess.running) {
+      roundsAtStop = sess.roundsCompleted;
+      engine.endEarly();
+    }
+  }
+});
+ok(roundsAtStop === 1, "the session really was stopped inside main round two");
+ok(stoppedMidMain.endedEarly === true, "and it ended early rather than running to the end");
+const bankedAfterStop = store.loadDayProgress("tuesday");
+ok(bankedAfterStop && bankedAfterStop.mainRoundsCompleted === 1,
+   "the finished round is on disk the moment it finishes — it used to read 0 here");
+ok(!(bankedAfterStop.done || []).includes("main"),
+   "and the main block is NOT retired, because Green still owes two rounds");
+const resumedAfterStop = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true,
+  seed: () => store.saveDayProgress("tuesday", bankedAfterStop)
+});
+ok((resumedAfterStop.circuits.find(c => c.block === "main") || {}).rounds === 2,
+   "so coming back asks for the two rounds still owed, not all three again");
+
+/* The banking must never pay twice. A session that runs the main block straight
+   through banks each round as it lands AND flushes at the end of the block. */
+const straightThrough = await runSession({ dayKey: "tuesday", light: "yellow", gateUnlocked: true });
+ok(straightThrough.roundsCompleted === 2 && straightThrough.roundsBanked === 2,
+   "every finished round is banked exactly once, never re-added by the block flush");
+
+/* Care still does not touch the training day's record — the guard moved into a
+   shared ownsDayProgress(), so a per-round bank must respect it too. */
+const careMidStop = await runSession({ dayKey: "monday", light: "recovery", gateUnlocked: true,
+  seed: () => store.saveDayProgress("monday",
+    { done: ["warmup"], light: "green", mainRoundsCompleted: 1 })
+});
+ok(careMidStop.roundsBanked === 0, "a care session banks no rounds against the training day");
+ok((store.loadDayProgress("monday") || {}).mainRoundsCompleted === 1,
+   "and leaves the training day's banked round exactly as it found it");
 
 /* --- 1. Recovery must not touch the training day's progress ---------------
    The reproduction: half a Monday, then a body check that says Recovery. The

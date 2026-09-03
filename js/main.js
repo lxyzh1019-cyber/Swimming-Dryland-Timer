@@ -422,8 +422,12 @@ Object.assign(RAW, {
     // Storing only the final light is what made a grown-up's override
     // indistinguishable from the body's own answer in the history.
     const suggested = r.suggestedLight || r.light || "green";
+    // Both inputs are stored, not just the one that won: a Yellow body map that
+    // lost to a Recovery readiness score is the interesting part of that morning.
     const check = { answers: r.answers, zoneSev: r.zoneSev, light: r.light,
                     suggestedLight: suggested, severity: r.severity,
+                    readinessLight: r.readinessLight || null,
+                    bodyLight: r.bodyLight || null,
                     resultSource: r.resultSource, overridden: r.light !== suggested };
     saveReadiness(check);
     // A sore or non-green morning belongs on the grown-up's other device, and it

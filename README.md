@@ -112,6 +112,33 @@ build step.
 - Workout content lives in `js/data.js` (`DAYS`). Progressive overload
   machinery is present but **paused** (`OVERLOAD_PAUSED` in `js/data.js`).
 
+## Firestore rules
+
+Everything the mirror writes lives in one collection,
+`jess_swimming_sessions`, holding three document shapes told apart by `kind`:
+session rows (no `kind`), one `journey-<athlete>` doc, and one
+`readiness-<athlete>` doc carrying the abnormal body-map checks. One collection
+was a deliberate choice — a second would have meant a second rule to get wrong.
+
+`firestore.rules` confines the app to that collection, rejects anything that is
+not one of the three shapes, caps document size, and forbids deletion outright
+so a mis-tap or a stale client can never take her history with it. It does not
+authenticate: the app has no sign-in, and the whole point of the mirror is that
+two phones in one family see the same log.
+
+Deploy it with the Firebase CLI, from the repository root:
+
+```
+npx firebase-tools deploy --only firestore:rules --project chore-tracker-a461b
+```
+
+**Cross-device saving is not verified by anything in this repository.** The test
+suite covers the local logic; it cannot reach Firestore. Rules also do nothing
+at all until they are deployed — an undeployed `firestore.rules` and no rules
+file are the same thing to the running app. After deploying, check it end to
+end: finish a session on one device, open the app on the other, and confirm the
+session and any abnormal body-map check both arrive.
+
 ## Exercise photos
 
 Photo slots are intentionally empty until real photos land in

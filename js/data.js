@@ -1161,11 +1161,20 @@ export const COACH_VOICE_ITEMS = [
 /* ------------------------------------------------------------
    READINESS CHECK (4-Q + body map) — from the Assessment prototype.
    ------------------------------------------------------------ */
+/* The pain question is LAST, and that ordering is load-bearing.
+
+   It used to be first, and answering "a bit sore" jumped straight to the body
+   map — so on a sore morning the other three were never asked, and the general
+   readiness score was never computed at all. The body map's severity then
+   produced the light on its own: three negative answers plus a merely tired
+   shoulder ran a Yellow day. Asking pain last costs no extra taps and means both
+   signals always exist, so the light can be the more cautious of the two.
+   Nothing reads this list positionally — every consumer is by `id`. */
 export const READINESS_QS = [
-  { id: "q_pain",  text: "Any aches or sore spots today?", isPain: true, yesLabel: "😊 All good", noLabel: "😣 A bit sore" },
   { id: "q_sleep", text: "How well did you sleep last night?", yesLabel: "😴 Good", noLabel: "🥱 Not great" },
   { id: "q_light", text: "How do your muscles feel from your last swim?", yesLabel: "💪 Fresh", noLabel: "😮‍💨 Tired" },
-  { id: "q_ready", text: "What's your energy like right now?", yesLabel: "⚡ Full", noLabel: "💤 Low" }
+  { id: "q_ready", text: "What's your energy like right now?", yesLabel: "⚡ Full", noLabel: "💤 Low" },
+  { id: "q_pain",  text: "Any aches or sore spots today?", isPain: true, yesLabel: "😊 All good", noLabel: "😣 A bit sore" }
 ];
 
 // Anatomically distinct front vs. back regions — only true shared joints
