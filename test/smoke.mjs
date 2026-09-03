@@ -15,6 +15,8 @@ globalThis.localStorage = (() => { const m = new Map(); return {
    device with no installed voices, and the condition that made a whole rep set
    fly past in milliseconds and get recorded as skipped. */
 globalThis.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
+const winListeners = {};
+globalThis.fireWinEvent = (type) => { (winListeners[type] || []).forEach(fn => fn({ type })); };
 globalThis.window = {
   SpeechSynthesisUtterance: globalThis.SpeechSynthesisUtterance,
   speechSynthesis: { getVoices: () => [], cancel() {}, speaking: false, pending: false, set onvoiceschanged(f) {},
@@ -23,7 +25,9 @@ globalThis.window = {
     this.createOscillator = () => ({ type: "", frequency: { value: 0 }, connect() {}, start() {}, stop() {} });
     this.createGain = () => ({ gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} });
     this.destination = {}; this.resume = () => {}; },
-  innerWidth: 1200, innerHeight: 800, addEventListener() {}, fetch: () => Promise.reject(new Error("no net"))
+  innerWidth: 1200, innerHeight: 800,
+  addEventListener(type, fn) { (winListeners[type] = winListeners[type] || []).push(fn); },
+  removeEventListener(type, fn) { const l = winListeners[type] || []; const i = l.indexOf(fn); if (i >= 0) l.splice(i, 1); }, fetch: () => Promise.reject(new Error("no net"))
 };
 /* A DOM stub real enough to import js/main.js, so the ACTION LAYER — which is
    where the Try-It arm flag and the detail-overlay pause live — can be driven
@@ -107,12 +111,28 @@ globalThis.setPasskeySupport = on => {
 globalThis.btoa = globalThis.btoa || (s => Buffer.from(s, "binary").toString("base64"));
 globalThis.atob = globalThis.atob || (s => Buffer.from(s, "base64").toString("binary"));
 
+/* The document listeners are RECORDED, not swallowed. The engine's
+   backgrounding guard hangs off `visibilitychange` / `pagehide`, and a stub
+   that dropped every registration would have let that guard be written and
+   never once executed by a test — which is exactly how the gap got here. */
+const docListeners = {};
 globalThis.document = {
+  hidden: false, visibilityState: "visible",
   getElementById: () => testRoot, createElement: () => fakeEl(),
-  addEventListener() {}, removeEventListener() {},
+  addEventListener(type, fn) { (docListeners[type] = docListeners[type] || []).push(fn); },
+  removeEventListener(type, fn) {
+    const l = docListeners[type] || [];
+    const i = l.indexOf(fn); if (i >= 0) l.splice(i, 1);
+  },
   querySelector: () => null, querySelectorAll: () => [],
   body: fakeEl(), documentElement: fakeEl()
 };
+globalThis.fireDocEvent = (type) => {
+  globalThis.document.visibilityState = globalThis.document.hidden ? "hidden" : "visible";
+  (docListeners[type] || []).forEach(fn => fn({ type }));
+};
+
+import fs from "node:fs";
 
 const base = new URL("../js/", import.meta.url).href;
 const util   = await import(base + "util.js");
@@ -3298,5 +3318,239 @@ ok(audio.SAFETY_RATE === 0.85,
 ok(audio.SPEECH_SETTLE_MS >= 350,
    "with a real beat between the instruction and the clock starting");
 store.updateSettings({ voiceStyle: "encouraging", voiceSpeed: "slow" });
+
+/* ============================================================
+   AUDIT REPAIR — 2026-09-03
+   One block per confirmed finding in the external audit. Each of
+   these failed on d7dbf77 for the reason named in its comment.
+   ============================================================ */
+
+/* --- THE RULES THIS REPAIR MUST NOT MOVE ----------------------------------
+   The audit asked for a Main round to require every row at its own full rule.
+   That is NOT the rule here, by decision: the per-row floor plus the round mean
+   is what absorbs a beat-early tap on one hold without handing a round away for
+   a move that was never really trained. Pinned here so a later pass cannot
+   quietly "fix" it back into the bug that printed "0 of 3". */
+ok(outcome.ROUND_DOSE_FRACTION === 0.8 && outcome.ROUND_ROW_FLOOR === 0.5,
+   "the round rule is a mean of 80% with a 50% per-row floor, and stays that way");
+const keptRule = outcome.mainRoundReport(
+  [1, 2, 3, 4].map(i => ({ block: "main", round: 1, name: "m" + i, status: "done",
+                           driver: "time", plannedSecs: 30, actualSecs: 30 }))
+    .concat([{ block: "main", round: 1, name: "m5", status: "partial",
+               driver: "time", plannedSecs: 30, actualSecs: 15 }]),
+  { 1: 5 }, outcome.OUTCOME_VERSION);
+ok(keptRule[0].counts === true,
+   "four clean moves and one at half dose still counts — the audit wanted this tightened; it is not");
+const flooredOut = outcome.mainRoundReport(
+  [1, 2, 3, 4].map(i => ({ block: "main", round: 1, name: "m" + i, status: "done",
+                           driver: "time", plannedSecs: 30, actualSecs: 30 }))
+    .concat([{ block: "main", round: 1, name: "m5", status: "partial",
+               driver: "time", plannedSecs: 30, actualSecs: 4 }]),
+  { 1: 5 }, outcome.OUTCOME_VERSION);
+ok(flooredOut[0].counts === false,
+   "and a move below the floor still loses the round, however good the mean");
+
+/* --- 1. THE RECORD IS WRITTEN BEFORE THE RESUME IS THROWN AWAY -------------
+   clearDayProgress(dayKey) ran on the line ABOVE finalize(true), and finalize
+   is where saveSession happens — and saveSession returns false when storage
+   refuses the write. So a full quota at the end of a long session deleted the
+   resume state and then failed to write the record that replaced it: the work
+   existed nowhere. Save first, and clear only what a successful save has
+   actually replaced. */
+let denyWrites = false;
+const realSetItem = localStorage.setItem;
+localStorage.setItem = function (k, v) {
+  if (denyWrites && String(k).includes("sessions")) { const e = new Error("QuotaExceededError"); e.name = "QuotaExceededError"; throw e; }
+  return realSetItem.call(this, k, v);
+};
+const quotaRun = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    // Refuse the session write only once the day is genuinely finished, so the
+    // failure lands exactly where the audit put it: at finalization.
+    if (sess.roundsCompleted >= 3) denyWrites = true;
+  }
+});
+ok(quotaRun.saveFailed === true, "a refused write is reported as a failed save, not a quiet success");
+ok(quotaRun.savedEntry === null, "and no record is pretended into existence");
+const survived = store.loadDayProgress("tuesday");
+denyWrites = false;
+localStorage.setItem = realSetItem;
+ok(survived && (survived.mainRoundsCompleted || 0) >= 1,
+   "the day's progress survives a failed save — it used to be deleted first, so the work existed nowhere");
+
+/* --- 3. A BLOCK IS DONE WHEN ITS ROWS ARE DONE, NOT WHEN ONE OF THEM IS ----
+   blockHadWork() was `some(status === "done")`, and recordBlockDone() then put
+   the whole block on the done list and deleted its move-by-move record. Skip
+   one warm-up move and the entire warm-up — the skipped move included — was
+   never asked for again. */
+let skippedOne = false;
+let skippedName = null;
+await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    const c = sess.circuits[sess.ci];
+    if (!skippedOne && c && c.block === "warmup" && sess.ei >= 1 &&
+        ["work", "reps"].includes(sess.phase) && sess.currentEx) {
+      skippedName = sess.currentEx.name;
+      skippedOne = true;
+      engine.skipCurrentExercise();
+      return;
+    }
+    // Stop once the warm-up is behind her: a run that reaches the end clears the
+    // day, and what this is about is what the RESUME would be handed.
+    if (skippedOne && c && c.block !== "warmup" && sess.running) engine.endEarly();
+  }
+});
+ok(skippedOne, "the run really did skip a warm-up move");
+const warmAfter = store.loadDayProgress("tuesday") || { done: [], moves: {} };
+ok(!(warmAfter.done || []).includes("warmup"),
+   "a warm-up with a skipped move is NOT retired — it used to be, skipped move and all");
+ok((warmAfter.moves && warmAfter.moves.warmup || []).length > 0,
+   "and the moves she did finish are still banked by name, so a resume does not re-ask for them");
+ok(!(warmAfter.moves.warmup || []).includes(skippedName),
+   "while the move she skipped is not among them: it comes back");
+
+/* --- 6. ONE DAY OF TRAINING HAS ONE IDENTITY ------------------------------
+   Resume was keyed on the weekday and the date, and records were told apart by
+   `isoDate|dayKey`, so a partial and the sitting that finished it were two
+   unrelated rows. Nothing could say they were the same workout. */
+const inst1 = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    if (sess.roundsCompleted >= 1 && sess.running) engine.endEarly();
+  }
+});
+ok(typeof inst1.workoutInstanceId === "string" && inst1.workoutInstanceId.length > 0,
+   "a workout gets a durable id when its plan starts");
+ok(inst1.savedEntry && inst1.savedEntry.workoutInstanceId === inst1.workoutInstanceId,
+   "and the id is on the record, not only in memory");
+const carried = store.loadDayProgress("tuesday");
+ok(carried && carried.workoutInstanceId === inst1.workoutInstanceId,
+   "day progress carries it too, which is how a resume knows what it is continuing");
+const inst2 = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true,
+  seed: () => store.saveDayProgress("tuesday", carried) });
+ok(inst2.workoutInstanceId === inst1.workoutInstanceId,
+   "so the sitting that finishes the day is the SAME workout, not a second one");
+const twoFragments = [inst1.savedEntry, inst2.savedEntry].filter(Boolean);
+ok(outcome.workoutInstances(twoFragments).length === 1,
+   "two fragments aggregate to one workout outcome — they used to count as two sessions");
+
+/* --- 5. TODAY SAYS WHAT THE OUTCOME SAYS ----------------------------------
+   vm/today.js printed "This day counts toward your streak." for ANY partial,
+   without ever asking countsForStreak. Below the 75% bar that is simply false,
+   and it is the screen the kid reads. */
+localStorage.clear(); store.migrate();
+const shortDay = {
+  isoDate: new Date().toISOString(), dayKey: util.edmontonDayKey(),
+  lightResult: "green", suggestedLight: "green", outcomeVersion: outcome.OUTCOME_VERSION,
+  xpVersion: 5, roundsDone: 0, roundsPlanned: 3, expectedWork: 10, completedFully: false,
+  durationSecs: 600, ledger: Array.from({ length: 10 }, (_, i) => ({
+    block: i < 4 ? "warmup" : "main", round: 1, name: "x" + i,
+    status: i < 4 ? "done" : "skipped", driver: "time", plannedSecs: 30,
+    actualSecs: i < 4 ? 30 : 0 }))
+};
+ok(store.outcomeOf(shortDay).countsForStreak === false,
+   "four moves out of ten is under the 75% bar, so it earns no streak day");
+store.saveSession(shortDay);
+const auditShortVm = tvm.buildTodayVM({ selectedDay: shortDay.dayKey, expanded: {}, isWide: true });
+const auditShortText = JSON.stringify(auditShortVm);
+ok(!/counts toward your streak/i.test(auditShortText),
+   "and Today does not claim it does — it used to say so for every partial");
+ok(/saved/i.test(auditShortText),
+   "it says the work was saved instead, which is the true and kinder half");
+
+localStorage.clear(); store.migrate();
+const earnedDay = { ...shortDay, ledger: Array.from({ length: 10 }, (_, i) => ({
+  block: i < 4 ? "warmup" : "main", round: 1, name: "x" + i,
+  status: i < 8 ? "done" : "skipped", driver: "time", plannedSecs: 30,
+  actualSecs: i < 8 ? 30 : 0 })) };
+ok(store.outcomeOf(earnedDay).countsForStreak === true, "eight of ten clears the bar");
+store.saveSession(earnedDay);
+ok(/counts toward your streak/i.test(JSON.stringify(tvm.buildTodayVM({ selectedDay: earnedDay.dayKey, expanded: {}, isWide: true }))),
+   "and at 75% Today does say the streak was earned — the two screens agree either way");
+
+/* --- 7. ONE DAY OF TRAINING PAYS FOR ONE DAY, ON EVERY DEVICE -------------
+   dayXpPaid is device-local by design, and the log is used as a floor under it,
+   which covers a day trained on two devices in sequence. What it does not cover
+   is two devices OFFLINE at once: each stamps a full day's award on its own
+   record, and rebuildJourneyXp then added both stamps together. 360 + 360. */
+localStorage.clear(); store.migrate();
+const sameDate = new Date().toISOString();
+const fullGreen = (suffix) => ({
+  isoDate: sameDate.replace(/\dZ$/, suffix + "Z"), dayKey: "tuesday",
+  lightResult: "green", outcomeVersion: outcome.OUTCOME_VERSION, xpVersion: 5,
+  roundsDone: 3, roundsPlanned: 3, expectedWork: 12, completedFully: true,
+  xpEarned: 360, durationSecs: 2000,
+  workoutInstanceId: "device-" + suffix,
+  ledger: Array.from({ length: 12 }, (_, i) => ({
+    block: "main", round: (i % 3) + 1, name: "m" + i, status: "done",
+    driver: "time", plannedSecs: 30, actualSecs: 30 }))
+});
+store.mergeSessions([fullGreen("1"), fullGreen("2")]);
+ok(store.loadSessions().length === 2, "two devices' records both survive the merge — neither is thrown away");
+const settled = store.rebuildJourneyXp();
+ok(settled <= 360,
+   "but the day settles at one day's pay (" + settled + "), not two — it used to rebuild to 720");
+
+/* --- 8. A BACKGROUNDED IPAD IS NOT A CHILD DOING BURPEES ------------------
+   The timer runs on wall-clock deadlines and nothing listened for the page
+   going away, so locking the iPad mid-hold and coming back a minute later
+   handed her the whole minute as work done. */
+ok(typeof engine.PAUSE_HIDDEN === "string" && engine.PAUSE_HIDDEN !== engine.PAUSE_USER,
+   "backgrounding has its own pause reason, told apart from a deliberate tap");
+let hiddenPause = null;
+await runSession({ dayKey: "tuesday", light: "red", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    if (!hiddenPause && ["work", "reps"].includes(sess.phase)) {
+      globalThis.document.hidden = true;
+      globalThis.fireDocEvent("visibilitychange");
+      hiddenPause = { paused: sess.paused, reasons: (sess.pauseReasons || []).slice() };
+      globalThis.document.hidden = false;
+      globalThis.fireDocEvent("visibilitychange");
+    }
+    if (sess.paused && sess.running) engine.resumeSession(engine.PAUSE_HIDDEN);
+  }
+});
+ok(hiddenPause && hiddenPause.paused === true,
+   "the page going away pauses the workout instead of letting the clock run on");
+ok(hiddenPause.reasons.includes(engine.PAUSE_HIDDEN),
+   "under the hidden reason, so coming back needs her to say Resume");
+
+/* --- 2. STORED TEXT IS TEXT, WHEREVER IT CAME FROM -----------------------
+   The wallet and the log render fields that arrive from the cloud mirror and
+   from restored backups. escapeHtml existed and the grown-up screen used it
+   throughout; the progress screen and the prize overlay interpolated raw. */
+localStorage.clear(); store.migrate();
+const nasty = `<img src=x onerror="window.__pwned=1">`;
+store.saveJourney({ xp: 5000, sessionXp: 5000, pendingDraws: 0,
+  prizesWon: [{ id: "p-nasty", label: nasty, icon: nasty, wonAt: Date.now(), redeemed: false }] });
+const progMarkup = pscreen.progressScreen(pvm.buildProgressVM({ progressScope: "4w", logScope: "week" }));
+ok(!progMarkup.includes("onerror="),
+   "a prize label out of the cloud renders as text on the progress screen, never as markup");
+ok(progMarkup.includes("&lt;img"), "it is escaped, not silently dropped — she still sees what is stored");
+
+/* --- 16. THE SAFETY GATE IS IN THE HANDLER, NOT ONLY IN THE MARKUP -------
+   A severity-3 body check disables the continue button until a grown-up
+   confirms. Disabling a button is a rendering decision; the invariant belongs
+   in the transition that actually starts the session. */
+ok(typeof rvm.mayStartFromReadiness === "function",
+   "there is one function that decides whether a readiness result may start a session");
+ok(rvm.mayStartFromReadiness({ severity: 3, grownupConfirmed: false }) === false,
+   "severity 3 without a grown-up cannot start a session");
+ok(rvm.mayStartFromReadiness({ severity: 3, grownupConfirmed: true }) === true,
+   "and with one it can — the override itself is untouched");
+
+/* --- 17. THE APP CAN BE INSTALLED AND OPENED WITH NO NETWORK --------------
+   "Works fully offline" rested on the browser cache after a successful online
+   load. Add to Home Screen and a fresh offline launch needs an app shell. */
+ok(fs.existsSync(new URL("../manifest.webmanifest", import.meta.url)),
+   "there is a web app manifest, so Add to Home Screen installs an app rather than a bookmark");
+ok(fs.existsSync(new URL("../sw.js", import.meta.url)),
+   "and a service worker, so a fresh launch with no network still gets the shell");
+const swSrc = fs.readFileSync(new URL("../sw.js", import.meta.url), "utf8");
+ok(/CACHE_VERSION/.test(swSrc), "the cache is versioned, so a release can retire the old one");
+ok(!/firestore|googleapis/i.test(swSrc), "and nothing from the cloud mirror is cached into a shared shell");
 
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);
