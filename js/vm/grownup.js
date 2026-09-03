@@ -10,7 +10,7 @@ import { redeemedPrizesForReview } from "../store.js";
 import { gateUnlocked, GATE_REASON } from "../gate.js";
 import { passkeySupported, hasPasskey } from "../passkey.js";
 import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal, outcomeOf,
-         sessionRounds as sessionRoundsDone, sessionRoundsPlanned,
+         sessionRounds as sessionRoundsDone, sessionRoundsPlanned, plannedRoundsAcrossDays,
          monthKeyOf, formVerdicts, latestFormVerdicts, loadReadinessLog } from "../store.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
 import { sessionEffort, effortSummary } from "../effort.js";
@@ -388,7 +388,9 @@ export function buildGrownupVM(state) {
   // "Planned" was three per session whatever the traffic light said, so every
   // yellow, red, mini and recovery day was scored against a plan it never had.
   const roundsDone = sessions.reduce((a, s) => a + sessionRoundsDone(s), 0);
-  const roundsPlanned = sessions.reduce((a, s) => a + sessionRoundsPlanned(s), 0);
+  // Each DAY's ask counted once. Summing the per-row ask scored a green day
+  // trained in two goes out of five, so finishing it read as 60% adherence.
+  const roundsPlanned = plannedRoundsAcrossDays(sessions);
   const rounds = { done: roundsDone, planned: Math.max(roundsPlanned, roundsDone), practice: 0,
     note: "Planned = the rounds each day actually asked for — green 3, yellow 2, red 1, mini 1." };
 

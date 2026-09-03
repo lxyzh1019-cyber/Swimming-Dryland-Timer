@@ -131,6 +131,23 @@ export function buildSessionVM(state) {
     : completionState;
   const roundsDone = Math.max(0, Number(liveOutcome.mainRoundsDone) || 0);
 
+  /* THE DAY'S ROUNDS, not this sitting's.
+
+     A day can be trained in two goes, and this line was the only thing on the
+     finish screen that did not know it: the numerator counted this sitting's
+     ledger and the denominator was `roundsPlanned`, the rounds this sitting had
+     LEFT to do. So a green day resumed after one banked round read "2 of 2 main
+     rounds" — beside XP, a streak and a "today counts" headline all judging the
+     full three, and with the round she trained before lunch nowhere on the
+     screen at all.
+
+     The engine now carries the head start and the day's own ask (see
+     startSession), so the line can say what every other number here is saying.
+     On a first sitting bankedRounds is 0 and dayRoundsPlanned IS roundsPlanned,
+     which is why nothing about a single-sitting day moves. */
+  const dayRoundsDone = Math.max(0, Number(sess.bankedRounds) || 0) + roundsDone;
+  const dayRoundsAsked = Math.max(0, Number(sess.dayRoundsPlanned) || 0);
+
   /* One line per main round that did not count, naming the move that cost it.
      Deliberately factual and never scolding: she is told what happened and what
      "counting" means, not that she failed. A round short of ROWS is a round she
@@ -358,12 +375,12 @@ export function buildSessionVM(state) {
        breather printed "0 of 3 main rounds" under thirty-four minutes of work.
        It is the outcome authority's number now, the same one the XP is priced
        on and the parent report will show tomorrow. */
-    roundsCompleted: roundsDone,
+    roundsCompleted: dayRoundsDone,
     // "N of M main rounds", not a count of every block plus every round added
     // into one number and labelled "rounds". A care session trains no rounds at
     // all, so it says nothing rather than "0 of 0".
     showRoundsLine: completionState !== "recovery",
-    roundsLine: `${roundsDone} of ${sess.roundsPlanned || 0} main round${(sess.roundsPlanned || 0) === 1 ? "" : "s"}`,
+    roundsLine: `${dayRoundsDone} of ${dayRoundsAsked} main round${dayRoundsAsked === 1 ? "" : "s"}`,
     /* And WHY a round did not count, in her own words, one line each. A bare
        zero next to a session she remembers finishing is the thing that sent a
        grown-up digging through an exported ledger — the app knew which move fell

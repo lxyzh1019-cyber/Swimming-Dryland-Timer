@@ -2528,9 +2528,29 @@ store.saveSession(mkRow({ roundsDone: 1, roundsPlanned: 3 }));
 const an7 = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics" }).analytics;
 ok(an7.rounds.done === 1, "rounds done is what she actually finished");
 ok(an7.rounds.planned === 3, "against what the day actually asked for");
-store.saveSession(mkRow({ mini: true, sessionType: "mini", roundsDone: 1, roundsPlanned: 3 }));
+/* On its OWN day — the plan is rolled up per real date now, so putting the mini
+   on the same date as the session above would be asking what that DATE asked
+   for (three), not what a mini asks for. */
+store.saveSession(mkRow({ mini: true, sessionType: "mini", roundsDone: 1, roundsPlanned: 3,
+  isoDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() }));
 const an8 = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics" }).analytics;
 ok(an8.rounds.planned === 4, "a mini asks for one round, not the light's three");
+
+/* And a day is asked for its rounds ONCE, however many times she sat down to
+   them. Summing the per-sitting ask scored a green day trained in two goes out
+   of five, so finishing it read back as 60% adherence. */
+localStorage.clear(); store.migrate();
+store.saveSession(mkRow({ roundsDone: 1, roundsPlanned: 3, dayRoundsPlanned: 3, bankedRounds: 0,
+  ledger: [{ name: "x", block: "main", round: 1, status: "done" }] }));
+store.saveSession(mkRow({ roundsDone: 2, roundsPlanned: 2, dayRoundsPlanned: 3, bankedRounds: 1,
+  ledger: [{ name: "y", block: "main", round: 2, status: "done" },
+           { name: "z", block: "main", round: 3, status: "done" }] }));
+const anTwoSittings = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics" }).analytics;
+ok(anTwoSittings.rounds.planned === 3,
+   "one day trained in two sittings asked for three rounds, not five");
+ok(anTwoSittings.rounds.done === 3, "and all three were finished");
+ok(anTwoSittings.roundsDonePct === 100,
+   "so a finished day reads as finished — it used to read 60%");
 
 /* ============================================================
    INTERACTION REGRESSIONS
@@ -2818,6 +2838,38 @@ ok(outcome.outcomeOf(secondRec).state === "complete",
 ok(store.countsForStreak(secondRec) === true, "and it earns the streak day it is owed");
 ok(!store.loadDayProgress("tuesday"),
    "finishing the day clears its progress record, so tomorrow starts clean");
+
+/* --- AND THE RESUME SAYS WHAT THE DAY DID, NOT WHAT IT HAD LEFT -----------
+   Everything else on that finish screen judges the day — the XP, the streak, the
+   "today counts" headline. The rounds line did not: the numerator counted this
+   sitting's ledger and the denominator was the rounds this sitting still OWED,
+   so a green day trained in two goes read "2 of 2 main rounds" with the round
+   she finished before lunch nowhere on the screen. */
+ok(secondSitting.bankedRounds === 1 && secondSitting.dayRoundsPlanned === 3,
+   "the resume knows the day's ask and its own head start");
+ok(secondSitting.roundsPlanned === 2,
+   "while still being PLANNED against what it owes, so the round is not billed twice");
+const resumedVm = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+ok(resumedVm.roundsLine === "3 of 3 main rounds",
+   "so the finish screen reports the day: " + JSON.stringify(resumedVm.roundsLine)
+   + " — it used to read 2 of 2");
+ok(secondRec.dayRoundsPlanned === 3 && secondRec.bankedRounds === 1,
+   "and the record carries both, so it reads the same tomorrow and after a restore");
+ok(store.dayRoundsPlanned(secondRec) === 3 && store.sessionRoundsPlanned(secondRec) === 2,
+   "the day's ask and the sitting's ask are separate questions with separate answers");
+ok(store.dayXpCap(secondRec) === 360,
+   "the day's XP ceiling is the DAY's — a resume alone on its date used to cap at 270");
+ok(store.sessionRounds(secondRec) === 2,
+   "while the row itself still pays only for the two rounds it trained");
+ok(store.plannedRoundsAcrossDays([firstRec, secondRec]) === 3,
+   "and the two sittings together asked for three rounds, not five");
+
+/* A first sitting is untouched by any of it: with nothing banked, the day's ask
+   and the sitting's ask are the same number. */
+ok(firstRec.dayRoundsPlanned === 3 && firstRec.bankedRounds === 0,
+   "a first sitting has no head start and carries the day's plan unchanged");
+ok(store.dayRoundsPlanned({ roundsPlanned: 2, roundsDone: 2 }) === 2,
+   "and a legacy row with no day plan falls back to its sitting's ask, exactly as it reads today");
 
 /* Prep is the one block deliberately re-run rather than banked: it is the
    movement prep for main, and skipping it would send a resume into main cold. */

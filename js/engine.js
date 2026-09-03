@@ -60,7 +60,12 @@ function blankSession() {
     // and the check runs again at the bottom of the loop, so it has to be
     // idempotent. See commitRoundIfDone.
     ledger: [], roundsCompleted: 0, roundsBanked: 0, roundsCounted: {},
-    roundsPlanned: 0, blocksCompleted: 0, expectedByRound: {},
+    // `roundsPlanned` is what THIS SITTING owes; `dayRoundsPlanned` is what the
+    // DAY asked for, and `bankedRounds` is how much of it was already trained
+    // before this sitting started. A resume needs all three — see
+    // dayRoundsPlanned in js/store.js.
+    roundsPlanned: 0, dayRoundsPlanned: 0, bankedRounds: 0,
+    blocksCompleted: 0, expectedByRound: {},
     repsCounted: 0, repsTarget: 0, repNow: 0, segmentsDone: 0, segmentsPlanned: 0,
     sideLabel: "", segmentLabel: "",
     /* Live coach state. The engine has always known all of this; it just never
@@ -1072,6 +1077,22 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     ? countExpectedWork(sess.circuits)
     : Math.max(sess.dayExpectedWork, countExpectedWork(sess.circuits));
   sess.roundsPlanned = (sess.spa || sess.recovery) ? 0 : mainOwed;
+  /* WHAT THE DAY ASKED FOR, and how much of it was already done.
+
+     `mainOwed` above is a REMAINDER, and it was the only rounds number anything
+     kept: `bankedRounds` was a local that died with this function, so by the
+     time a screen wanted to report the day, the day's own plan could not be
+     recovered. It cannot be re-read later either — bankMainRounds adds to
+     prog.mainRoundsCompleted as each round lands, and a completed run calls
+     clearDayProgress — so the value is captured here, at the one moment it is
+     still the head start rather than the running total.
+
+     That is how a green day trained in two goes came to say "2 of 2 main
+     rounds" on the finish screen, next to XP and a streak that were both
+     judging all three. The record already carries day-wide expectedWork and
+     bankedCredit for exactly this reason; rounds were the omission. */
+  sess.dayRoundsPlanned = (sess.spa || sess.recovery) ? 0 : roundsForLight(sess.light);
+  sess.bankedRounds = isCareSession() ? 0 : bankedRounds;
   // Computed here rather than at finalize, because the LIVE round check and the
   // saved record must be judged against the same expected counts. Deriving it
   // twice is how the engine and the ledger came to disagree in the first place.
@@ -1347,6 +1368,11 @@ export function finalize(completed) {
     // numbers. Storing only the planned one is what paid 150% for one day.
     roundsDone: (sess.spa || sess.recovery) ? 0 : sess.roundsCompleted,
     roundsPlanned: sess.roundsPlanned,
+    // The day's own ask, and what it had already been paid in rounds — so a
+    // resumed sitting can be reported against the day rather than against its
+    // own leftovers. See dayRoundsPlanned in js/store.js.
+    dayRoundsPlanned: (sess.spa || sess.recovery) ? 0 : sess.dayRoundsPlanned,
+    bankedRounds: (sess.spa || sess.recovery) ? 0 : (sess.bankedRounds || 0),
     blocksCompleted: sess.blocksCompleted,
     safetyStop,
     ledger: sess.ledger || [],
