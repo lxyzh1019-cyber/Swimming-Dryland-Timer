@@ -3,7 +3,7 @@
    values from the engine's `sess` view-state.
    ============================================================ */
 
-import { sess, refTime, screenRepsDetail } from "../engine.js";
+import { sess, refTime, screenRepsDetail, pausedByBackground } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork, videoSearchUrl } from "../data.js";
 import { fmtMMSS, exercisePhotoUrl } from "../util.js";
 import { loadSessions } from "../store.js";
@@ -302,6 +302,10 @@ export function buildSessionVM(state) {
     timerZone, timerZoneType, timerUrgent,
     timerProgress: sess.timerMax > 0 ? Math.max(0, sess.timerSecs / sess.timerMax) : 1,
     timerIsPaused: sess.paused, timerNotPaused: !sess.paused,
+    // Paused BY the app, because the page went away — see PAUSE_HIDDEN in
+    // js/engine.js. Worth its own line on the screen: the clock is not where
+    // she left it, and she is owed the reason.
+    pausedByBackground: pausedByBackground(),
     isResting, notResting: !isResting && !isPrompt, isBigRest,
     // Only offer the instructions when there is actually a move to describe.
     // During the lead-in there is no current exercise, so the old ⓘ button

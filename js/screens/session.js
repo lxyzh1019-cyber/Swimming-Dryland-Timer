@@ -366,6 +366,10 @@ function centerStack(vm, wide) {
 
 function controls(vm, wide) {
   return `
+  ${vm.pausedByBackground ? `
+  <div style="background:var(--sun-wash);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:8px;font-size:13px;font-weight:800;color:var(--sun-ink);line-height:1.4;text-align:center;">
+    ⏸ You left the app, so I stopped the clock. Nothing was counted while you were away — tap Resume when you're ready.
+  </div>` : ""}
   <button type="button" data-action="advance" style="width:100%;min-height:${wide ? 48 : 52}px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--mint);color:#fff;box-shadow:0 4px 0 var(--mint-deep);font-family:inherit;">${vm.doneLabel}</button>
   ${vm.notConfirmingEnd ? `
   <div style="display:flex;gap:${wide ? 14 : 8}px;">

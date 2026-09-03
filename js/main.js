@@ -526,6 +526,10 @@ Object.assign(RAW, {
     // paused herself, or left open on a video, stays paused.
     engine.resumeSession("instructions");
     engine.resumeSession("video");
+    // If the iPad also went to sleep while the card was open, that hold is hers
+    // to release too — this button says "resume my workout", and it has to mean
+    // it however many reasons are stacked behind it.
+    engine.resumeSession(engine.PAUSE_HIDDEN);
     render();
   },
   openPrizeDraw() {

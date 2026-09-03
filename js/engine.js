@@ -1644,6 +1644,50 @@ export function finalize(completed) {
    counts. */
 export const PAUSE_USER = "user";
 
+/* THE PAGE GOING AWAY IS NOT A CHILD DOING BURPEES.
+
+   Every timer in here runs on a wall-clock deadline, and nothing listened for
+   the page going away. Safari suspends a backgrounded tab and freezes a locked
+   screen, so locking the iPad thirty seconds into a forty-second hold and
+   coming back a minute later handed her the whole minute as work performed —
+   recorded done, paid for, and counted toward a round she was not there for.
+   The one thing the app must never do is credit work a child did not do.
+
+   So the workout pauses itself the moment the page is hidden, under its own
+   reason so it is told apart from a deliberate tap: coming back needs an
+   explicit Resume, which is also the only honest thing to show someone who has
+   just returned to a screen and cannot know where the clock got to. Speech is
+   cancelled with it, because a cue that resumes on return is a cue for a phase
+   that has already gone.
+
+   Registered once, at module load, and never removed: the guard has to be live
+   for every session, not only the one that installed it. When nothing is
+   running it does nothing. */
+export const PAUSE_HIDDEN = "hidden";
+
+function onPageHidden() {
+  if (!sess.running) return;
+  const hidden = typeof document !== "undefined" && document
+    ? (document.hidden === true || document.visibilityState === "hidden")
+    : true;
+  if (!hidden) return;
+  pauseSession(PAUSE_HIDDEN);
+  // A countdown or a tempo cue queued behind a suspended page comes back late
+  // and lands on the wrong exercise. Nothing spoken survives the trip.
+  cancelSpeech();
+}
+
+/* `pagehide` as well as `visibilitychange`: iOS fires pagehide for the cases
+   where a tab is frozen outright, and firing both only pauses twice, which the
+   reason set already makes a no-op. */
+if (typeof document !== "undefined" && document && document.addEventListener) {
+  document.addEventListener("visibilitychange", onPageHidden);
+  document.addEventListener("pagehide", onPageHidden);
+}
+if (typeof window !== "undefined" && window && window.addEventListener) {
+  window.addEventListener("pagehide", onPageHidden);
+}
+
 function pauseReasons() {
   if (!Array.isArray(sess.pauseReasons)) sess.pauseReasons = [];
   return sess.pauseReasons;
@@ -1680,10 +1724,31 @@ export function resumeSession(reason = PAUSE_USER) {
   notify("phase");
 }
 
-/* The Pause button. Everything else names its own reason. */
+/* The Pause button. Everything else names its own reason.
+
+   Resuming releases the BACKGROUNDING hold as well as her own, because the
+   button she comes back to is this one and there is no second control she could
+   be expected to know about. Without that, a workout the app paused for her
+   while the iPad was locked could not be restarted from the workout screen at
+   all — the reason set would still be holding it, and the app would look
+   broken to a ten-year-old who had done nothing wrong.
+
+   Overlay holds ("instructions", "video") are deliberately NOT released here:
+   their overlay is still open in front of her, and closing it is what says she
+   is done reading. */
 export function togglePause() {
-  if (sess.paused) resumeSession(PAUSE_USER);
-  else pauseSession(PAUSE_USER);
+  if (sess.paused) {
+    resumeSession(PAUSE_HIDDEN);
+    resumeSession(PAUSE_USER);
+  } else pauseSession(PAUSE_USER);
+}
+
+/* Was the workout stopped BY the app rather than by her? The screen needs to
+   say so: "you paused this" and "the iPad went to sleep, and I stopped the
+   clock so nothing was counted while you were away" are different messages,
+   and only the second explains a timer that is not where she left it. */
+export function pausedByBackground() {
+  return !!sess.paused && (sess.pauseReasons || []).includes(PAUSE_HIDDEN);
 }
 
 export function advance() {
