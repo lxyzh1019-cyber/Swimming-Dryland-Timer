@@ -127,7 +127,15 @@ function legacyHadWork(entry) {
      · every row the round was supposed to produce is there, and
      · nothing in it was SKIPPED — a move not attempted is not a short move, and
        no amount of credit elsewhere in the round buys it back, and
+     · no single move is below ROUND_ROW_FLOOR — half its dose, and
      · the round's mean credit is at least ROUND_DOSE_FRACTION.
+
+   The per-move floor is what stops a mean from laundering a move. Five moves
+   average 0.82 when four are perfect and the fifth is three seconds of a
+   thirty-second hold: over the bar on the arithmetic, and plainly not a round
+   she trained. Above the floor the mean is doing the job it should — absorbing
+   a beat-early tap here and there — and below it a move is missing in all but
+   name, which is the skip rule one step softer, not a different rule.
 
    The credit per row is `streakCredit` unchanged — 1 for a `done` row, and a
    `partial` pro-rated by its own reps or seconds. Nothing new is measured and
@@ -144,6 +152,7 @@ function legacyHadWork(entry) {
    cloud or a backup — keep the all-done reading rather than being re-scored
    underneath her, the same way partial work and the streak bar are gated above. */
 export const ROUND_DOSE_FRACTION = 0.8;
+export const ROUND_ROW_FLOOR = 0.5;
 
 export function mainRoundReport(ledger, expectedByRound = null, outcomeVersion = null) {
   const rows = (ledger || []).filter(l => l && l.block === "main");
@@ -162,8 +171,9 @@ export function mainRoundReport(ledger, expectedByRound = null, outcomeVersion =
     const skipped = rs.filter(l => l.status === "skipped");
     const credit = rs.reduce((a, l) => a + streakCredit(l, true), 0);
     const ratio = rs.length ? credit / rs.length : 0;
+    const underFloor = rs.filter(l => streakCredit(l, true) < ROUND_ROW_FLOOR);
     const counts = doseJudged
-      ? (missing === 0 && !skipped.length && ratio >= ROUND_DOSE_FRACTION)
+      ? (missing === 0 && !skipped.length && !underFloor.length && ratio >= ROUND_DOSE_FRACTION)
       : (rs.every(l => l.status === "done") && missing === 0);
     report.push({
       round: r, rows: rs.length, expected: Number.isFinite(expected) ? expected : null,

@@ -660,6 +660,13 @@ export function buildGrownupVM(state) {
     key: v, label: v[0].toUpperCase() + v.slice(1),
     style: "padding:9px 16px;border-radius:var(--radius-pill);border:2px solid " + ((settings.voiceStyle || "fun") === v ? "var(--aqua)" : "var(--hairline)") + ";background:" + ((settings.voiceStyle || "fun") === v ? "var(--aqua-wash)" : "var(--surface)") + ";color:" + ((settings.voiceStyle || "fun") === v ? "var(--aqua-ink)" : "var(--ink-soft)") + ";font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;"
   }));
+  /* Speed, not style. Two options and no slider: this is a setting a grown-up
+     changes once, and "Slow / Normal" is a decision they can make by ear. */
+  const voiceSpeedOpts = [["slow", "Slow"], ["normal", "Normal"]].map(([v, label]) => {
+    const on = (settings.voiceSpeed || "slow") === v;
+    return { key: v, label,
+      style: "padding:9px 16px;border-radius:var(--radius-pill);border:2px solid " + (on ? "var(--aqua)" : "var(--hairline)") + ";background:" + (on ? "var(--aqua-wash)" : "var(--surface)") + ";color:" + (on ? "var(--aqua-ink)" : "var(--ink-soft)") + ";font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;" };
+  });
 
   /* ---- coaching tab ---- */
   const gate = loadGate();
@@ -730,7 +737,7 @@ export function buildGrownupVM(state) {
     backupNote: state.backupNote || "", backupNoteOk: !!state.backupNoteOk,
     settingsExRest: settings.exerciseRestSeconds, settingsRndRest: settings.roundRestSeconds, settingsSecRest: settings.sectionRestSeconds,
     stepperBtn: "width:44px;height:44px;border-radius:50%;background:var(--surface-2);border:2px solid var(--hairline);font-size:22px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;",
-    voiceStyleOpts,
+    voiceStyleOpts, voiceSpeedOpts,
     // Three switches, not one. The old single 🎧 toggle silenced the timer
     // beeps and the safety cues along with the coach's chatter.
     coachVoiceOn: settings.coachSpeechOn !== false,

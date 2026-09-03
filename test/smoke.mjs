@@ -3030,4 +3030,221 @@ engine.togglePause();
 ok(engine.sess.paused === false, "and only she can lift it");
 engine.exitSession();
 
+/* ============================================================
+   "0 OF 3 MAIN ROUNDS" AFTER THREE ROUNDS OF WORK
+
+   The reported bug: a Thursday Green session, thirty-four minutes, all three
+   main rounds trained, recorded as `0 of 3 main rounds · +90 XP` — the show-up
+   credit alone. Three separate faults had to line up, and each one gets its own
+   assertions here.
+   ============================================================ */
+
+/* --- 1. the Thursday green day, straight through -------------------------- */
+const thuMain = engine.assembleCircuits("thursday", "green")
+  .find(c => c.block === "main");
+const thuPerRound = thuMain.exercises.length;
+ok(thuPerRound === 5 && thuMain.rounds === 3,
+   "Thursday Green's main block is 5 moves × 3 rounds (" + thuPerRound + "×" + thuMain.rounds + ")");
+
+const thuLedger = [];
+for (let r = 1; r <= 3; r++) {
+  thuMain.exercises.forEach((ex, i) => thuLedger.push({
+    name: ex.name, block: "main", round: r, ci: 0, ei: i, status: "done",
+    driver: "time", plannedSecs: 30, actualSecs: 30 }));
+}
+const thuExpected = { 1: thuPerRound, 2: thuPerRound, 3: thuPerRound };
+const thuRow = {
+  app: "swimming", dayKey: "thursday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION,
+  sessionType: "main", roundsPlanned: 3, completedFully: true,
+  expectedWork: thuLedger.length, expectedByRound: thuExpected, ledger: thuLedger
+};
+ok(outcome.outcomeOf({ ...thuRow, roundsDone: 3 }).mainRoundsDone === 3,
+   "fifteen finished main rows are three finished main rounds");
+ok(store.xpForSession({ ...thuRow, roundsDone: 3 }) === 360,
+   "and a full Thursday Green pays 360 XP");
+
+/* THE FAULT ITSELF: the same fifteen rows, with the engine's counter stuck at
+   zero because the round was committed after a rest she never sat through. The
+   reading used to be Math.min(ledger, engine) — so zero won, the screen printed
+   "0 of 3" and the day was priced at the 90 XP show-up credit. */
+ok(outcome.outcomeOf({ ...thuRow, roundsDone: 0 }).mainRoundsDone === 3,
+   "a stuck engine counter cannot erase rounds the rows can prove");
+ok(store.xpForSession({ ...thuRow, roundsDone: 0 }) === 360,
+   "and the day is paid on the rows too — it used to pay 90, the show-up credit");
+ok(outcome.outcomeOf({ ...thuRow, roundsDone: 0 }).roundsDisagree === true,
+   "the disagreement is still reported, because now it means a real defect");
+
+/* --- 2. the round is banked before the rest, not after -------------------- */
+/* Stop during the round rest that follows main round one. The round is finished
+   and its rows are on the ledger; the old code incremented the counter at the
+   BOTTOM of the round loop, so this abort path returned into finalize() first
+   and threw the round away. */
+let stoppedInRoundRest = false;
+const stopInRest = await runSession({ dayKey: "thursday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    if (sess.phase === "intent") { engine.advance(); return; }
+    if (sess.phase === "roundRest" && sess.round === 1 && sess.running) {
+      stoppedInRoundRest = true;
+      engine.endEarly();
+    }
+  }
+});
+ok(stoppedInRoundRest, "the session really was stopped during the round-one rest");
+ok(stopInRest.roundsCompleted === 1,
+   "the round she finished is counted before the rest she quit in — it used to read 0");
+const restRow = store.loadSessions()[0];
+ok(restRow.roundsDone === 1, "and the saved record says one round, not zero");
+ok(store.sessionXp(restRow) === 180, "so it pays for the round she trained (180), not 90");
+ok((store.loadDayProgress("thursday") || {}).mainRoundsCompleted === 1,
+   "and the round is banked to the day, so coming back asks for two");
+
+/* --- 3. a round is judged on its DOSE, by the engine's own 80% floor ------ */
+const doseRound = (mk) => {
+  const rows = [0, 1, 2, 3, 4].map(i => ({
+    name: "m" + i, block: "main", round: 1, status: "done",
+    driver: "time", plannedSecs: 30, actualSecs: 30 }));
+  return mk(rows);
+};
+const roundsOf = (rows, expected = { 1: 5 }) =>
+  outcome.mainRoundsFromLedger(rows, expected, outcome.OUTCOME_VERSION);
+
+ok(outcome.ROUND_DOSE_FRACTION === 0.8,
+   "a round is held to the same 80% floor a single timed move is");
+ok(roundsOf(doseRound(rows => rows)) === 1, "five finished moves is a finished round");
+ok(roundsOf(doseRound(rows => rows.map((l, i) => i === 0
+     ? { ...l, status: "partial", actualSecs: 23 } : l))) === 1,
+   "one move at 77% still leaves the round above the bar — this is the tap-Done-early case");
+ok(roundsOf(doseRound(rows => rows.map((l, i) => i === 0
+     ? { ...l, status: "partial", actualSecs: 3 } : l))) === 0,
+   "but a move barely attempted voids it — four perfect moves average that away otherwise");
+ok(outcome.ROUND_ROW_FLOOR === 0.5, "no single move may be under half its dose");
+ok(roundsOf(doseRound(rows => rows.map((l, i) => i === 0
+     ? { ...l, status: "partial", actualSecs: 15 } : l))) === 1,
+   "exactly half is the floor, and clears it");
+ok(roundsOf(doseRound(rows => rows.map((l, i) => i === 0
+     ? { ...l, status: "partial", actualSecs: 14 } : l))) === 0,
+   "a second under it does not, however good the rest of the round was");
+ok(roundsOf(doseRound(rows => rows.map(l =>
+     ({ ...l, status: "partial", actualSecs: 24 })))) === 1,
+   "every move at exactly 80% is a round at exactly 80%, which counts");
+ok(roundsOf(doseRound(rows => rows.map(l =>
+     ({ ...l, status: "partial", actualSecs: 23 })))) === 0,
+   "and every move a second under it is not");
+ok(roundsOf(doseRound(rows => rows.map((l, i) => i === 0
+     ? { ...l, status: "skipped", actualSecs: 0 } : l))) === 0,
+   "a SKIPPED move voids the round however good the other four were");
+ok(roundsOf(doseRound(rows => rows.slice(0, 4))) === 0,
+   "and a round short of a row is a round she did not reach");
+
+/* The rule is looser than the one it replaces, so it must not reach backwards
+   into records written under the old one. */
+ok(outcome.mainRoundsFromLedger(doseRound(rows => rows.map((l, i) => i === 0
+     ? { ...l, status: "partial", actualSecs: 23 } : l)), { 1: 5 }, 2) === 0,
+   "a pre-v3 record keeps the all-done reading and is not re-scored underneath her");
+
+/* --- 4. it says WHICH move cost her the round ----------------------------- */
+const shortReport = outcome.mainRoundReport(
+  doseRound(rows => rows.map((l, i) => i === 2
+    ? { ...l, name: "Single-Leg Balance Reach", status: "partial", actualSecs: 3 } : l)),
+  { 1: 5 }, outcome.OUTCOME_VERSION);
+ok(shortReport.length === 1 && shortReport[0].counts === false, "the short round is reported as short");
+ok(shortReport[0].blockedBy && shortReport[0].blockedBy.name === "Single-Leg Balance Reach",
+   "and names the move that cost it, instead of leaving a bare 0 of 3 to be guessed at");
+ok(shortReport[0].blockedBy.got === 3 && shortReport[0].blockedBy.planned === 30,
+   "with the numbers she can act on");
+
+/* And the finish screen SAYS it, which is the whole point — the bare "0 of 3"
+   next to thirty-four minutes is what sent a grown-up digging through an
+   exported ledger for an answer the app already had. */
+let shortMove = null;
+await runSession({ dayKey: "thursday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    if (sess.phase === "intent") { engine.advance(); return; }
+    // Tap "Done — Next" four seconds into a thirty-second hold in round two —
+    // the exact gesture behind the report. It is NOT a skip: the row is real
+    // work, recorded as partial, and it is round two alone that it costs.
+    if (!shortMove && sess.phase === "work" && sess.round === 2
+        && sess.currentEx && (sess.currentEx.block === "main") && sess.exElapsed >= 4) {
+      shortMove = sess.currentEx.name;
+      engine.advance();
+    }
+  }
+});
+const shortVm = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+ok(shortMove, "a main move in round two really was cut short (" + shortMove + ")");
+ok(shortVm.roundsLine === "2 of 3 main rounds",
+   "the other two rounds still count — one short move costs its own round, not the session");
+ok(shortVm.roundShortNotes.length === 1 && /^Round 2 didn't count/.test(shortVm.roundShortNotes[0]),
+   "and the screen names the round: " + JSON.stringify(shortVm.roundShortNotes));
+ok(shortVm.roundShortNotes[0].includes(shortMove),
+   "and the move inside it, so she is told what happened instead of shown a bare number");
+ok(sscreen.sessionScreen(shortVm).includes(shortVm.roundShortNotes[0]),
+   "and the note is actually rendered onto the finish screen");
+
+/* --- 5. the Clean/Wobbly spot check changes nothing ----------------------- */
+/* It is offered on a couple of moves per session by design, and a grown-up
+   reasonably wondered whether not seeing it — or dismissing it — was what cost
+   the rounds. It is not, and this says so in both directions. */
+const answered = await runSession({ dayKey: "thursday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") engine.pickClean();
+    if (sess.phase === "intent") engine.advance();
+  }
+});
+const dismissed = await runSession({ dayKey: "thursday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") engine.advance();   // dismissed, not answered
+    if (sess.phase === "intent") engine.advance();
+  }
+});
+ok(answered.roundsCompleted === 3, "answering every form check finishes three rounds");
+ok(dismissed.roundsCompleted === 3,
+   "and dismissing every single one finishes the same three — the check never gated a round");
+ok(store.sessionXp(store.loadSessions()[0]) === 360,
+   "the dismissed run is paid identically");
+
+/* --- 6. a rep is counted once it has been performed ----------------------- */
+/* `repsCounted` grades the move and pro-rates a partial one, and it used to be
+   incremented at the top of the rep — so it really counted reps STARTED, and
+   stopping during the last one credited it in full. */
+let repsAtStop = null, repTargetAtStop = null;
+await runSession({ dayKey: "thursday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    if (sess.phase === "intent") { engine.advance(); return; }
+    if (repsAtStop === null && sess.phase === "reps" && sess.repNow >= 3 && sess.running) {
+      repsAtStop = sess.repsCounted;
+      repTargetAtStop = sess.repNow;
+      engine.endEarly();
+    }
+  }
+});
+ok(repTargetAtStop !== null, "the session really was stopped inside a rep");
+ok(repsAtStop === repTargetAtStop - 1,
+   "the rep she was interrupted in the middle of is not counted (" + repsAtStop
+   + " counted, stopped inside rep " + repTargetAtStop + ") — it used to be");
+
+/* --- 7. the coach can actually be slowed down ----------------------------- */
+ok(store.DEFAULT_SETTINGS.voiceSpeed === "slow",
+   "the coach ships slow, because the app is built for a ten-year-old");
+ok(audio.VOICE_SPEED.slow === 0.82 && audio.VOICE_SPEED.normal === 0.95,
+   "speed is two named rates, not a number buried in a personality");
+store.updateSettings({ voiceSpeed: "slow", voiceStyle: "encouraging" });
+const slowRate = audio.coachRate();
+store.updateSettings({ voiceSpeed: "normal" });
+const normalRate = audio.coachRate();
+ok(slowRate < normalRate, "slow is genuinely slower than normal (" + slowRate + " vs " + normalRate + ")");
+ok(Math.abs(slowRate - 0.82 * 0.94) < 1e-9,
+   "speed and style compose — Encouraging used to come out at 0.99, i.e. normal speed");
+store.updateSettings({ voiceStyle: "fun", voiceSpeed: "slow" });
+ok(audio.coachRate() < 1, "even the loud persona is under normal speed when speed is set to slow");
+ok(audio.SAFETY_RATE === 0.85,
+   "and a safety line is slower still, whatever the persona and whatever the speed");
+ok(audio.SPEECH_SETTLE_MS >= 350,
+   "with a real beat between the instruction and the clock starting");
+store.updateSettings({ voiceStyle: "encouraging", voiceSpeed: "slow" });
+
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

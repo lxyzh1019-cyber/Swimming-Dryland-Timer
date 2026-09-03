@@ -171,6 +171,11 @@ export const DEFAULT_SETTINGS = {
   // Default to effort/process praise (Dweck-aligned) rather than trait hype;
   // the louder "fun" persona stays available as an opt-in in Grown-up settings.
   voiceStyle: "encouraging",
+  /* How fast the coach talks, chosen separately from how she sounds — see
+     VOICE_SPEED in js/audio.js. Slow by default: speed used to be baked into
+     the personality, so the app had no genuinely slow voice to offer a child
+     who needed one. A grown-up can set it to Normal in Coaching settings. */
+  voiceSpeed: "slow",
   exerciseRestSeconds: 5,
   roundRestSeconds: 25,
   sectionRestSeconds: 30,   // NEW (block break; old app hardcoded 8s)

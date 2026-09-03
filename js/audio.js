@@ -57,7 +57,21 @@ if (speech) {
 }
 
 const VOICE_PITCH = 1.0;
-const VOICE_RATE  = 1.05;
+
+/* SPEED IS A SEPARATE SETTING FROM STYLE.
+
+   It was not, and the result was that the app had no slow voice at all. Speed
+   lived inside the personality: a flat 1.05 base times a persona multiplier, so
+   "Encouraging" — the one a grown-up picks when a child is struggling to keep
+   up — came out at 1.05 × 0.94 ≈ 0.99, which is to say normal speed with a
+   softer pitch. There was nothing to turn down, and nothing that said so.
+
+   So style now chooses how the coach SOUNDS and speed chooses how fast she
+   talks, and the two compose. Slow is the default: the app is built for a
+   ten-year-old hearing an exercise name for the first time, and a cue she has
+   to replay in her head is a cue that arrived too fast. */
+export const VOICE_SPEED = { slow: 0.82, normal: 0.95 };
+
 const VOICE_PERSONA = {
   classic:     { rate: 1.00, pitch: 1.00 },
   fun:         { rate: 1.12, pitch: 1.15 },
@@ -73,11 +87,21 @@ function applyPronunciationMap(msg) {
   return out;
 }
 
+/* The rate every coach line is spoken at. The one place speed and style meet,
+   and the one place a voice rate is decided — clamped, because the two settings
+   multiply and a browser handed a rate outside its supported range is free to
+   ignore it entirely and speak at 1.0. */
+export function coachRate() {
+  const speed = VOICE_SPEED[settings.voiceSpeed] || VOICE_SPEED.slow;
+  const p = VOICE_PERSONA[settings.voiceStyle || "classic"] || VOICE_PERSONA.classic;
+  return Math.min(1.3, Math.max(0.6, speed * p.rate));
+}
+
 function createCoachUtterance(msg) {
   const u = new SpeechSynthesisUtterance(applyPronunciationMap(msg));
   const style = settings.voiceStyle || "classic";
   const p = VOICE_PERSONA[style] || VOICE_PERSONA.classic;
-  u.rate  = VOICE_RATE  * p.rate;
+  u.rate  = coachRate();
   u.pitch = VOICE_PITCH * p.pitch;
   if (_coachVoice) u.voice = _coachVoice;
   return u;
@@ -99,6 +123,8 @@ export function interruptSpeech(msg) {
   speak(msg);
 }
 
+export const SAFETY_RATE = 0.85;
+
 /* A safety line — "Session stopped", a pain check, a form warning. It is spoken
    whenever the safety voice is on, independently of the coach's voice and of
    quiet mode. Muting the chatter must never mute this. */
@@ -106,7 +132,10 @@ export function speakSafety(msg) {
   if (!safetySpeechOn() || !msg) return;
   speech.cancel();
   const u = createCoachUtterance(String(msg));
-  u.rate = 0.95; u.pitch = 1;      // level and clear, whatever persona is set
+  // Level, clear and SLOW, whatever the persona and whatever speed is set. This
+  // is the one line she has to take in while something has already gone wrong,
+  // so it is the one line that does not track a preference.
+  u.rate = SAFETY_RATE; u.pitch = 1;
   speech.speak(u);
 }
 
@@ -117,6 +146,8 @@ export function cancelSpeech() {
 export function speechActive() {
   return !!(speech && (speech.speaking || speech.pending));
 }
+
+export const SPEECH_SETTLE_MS = 400;
 
 // Speak and WAIT for the utterance to finish before proceeding — the timer
 // never starts until the voice cue completes. Resolves immediately when the
@@ -136,11 +167,17 @@ export function speakAndWait(msg) {
       settled = true;
       clearTimeout(startFailsafe);
       if (failsafe) clearTimeout(failsafe);
-      setTimeout(resolve, 200);
+      // A beat between the instruction and the countdown starting. 200ms ran the
+      // cue straight into "three, two, one" with nothing between them; this is
+      // the pause a coach leaves for the words to land before the clock does.
+      setTimeout(resolve, SPEECH_SETTLE_MS);
     }
     u.onstart = () => {
       clearTimeout(startFailsafe);
-      failsafe = setTimeout(done, Math.max(msg.length * 100, 3000));
+      // Scaled by the rate: the failsafe is an estimate of how long the line
+      // takes to say, and a slow voice takes proportionally longer. Left fixed,
+      // it cut off exactly the long instructions slow speed exists to help with.
+      failsafe = setTimeout(done, Math.max(msg.length * 100, 3000) / coachRate());
     };
     u.onend = done;
     u.onerror = done;

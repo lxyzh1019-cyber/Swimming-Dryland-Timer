@@ -248,7 +248,7 @@ const snapshot = () => JSON.stringify({
 /* Arguments that would really change something, so "nothing happened" means the
    guard stopped it rather than the argument being inert. */
 const ARG = {
-  setVoiceStyle: "fun", bumpRest: "exerciseRestSeconds|5|3|120",
+  setVoiceStyle: "fun", setVoiceSpeed: "normal", bumpRest: "exerciseRestSeconds|5|3|120",
   setLadderRung: "Box Jump|3", formCheckPass: "Dead Bug", formCheckFail: "Dead Bug",
   pickEngagement: "yes", restorePrize: "some-id", removePrizePoolItem: "0",
   pickAthlete: "someone-else", renameAthlete: "Hacked", nav: "grownup",

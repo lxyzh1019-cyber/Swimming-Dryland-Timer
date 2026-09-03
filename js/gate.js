@@ -100,6 +100,7 @@ export const GATE_REASON = {
   toggleCoachVoice: "change the coaching settings",
   toggleTimerSounds: "change the coaching settings",
   setVoiceStyle:  "change the coach's voice",
+  setVoiceSpeed:  "change how fast the coach talks",
   bumpRest:       "change how long her rests are",
   pickAthlete:    "switch to a different athlete",
   addAthlete:     "add a new athlete to this device",

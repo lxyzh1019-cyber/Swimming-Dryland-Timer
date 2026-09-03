@@ -61,7 +61,7 @@ function blankSession() {
     // idempotent. See commitRoundIfDone.
     ledger: [], roundsCompleted: 0, roundsBanked: 0, roundsCounted: {},
     roundsPlanned: 0, blocksCompleted: 0, expectedByRound: {},
-    repsCounted: 0, repsTarget: 0, segmentsDone: 0, segmentsPlanned: 0,
+    repsCounted: 0, repsTarget: 0, repNow: 0, segmentsDone: 0, segmentsPlanned: 0,
     sideLabel: "", segmentLabel: "",
     /* Live coach state. The engine has always known all of this; it just never
        said it out loud anywhere she could see. Speech may announce it, but the
@@ -417,10 +417,24 @@ function repSleep(ms, stopped) {
 
 /* One rep, spoken and beeped. Tempo reps get their phase words ("Up / Hold /
    Down"); plain reps get the number. Counting continues with the voice off —
-   the beeps and the clock still have to be right. */
+   the beeps and the clock still have to be right.
+
+   A REP IS COUNTED WHEN IT HAS BEEN PERFORMED, not when it is called. The count
+   used to be incremented at the top, so the number was really "reps started":
+   stop during the eighth of eight and the ledger recorded eight, which is a rep
+   she was interrupted in the middle of, credited in full. `repsCounted` is what
+   grades the move (repsCounted >= repsTarget is `done`) and what pro-rates a
+   partial one, so an over-count paid for work that did not happen.
+
+   `sess.repNow` is the rep she is IN, which is what the screen wants; the two
+   were the same field and could not both be right. */
 async function runOneRep(ex, p, n, stopped) {
-  sess.repsCounted += 1;
+  sess.repNow = n;
   notify("tick");
+  const counted = (r) => {
+    if (r !== "interrupt") { sess.repsCounted += 1; notify("tick"); }
+    return r;
+  };
   if (!p.tempo) {
     // Pace on the CLOCK, with speech layered on top — never on how long the
     // voice happens to take. A device with no installed voices (or speech
@@ -432,8 +446,8 @@ async function runOneRep(ex, p, n, stopped) {
     else beep(660, 0.08);
     const target = Math.max(1, settings.secondsPerRep || 3) * 1000;
     const left = target - (Date.now() - started);
-    if (left > 0) return repSleep(left, stopped);
-    return stopped() ? "interrupt" : "done";
+    if (left > 0) return counted(await repSleep(left, stopped));
+    return counted(stopped() ? "interrupt" : "done");
   }
   const words = ex.tempoWords || ["Up", "Hold", "Down"];
   const freqs = [660, 880, 440];
@@ -450,7 +464,7 @@ async function runOneRep(ex, p, n, stopped) {
       if (s < secs - 1) beep(freqs[i], 0.06);
     }
   }
-  return "done";
+  return counted("done");
 }
 
 /* The reset between two segments. Done here means "skip the wait", not "end
@@ -480,6 +494,7 @@ async function runPrescribedReps(ex) {
   const segments = prescriptionSegments(p);
   sess.repsTarget = p.totalReps;
   sess.repsCounted = 0;
+  sess.repNow = 0;
   sess.segmentsPlanned = segments.length;
   sess.segmentsDone = 0;
   sess.segmentLabel = "";
@@ -686,7 +701,7 @@ function recordExercise(ex, circuit, ci, ei, r, wasSkipped) {
     at: Date.now()
   };
   sess.ledger.push(row);
-  sess.repsCounted = 0; sess.repsTarget = 0;
+  sess.repsCounted = 0; sess.repsTarget = 0; sess.repNow = 0;
   sess.segmentsDone = 0; sess.segmentsPlanned = 0;
   return row;
 }
