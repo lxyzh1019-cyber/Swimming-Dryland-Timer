@@ -606,6 +606,13 @@ function settingsTab(vm) {
         ${vm.voiceStyleOpts.map(vs => `<button type="button" data-action="setVoiceStyle" data-arg="${vs.key}" style="${vs.style}">${vs.label}</button>`).join("")}
       </div>
     </div>
+    <div>
+      <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Voice speed</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${vm.voiceSpeedOpts.map(vs => `<button type="button" data-action="setVoiceSpeed" data-arg="${vs.key}" style="${vs.style}">${vs.label}</button>`).join("")}
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">How fast the coach talks, separate from how she sounds. Slow gives her time to hear the move before the timer starts.</div>
+    </div>
     ${[["Rest between exercises", "exerciseRestSeconds", vm.settingsExRest, 1, 3, 15],
        ["Rest between rounds", "roundRestSeconds", vm.settingsRndRest, 5, 10, 90],
        ["Rest between sections", "sectionRestSeconds", vm.settingsSecRest, 5, 10, 90]].map(([label, key, val, step, min, max]) => `

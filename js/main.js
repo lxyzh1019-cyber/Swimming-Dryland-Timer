@@ -691,6 +691,7 @@ Object.assign(RAW, {
   formCheckPass(arg) { recordFormVerdict(arg, true, state.formCheckMonth); render(); },
   formCheckFail(arg) { recordFormVerdict(arg, false, state.formCheckMonth); render(); },
   setVoiceStyle(arg) { updateSettings({ voiceStyle: arg }); render(); },
+  setVoiceSpeed(arg) { updateSettings({ voiceSpeed: arg }); render(); },
   bumpRest(arg) {
     const [key, step, min, max] = arg.split("|");
     const next = Math.min(Number(max), Math.max(Number(min), (settings[key] || 0) + Number(step)));

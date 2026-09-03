@@ -1207,11 +1207,18 @@ ok(st(40, 0) === "done", "an exercise with no planned time is judged only on sho
    That paid 540 for a 360-day plan. */
 localStorage.clear();
 store.migrate();
+/* The ledger has to SHOW the rounds the row claims: XP is priced off the rows
+   now, not off `roundsDone`, precisely so a counter written at the wrong moment
+   cannot pay a full session the show-up credit alone. */
+const mainRound = (r, n = 2) => Array.from({ length: n }, (_, i) => ({
+  name: "m" + r + "-" + i, block: "main", round: r, status: "done" }));
 const partial = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
   xpVersion: store.XP_VERSION, roundsDone: 1, roundsPlanned: 3, sessionType: "main",
-  completedFully: false, endedEarly: true, ledger: [{ name: "x", status: "done" }] };
+  outcomeVersion: store.OUTCOME_VERSION,
+  completedFully: false, endedEarly: true, ledger: mainRound(1) };
 const firstPay = store.claimSessionXp(partial);
-const resumed = { ...partial, roundsDone: 2, completedFully: true, endedEarly: false };
+const resumed = { ...partial, roundsDone: 2, completedFully: true, endedEarly: false,
+  ledger: [...mainRound(1), ...mainRound(2)] };
 const secondPay = store.claimSessionXp(resumed);
 ok(firstPay === 180, "the partial pays for the one round it finished");
 ok(firstPay + secondPay === 360, "and the resume tops it up to exactly one full day, never 540");
@@ -1228,7 +1235,9 @@ const oneDate = new Date().toISOString();
 const mondayCard = { app: "swimming", dayKey: "monday", isoDate: oneDate,
   xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main",
   roundsDone: 3, roundsPlanned: 3, completedFully: true,
-  ledger: [{ name: "x", block: "main", round: 1, status: "done" }] };
+  // Three rounds' worth of rows, because three rounds is what this card claims
+  // and the rows are what it is now priced on.
+  ledger: [...mainRound(1), ...mainRound(2), ...mainRound(3)] };
 const tuesdayCard = { ...mondayCard, dayKey: "tuesday" };
 const mondayPay = store.claimSessionXp(mondayCard);
 const tuesdayPay = store.claimSessionXp(tuesdayCard);
@@ -1256,7 +1265,8 @@ ok(recPay + trainedAfter === 360,
 localStorage.clear();
 store.migrate();
 const bigFirst = store.claimSessionXp(mondayCard);
-const smallAfter = store.claimSessionXp({ ...mondayCard, dayKey: "wednesday", roundsDone: 1 });
+const smallAfter = store.claimSessionXp({ ...mondayCard, dayKey: "wednesday",
+  roundsDone: 1, ledger: mainRound(1) });
 ok(bigFirst + smallAfter === 360, "a lighter card after a full one adds nothing");
 
 /* The cap has to survive a REBUILD. XP is derived from the log on every boot
@@ -1273,7 +1283,7 @@ const spentDay = await runSession({ dayKey: "monday", light: "red", gateUnlocked
     isoDate: new Date().toISOString(), xpVersion: store.XP_VERSION,
     outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main",
     roundsDone: 3, roundsPlanned: 3, completedFully: true,
-    ledger: [{ name: "x", block: "main", round: 1, status: "done" }] })
+    ledger: [...mainRound(1), ...mainRound(2), ...mainRound(3)] })
 });
 ok(spentDay.xpEarned === 0, "a session run after the day's budget is spent is granted nothing");
 const spentRow = store.loadSessions().find(x => x.dayKey === "monday");
@@ -1361,12 +1371,27 @@ ok(store.countsForStreak(streakRow(Math.ceil(redPlan * 0.75), redPlan, { roundsD
    "three quarters of a Red day earns the streak with ZERO completed main rounds");
 ok(store.countsForStreak(streakRow(Math.floor(redPlan * 0.75) - 1, redPlan, { roundsDone: 0 })) === false,
    "and below three quarters earns nothing, rounds or no rounds");
-ok(outcome.deriveSessionOutcome({
-     ledger: streakRow(Math.ceil(redPlan * 0.75), redPlan).ledger,
-     expectedWork: redPlan, outcomeVersion: outcome.OUTCOME_VERSION,
-     sessionType: "main", roundsDone: 0
-   }).mainRoundsDone === 0,
+/* The round count and the streak are independent readings of the same rows, and
+   this says so from the other side: a short day that never finished a round
+   still earns the streak on dose alone.
+
+   It used to be asserted with a ledger whose rows DID prove a round, and a
+   `roundsDone: 0` that min() let override them — so it passed by way of the very
+   bug that reported "0 of 3 main rounds" after three rounds of work. The rows
+   are what is short now, which is what the case was always about. */
+const shortOfARound = streakRow(Math.ceil(redPlan * 0.75), redPlan).ledger;
+const shortRoundOutcome = outcome.deriveSessionOutcome({
+  ledger: shortOfARound, expectedWork: redPlan,
+  // The round asked for the whole plan and got three quarters of it: rows are
+  // MISSING, which is what "she did not finish the round" actually looks like.
+  expectedByRound: { 1: redPlan },
+  outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main", roundsDone: 0
+});
+ok(shortRoundOutcome.mainRoundsDone === 0,
    "the outcome says plainly that no round was completed, and pays the day anyway");
+ok(store.countsForStreak(streakRow(Math.ceil(redPlan * 0.75), redPlan,
+     { ledger: shortOfARound, roundsDone: 0 })) === true,
+   "the dose earns the streak with no completed round behind it");
 
 /* --- THE BAR IS THE DAY'S, NOT THE SITTING'S ------------------------------
    A day can be trained in two goes, and the second used to be judged against
@@ -1854,7 +1879,8 @@ const row = (o) => ({ app: "swimming", dayKey: "monday", dayTitle: "Mon", xpVers
   sessionType: "main", lightResult: "green", ...o });
 /* a real session, a GO-and-quit on the SAME day, a try-it row and a safety stop */
 store.saveSession(row({ isoDate: iso(1), durationSecs: 1500, completedFully: true, roundsDone: 3,
-  roundsPlanned: 3, ledger: [{ name: "a", status: "done" }], mood: "great", xpEarned: 360 }));
+  roundsPlanned: 3, ledger: [...mainRound(1), ...mainRound(2), ...mainRound(3)],
+  mood: "great", xpEarned: 360 }));
 store.saveSession(row({ isoDate: iso(1), durationSecs: 20, completedFully: true, roundsDone: 0,
   roundsPlanned: 3, ledger: [{ name: "a", status: "skipped" }], xpEarned: 0 }));
 store.saveSession(row({ isoDate: iso(2), durationSecs: 400, practice: true, sessionType: "try-it" }));
@@ -1862,7 +1888,8 @@ store.saveSession(row({ isoDate: iso(3), durationSecs: 300, safetyStop: true, pa
   endedEarly: true, completedFully: false, ledger: [{ name: "a", status: "done" }] }));
 /* a real session she never told the app how she felt about */
 store.saveSession(row({ isoDate: iso(4), durationSecs: 1200, completedFully: true, roundsDone: 2,
-  roundsPlanned: 2, lightResult: "yellow", ledger: [{ name: "a", status: "done" }], xpEarned: 270 }));
+  roundsPlanned: 2, lightResult: "yellow",
+  ledger: [...mainRound(1), ...mainRound(2)], xpEarned: 270 }));
 
 const pv0 = pvm.buildProgressVM({ progressScope: "4w", logScope: "month" });
 const zeroMin = pvm.logEntryView(store.loadSessions()[1]);
@@ -2501,9 +2528,29 @@ store.saveSession(mkRow({ roundsDone: 1, roundsPlanned: 3 }));
 const an7 = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics" }).analytics;
 ok(an7.rounds.done === 1, "rounds done is what she actually finished");
 ok(an7.rounds.planned === 3, "against what the day actually asked for");
-store.saveSession(mkRow({ mini: true, sessionType: "mini", roundsDone: 1, roundsPlanned: 3 }));
+/* On its OWN day — the plan is rolled up per real date now, so putting the mini
+   on the same date as the session above would be asking what that DATE asked
+   for (three), not what a mini asks for. */
+store.saveSession(mkRow({ mini: true, sessionType: "mini", roundsDone: 1, roundsPlanned: 3,
+  isoDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() }));
 const an8 = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics" }).analytics;
 ok(an8.rounds.planned === 4, "a mini asks for one round, not the light's three");
+
+/* And a day is asked for its rounds ONCE, however many times she sat down to
+   them. Summing the per-sitting ask scored a green day trained in two goes out
+   of five, so finishing it read back as 60% adherence. */
+localStorage.clear(); store.migrate();
+store.saveSession(mkRow({ roundsDone: 1, roundsPlanned: 3, dayRoundsPlanned: 3, bankedRounds: 0,
+  ledger: [{ name: "x", block: "main", round: 1, status: "done" }] }));
+store.saveSession(mkRow({ roundsDone: 2, roundsPlanned: 2, dayRoundsPlanned: 3, bankedRounds: 1,
+  ledger: [{ name: "y", block: "main", round: 2, status: "done" },
+           { name: "z", block: "main", round: 3, status: "done" }] }));
+const anTwoSittings = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics" }).analytics;
+ok(anTwoSittings.rounds.planned === 3,
+   "one day trained in two sittings asked for three rounds, not five");
+ok(anTwoSittings.rounds.done === 3, "and all three were finished");
+ok(anTwoSittings.roundsDonePct === 100,
+   "so a finished day reads as finished — it used to read 60%");
 
 /* ============================================================
    INTERACTION REGRESSIONS
@@ -2792,6 +2839,38 @@ ok(store.countsForStreak(secondRec) === true, "and it earns the streak day it is
 ok(!store.loadDayProgress("tuesday"),
    "finishing the day clears its progress record, so tomorrow starts clean");
 
+/* --- AND THE RESUME SAYS WHAT THE DAY DID, NOT WHAT IT HAD LEFT -----------
+   Everything else on that finish screen judges the day — the XP, the streak, the
+   "today counts" headline. The rounds line did not: the numerator counted this
+   sitting's ledger and the denominator was the rounds this sitting still OWED,
+   so a green day trained in two goes read "2 of 2 main rounds" with the round
+   she finished before lunch nowhere on the screen. */
+ok(secondSitting.bankedRounds === 1 && secondSitting.dayRoundsPlanned === 3,
+   "the resume knows the day's ask and its own head start");
+ok(secondSitting.roundsPlanned === 2,
+   "while still being PLANNED against what it owes, so the round is not billed twice");
+const resumedVm = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+ok(resumedVm.roundsLine === "3 of 3 main rounds",
+   "so the finish screen reports the day: " + JSON.stringify(resumedVm.roundsLine)
+   + " — it used to read 2 of 2");
+ok(secondRec.dayRoundsPlanned === 3 && secondRec.bankedRounds === 1,
+   "and the record carries both, so it reads the same tomorrow and after a restore");
+ok(store.dayRoundsPlanned(secondRec) === 3 && store.sessionRoundsPlanned(secondRec) === 2,
+   "the day's ask and the sitting's ask are separate questions with separate answers");
+ok(store.dayXpCap(secondRec) === 360,
+   "the day's XP ceiling is the DAY's — a resume alone on its date used to cap at 270");
+ok(store.sessionRounds(secondRec) === 2,
+   "while the row itself still pays only for the two rounds it trained");
+ok(store.plannedRoundsAcrossDays([firstRec, secondRec]) === 3,
+   "and the two sittings together asked for three rounds, not five");
+
+/* A first sitting is untouched by any of it: with nothing banked, the day's ask
+   and the sitting's ask are the same number. */
+ok(firstRec.dayRoundsPlanned === 3 && firstRec.bankedRounds === 0,
+   "a first sitting has no head start and carries the day's plan unchanged");
+ok(store.dayRoundsPlanned({ roundsPlanned: 2, roundsDone: 2 }) === 2,
+   "and a legacy row with no day plan falls back to its sitting's ask, exactly as it reads today");
+
 /* Prep is the one block deliberately re-run rather than banked: it is the
    movement prep for main, and skipping it would send a resume into main cold. */
 ok((data.DAYS.tuesday.prepMenu || []).length > 0, "tuesday has a prep menu to test with");
@@ -3002,5 +3081,222 @@ ok(engine.sess.paused === true, "reading a move and closing it leaves her own pa
 engine.togglePause();
 ok(engine.sess.paused === false, "and only she can lift it");
 engine.exitSession();
+
+/* ============================================================
+   "0 OF 3 MAIN ROUNDS" AFTER THREE ROUNDS OF WORK
+
+   The reported bug: a Thursday Green session, thirty-four minutes, all three
+   main rounds trained, recorded as `0 of 3 main rounds · +90 XP` — the show-up
+   credit alone. Three separate faults had to line up, and each one gets its own
+   assertions here.
+   ============================================================ */
+
+/* --- 1. the Thursday green day, straight through -------------------------- */
+const thuMain = engine.assembleCircuits("thursday", "green")
+  .find(c => c.block === "main");
+const thuPerRound = thuMain.exercises.length;
+ok(thuPerRound === 5 && thuMain.rounds === 3,
+   "Thursday Green's main block is 5 moves × 3 rounds (" + thuPerRound + "×" + thuMain.rounds + ")");
+
+const thuLedger = [];
+for (let r = 1; r <= 3; r++) {
+  thuMain.exercises.forEach((ex, i) => thuLedger.push({
+    name: ex.name, block: "main", round: r, ci: 0, ei: i, status: "done",
+    driver: "time", plannedSecs: 30, actualSecs: 30 }));
+}
+const thuExpected = { 1: thuPerRound, 2: thuPerRound, 3: thuPerRound };
+const thuRow = {
+  app: "swimming", dayKey: "thursday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION,
+  sessionType: "main", roundsPlanned: 3, completedFully: true,
+  expectedWork: thuLedger.length, expectedByRound: thuExpected, ledger: thuLedger
+};
+ok(outcome.outcomeOf({ ...thuRow, roundsDone: 3 }).mainRoundsDone === 3,
+   "fifteen finished main rows are three finished main rounds");
+ok(store.xpForSession({ ...thuRow, roundsDone: 3 }) === 360,
+   "and a full Thursday Green pays 360 XP");
+
+/* THE FAULT ITSELF: the same fifteen rows, with the engine's counter stuck at
+   zero because the round was committed after a rest she never sat through. The
+   reading used to be Math.min(ledger, engine) — so zero won, the screen printed
+   "0 of 3" and the day was priced at the 90 XP show-up credit. */
+ok(outcome.outcomeOf({ ...thuRow, roundsDone: 0 }).mainRoundsDone === 3,
+   "a stuck engine counter cannot erase rounds the rows can prove");
+ok(store.xpForSession({ ...thuRow, roundsDone: 0 }) === 360,
+   "and the day is paid on the rows too — it used to pay 90, the show-up credit");
+ok(outcome.outcomeOf({ ...thuRow, roundsDone: 0 }).roundsDisagree === true,
+   "the disagreement is still reported, because now it means a real defect");
+
+/* --- 2. the round is banked before the rest, not after -------------------- */
+/* Stop during the round rest that follows main round one. The round is finished
+   and its rows are on the ledger; the old code incremented the counter at the
+   BOTTOM of the round loop, so this abort path returned into finalize() first
+   and threw the round away. */
+let stoppedInRoundRest = false;
+const stopInRest = await runSession({ dayKey: "thursday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    if (sess.phase === "intent") { engine.advance(); return; }
+    if (sess.phase === "roundRest" && sess.round === 1 && sess.running) {
+      stoppedInRoundRest = true;
+      engine.endEarly();
+    }
+  }
+});
+ok(stoppedInRoundRest, "the session really was stopped during the round-one rest");
+ok(stopInRest.roundsCompleted === 1,
+   "the round she finished is counted before the rest she quit in — it used to read 0");
+const restRow = store.loadSessions()[0];
+ok(restRow.roundsDone === 1, "and the saved record says one round, not zero");
+ok(store.sessionXp(restRow) === 180, "so it pays for the round she trained (180), not 90");
+ok((store.loadDayProgress("thursday") || {}).mainRoundsCompleted === 1,
+   "and the round is banked to the day, so coming back asks for two");
+
+/* --- 3. a round is judged on its DOSE, by the engine's own 80% floor ------ */
+const doseRound = (mk) => {
+  const rows = [0, 1, 2, 3, 4].map(i => ({
+    name: "m" + i, block: "main", round: 1, status: "done",
+    driver: "time", plannedSecs: 30, actualSecs: 30 }));
+  return mk(rows);
+};
+const roundsOf = (rows, expected = { 1: 5 }) =>
+  outcome.mainRoundsFromLedger(rows, expected, outcome.OUTCOME_VERSION);
+
+ok(outcome.ROUND_DOSE_FRACTION === 0.8,
+   "a round is held to the same 80% floor a single timed move is");
+ok(roundsOf(doseRound(rows => rows)) === 1, "five finished moves is a finished round");
+ok(roundsOf(doseRound(rows => rows.map((l, i) => i === 0
+     ? { ...l, status: "partial", actualSecs: 23 } : l))) === 1,
+   "one move at 77% still leaves the round above the bar — this is the tap-Done-early case");
+ok(roundsOf(doseRound(rows => rows.map((l, i) => i === 0
+     ? { ...l, status: "partial", actualSecs: 3 } : l))) === 0,
+   "but a move barely attempted voids it — four perfect moves average that away otherwise");
+ok(outcome.ROUND_ROW_FLOOR === 0.5, "no single move may be under half its dose");
+ok(roundsOf(doseRound(rows => rows.map((l, i) => i === 0
+     ? { ...l, status: "partial", actualSecs: 15 } : l))) === 1,
+   "exactly half is the floor, and clears it");
+ok(roundsOf(doseRound(rows => rows.map((l, i) => i === 0
+     ? { ...l, status: "partial", actualSecs: 14 } : l))) === 0,
+   "a second under it does not, however good the rest of the round was");
+ok(roundsOf(doseRound(rows => rows.map(l =>
+     ({ ...l, status: "partial", actualSecs: 24 })))) === 1,
+   "every move at exactly 80% is a round at exactly 80%, which counts");
+ok(roundsOf(doseRound(rows => rows.map(l =>
+     ({ ...l, status: "partial", actualSecs: 23 })))) === 0,
+   "and every move a second under it is not");
+ok(roundsOf(doseRound(rows => rows.map((l, i) => i === 0
+     ? { ...l, status: "skipped", actualSecs: 0 } : l))) === 0,
+   "a SKIPPED move voids the round however good the other four were");
+ok(roundsOf(doseRound(rows => rows.slice(0, 4))) === 0,
+   "and a round short of a row is a round she did not reach");
+
+/* The rule is looser than the one it replaces, so it must not reach backwards
+   into records written under the old one. */
+ok(outcome.mainRoundsFromLedger(doseRound(rows => rows.map((l, i) => i === 0
+     ? { ...l, status: "partial", actualSecs: 23 } : l)), { 1: 5 }, 2) === 0,
+   "a pre-v3 record keeps the all-done reading and is not re-scored underneath her");
+
+/* --- 4. it says WHICH move cost her the round ----------------------------- */
+const shortReport = outcome.mainRoundReport(
+  doseRound(rows => rows.map((l, i) => i === 2
+    ? { ...l, name: "Single-Leg Balance Reach", status: "partial", actualSecs: 3 } : l)),
+  { 1: 5 }, outcome.OUTCOME_VERSION);
+ok(shortReport.length === 1 && shortReport[0].counts === false, "the short round is reported as short");
+ok(shortReport[0].blockedBy && shortReport[0].blockedBy.name === "Single-Leg Balance Reach",
+   "and names the move that cost it, instead of leaving a bare 0 of 3 to be guessed at");
+ok(shortReport[0].blockedBy.got === 3 && shortReport[0].blockedBy.planned === 30,
+   "with the numbers she can act on");
+
+/* And the finish screen SAYS it, which is the whole point — the bare "0 of 3"
+   next to thirty-four minutes is what sent a grown-up digging through an
+   exported ledger for an answer the app already had. */
+let shortMove = null;
+await runSession({ dayKey: "thursday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    if (sess.phase === "intent") { engine.advance(); return; }
+    // Tap "Done — Next" four seconds into a thirty-second hold in round two —
+    // the exact gesture behind the report. It is NOT a skip: the row is real
+    // work, recorded as partial, and it is round two alone that it costs.
+    if (!shortMove && sess.phase === "work" && sess.round === 2
+        && sess.currentEx && (sess.currentEx.block === "main") && sess.exElapsed >= 4) {
+      shortMove = sess.currentEx.name;
+      engine.advance();
+    }
+  }
+});
+const shortVm = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+ok(shortMove, "a main move in round two really was cut short (" + shortMove + ")");
+ok(shortVm.roundsLine === "2 of 3 main rounds",
+   "the other two rounds still count — one short move costs its own round, not the session");
+ok(shortVm.roundShortNotes.length === 1 && /^Round 2 didn't count/.test(shortVm.roundShortNotes[0]),
+   "and the screen names the round: " + JSON.stringify(shortVm.roundShortNotes));
+ok(shortVm.roundShortNotes[0].includes(shortMove),
+   "and the move inside it, so she is told what happened instead of shown a bare number");
+ok(sscreen.sessionScreen(shortVm).includes(shortVm.roundShortNotes[0]),
+   "and the note is actually rendered onto the finish screen");
+
+/* --- 5. the Clean/Wobbly spot check changes nothing ----------------------- */
+/* It is offered on a couple of moves per session by design, and a grown-up
+   reasonably wondered whether not seeing it — or dismissing it — was what cost
+   the rounds. It is not, and this says so in both directions. */
+const answered = await runSession({ dayKey: "thursday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") engine.pickClean();
+    if (sess.phase === "intent") engine.advance();
+  }
+});
+const dismissed = await runSession({ dayKey: "thursday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") engine.advance();   // dismissed, not answered
+    if (sess.phase === "intent") engine.advance();
+  }
+});
+ok(answered.roundsCompleted === 3, "answering every form check finishes three rounds");
+ok(dismissed.roundsCompleted === 3,
+   "and dismissing every single one finishes the same three — the check never gated a round");
+ok(store.sessionXp(store.loadSessions()[0]) === 360,
+   "the dismissed run is paid identically");
+
+/* --- 6. a rep is counted once it has been performed ----------------------- */
+/* `repsCounted` grades the move and pro-rates a partial one, and it used to be
+   incremented at the top of the rep — so it really counted reps STARTED, and
+   stopping during the last one credited it in full. */
+let repsAtStop = null, repTargetAtStop = null;
+await runSession({ dayKey: "thursday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    if (sess.phase === "intent") { engine.advance(); return; }
+    if (repsAtStop === null && sess.phase === "reps" && sess.repNow >= 3 && sess.running) {
+      repsAtStop = sess.repsCounted;
+      repTargetAtStop = sess.repNow;
+      engine.endEarly();
+    }
+  }
+});
+ok(repTargetAtStop !== null, "the session really was stopped inside a rep");
+ok(repsAtStop === repTargetAtStop - 1,
+   "the rep she was interrupted in the middle of is not counted (" + repsAtStop
+   + " counted, stopped inside rep " + repTargetAtStop + ") — it used to be");
+
+/* --- 7. the coach can actually be slowed down ----------------------------- */
+ok(store.DEFAULT_SETTINGS.voiceSpeed === "slow",
+   "the coach ships slow, because the app is built for a ten-year-old");
+ok(audio.VOICE_SPEED.slow === 0.82 && audio.VOICE_SPEED.normal === 0.95,
+   "speed is two named rates, not a number buried in a personality");
+store.updateSettings({ voiceSpeed: "slow", voiceStyle: "encouraging" });
+const slowRate = audio.coachRate();
+store.updateSettings({ voiceSpeed: "normal" });
+const normalRate = audio.coachRate();
+ok(slowRate < normalRate, "slow is genuinely slower than normal (" + slowRate + " vs " + normalRate + ")");
+ok(Math.abs(slowRate - 0.82 * 0.94) < 1e-9,
+   "speed and style compose — Encouraging used to come out at 0.99, i.e. normal speed");
+store.updateSettings({ voiceStyle: "fun", voiceSpeed: "slow" });
+ok(audio.coachRate() < 1, "even the loud persona is under normal speed when speed is set to slow");
+ok(audio.SAFETY_RATE === 0.85,
+   "and a safety line is slower still, whatever the persona and whatever the speed");
+ok(audio.SPEECH_SETTLE_MS >= 350,
+   "with a real beat between the instruction and the clock starting");
+store.updateSettings({ voiceStyle: "encouraging", voiceSpeed: "slow" });
 
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

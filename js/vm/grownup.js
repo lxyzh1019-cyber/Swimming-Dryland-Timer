@@ -10,7 +10,7 @@ import { redeemedPrizesForReview } from "../store.js";
 import { gateUnlocked, GATE_REASON } from "../gate.js";
 import { passkeySupported, hasPasskey } from "../passkey.js";
 import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal, outcomeOf,
-         sessionRounds as sessionRoundsDone, sessionRoundsPlanned,
+         sessionRounds as sessionRoundsDone, sessionRoundsPlanned, plannedRoundsAcrossDays,
          monthKeyOf, formVerdicts, latestFormVerdicts, loadReadinessLog } from "../store.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
 import { sessionEffort, effortSummary } from "../effort.js";
@@ -388,7 +388,9 @@ export function buildGrownupVM(state) {
   // "Planned" was three per session whatever the traffic light said, so every
   // yellow, red, mini and recovery day was scored against a plan it never had.
   const roundsDone = sessions.reduce((a, s) => a + sessionRoundsDone(s), 0);
-  const roundsPlanned = sessions.reduce((a, s) => a + sessionRoundsPlanned(s), 0);
+  // Each DAY's ask counted once. Summing the per-row ask scored a green day
+  // trained in two goes out of five, so finishing it read as 60% adherence.
+  const roundsPlanned = plannedRoundsAcrossDays(sessions);
   const rounds = { done: roundsDone, planned: Math.max(roundsPlanned, roundsDone), practice: 0,
     note: "Planned = the rounds each day actually asked for — green 3, yellow 2, red 1, mini 1." };
 
@@ -660,6 +662,13 @@ export function buildGrownupVM(state) {
     key: v, label: v[0].toUpperCase() + v.slice(1),
     style: "padding:9px 16px;border-radius:var(--radius-pill);border:2px solid " + ((settings.voiceStyle || "fun") === v ? "var(--aqua)" : "var(--hairline)") + ";background:" + ((settings.voiceStyle || "fun") === v ? "var(--aqua-wash)" : "var(--surface)") + ";color:" + ((settings.voiceStyle || "fun") === v ? "var(--aqua-ink)" : "var(--ink-soft)") + ";font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;"
   }));
+  /* Speed, not style. Two options and no slider: this is a setting a grown-up
+     changes once, and "Slow / Normal" is a decision they can make by ear. */
+  const voiceSpeedOpts = [["slow", "Slow"], ["normal", "Normal"]].map(([v, label]) => {
+    const on = (settings.voiceSpeed || "slow") === v;
+    return { key: v, label,
+      style: "padding:9px 16px;border-radius:var(--radius-pill);border:2px solid " + (on ? "var(--aqua)" : "var(--hairline)") + ";background:" + (on ? "var(--aqua-wash)" : "var(--surface)") + ";color:" + (on ? "var(--aqua-ink)" : "var(--ink-soft)") + ";font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;" };
+  });
 
   /* ---- coaching tab ---- */
   const gate = loadGate();
@@ -730,7 +739,7 @@ export function buildGrownupVM(state) {
     backupNote: state.backupNote || "", backupNoteOk: !!state.backupNoteOk,
     settingsExRest: settings.exerciseRestSeconds, settingsRndRest: settings.roundRestSeconds, settingsSecRest: settings.sectionRestSeconds,
     stepperBtn: "width:44px;height:44px;border-radius:50%;background:var(--surface-2);border:2px solid var(--hairline);font-size:22px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;",
-    voiceStyleOpts,
+    voiceStyleOpts, voiceSpeedOpts,
     // Three switches, not one. The old single 🎧 toggle silenced the timer
     // beeps and the safety cues along with the coach's chatter.
     coachVoiceOn: settings.coachSpeechOn !== false,
@@ -793,7 +802,7 @@ export function buildGrownupVM(state) {
 
 /* CSV export — weekly summary ported from the old Coach Insights. */
 export function exportCsv() {
-  const rows = [["date", "day", "title", "type", "light", "minutes", "outcome", "countsAsTraining", "roundsDone", "roundsPlanned", "completedFully", "endedEarly", "pain", "skips", "pauses", "clean", "wobbly", "mood", "intentWord", "xpEarned"]];
+  const rows = [["date", "day", "title", "type", "light", "minutes", "outcome", "countsAsTraining", "roundsDone", "roundsPlanned", "completedFully", "endedEarly", "pain", "skips", "pauses", "clean", "wobbly", "mood", "intentWord", "xpEarned", "roundsShort"]];
   loadSessions().forEach(s => {
     rows.push([
       edmontonISO(s.isoDate), s.dayKey || "", s.dayTitle || "", s.sessionType || "",
@@ -803,7 +812,14 @@ export function exportCsv() {
       sessionRoundsDone(s), sessionRoundsPlanned(s),
       s.completedFully ? 1 : 0, s.endedEarly ? 1 : 0, s.pain ? 1 : 0,
       s.skippedCount || 0, s.pauseCount || 0, s.clean || 0, s.wobbly || 0,
-      s.mood || "", s.intentWord || "", s.xpEarned || 0
+      s.mood || "", s.intentWord || "", s.xpEarned || 0,
+      // WHY a round did not count, so "she did three rounds and it says one" is
+      // answerable from the export instead of from the raw ledger.
+      (outcomeOf(s).roundReport || []).filter(r => !r.counts)
+        .map(r => "R" + r.round + ":" + (r.missing ? "stopped partway"
+          : r.skipped.length ? "skipped " + r.skipped[0]
+          : r.blockedBy ? "short on " + r.blockedBy.name
+          : "short")).join("; ")
     ]);
   });
   const csv = rows.map(r => r.map(v => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v).join(",")).join("\n");

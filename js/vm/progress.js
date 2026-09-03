@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { LADDER, RANK_LORE, RANK_TEASE, fmtXp } from "../data.js";
-import { sessionXp, levelFromXp, sessionRounds, sessionRoundsPlanned } from "../store.js";
+import { sessionXp, levelFromXp, sessionRounds, plannedRoundsAcrossDays } from "../store.js";
 import { loadSessions, loadJourney, currentStreak, redeemPrize, countsAsTrained, countsForStreak, streakFreezeDates, prizeUndoOpen, outcomeOf } from "../store.js";
 import { edmontonWeekISODates, edmontonISO, DAY_MS } from "../util.js";
 import { buildJourney } from "./today.js";
@@ -213,8 +213,10 @@ export function buildProgressVM(state) {
   const pRounds = pSessions.reduce((a, s) => a + sessionRounds(s), 0);
   const pPartial = pSessions.length - pDone.length;
   // What those days actually asked for — green 3, yellow 2, red 1, mini 1 —
-  // rather than three apiece regardless of the light.
-  const pPlannedRounds = pSessions.reduce((a, s) => a + sessionRoundsPlanned(s), 0);
+  // rather than three apiece regardless of the light, and counted once per day
+  // rather than once per sitting: a day trained in two goes asked for its
+  // rounds once, however many times she sat down to them.
+  const pPlannedRounds = plannedRoundsAcrossDays(pSessions);
   const pXp = pSessions.reduce((a, s) => a + sessionXp(s), 0);
   const xpNow = journeyStore.xp || 0;
   // Levels gained inside the window, from the training XP it actually banked.

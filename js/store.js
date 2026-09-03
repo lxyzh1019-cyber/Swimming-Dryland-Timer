@@ -171,6 +171,11 @@ export const DEFAULT_SETTINGS = {
   // Default to effort/process praise (Dweck-aligned) rather than trait hype;
   // the louder "fun" persona stays available as an opt-in in Grown-up settings.
   voiceStyle: "encouraging",
+  /* How fast the coach talks, chosen separately from how she sounds — see
+     VOICE_SPEED in js/audio.js. Slow by default: speed used to be baked into
+     the personality, so the app had no genuinely slow voice to offer a child
+     who needed one. A grown-up can set it to Normal in Coaching settings. */
+  voiceSpeed: "slow",
   exerciseRestSeconds: 5,
   roundRestSeconds: 25,
   sectionRestSeconds: 30,   // NEW (block break; old app hardcoded 8s)
@@ -1014,18 +1019,77 @@ export function sessionRounds(entry) {
     if (entry.mini) return 1;
     return Math.min(3, Math.max(1, entry.roundsDone || 1));
   }
-  // You cannot finish more rounds than the day asked for — a mini is one
-  // round however the traffic light was set.
-  return Math.min(sessionRoundsPlanned(entry), Math.max(0, entry.roundsDone || 0));
+  /* THE LEDGER PRICES THE SESSION, not the engine's bare counter.
+     `entry.roundsDone` is a number the engine wrote and nothing can re-check,
+     and it was written at the wrong moment: a round finished and then
+     interrupted during its rest was saved as zero, so a full Thursday was priced
+     at the 90 XP show-up credit alone. outcomeOf reads the rows instead — the
+     same authority the finish screen, the streak and the parent reports use, so
+     the number she is paid and the number she is shown cannot disagree.
+
+     Still capped by what the day asked for: you cannot finish more rounds than
+     were on offer, and a mini is one round however the traffic light was set. */
+  return Math.min(sessionRoundsPlanned(entry),
+                  Math.max(0, outcomeOf(entry).mainRoundsDone || 0));
 }
 
-/* Rounds the day asked for — the ceiling a day's XP is capped at. */
+/* Rounds THIS SITTING was asked for — the ceiling on what one row may be paid.
+
+   On a resume this is a REMAINDER: a green day with one round already banked
+   asks its second sitting for two. That is the right number for capping a row,
+   and the wrong number for every sentence that begins "today" — which is what
+   dayRoundsPlanned below is for. */
 export function sessionRoundsPlanned(entry) {
   if (!entry) return 0;
   if (entry.sessionType === "recovery" || entry.sessionType === "spa") return 0;
   if (entry.mini || entry.sessionType === "mini") return 1;
   if (Number.isFinite(entry.roundsPlanned)) return Math.min(3, Math.max(0, entry.roundsPlanned));
   return Math.min(3, Math.max(1, entry.roundsDone || 1));
+}
+
+/* Rounds THE DAY asked for, whatever it took to get through them.
+
+   One number answered both questions until now, and the remainder won, so a day
+   trained in two goes was reported against leftovers at both ends: the finish
+   screen said "2 of 2 main rounds" for a full green day, and the grown-up tiles
+   ADDED the two sittings' asks — 3 and 2 — and scored a finished day 3 of 5.
+
+   Rows written before this carry no day plan, so they fall back to the sitting's
+   own ask, which is exactly how they read today. On a first sitting the two are
+   the same number anyway; only a resume can tell them apart. */
+export function dayRoundsPlanned(entry) {
+  if (!entry) return 0;
+  if (entry.sessionType === "recovery" || entry.sessionType === "spa") return 0;
+  if (entry.mini || entry.sessionType === "mini") return 1;
+  if (Number.isFinite(entry.dayRoundsPlanned)) {
+    return Math.min(3, Math.max(0, entry.dayRoundsPlanned));
+  }
+  return sessionRoundsPlanned(entry);
+}
+
+/* Rounds a SET of sessions was asked for, counting each real day once.
+
+   Both the grown-up analytics tile and the progress period stats summed the
+   per-row ask, which double-counts a day trained in two goes: the first sitting
+   stores the full three, the resume stores the two it had left, and a day that
+   asked for three is scored out of five. A finished green day read 3 / 5 and
+   60% adherence to the grown-up who was checking whether it got done.
+
+   So the plan is rolled up by the REAL DATE — the same unit the XP budget is
+   keyed by (see dayXpKey) — taking the largest ask any row on that date
+   declares. Largest, not first: a date carrying both a recovery pass (0) and a
+   training session (3) asked for three, and a legacy row falling back to its
+   sitting's ask must never shrink a date a newer row can describe properly. */
+export function plannedRoundsAcrossDays(sessions) {
+  const byDate = new Map();
+  (sessions || []).forEach(s => {
+    if (!s) return;
+    const k = edmontonISO(s.isoDate);
+    byDate.set(k, Math.max(byDate.get(k) || 0, dayRoundsPlanned(s)));
+  });
+  let total = 0;
+  byDate.forEach(v => { total += v; });
+  return total;
 }
 
 /* Did any real work happen? Delegated to the one outcome authority — this used
@@ -1074,8 +1138,13 @@ export function xpForSession(entry) {
    budget, and a session can only draw what is left in it. */
 const DAY_XP_RETENTION = 60;                       // days of budget rows kept
 
+/* The ceiling is the DAY's, which is what the name says and what the budget is
+   keyed by. It used to be the sitting's: harmless while the first sitting's row
+   is on the device, because the cap is the largest any row for the date claims —
+   and an under-payment when it is not, which is the ordinary case for a day
+   started on the tablet and finished on the phone. */
 export function dayXpCap(entry) {
-  return XP_SHOWED_UP + XP_PER_ROUND * sessionRoundsPlanned(entry);
+  return XP_SHOWED_UP + XP_PER_ROUND * dayRoundsPlanned(entry);
 }
 
 /* The budget belongs to the REAL DAY, not to the weekday card that was run.
