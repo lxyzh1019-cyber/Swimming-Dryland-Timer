@@ -624,9 +624,66 @@ ok(data.LIGHT_META.green.emoji === "🟢", "unified circle light icons");
 
 /* --- readiness scoring --- */
 const scored = rvm.newReadinessFlow("monday", false);
-rvm.answerQuestion(scored, "q_pain", "yes");
 ["q_sleep", "q_light", "q_ready"].forEach(q => rvm.answerQuestion(scored, q, "yes"));
+rvm.answerQuestion(scored, "q_pain", "yes");
 ok(scored.light === "green", "all-good readiness → green");
+
+/* --- THE TWO SIGNALS ARE COMBINED, NOT SWAPPED ---------------------------
+   The body map used to overwrite the general-readiness light outright — and on
+   the sore path the readiness light was never even computed, because scoring
+   bailed unless the pain answer was "all good" and the pain question was asked
+   FIRST. So a girl who slept badly, felt tired and had no energy, with one
+   merely-tired shoulder, was handed a Yellow two-round day. Neither reading is
+   wrong; they are about different things. The session runs the smaller day. */
+ok(rvm.moreCautious("green", "red") === "red" && rvm.moreCautious("recovery", "yellow") === "recovery",
+   "the more cautious of two lights is the smaller day, whichever side it comes from");
+ok(rvm.moreCautious("yellow", null) === "yellow", "and a missing second signal decides nothing");
+ok(data.READINESS_QS[data.READINESS_QS.length - 1].id === "q_pain",
+   "the pain question is asked LAST, so the other three always get asked");
+
+const flatAndSore = rvm.newReadinessFlow("monday", false);
+["q_sleep", "q_light", "q_ready"].forEach(q => rvm.answerQuestion(flatAndSore, q, "no"));
+rvm.answerQuestion(flatAndSore, "q_pain", "no");
+ok(flatAndSore.readinessLight === "recovery",
+   "three negative answers score Recovery even on the sore path — they used to score nothing");
+ok(flatAndSore.step === "bodyArea", "and the sore answer still routes to the body map");
+rvm.setZoneSev(flatAndSore, 2, 2);
+ok(flatAndSore.bodyLight === "yellow", "a tired shoulder is Yellow on the body map's own terms");
+ok(flatAndSore.light === "recovery",
+   "but the day runs Recovery — the body map no longer overrules a flatter body");
+const flatVM = rvm.buildReadinessVM(flatAndSore, true);
+ok(/Body Check said/.test(flatVM.combinedLine) && /Quick check said/.test(flatVM.combinedLine),
+   "and the card names both readings, so Recovery over a Yellow map is not a mystery");
+
+/* The other direction is unchanged: a sore body still outranks a good night. */
+const freshButSore = rvm.newReadinessFlow("monday", false);
+["q_sleep", "q_light", "q_ready"].forEach(q => rvm.answerQuestion(freshButSore, q, "yes"));
+rvm.answerQuestion(freshButSore, "q_pain", "no");
+rvm.setZoneSev(freshButSore, 2, 3);
+ok(freshButSore.light === "red", "a good night with real pain in it is still a Red day");
+ok(rvm.buildReadinessVM(freshButSore, true).needsGrownupConfirm,
+   "and severity 3 still needs a grown-up");
+
+/* The pain gate belongs to the PAIN, not to whichever signal won the light. */
+const flatAndHurting = rvm.newReadinessFlow("monday", false);
+["q_sleep", "q_light", "q_ready"].forEach(q => rvm.answerQuestion(flatAndHurting, q, "no"));
+rvm.answerQuestion(flatAndHurting, "q_pain", "no");
+rvm.setZoneSev(flatAndHurting, 2, 3);
+ok(flatAndHurting.light === "recovery", "pain plus a flat body is Recovery, not Red");
+ok(rvm.buildReadinessVM(flatAndHurting, true).needsGrownupConfirm,
+   "and the grown-up confirm survives the readiness score taking the light past Red");
+
+/* Re-checking the body must not quietly throw the readiness answers away. */
+rvm.resetBodyCheck(flatAndHurting);
+ok(flatAndHurting.light === "recovery" && flatAndHurting.severity === null,
+   "clearing the marks clears the MARKS — a flat night is not a mark and survives");
+
+/* Nothing regresses where there is only one signal to go on. */
+const bodyOnly = rvm.newReadinessFlow("monday", false);
+rvm.answerQuestion(bodyOnly, "q_pain", "no");
+rvm.setZoneSev(bodyOnly, 2, 2);
+ok(bodyOnly.light === "yellow" && bodyOnly.readinessLight === null,
+   "with no readiness answers the body map decides alone, exactly as it always did");
 
 /* --- pain-gate: level 3 requires a grown-up confirm; level 2 does not --- */
 const r3 = rvm.newReadinessFlow("monday", false);
@@ -1088,6 +1145,13 @@ ok(s1.ledger.every(l => l.status === "done"), "everything done reads as done");
 const rec1 = store.loadSessions()[0];
 ok(rec1.roundsDone === 3 && rec1.roundsPlanned === 3, "the record stores rounds done AND rounds planned");
 ok(store.sessionXp(rec1) === 360, "a full green day pays 360");
+/* A session that is not a resume must be untouched by any of the day-banking
+   machinery: nothing was banked before it, and the day's ask IS its ask. */
+ok(s1.bankedCredit === 0, "a first sitting carries no banked credit");
+ok(s1.expectedWork === s1.dayExpectedWork && s1.expectedWork === engine.countExpectedWork(s1.circuits),
+   "and is priced against exactly the plan it ran — the day's plan and its own are the same thing");
+ok(rec1.bankedCredit === 0 && outcome.outcomeOf(rec1).state === "complete",
+   "so a straight-through green day still reads complete, scored exactly as before");
 
 /* --- side switching actually happens --- */
 const sided = s1.ledger.filter(l => l.segmentsPlanned > 1 && l.driver === "reps");
@@ -1267,6 +1331,8 @@ const streakRow = (doneCount, expected, extra = {}) => ({
     name: "m" + i, block: "main", round: 1, status: "done" })),
   ...extra
 });
+/* `roundsDone` is overridable because the bar must NOT be a hidden round count —
+   see the zero-round assertions below. */
 ok(outcome.STREAK_WORK_FRACTION === 0.75, "a training day needs three quarters of its plan");
 ok(store.countsForStreak(streakRow(1, 20)) === false, "one move out of twenty is not a training day");
 ok(store.countsForStreak(streakRow(14, 20)) === false, "nor is 70% of it");
@@ -1285,6 +1351,62 @@ ok(store.countsForStreak(streakRow(Math.ceil(redPlan * 0.75), redPlan)) === true
    "three quarters of a red day earns the streak");
 ok(store.countsForStreak(streakRow(Math.ceil(redPlan * 0.75), greenPlan)) === false,
    "the same amount of work against a green plan does not — the ask scales with the light");
+
+/* THE BAR IS THE DOSE, AND ONLY THE DOSE.
+   Every assertion above happens to carry `roundsDone: 1`, so none of them could
+   tell a dose rule from a dose rule with a quiet "and finish one main round"
+   stapled to it. A short Red day may not even reach the end of its single round,
+   and it still trained. State it outright, in both directions. */
+ok(store.countsForStreak(streakRow(Math.ceil(redPlan * 0.75), redPlan, { roundsDone: 0 })) === true,
+   "three quarters of a Red day earns the streak with ZERO completed main rounds");
+ok(store.countsForStreak(streakRow(Math.floor(redPlan * 0.75) - 1, redPlan, { roundsDone: 0 })) === false,
+   "and below three quarters earns nothing, rounds or no rounds");
+ok(outcome.deriveSessionOutcome({
+     ledger: streakRow(Math.ceil(redPlan * 0.75), redPlan).ledger,
+     expectedWork: redPlan, outcomeVersion: outcome.OUTCOME_VERSION,
+     sessionType: "main", roundsDone: 0
+   }).mainRoundsDone === 0,
+   "the outcome says plainly that no round was completed, and pays the day anyway");
+
+/* --- THE BAR IS THE DAY'S, NOT THE SITTING'S ------------------------------
+   A day can be trained in two goes, and the second used to be judged against
+   its own leftovers alone. That cut both ways: a sitting that finished
+   everything still owed could not read as completing the DAY, and a two-move
+   sitting on a barely-started day cleared 75% of two moves and bought the
+   streak outright. The plan stays the whole day's now, and the credit already
+   banked today is carried in beside it. */
+const dayPlan = 20;
+const sitting = (rows, banked) => ({
+  app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+  xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION,
+  sessionType: "main", roundsDone: 1, roundsPlanned: 3, expectedWork: dayPlan,
+  bankedCredit: banked,
+  ledger: Array.from({ length: rows }, (_, i) => ({
+    name: "m" + i, block: "main", round: 1, status: "done" }))
+});
+ok(store.countsForStreak(sitting(2, 4)) === false,
+   "two moves in the evening on a barely-started day is 6 of 20 — it buys nothing");
+ok(store.countsForStreak(sitting(11, 4)) === true,
+   "but the sitting that carries the day past three quarters earns it");
+const finished = outcome.outcomeOf(sitting(16, 4));
+ok(finished.state === "complete" && finished.workRatio === 1,
+   "and a day finished across two sittings reads COMPLETE — it used to read partial forever");
+ok(outcome.outcomeOf(sitting(15, 4)).state === "partial",
+   "one move short of the day is still short, however it was split up");
+
+/* A sitting with a skipped move in it is not a finished sitting, whatever the
+   day already banked — the day-wide credit must not paper over this run. */
+const skippedInSitting = sitting(16, 4);
+skippedInSitting.ledger[0] = { name: "m0", block: "main", round: 1, status: "skipped" };
+ok(outcome.outcomeOf(skippedInSitting).state === "partial",
+   "banked credit never turns a sitting with a skipped move into a complete one");
+
+/* Going forward only, again: nothing written before this carries the field, and
+   its expectedWork was its own size, so every existing row scores as it did. */
+const noBanked = { ...sitting(15, 0) };
+delete noBanked.bankedCredit;
+ok(store.countsForStreak(noBanked) === true && store.countsForStreak(sitting(15, 0)) === true,
+   "a record with no banked credit reads exactly as one with zero — no migration, no re-scoring");
 
 /* A safety stop still buys nothing, however much came before it. */
 ok(store.countsForStreak(streakRow(20, 20, { safetyStop: true, pain: true })) === false,
@@ -2473,6 +2595,221 @@ const partialMain = await runSession({ dayKey: "tuesday", light: "green", gateUn
 });
 ok((partialMain.circuits.find(c => c.block === "main") || {}).rounds === 2,
    "one round banked under Green leaves two owed, with the block never retired");
+
+/* --- A FINISHED MAIN ROUND SURVIVES BEING INTERRUPTED ----------------------
+   The seeded resumes above all hand the engine a progress record that ALREADY
+   says a round is banked. Nothing tested that a real session ever writes one.
+   It did not: `sess.roundsCompleted` was incremented per round, but the write to
+   day progress lived past the end of the main block's round loop — past every
+   `return finalize(false)` an interrupted session takes. So stopping a Green day
+   after a clean round one left `mainRoundsCompleted: 0`, and coming back made
+   her do that round over. The record and the streak were right the whole time;
+   only the resume threw the work away. */
+let roundsAtStop = 0;
+const stoppedMidMain = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    // Stop partway through round TWO — round one is finished, round two is not.
+    if (sess.roundsCompleted >= 1 && sess.round >= 2 && sess.running) {
+      roundsAtStop = sess.roundsCompleted;
+      engine.endEarly();
+    }
+  }
+});
+ok(roundsAtStop === 1, "the session really was stopped inside main round two");
+ok(stoppedMidMain.endedEarly === true, "and it ended early rather than running to the end");
+const bankedAfterStop = store.loadDayProgress("tuesday");
+ok(bankedAfterStop && bankedAfterStop.mainRoundsCompleted === 1,
+   "the finished round is on disk the moment it finishes — it used to read 0 here");
+ok(!(bankedAfterStop.done || []).includes("main"),
+   "and the main block is NOT retired, because Green still owes two rounds");
+const resumedAfterStop = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true,
+  seed: () => store.saveDayProgress("tuesday", bankedAfterStop)
+});
+ok((resumedAfterStop.circuits.find(c => c.block === "main") || {}).rounds === 2,
+   "so coming back asks for the two rounds still owed, not all three again");
+
+/* The banking must never pay twice. A session that runs the main block straight
+   through banks each round as it lands AND flushes at the end of the block. */
+const straightThrough = await runSession({ dayKey: "tuesday", light: "yellow", gateUnlocked: true });
+ok(straightThrough.roundsCompleted === 2 && straightThrough.roundsBanked === 2,
+   "every finished round is banked exactly once, never re-added by the block flush");
+
+/* Care still does not touch the training day's record — the guard moved into a
+   shared ownsDayProgress(), so a per-round bank must respect it too. */
+const careMidStop = await runSession({ dayKey: "monday", light: "recovery", gateUnlocked: true,
+  seed: () => store.saveDayProgress("monday",
+    { done: ["warmup"], light: "green", mainRoundsCompleted: 1 })
+});
+ok(careMidStop.roundsBanked === 0, "a care session banks no rounds against the training day");
+ok((store.loadDayProgress("monday") || {}).mainRoundsCompleted === 1,
+   "and leaves the training day's banked round exactly as it found it");
+
+/* --- A PARTLY-FINISHED BLOCK IS NOT ASKED FOR TWICE ------------------------
+   A block was only banked once it was COMPLETE, so stopping four moves into an
+   eight-move warm-up brought all four back on the next attempt. A finished move
+   is finished. Banked by NAME, because the same block assembles differently
+   depending on the valgus gate and the pool load. */
+let stoppedInWarmup = null;
+await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    const warm = sess.ledger.filter(l => l.block === "warmup" && l.status === "done");
+    if (warm.length >= 2 && sess.running) {
+      stoppedInWarmup = warm.map(l => l.name);
+      engine.endEarly();
+    }
+  }
+});
+const warmProg = store.loadDayProgress("tuesday");
+ok(stoppedInWarmup && stoppedInWarmup.length >= 2, "the session really was stopped inside the warm-up");
+ok(warmProg && (warmProg.moves.warmup || []).join("|") === stoppedInWarmup.join("|"),
+   "the moves she finished are banked by name — the block used to bank nothing at all");
+ok(!(warmProg.done || []).includes("warmup"),
+   "and the block is NOT retired, because it is not finished");
+ok(warmProg.bankedCredit === stoppedInWarmup.length,
+   "the credit banked today is the count of finished moves");
+
+const resumedWarmup = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true,
+  seed: () => store.saveDayProgress("tuesday", warmProg)
+});
+const rwWarm = resumedWarmup.circuits.find(c => c.block === "warmup");
+ok(rwWarm && !rwWarm.exercises.some(ex => stoppedInWarmup.includes(ex.name)),
+   "coming back offers only what is left of the warm-up");
+ok(resumedWarmup.bankedCredit === warmProg.bankedCredit,
+   "and the session carries the credit the day has already been paid");
+
+/* A block banked down to nothing simply does not run. */
+const fullWarm = engine.assembleCircuits("tuesday", "green", {})
+  .find(c => c.block === "warmup").exercises.map(ex => ex.name);
+const noWarm = engine.assembleCircuits("tuesday", "green", { skipMoves: { warmup: fullWarm } });
+ok(!noWarm.some(c => c.block === "warmup"),
+   "a warm-up whose every move is banked drops out, same as a retired block");
+
+/* --- MAIN RESUMES INTO A RAGGED ROUND -------------------------------------
+   Main's unit is the round, so a round interrupted halfway is neither finished
+   nor untouched. What is LEFT of it runs as a round of its own, and only then
+   the full rounds still owed. The two circuits must not both call their first
+   round "round 1" — roundBase numbers each from where the day actually is, and
+   that numbering is what keeps the round-completion proof honest. */
+const greenMain = engine.assembleCircuits("tuesday", "green", {})
+  .find(c => c.block === "main");
+const halfRound = greenMain.exercises.slice(0, 3).map(ex => ex.name);
+const ragged = engine.assembleCircuits("tuesday", "green",
+  { mainRounds: 2, mainPartialRound: halfRound });
+const raggedMains = ragged.filter(c => c.block === "main");
+ok(raggedMains.length === 2, "a partly-done round produces a remainder circuit AND the rounds still owed");
+ok(raggedMains[0].partialRound === true && raggedMains[0].rounds === 1
+   && raggedMains[0].exercises.length === greenMain.exercises.length - 3,
+   "the remainder round holds exactly the moves that were not finished");
+ok(raggedMains[0].roundBase === 1 && raggedMains[1].roundBase === 2,
+   "and the rounds are numbered from where the day is, so the two circuits never collide");
+const raggedByRound = engine.countExpectedByRound(ragged);
+ok(raggedByRound[1] === greenMain.exercises.length - 3,
+   "the remainder round declares its OWN smaller size — which is what lets it prove itself finished");
+ok(raggedByRound[2] === greenMain.exercises.length && raggedByRound[3] === greenMain.exercises.length,
+   "while the full rounds after it still declare a full round's worth");
+
+/* The proof still refuses a remainder round that was cut short again. */
+const shortRemainder = raggedMains[0].exercises.slice(0, 1)
+  .map((ex, i) => ({ name: ex.name, block: "main", round: 1, status: "done" }));
+ok(outcome.mainRoundsFromLedger(shortRemainder, raggedByRound) === 0,
+   "a remainder round cut short again credits nothing — the proof survives the ragged round");
+const wholeRemainder = raggedMains[0].exercises
+  .map(ex => ({ name: ex.name, block: "main", round: 1, status: "done" }));
+ok(outcome.mainRoundsFromLedger(wholeRemainder, raggedByRound) === 1,
+   "and finishing it credits the interrupted round exactly once");
+
+/* A partial move is real work, and is still not a finished move: it is offered
+   again rather than banked, so it never ends up permanently half-done. Short-Foot
+   is a 20s timed warm-up hold; ending it around 5s is past MIN_EXERCISE_SECS and
+   well under DONE_WORK_FRACTION, so it lands as `partial` rather than skipped. */
+const CUT = "Short-Foot";
+let cutShort = null;
+await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    if (!cutShort && sess.phase === "work" && sess.currentEx
+        && sess.currentEx.name === CUT && sess.exElapsed >= 5) {
+      cutShort = CUT;
+      engine.advance();
+      return;
+    }
+    if (cutShort && sess.ledger.some(l => l.name === CUT) && sess.running) engine.endEarly();
+  }
+});
+const partialProg = store.loadDayProgress("tuesday");
+const cutRow = engine.sess.ledger.find(l => l.name === cutShort);
+ok(cutRow && cutRow.status === "partial", "the first move really was recorded partial, not skipped");
+ok(!(partialProg.moves.warmup || []).includes(cutShort),
+   "a partial move is NOT banked — it would otherwise never get finished");
+ok((partialProg.moves.warmup || []).length >= 1,
+   "while the moves that were actually finished around it are");
+const resumedPartial = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true,
+  seed: () => store.saveDayProgress("tuesday", partialProg)
+});
+ok((resumedPartial.circuits.find(c => c.block === "warmup") || { exercises: [] })
+     .exercises.some(ex => ex.name === cutShort),
+   "so it is offered again on the next attempt");
+
+/* --- A DAY TRAINED IN TWO GOES, END TO END --------------------------------
+   The whole point of the banking, proven the only way that counts: run a real
+   session, stop it partway, run the resume to the end, and check what the second
+   record actually says. */
+let firstStopped = false;
+const firstSitting = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    // Stop once main round one is banked and round two is under way.
+    if (!firstStopped && sess.roundsCompleted >= 1 && sess.round >= 2 && sess.running) {
+      firstStopped = true;
+      engine.endEarly();
+    }
+  }
+});
+const midProg = store.loadDayProgress("tuesday");
+const firstRec = store.loadSessions()[0];
+ok(firstStopped && firstRec.endedEarly === true, "the first sitting stopped inside main round two");
+ok(store.countsForStreak(firstRec) === false,
+   "and on its own it is short of the day, so it earns no streak yet");
+ok(midProg.bankedCredit > 0 && midProg.mainRoundsCompleted === 1,
+   "it leaves behind both the finished moves and the finished round");
+
+const secondSitting = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true,
+  seed: () => store.saveDayProgress("tuesday", midProg)
+}, { onTick: (ms, sess) => { if (sess.phase === "formcheck") engine.pickClean(); } });
+ok(secondSitting.running === false, "the resume runs to the end");
+ok(secondSitting.bankedCredit === midProg.bankedCredit,
+   "judged with the credit the day had already been paid");
+ok(secondSitting.expectedWork >= secondSitting.dayExpectedWork,
+   "and against the whole day's ask, not its own leftovers");
+const secondRec = store.loadSessions()[0];
+ok(secondRec.bankedCredit === midProg.bankedCredit,
+   "the record carries the banked credit, so it scores the same tomorrow");
+ok(outcome.outcomeOf(secondRec).state === "complete",
+   "a day finished across two sittings reads COMPLETE — it used to be partial forever");
+ok(store.countsForStreak(secondRec) === true, "and it earns the streak day it is owed");
+ok(!store.loadDayProgress("tuesday"),
+   "finishing the day clears its progress record, so tomorrow starts clean");
+
+/* Prep is the one block deliberately re-run rather than banked: it is the
+   movement prep for main, and skipping it would send a resume into main cold. */
+ok((data.DAYS.tuesday.prepMenu || []).length > 0, "tuesday has a prep menu to test with");
+ok(!(midProg.moves.prep || []).length, "prep moves are never banked");
+const resumedPrep = secondSitting.circuits.find(c => c.block === "prep");
+ok(resumedPrep && resumedPrep.exercises.length === data.DAYS.tuesday.prepMenu.length,
+   "so a resume runs the whole prep menu again, rather than going into main cold");
+
+/* Care and try-it still never touch the training day — the same ownsDayProgress
+   guard the round banking uses. */
+const careMoves = await runSession({ dayKey: "monday", light: "recovery", gateUnlocked: true,
+  seed: () => store.saveDayProgress("monday",
+    { done: [], light: "green", mainRoundsCompleted: 0, moves: { warmup: ["Wall Slides"] }, bankedCredit: 1 })
+});
+ok(careMoves.bankedCredit === 0, "a care session carries no training credit");
+const afterCare = store.loadDayProgress("monday");
+ok(afterCare.bankedCredit === 1 && (afterCare.moves.warmup || []).length === 1,
+   "and banks nothing over the training day's own record");
 
 /* --- 1. Recovery must not touch the training day's progress ---------------
    The reproduction: half a Monday, then a body check that says Recovery. The

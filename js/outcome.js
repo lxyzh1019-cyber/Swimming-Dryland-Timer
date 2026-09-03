@@ -27,10 +27,20 @@ export const OUTCOME_VERSION = 2;
    actually asked for. A red day's plan is a third the size of a green one, and
    75% of it is 75% either way: a light day is a smaller ask, never a harder one.
 
-   The fraction is of the DOSE, not of the row count — see streakCredit below.
-   Counting rows was the hole this bar was supposed to close: a `partial` row
-   counted as one whole unit, so three seconds of a thirty-second hold, fifteen
-   times over, cleared 75% of a twenty-move session.
+   The fraction is of the COMPLETION CREDIT, not of the row count — see
+   streakCredit below. Counting rows was the hole this bar was supposed to close:
+   a `partial` row counted as one whole unit, so three seconds of a thirty-second
+   hold, fifteen times over, cleared 75% of a twenty-move session.
+
+   Say what that credit is, exactly, because "75% of the dose" overstates it. A
+   row the engine already called `done` is worth 1 and is not re-measured; only
+   `partial` rows are pro-rated. The engine calls a timed move done at 80% of its
+   clock (DONE_WORK_FRACTION in js/engine.js), so a session performed at that
+   floor all the way through clears this bar at 60% of the literal planned
+   seconds. That is deliberate, not an oversight: the 80% floor is the app's
+   answer to a ten-year-old who is a beat slow off every start, and paying a
+   finished move less than full credit would take it back. The bar is 75% OF THE
+   SESSION COMPLETED, not 75% of the stopwatch.
 
    Recovery does not earn a streak day at all; it FREEZES the one she has. Its
    menu is care, not training, so it cannot add to a training streak — but
@@ -62,6 +72,13 @@ function rowIsWork(row, countPartial) {
    calling a timed dose `done` (DONE_WORK_FRACTION in js/engine.js) — this
    applies the same honesty one level up, by paying a partial row the fraction
    of the dose it actually produced.
+
+   A `done` row is worth 1 and is NOT re-measured against its clock. That is the
+   whole reason the engine has an 80% floor for calling a timed move done: below
+   it the row is `partial` and gets pro-rated here, at or above it the move is
+   finished and paid in full. Pro-rating done rows as well would move the floor
+   without saying so, and is a different decision from this one — see
+   STREAK_WORK_FRACTION above for what the resulting bar does and does not mean.
 
    The numbers come off the ledger row itself (see recordExercise in
    js/engine.js), so nothing new has to be measured or stored. A partial row
@@ -133,8 +150,22 @@ export function deriveSessionOutcome(input = {}) {
   const {
     ledger = [], expectedWork = null, safetyStop = false, explicitAbort = false,
     sessionType = null, practice = false, outcomeVersion = null,
-    expectedByRound = null, roundsDone = null
+    expectedByRound = null, roundsDone = null, bankedCredit = 0
   } = input;
+
+  /* WORK ALREADY BANKED TODAY, before this sitting started.
+
+     A day can be trained in two goes. The second used to be judged against its
+     own leftovers alone, which cut both ways: a sitting that finished everything
+     still owed could not read as completing the DAY, and a two-move sitting on a
+     barely-started day cleared 75% of two moves and bought the streak.
+
+     So `expectedWork` is the whole day's ask, and this is what the day has
+     already been paid. Only FINISHED moves are banked (see bankMove in
+     js/engine.js), and a finished move is worth exactly 1, so the count is the
+     credit. Zero for a first sitting and for every record written before this,
+     which is what keeps their scores identical. */
+  const banked = Math.max(0, Number(bankedCredit) || 0);
 
   const rows = ledger || [];
   const countPartial = Number(outcomeVersion) >= 1;
@@ -165,9 +196,11 @@ export function deriveSessionOutcome(input = {}) {
   // Completion is "every expected instance was DONE" — never "the loop ended".
   // Partial rows do not complete a session even though they are real work.
   const expected = Number.isFinite(expectedWork) ? expectedWork : null;
+  // `allRowsDone` stays about THIS sitting: a sitting with a skipped move in it
+  // is not a finished sitting, however much of the day was banked before it.
   const allRowsDone = rows.length > 0 && rows.every(l => l && l.status === "done");
   const completedFully = expected !== null
-    ? (doneRows >= expected && rows.length >= expected && allRowsDone)
+    ? (doneRows + banked >= expected && rows.length + banked >= expected && allRowsDone)
     : rows.length ? allRowsDone
     : input.completedFully === true;
 
@@ -198,7 +231,7 @@ export function deriveSessionOutcome(input = {}) {
      because a rule changed underneath her, which is exactly the kind of thing
      the streak must never do. */
   const streakJudged = Number(outcomeVersion) >= 2;
-  const streakWork = rows.reduce((a, l) => a + streakCredit(l, countPartial), 0);
+  const streakWork = banked + rows.reduce((a, l) => a + streakCredit(l, countPartial), 0);
   const workRatio = expected !== null && expected > 0 ? streakWork / expected : null;
   let countsForStreak;
   if (!streakJudged || workRatio === null) {
@@ -248,6 +281,7 @@ export function outcomeOf(entry) {
     expectedWork: Number.isFinite(entry.expectedWork) ? entry.expectedWork : null,
     expectedByRound: entry.expectedByRound || null,
     roundsDone: Number.isFinite(entry.roundsDone) ? entry.roundsDone : null,
+    bankedCredit: Number.isFinite(entry.bankedCredit) ? entry.bankedCredit : 0,
     safetyStop: !!(entry.safetyStop || entry.pain),
     explicitAbort: entry.endedEarly === true,
     sessionType: entry.sessionType || (entry.spa ? "spa" : null),

@@ -90,6 +90,10 @@ function resultCard(vm, { areaLabel = "" } = {}) {
         <div style="font-size:15px;font-weight:700;color:var(--ink-soft);margin-top:5px;line-height:1.45;">${vm.resultDesc}</div>
       </div>
     </div>
+    ${vm.combinedLine ? `<div style="display:flex;align-items:flex-start;gap:8px;background:var(--surface-2);border-left:4px solid ${vm.light.color};border-radius:10px;padding:10px 12px;margin-bottom:16px;">
+      <span style="font-size:14px;flex-shrink:0;line-height:1.45;" aria-hidden="true">⚖️</span>
+      <span style="font-size:13px;font-weight:800;color:var(--ink-soft);line-height:1.45;">${vm.combinedLine}</span>
+    </div>` : ""}
     ${vm.suggestionLine ? `<div style="display:flex;align-items:flex-start;gap:8px;background:var(--surface-2);border-left:4px solid ${vm.light.color};border-radius:10px;padding:10px 12px;margin-bottom:16px;">
       <span style="font-size:14px;flex-shrink:0;line-height:1.45;" aria-hidden="true">🧑</span>
       <span style="font-size:13px;font-weight:800;color:var(--ink-soft);line-height:1.45;">${vm.suggestionLine}</span>

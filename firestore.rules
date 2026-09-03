@@ -1,0 +1,79 @@
+rules_version = '2';
+
+/* ============================================================
+   FIRESTORE RULES — Swimming Dryland Timer
+
+   The app has no sign-in. It runs on two phones in one family, and the whole
+   point of the mirror is that a session recorded on hers shows up on the
+   grown-up's. There is nobody to authenticate against, so these rules cannot
+   be about identity. What they CAN do — and what an open database does not —
+   is confine the app to the one collection it uses, refuse anything that does
+   not look like one of its three document shapes, and make deletion impossible
+   so a mis-tap or a stale client can never take her history with it.
+
+   Everything lives in ONE collection, `jess_swimming_sessions`, because adding
+   a second would have meant a second rule to get wrong (see the comments in
+   js/firebase.js). It holds three shapes, told apart by `kind`:
+
+     - a session document          (no `kind`; written by fsAddSession)
+     - `journey-<athlete>`         (kind: "journey")
+     - `readiness-<athlete>`       (kind: "readiness", abnormal checks only)
+
+   NOT VERIFIED FROM THE REPOSITORY. Rules only do anything once deployed —
+   see the deploy steps in README.md. Until then, treat cross-device saving as
+   untested, whatever this file says.
+   ============================================================ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /jess_swimming_sessions/{docId} {
+
+      /* Reading is the mirror's entire purpose, and the collection holds no
+         secrets — training rows, XP, and the sore spots a grown-up is meant to
+         see. fsGetRecent and fsGetAll both order by `createdAt`. */
+      allow read: if true;
+
+      /* Size is the one hard limit worth enforcing: a runaway client that
+         appends to a document forever is the realistic failure here, not an
+         attacker. 1 MB is Firestore's own ceiling; 200 KB is far above any
+         real session and far below anything that could quietly rot the store. */
+      allow create: if request.resource.data.size() < 200 * 1024
+                    && isKnownShape(request.resource.data);
+
+      /* fsUpdateSession patches a session row after the fact (mood, reflection,
+         the quiz) and fsSaveReadiness / fsSetJourney rewrite their own single
+         doc wholesale. A write may not change what KIND of document this is. */
+      allow update: if request.resource.data.size() < 200 * 1024
+                    && isKnownShape(request.resource.data)
+                    && sameKind(resource.data, request.resource.data);
+
+      /* The app never deletes. Nothing should be able to. */
+      allow delete: if false;
+    }
+
+    function kindOf(d) {
+      return 'kind' in d ? d.kind : 'session';
+    }
+
+    function sameKind(before, after) {
+      return kindOf(before) == kindOf(after);
+    }
+
+    /* A session row is identified by the fields every writer sets; the two
+       singleton docs by their `kind`. Anything else is not this app's. */
+    function isKnownShape(d) {
+      return kindOf(d) == 'journey'
+          || kindOf(d) == 'readiness'
+          || (kindOf(d) == 'session' && d.keys().hasAny(['isoDate', 'dayKey']));
+    }
+
+    /* Firestore denies by default, so this only says out loud what the default
+       already does: nothing outside this app's own collection is reachable. It
+       does NOT narrow the rule above — Firestore grants access when ANY match
+       allows it, so a catch-all deny can never be used to claw one back. */
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

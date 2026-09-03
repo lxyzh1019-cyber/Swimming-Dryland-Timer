@@ -464,6 +464,20 @@ ok(rv.wasOverridden === false, "returning to the suggested light clears the over
 ok(rv.suggestionLine === "", "and the two-decision line goes away with it");
 ok(/2 rounds/.test(rv.resultDesc), "the body-check wording comes back");
 
+/* ---- the saved check records BOTH readings, not just the winner ----------
+   A Yellow body map that lost to a Recovery readiness score is the interesting
+   half of that morning, and the grown-up's log had no way to see it. */
+gate.lockGate(); resetGateState();
+main.state.readiness = rvm.newReadinessFlow("monday");
+["q_sleep", "q_light", "q_ready"].forEach(q => rvm.answerQuestion(main.state.readiness, q, "no"));
+rvm.answerQuestion(main.state.readiness, "q_pain", "no");
+main.actions.rSetZoneSev("2|2");
+main.actions.rResultCta("continue");
+const savedCheck = store.loadReadiness();
+ok(savedCheck.light === "recovery", "the check that is saved is the combined one");
+ok(savedCheck.bodyLight === "yellow" && savedCheck.readinessLight === "recovery",
+   "and it carries both readings, so the log can say why the smaller day was run");
+
 /* Severity 4 carries action "back". Overriding it used to leave a button that
    EXITED instead of starting — dead on the one path a grown-up most needs. */
 gate.lockGate(); resetGateState();

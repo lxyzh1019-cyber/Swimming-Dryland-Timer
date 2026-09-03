@@ -16,8 +16,22 @@ export function newReadinessFlow(dayKey, practice) {
     // is what the check itself produced, kept so the app can show both decisions
     // and so a grown-up's override is never mistaken for the body's own answer.
     severity: null, light: "green", suggestedLight: "green", overridden: false,
+    // The two signals the check produces, kept SEPARATELY so the final light can
+    // be the more cautious of them rather than whichever spoke last.
+    readinessLight: null, bodyLight: null,
     resultSource: "readiness", readinessDone: false, grownupOk: false
   };
+}
+
+/* Caution, in order. A light is never quietly downgraded by a second opinion:
+   where the two signals disagree, the session runs the smaller day. */
+export const LIGHT_ORDER = ["green", "yellow", "red", "recovery"];
+
+export function moreCautious(a, b) {
+  const ia = LIGHT_ORDER.indexOf(a), ib = LIGHT_ORDER.indexOf(b);
+  if (ia < 0) return ib < 0 ? "green" : b;
+  if (ib < 0) return a;
+  return ia >= ib ? a : b;
 }
 
 /* Toggle the "a grown-up said it's OK" confirmation (pain severity 3 gate). */
@@ -27,15 +41,30 @@ export function confirmGrownup(r) { r.grownupOk = !r.grownupOk; }
 
 export function answerQuestion(r, id, val) {
   r.answers[id] = val;
+  // Score FIRST, then route. Routing first is what threw the general readiness
+  // answers away on every sore morning — see READINESS_QS in js/data.js.
+  scoreReadiness(r);
   if (id === "q_pain" && val === "no") { r.step = "bodyArea"; return; }
   maybeFinish(r);
+}
+
+/* The general-readiness verdict on its own: three yes/no answers about sleep,
+   muscles and energy. Computed whenever those three are in, whatever the pain
+   answer was, so the body map has something to be weighed against. Stays null
+   until all three are there — a saved flow from before this, or a test that taps
+   only the pain question, has no readiness signal and the body map decides
+   alone, exactly as it used to. */
+function scoreReadiness(r) {
+  const need = ["q_sleep", "q_light", "q_ready"];
+  if (!need.every(k => r.answers[k] != null)) return;
+  const yes = need.filter(k => r.answers[k] === "yes").length;
+  r.readinessLight = yes >= 3 ? "green" : yes === 2 ? "yellow" : yes === 1 ? "red" : "recovery";
 }
 
 function maybeFinish(r) {
   const need = ["q_pain", "q_sleep", "q_light", "q_ready"];
   if (!need.every(k => r.answers[k] != null) || r.answers.q_pain !== "yes") return;
-  const yes = ["q_sleep", "q_light", "q_ready"].filter(k => r.answers[k] === "yes").length;
-  r.light = yes >= 3 ? "green" : yes === 2 ? "yellow" : yes === 1 ? "red" : "recovery";
+  r.light = r.readinessLight || "green";
   r.suggestedLight = r.light;
   r.readinessDone = true;
   r.resultSource = "readiness";
@@ -90,17 +119,28 @@ export function setZoneSev(r, num, level) {
   r.zoneSev = zs;
   r.pendingZone = null;
   r.severity = worst || null;
-  r.light = worst ? map[worst] : "green";
+  r.bodyLight = worst ? map[worst] : "green";
+  /* Both signals, and we run the smaller day. The body map used to simply
+     OVERWRITE the light, so a Recovery-grade set of readiness answers came out
+     Yellow because one shoulder was merely tired. Neither reading is wrong —
+     they are about different things — so neither gets to cancel the other. */
+  r.light = moreCautious(r.bodyLight, r.readinessLight);
   r.suggestedLight = r.light;      // a new mark replaces any earlier override
   r.overridden = false;
-  r.resultSource = worst ? "bodycheck" : "readiness";
+  // Which signal actually produced the light, so the result card can show the
+  // body-check copy only when the body check is the one being acted on.
+  r.resultSource = worst && r.light === r.bodyLight ? "bodycheck" : "readiness";
   r.grownupOk = false;   // any change re-requires the grown-up confirm
 }
 
 export function resetBodyCheck(r) {
-  // "Rest 1–2 min, then re-check": clear the marks so she can redo the body check.
+  // "Rest 1–2 min, then re-check": clear the MARKS so she can redo the body
+  // check. Her readiness answers are not marks and are not cleared — re-checking
+  // a sore shoulder must not quietly discard a Red night's sleep.
   r.severity = null; r.zoneSev = {}; r.resultSource = "readiness";
-  r.light = "green"; r.suggestedLight = "green"; r.overridden = false; r.grownupOk = false;
+  r.bodyLight = null;
+  r.light = r.readinessLight || "green";
+  r.suggestedLight = r.light; r.overridden = false; r.grownupOk = false;
 }
 
 /* ---- view-model ---- */
@@ -210,6 +250,14 @@ export function buildReadinessVM(r, isWide) {
      left a button that quietly EXITED instead of starting, which is the one
      case a grown-up is most likely to be using the override for. */
   const showBodyResult = isBodyResultPath && !wasOverridden;
+  /* The two inputs, named, whenever they differed — otherwise a Recovery light
+     sitting over a Yellow body map looks like the app got the severity wrong. */
+  const bodyLight = r.bodyLight || null;
+  const readinessLight = r.readinessLight || null;
+  const combinedLine = bodyLight && readinessLight && bodyLight !== readinessLight
+    ? "Body Check said " + lightWord(bodyLight) + ". Quick check said "
+      + lightWord(readinessLight) + ". Today runs the smaller one."
+    : "";
   const resultDesc = showBodyResult ? BR.desc : light.desc;
   // action encoded for the delegated handler: continue | retry | back
   const resultCta = showBodyResult
@@ -269,10 +317,15 @@ export function buildReadinessVM(r, isWide) {
     showInlineReadinessResult, showInlineBodyResult,
     noZonesYet: step === "bodyArea" && selectedNums.length === 0,
     isBodyResultPath, resultDesc, resultCta,
-    suggestionLine, wasOverridden, suggestedLight: suggested,
+    suggestionLine, combinedLine, wasOverridden, suggestedLight: suggested,
+    bodyLight, readinessLight,
     // Pain severity 3 ("changed movement") must not be self-cleared: require an
     // explicit grown-up confirmation before the Continue button is enabled.
-    needsGrownupConfirm: isBodyResultPath && !!BR.needsGrownup,
+    /* The severity-3 pain gate is about the PAIN, not about which signal won.
+       Keying it to the body-result path meant a readiness score strict enough to
+       drive the light past Red took the grown-up confirmation away with it —
+       exactly backwards, since that is a day with pain AND a flat body. */
+    needsGrownupConfirm: (r.severity || 0) >= 3 && !!BODY_RESULTS[3].needsGrownup,
     grownupConfirmed: !!r.grownupOk,
     questions,
     // Only offer the one-tap reuse when there is genuinely a recent check to
