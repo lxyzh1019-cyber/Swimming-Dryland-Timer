@@ -1,7 +1,22 @@
 /* ============================================================
    PROGRESS screen — streak hero, prize wallet, milestones,
    training log rail, LVL hero + Ocean Story rank cards.
+
+   EVERY STORED STRING ON THIS SCREEN GOES THROUGH escapeHtml.
+
+   Prize labels and icons, the athlete's own reflection notes and the day
+   titles all arrive from persisted state — the local store, a restored backup,
+   or the cloud mirror, which is a shared collection with no sign-in in front of
+   it. They were interpolated raw into innerHTML here, so a stored string
+   containing markup ran as markup on the screen a kid and a parent read. The
+   grown-up screen escaped its fields throughout; this one did not.
+
+   The rule is the whole rule: nothing that was ever written to storage or
+   arrived over a wire is interpolated without escaping it, and that includes
+   values going into attributes.
    ============================================================ */
+
+import { escapeHtml } from "../util.js";
 
 export function progressScreen(vm) {
   return `
@@ -36,11 +51,11 @@ export function progressScreen(vm) {
             <div data-list="1" style="max-height:260px;display:flex;flex-direction:column;gap:8px;padding-bottom:8px;">
               ${vm.prizesWon.map(pz => `
               <div style="${pz.cardStyle}">
-                <span style="font-size:22px;flex-shrink:0;">${pz.icon}</span>
-                <span style="flex:1;font-size:14px;font-weight:800;color:var(--ink);line-height:1.2;">${pz.label}</span>
+                <span style="font-size:22px;flex-shrink:0;">${escapeHtml(pz.icon)}</span>
+                <span style="flex:1;font-size:14px;font-weight:800;color:var(--ink);line-height:1.2;">${escapeHtml(pz.label)}</span>
                 ${pz.spent
-                  ? `<span style="${pz.redeemBtnStyle}display:inline-flex;align-items:center;">${pz.redeemLabel}</span>`
-                  : `<button type="button" data-action="redeemPrize" data-arg="${pz.id}" style="${pz.redeemBtnStyle}">${pz.redeemLabel}</button>`}
+                  ? `<span style="${pz.redeemBtnStyle}display:inline-flex;align-items:center;">${escapeHtml(pz.redeemLabel)}</span>`
+                  : `<button type="button" data-action="redeemPrize" data-arg="${escapeHtml(pz.id)}" style="${pz.redeemBtnStyle}">${escapeHtml(pz.redeemLabel)}</button>`}
               </div>`).join("")}
             </div>
           </div>`
@@ -81,7 +96,7 @@ export function progressScreen(vm) {
       <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);margin-bottom:16px;">
         <div style="font-weight:900;font-size:12px;letter-spacing:0.05em;color:var(--ink-soft);margin-bottom:14px;text-transform:uppercase;">Milestones</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;">
-          ${vm.milestones.map(ms => `<div style="${ms.style}">${ms.icon} ${ms.label}</div>`).join("")}
+          ${vm.milestones.map(ms => `<div style="${ms.style}">${escapeHtml(ms.icon)} ${escapeHtml(ms.label)}</div>`).join("")}
         </div>
       </div>
 
@@ -97,12 +112,12 @@ export function progressScreen(vm) {
             ${vm.hasLog ? vm.logItems.map(hi => `
               <div style="width:200px;flex-shrink:0;background:var(--surface-2);border-radius:var(--radius-lg);padding:14px;display:flex;flex-direction:column;gap:6px;box-sizing:border-box;scroll-snap-align:start;">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                  <span style="font-size:26px;line-height:1;" title="${hi.moodLabel}" aria-label="${hi.moodLabel}">${hi.moodEmoji}</span>
-                  <span style="${hi.lightChipStyle}">${hi.lightLabel}</span>
+                  <span style="font-size:26px;line-height:1;" title="${escapeHtml(hi.moodLabel)}" aria-label="${escapeHtml(hi.moodLabel)}">${escapeHtml(hi.moodEmoji)}</span>
+                  <span style="${hi.lightChipStyle}">${escapeHtml(hi.lightLabel)}</span>
                 </div>
-                <div style="font-weight:900;font-size:14px;color:var(--ink);line-height:1.25;">${hi.dayTitle}</div>
-                <div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${hi.dateStr} · ${hi.duration}</div>
-                ${hi.note ? `<div style="font-size:12px;font-weight:700;color:var(--sun-ink);line-height:1.35;">${hi.note}</div>` : ""}
+                <div style="font-weight:900;font-size:14px;color:var(--ink);line-height:1.25;">${escapeHtml(hi.dayTitle)}</div>
+                <div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${escapeHtml(hi.dateStr)} · ${escapeHtml(hi.duration)}</div>
+                ${hi.note ? `<div style="font-size:12px;font-weight:700;color:var(--sun-ink);line-height:1.35;">${escapeHtml(hi.note)}</div>` : ""}
               </div>`).join("")
             : `<div style="padding:14px;font-size:14px;font-weight:700;color:var(--ink-soft);">No sessions yet — your first one lands here. 🌊</div>`}
             <button type="button" data-action="nav" data-arg="grownup" style="width:150px;flex-shrink:0;background:var(--aqua-wash);border:2px dashed var(--aqua-light);border-radius:var(--radius-lg);padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;scroll-snap-align:start;">

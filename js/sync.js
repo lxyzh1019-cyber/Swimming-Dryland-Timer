@@ -43,7 +43,11 @@ const BACKFILL_LIMIT = 40;
    restored", and the app carries on with whatever is on the device.
    Returns { added, uploaded, xp }. */
 export async function restoreFromCloud() {
-  const idle = { added: 0, uploaded: 0, xp: 0 };
+  /* `reachedCloud` says whether the mirror actually ANSWERED, which is a
+     different question from whether anything came back. The gate needs it to
+     tell "this family is new" apart from "we could not ask" — see
+     setBootstrapState in js/gate.js. */
+  const idle = { added: 0, uploaded: 0, xp: 0, reachedCloud: false };
   if (_done) return idle;
   _done = true;
   // Mirroring off (privacy opt-out) means there is nothing of ours up there,
@@ -109,7 +113,7 @@ export async function restoreFromCloud() {
     // prize claimed from here on is claimed against a number both devices agree
     // on. See xpIsPending / addPrize in js/store.js.
     noteSyncResult(true);
-    return { added, uploaded, xp };
+    return { added, uploaded, xp, reachedCloud: true };
   } catch (e) {
     console.warn("Cloud sync skipped:", e);
     // Not an error worth showing: the app runs offline by design. It does mean

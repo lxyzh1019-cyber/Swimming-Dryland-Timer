@@ -2237,7 +2237,21 @@ ok(gate.gateChallenge === undefined && gate.answerGate === undefined,
 /* --- first run on a FRESH device: the PIN goes on like a device passcode --- */
 ok(gate.hasGrownupPin() === false, "a fresh device has no PIN");
 ok(gate.isFreshDevice() === true, "and no training on it either");
-ok(gate.gateMode() === "setPin", "so the first PIN can simply be chosen — there is nothing yet to protect");
+/* ...but not until the cloud restore has answered. An empty session list on a
+   wiped iPad is indistinguishable from a brand-new one until the mirror has
+   been asked, and the restore is fired unawaited at boot — so for the first
+   second of every launch, anyone tapping Grown-up could set a fresh PIN over a
+   family that already had one. */
+ok(gate.bootstrapState() === "checking", "a launch starts out not yet knowing whether there is cloud history");
+ok(gate.gateMode() === "checking", "and refuses to hand out a free first PIN while it does not know");
+gate.setBootstrapState("restored");
+ok(gate.gateMode() === "passkey", "a device that turns out to HAVE history asks for the passkey, not a new PIN");
+gate.setBootstrapState("empty");
+ok(gate.gateMode() === "setPin", "the mirror answering 'nothing here' is what makes the device genuinely fresh");
+ok(gate.gateNeedsOfflineSetup() === false, "and that answer needs no warning — it is a real answer");
+gate.setBootstrapState("offline-unverified");
+ok(gate.gateNeedsOfflineSetup() === true,
+   "a device that could not reach the mirror may still be set up, but must say so first");
 ok(gate.choosePin("12") === false, "a two-digit PIN is still refused");
 ok(gate.choosePin("4821") === true, "a real one is set");
 ok(gate.gateUnlocked() === true, "and setting it unlocks in the same step");
@@ -3527,9 +3541,41 @@ const nasty = `<img src=x onerror="window.__pwned=1">`;
 store.saveJourney({ xp: 5000, sessionXp: 5000, pendingDraws: 0,
   prizesWon: [{ id: "p-nasty", label: nasty, icon: nasty, wonAt: Date.now(), redeemed: false }] });
 const progMarkup = pscreen.progressScreen(pvm.buildProgressVM({ progressScope: "4w", logScope: "week" }));
-ok(!progMarkup.includes("onerror="),
+ok(!/<img\s+src=x/i.test(progMarkup),
    "a prize label out of the cloud renders as text on the progress screen, never as markup");
-ok(progMarkup.includes("&lt;img"), "it is escaped, not silently dropped — she still sees what is stored");
+ok(progMarkup.includes("&lt;img") && progMarkup.includes("&quot;"),
+   "it is escaped rather than silently dropped — she still sees exactly what is stored");
+/* The prize id goes into a data-arg ATTRIBUTE, which is its own escaping
+   context and its own way to break out of one. */
+ok(!/data-arg="[^"]*"[^>]*onerror/i.test(progMarkup),
+   "and an id carrying a quote cannot climb out of the attribute it is written into");
+
+/* --- MALFORMED ROWS ARE QUARANTINED, NOT MERGED --------------------------
+   Everything merged arrives from a collection with no sign-in in front of it,
+   or a JSON file picked off a disk. A row that is merely the wrong shape does
+   damage without anyone being hostile: a `ledger` that is a string reaches
+   every screen that iterates it, and a NaN duration poisons an average. */
+localStorage.clear(); store.migrate();
+const goodRow = { isoDate: new Date().toISOString(), dayKey: "monday",
+                  completedFully: true, xpEarned: 100, ledger: [], durationSecs: 900 };
+const badRows = [
+  { ...goodRow, isoDate: "not-a-date" },
+  { ...goodRow, isoDate: new Date(Date.now() - 1e7).toISOString(), ledger: "<script>" },
+  { ...goodRow, isoDate: new Date(Date.now() - 2e7).toISOString(), durationSecs: "twenty" },
+  { ...goodRow, isoDate: new Date(Date.now() - 3e7).toISOString(), perExercise: { 0: "x" } },
+  { ...goodRow, isoDate: new Date(Date.now() - 4e7).toISOString(), dayKey: { evil: true } }
+];
+ok(store.mergeSessions([goodRow, ...badRows]) === 1,
+   "exactly the one well-formed row is merged; the malformed ones are turned away");
+ok(store.loadSessions().length === 1, "and nothing malformed reaches the log");
+ok(store.loadSessions().every(r => Array.isArray(r.ledger)),
+   "so every row a screen iterates really is iterable");
+ok(Number.isFinite(store.rebuildJourneyXp()),
+   "and the totals stay numbers rather than becoming NaN on the next boot");
+ok(store.mergeCloudJourney({ kind: "journey", prizesWon: "all of them" }) === false,
+   "a journey snapshot whose wallet is not a list is refused whole");
+ok(store.mergeCloudJourney({ kind: "journey", qLedger: [1, 2, 3] }) === false,
+   "and so is one whose quiz ledger is the wrong kind of thing");
 
 /* --- 16. THE SAFETY GATE IS IN THE HANDLER, NOT ONLY IN THE MARKUP -------
    A severity-3 body check disables the continue button until a grown-up
@@ -3551,6 +3597,15 @@ ok(fs.existsSync(new URL("../sw.js", import.meta.url)),
    "and a service worker, so a fresh launch with no network still gets the shell");
 const swSrc = fs.readFileSync(new URL("../sw.js", import.meta.url), "utf8");
 ok(/CACHE_VERSION/.test(swSrc), "the cache is versioned, so a release can retire the old one");
-ok(!/firestore|googleapis/i.test(swSrc), "and nothing from the cloud mirror is cached into a shared shell");
+/* The property that matters is not the absence of a word, it is that the fetch
+   handler refuses anything that is not a same-origin GET before it can reach a
+   cache.put — the mirror carries body-map notes and readiness answers. */
+ok(/url\.origin\s*!==\s*self\.location\.origin/.test(swSrc) && /req\.method\s*!==\s*"GET"/.test(swSrc),
+   "and nothing cross-origin or non-GET reaches the cache — the mirror is never cached into a shared shell");
+ok(!SHELL_LISTED_CLOUD(swSrc), "no cloud endpoint is in the precached shell list either");
+function SHELL_LISTED_CLOUD(src) {
+  const list = (src.match(/const SHELL = \[([\s\S]*?)\];/) || [])[1] || "";
+  return /https?:/i.test(list);
+}
 
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

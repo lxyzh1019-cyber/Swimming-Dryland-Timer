@@ -132,6 +132,51 @@ export function gateUnlocked(now = Date.now()) {
    history, the passkey is the only way to set or change one. */
 export function isFreshDevice() { return (loadSessions() || []).length === 0; }
 
+/* ---- IS THIS DEVICE ACTUALLY FRESH, OR HAVE WE JUST NOT LOOKED YET? -------
+
+   "No sessions on this device" was the whole test, and the cloud restore that
+   would have filled them in is fired off unawaited at boot (see js/main.js).
+   So for the first second or two of every launch a wiped iPad — or a new one
+   in the same family — looks exactly like a brand-new device. Tapping Grown-up
+   in that window let anyone set a fresh PIN over a family that already had
+   one, which is the whole protection gone to a race.
+
+   The bootstrap has a state now, and the free first PIN is only offered from
+   one of them:
+
+     "checking"           — a restore is in flight. Nothing may be decided.
+     "empty"              — the mirror answered, and there is genuinely nothing.
+     "restored"           — history came back; this is not a new family.
+     "offline-unverified" — we could not reach the mirror at all.
+
+   Offline-unverified is the awkward one, and it cannot be resolved by waiting:
+   with no sign-in there is no other way to ask. It is allowed, because a family
+   that is genuinely new and genuinely offline must still be able to set up the
+   app — but only through a path that SAYS so, so an adult is choosing it rather
+   than the app quietly inferring "new family" from an empty list. */
+let bootstrap = "checking";
+
+export function setBootstrapState(state) {
+  if (["checking", "empty", "restored", "offline-unverified"].includes(state)) {
+    bootstrap = state;
+  }
+  // A restore that found history retracts any free-PIN right the checking phase
+  // had not yet granted — the family is not new after all.
+  if (state === "restored") mayChoosePin = false;
+  return bootstrap;
+}
+export function bootstrapState() { return bootstrap; }
+
+/* Cloud history has been ruled out — either the mirror said so, or we could not
+   ask. The second case is deliberately not silent: see gateNeedsOfflineSetup. */
+export function cloudHistoryResolved() { return bootstrap !== "checking"; }
+
+/* An adult is about to create the first PIN on a device whose cloud history we
+   could not check. The screen must say that before they do. */
+export function gateNeedsOfflineSetup() {
+  return bootstrap === "offline-unverified" && !hasGrownupPin() && isFreshDevice();
+}
+
 /* How the app should ask right now:
      "setPin"  — allowed to choose a PIN (fresh device, or the passkey just said so)
      "pin"     — a PIN is set; type it
@@ -139,9 +184,23 @@ export function isFreshDevice() { return (loadSessions() || []).length === 0; }
                  reset one: the ceremony is the only way through */
 export function gateMode(wantsNewPin = false) {
   if (mayChoosePin) return "setPin";
-  if (!hasGrownupPin() && isFreshDevice()) { mayChoosePin = true; return "setPin"; }
+  /* Nothing may be decided from an empty session list while the restore that
+     would fill it in is still in flight — "checking" is not "new family". And
+     "restored" is a positive answer that this family is NOT new, which outranks
+     whatever the local list happens to hold at this instant: a restore can
+     report history without every row having landed yet. Only a mirror that
+     answered "nothing here", or one that could not be reached at all, leaves
+     room for a first PIN. */
+  const mayBeNewFamily = bootstrap === "empty" || bootstrap === "offline-unverified";
+  if (!hasGrownupPin() && isFreshDevice() && mayBeNewFamily) {
+    mayChoosePin = true; return "setPin";
+  }
   if (wantsNewPin) return "passkey";
-  return hasGrownupPin() ? "pin" : "passkey";
+  if (hasGrownupPin()) return "pin";
+  // No PIN, and either the restore is still running or it brought history back.
+  // Waiting is a second; the passkey is the way through if it turns out there
+  // really is nothing to restore.
+  return bootstrap === "checking" ? "checking" : "passkey";
 }
 
 /* Why a PIN was refused — shown under the field, so "nothing happened" never

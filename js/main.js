@@ -13,7 +13,7 @@ import { downloadBackup, restoreBackupFile } from "./backup.js";
 import { buildTodayVM, journeyPathScrollIntoView } from "./vm/today.js";
 import { todayWide, todayNarrow } from "./screens/today.js";
 import { page, shellWithRail, bottomNav } from "./screens/shell.js";
-import { newReadinessFlow, answerQuestion, setZoneSev, resetBodyCheck, confirmGrownup, buildReadinessVM } from "./vm/readiness.js";
+import { newReadinessFlow, answerQuestion, setZoneSev, resetBodyCheck, confirmGrownup, buildReadinessVM, mayStartFromReadiness } from "./vm/readiness.js";
 import { readinessScreen } from "./screens/readiness.js";
 import * as engine from "./engine.js";
 import { buildSessionVM, sessionQuizFor } from "./vm/session.js";
@@ -28,8 +28,9 @@ import { grownupScreen } from "./screens/grownup.js";
 import { requireGrownup, answerPin, choosePin, allowPinChoice, clearPinChoice,
          pinRefusalReason, gateMode, lockGate, gateUnlocked, unlockByPasskey,
          hasGrownupPin, isFreshDevice, PIN_MIN_DIGITS, PIN_MAX_DIGITS,
-         GATE_REASON } from "./gate.js";
+         GATE_REASON, setBootstrapState, bootstrapState, gateNeedsOfflineSetup } from "./gate.js";
 import { passkeySupported, hasPasskey, enrollPasskey, verifyPasskey, forgetPasskey } from "./passkey.js";
+import { loadSessions } from "./store.js";
 import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS, recordFormVerdict, repairPrizeWallet, redeemedPrizesForReview, restorePrize } from "./store.js";
 
 export const state = {
@@ -129,7 +130,11 @@ function gateHtml() {
     mode === "pin" ? `
       <div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:10px;">Enter the grown-up PIN.</div>
       <input type="password" inputmode="numeric" autocomplete="off" data-input="gatePin" style="${inputStyle}" placeholder="PIN">`
+    : mode === "checking" ? `
+      <div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:4px;">Checking for this family's history…</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.5;">This device has no training on it yet. Before it offers to set a new grown-up PIN, it checks whether the family already has one — a wiped or brand-new iPad looks identical to a first-ever setup until that answer comes back. One moment.</div>`
     : mode === "setPin" ? `
+      ${gateNeedsOfflineSetup() ? `<div style="background:var(--sun-wash);border:2px solid var(--sun);border-radius:12px;padding:11px 13px;margin-bottom:10px;font-size:13px;font-weight:800;color:var(--sun-ink);line-height:1.45;">⚠️ This device could not reach the family's saved history, so it cannot tell whether a grown-up PIN already exists somewhere else. Setting one here creates a NEW setup. If this family has used the app before, connect to the internet and reopen the app instead.</div>` : ""}
       <div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:4px;">Choose a grown-up PIN.</div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.5;margin-bottom:10px;">${PIN_MIN_DIGITS}–${PIN_MAX_DIGITS} digits. It stays on this device — never in a backup file, never sent anywhere. Pick one she doesn't know.${hasPasskey() ? "" : ` <strong>There is no passkey on this device yet, so a forgotten PIN could not be reset.</strong> Set one up below, or write the PIN down.`}</div>
       <input type="password" inputmode="numeric" autocomplete="off" data-input="gateNewPin" style="${inputStyle}" placeholder="New PIN">
@@ -151,7 +156,7 @@ function gateHtml() {
       ${body}
       ${state.gateError ? `<div role="alert" style="margin-top:8px;font-size:13px;font-weight:800;color:var(--stop-ink);line-height:1.45;">${escapeHtml(state.gateError)}</div>` : ""}
       <div style="display:flex;gap:10px;margin-top:14px;">
-        ${mode === "passkey" ? "" : btn("submitGate", mode === "setPin" ? "Set PIN" : "Unlock", true)}
+        ${mode === "passkey" || mode === "checking" ? "" : btn("submitGate", mode === "setPin" ? "Set PIN" : "Unlock", true)}
         ${btn("cancelGate", "Cancel", false)}
       </div>
       ${mode === "pin" ? `<button type="button" data-action="forgotPin" style="margin-top:10px;background:none;border:none;padding:4px;color:var(--ink-soft);font-weight:800;font-size:13px;text-decoration:underline;cursor:pointer;font-family:inherit;">Forgot the PIN?</button>` : ""}
@@ -416,6 +421,14 @@ Object.assign(RAW, {
     const r = state.readiness;
     if (arg === "back") { state.readiness = null; render(); return; }
     if (arg === "retry") { resetBodyCheck(r); render(); return; }
+    /* THE SAFETY GATE, IN THE TRANSITION AND NOT ONLY IN THE MARKUP.
+
+       A severity-3 body check needs a grown-up to say so before she trains.
+       That was enforced by rendering the Continue button `disabled`, which is
+       what a normal tap meets and nothing else: a stale screen, a replayed
+       action or any future caller reached this handler with the gate wide open.
+       The rule is asked here, of the one function that states it. */
+    if (!mayStartFromReadiness(r)) { render(); return; }
     // continue: persist the check (try-it runs don't overwrite the real day's
     // check), then hand the resolved light to the session
     // Both decisions are saved: what the check produced, and what actually ran.
@@ -881,7 +894,17 @@ function boot() {
   // Pull anything this device is missing back out of the cloud mirror (a wiped
   // or brand-new browser starts empty, but the history is still up there), then
   // repaint so the restored streak / XP / log show up straight away.
-  restoreFromCloud().then(() => {
+  restoreFromCloud().then((result) => {
+    /* WHAT THE RESTORE ACTUALLY ESTABLISHED, handed to the gate.
+
+       Until this resolves, an empty session list says nothing about whether
+       this family is new — see setBootstrapState in js/gate.js. A restore that
+       brought rows back, or found the device already holding history, proves it
+       is not; one that reached the mirror and found nothing proves it is; one
+       that could not reach the mirror at all proves neither, and says so. */
+    const reached = !!(result && result.reachedCloud);
+    const hasHistory = (loadSessions() || []).length > 0;
+    setBootstrapState(hasHistory ? "restored" : reached ? "empty" : "offline-unverified");
     // The XP total is rebuilt from the synced sources, so repaint regardless.
     if (!state.inSession) render();
   });

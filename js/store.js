@@ -1614,21 +1614,55 @@ function stripCloudFields(doc) {
   return entry;
 }
 
+/* IS THIS SHAPED LIKE A SESSION THIS APP WROTE?
+
+   Everything merged here arrives from somewhere the app does not control: a
+   collection with no sign-in in front of it, or a JSON file a grown-up picked
+   off a disk. A row that is merely the wrong shape is enough to do damage
+   without anyone being hostile — a `ledger` that is a string rather than an
+   array reaches every screen that iterates it, and a NaN duration poisons an
+   average. So a row is checked before it joins the log, and a row that fails is
+   quarantined (counted and logged, never merged) rather than being allowed in
+   to break a screen later, somewhere with no clue where it came from.
+
+   Deliberately shallow: this is a shape check, not a re-scoring. Interpreting
+   what a row MEANS is js/outcome.js's job and stays there. */
+function looksLikeSession(entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+  if (typeof entry.isoDate !== "string" || !entry.isoDate) return false;
+  if (isNaN(new Date(entry.isoDate))) return false;
+  if (entry.dayKey != null && typeof entry.dayKey !== "string") return false;
+  // The fields every reader ITERATES have to be iterable, or they take a screen
+  // down at render time rather than here.
+  if (entry.ledger != null && !Array.isArray(entry.ledger)) return false;
+  if (entry.perExercise != null && !Array.isArray(entry.perExercise)) return false;
+  if (entry.formChecks != null && !Array.isArray(entry.formChecks)) return false;
+  // And the fields that get summed have to be numbers, or one row turns every
+  // total on the progress screen into NaN.
+  const numeric = ["durationSecs", "xpEarned", "roundsDone", "roundsPlanned", "expectedWork"];
+  return numeric.every(k => entry[k] == null || Number.isFinite(Number(entry[k])));
+}
+
 /* Add any incoming records the local log doesn't already have.
    Returns how many were added. */
 export function mergeSessions(incoming) {
   const local = loadSessions();
   const seen = new Set(local.map(sessionKey));
   let added = 0;
+  let rejected = 0;
   (incoming || []).forEach(doc => {
     const entry = stripCloudFields(doc);
     if (!entry.isoDate) return;
+    if (!looksLikeSession(entry)) { rejected++; return; }
     const key = sessionKey(entry);
     if (seen.has(key)) return;
     seen.add(key);
     local.push(entry);
     added++;
   });
+  // Quarantined, not silently dropped: a grown-up looking at why a restore was
+  // short should find the count rather than have to guess.
+  if (rejected) logEvent("merge_rejected", { rejected, source: "sessions" });
   if (added) {
     local.sort((a, b) => String(a.isoDate).localeCompare(String(b.isoDate)));
     writeStorage(LS_SESSIONS, local);
@@ -1802,6 +1836,14 @@ export function journeySnapshot() {
    when something changed. */
 export function mergeCloudJourney(snap) {
   if (!snap || snap.kind !== "journey") return false;
+  /* Same rule as the session merge above: what arrives from the mirror is not
+     trusted to be the shape it claims. The wallet is iterated and rendered, and
+     the ledger is keyed and priced, so both have to be the right kind of thing
+     before either is unioned into what is already here. */
+  if (snap.prizesWon != null && !Array.isArray(snap.prizesWon)) return false;
+  if (snap.voidedPrizeIds != null && !Array.isArray(snap.voidedPrizeIds)) return false;
+  if (snap.qLedger != null && (typeof snap.qLedger !== "object" || Array.isArray(snap.qLedger))) return false;
+  if (snap.quizItems != null && (typeof snap.quizItems !== "object" || Array.isArray(snap.quizItems))) return false;
   let changed = false;
 
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
