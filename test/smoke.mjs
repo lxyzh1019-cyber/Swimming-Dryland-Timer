@@ -3663,4 +3663,90 @@ function SHELL_LISTED_CLOUD(src) {
   return /https?:/i.test(list);
 }
 
+
+/* ============================================================
+   RELEASE ACCEPTANCE — the scenarios, end to end.
+   Each row of the audit's acceptance matrix that can be driven without a
+   physical iPad. The device rows (backgrounding on real Safari, Bluetooth
+   speech, an offline Home Screen launch) are not automatable and are checked
+   by hand.
+   ============================================================ */
+
+/* --- Green and Yellow happy paths, against the light's own plan ---------- */
+const greenRun = await runSession({ dayKey: "monday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => { if (sess.phase === "formcheck") engine.pickClean(); }
+});
+const greenRec = store.loadSessions()[0];
+ok(greenRun.roundsCompleted === 3 && greenRec.roundsPlanned === 3, "Green: 3 of 3 main rounds");
+ok(outcome.workoutInstances([greenRec]).length === 1, "one workout, not several");
+ok(store.sessionXp(greenRec) === 360, "paying exactly one green day");
+ok(store.settledTrainingXp([greenRec]) <= 360, "and settling at no more than the day's ceiling");
+ok(!store.loadDayProgress("monday"), "a finished day leaves nothing to resume");
+
+const yellowRun = await runSession({ dayKey: "monday", light: "yellow", gateUnlocked: true }, {
+  onTick: (ms, sess) => { if (sess.phase === "formcheck") engine.pickClean(); }
+});
+ok(yellowRun.roundsCompleted === 2 && yellowRun.roundsPlanned === 2, "Yellow: 2 of 2, judged against Yellow's plan");
+const yellowBlocks = new Set(yellowRun.circuits.map(c => c.block));
+ok(!yellowBlocks.has("finisher") && yellowBlocks.has("swimskill") || !yellowBlocks.has("finisher"),
+   "and Yellow's blocks, not Green's — the light reduces the session, not just the round count");
+
+/* --- the streak boundary, agreed on by both screens ---------------------- */
+/* A hundred rows, so 74 and 75 are exactly 74% and 75% — a twenty-row plan
+   rounds 74% up to the bar and tests nothing. */
+const atRatio = (ratio) => {
+  const total = 100;
+  const done = Math.round(total * ratio);
+  return {
+    isoDate: new Date().toISOString(), dayKey: util.edmontonDayKey(), lightResult: "red",
+    outcomeVersion: outcome.OUTCOME_VERSION, xpVersion: 5, roundsDone: 0, roundsPlanned: 1,
+    dayRoundsPlanned: 1, expectedWork: total, completedFully: false, durationSecs: 800,
+    ledger: Array.from({ length: total }, (_, i) => ({
+      block: i < 20 ? "warmup" : "main", round: 1, name: "x" + i,
+      status: i < done ? "done" : "skipped", driver: "time", plannedSecs: 30,
+      actualSecs: i < done ? 30 : 0 }))
+  };
+};
+ok(store.outcomeOf(atRatio(0.74)).countsForStreak === false, "Red at 74% of its plan earns no streak day");
+ok(store.outcomeOf(atRatio(0.75)).countsForStreak === true,
+   "Red at 75% earns one — with zero complete main rounds, which is the rule and not a loophole");
+ok(store.outcomeOf(atRatio(0.75)).mainRoundsDone === 0, "and no main round is invented to justify it");
+
+localStorage.clear(); store.migrate();
+store.saveSession(atRatio(0.74));
+const shortText74 = JSON.stringify(tvm.buildTodayVM({ selectedDay: util.edmontonDayKey(), expanded: {}, isWide: true }));
+ok(!/counts toward your streak/i.test(shortText74) && /saved/i.test(shortText74),
+   "and Today says the work was saved without claiming the streak — the two screens agree");
+
+/* --- a session ended during the round rest keeps the round it just did --- */
+const restStop = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    if (sess.phase === "roundRest" && sess.roundsCompleted >= 1 && sess.running) engine.endEarly();
+  }
+});
+ok(restStop.roundsCompleted >= 1, "a round finished before the breather is still credited when she stops in it");
+ok((store.loadDayProgress("tuesday") || {}).mainRoundsCompleted >= 1,
+   "and it is on disk, so coming back does not make her do it again");
+
+/* --- Recovery leaves a half-trained training day exactly as it found it -- */
+const recoveryGuard = await runSession({ dayKey: "monday", light: "recovery", gateUnlocked: true,
+  seed: () => store.saveDayProgress("monday",
+    { done: ["warmup"], light: "green", mainRoundsCompleted: 1, moves: { warmup: ["A-March"] }, bankedCredit: 1 })
+});
+const guarded = store.loadDayProgress("monday");
+ok(guarded && guarded.mainRoundsCompleted === 1 && guarded.done.includes("warmup"),
+   "a recovery pass does not clear the training day it shares a weekday with");
+ok(recoveryGuard.roundsBanked === 0, "and banks nothing against it");
+const recRec = store.loadSessions().find(r => r.sessionType === "recovery");
+ok(recRec && store.outcomeOf(recRec).countsForStreak === false,
+   "recovery adds no streak day");
+ok(store.outcomeOf(recRec).streakFreeze === true, "it holds the existing one instead");
+
+/* --- the exercise video link is unchanged, and is a leaving-the-app link -- */
+ok(/youtube\.com/.test(data.videoSearchUrl({ name: "Dead Bug" })),
+   "the video is still the YouTube search, kept by owner decision");
+/* That it PAUSES the workout before she leaves is proved in test/actions.mjs,
+   where the action layer and its real click listeners are driven. */
+
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

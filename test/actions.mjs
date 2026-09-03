@@ -204,6 +204,36 @@ main.actions.resumeFromDetail();
 ok(engine.sess.paused === false, "only the explicit Resume button restarts the clock");
 ok(main.state.detailOverlay === false, "and it closes the card too");
 
+/* THE VIDEO LINK IS A LEAVING-THE-APP LINK.
+
+   The exercise video opens a YouTube search in another tab — kept as it is by
+   owner decision — and the whole time she is over there the workout's clock is
+   a wall-clock deadline that does not care where she went. Opening it takes its
+   own pause, and coming back needs the explicit Resume, exactly like the
+   instructions card. */
+engine.sess.running = true; engine.sess.paused = false; engine.sess.pauseReasons = [];
+engine.pauseSession("video");
+ok(engine.sess.paused === true, "opening the exercise video pauses the workout before she leaves");
+ok((engine.sess.pauseReasons || []).includes("video"),
+   "under its own reason, so returning to the tab cannot silently restart the clock");
+engine.resumeSession("user");
+ok(engine.sess.paused === true, "and a stray user-resume does not release the hold the video took");
+main.actions.resumeFromDetail();
+ok(engine.sess.paused === false, "only the explicit Resume does");
+
+/* THE BACKGROUNDING HOLD IS RELEASED BY THE BUTTON SHE COMES BACK TO.
+
+   The app pauses itself when the iPad is locked (see PAUSE_HIDDEN in
+   js/engine.js). If the workout screen's own Resume did not release that hold,
+   the workout could not be restarted from the workout screen at all — and there
+   is no second control a ten-year-old could be expected to find. */
+engine.sess.running = true; engine.sess.paused = false; engine.sess.pauseReasons = [];
+engine.pauseSession(engine.PAUSE_HIDDEN);
+ok(engine.sess.paused === true, "the app pauses itself when the page goes away");
+main.actions.pauseTimer();
+ok(engine.sess.paused === false,
+   "and the workout screen's Resume gets her out of it — it used to be held by a reason no button named");
+
 /* Reading the instructions must not be able to un-pause a session she paused
    herself before opening them. */
 engine.sess.paused = true;

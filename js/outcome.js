@@ -1,4 +1,53 @@
 /* ============================================================
+   THE RULES, WRITTEN DOWN ONCE
+
+   These are requirements, not preferences, and they have each been broken by a
+   well-meaning change at least once. They are stated here, next to the code
+   that enforces them, so a future repair has to disagree with them on purpose.
+
+   THE TRAFFIC LIGHT DECIDES THE DOSE.
+
+     Green     3 main rounds   warm-up, coordination, main, prep, finisher, swim-skill
+     Yellow    2               warm-up, coordination, main, swim-skill
+     Red       1               warm-up, main, swim-skill
+     Recovery  0               the recovery menu only
+
+   The light that counts is the FINAL one — what the adult chose and the session
+   actually ran under. Blocks, rounds, the completion denominator, the streak
+   denominator, the XP ceiling and every report use it. The body's own
+   suggestion is stored beside it (`suggestedLight`) and never overwritten, so
+   an override cannot rewrite the history of what her body reported.
+
+   THE STREAK IS 75% OF THE FINAL LIGHT'S PLAN, AND NOTHING ELSE.
+
+     streak = credit earned / the final light's expected work >= 0.75
+
+   For green, yellow and red alike. It is INDEPENDENT of main rounds: a red day
+   can earn its streak at 75% with zero complete main rounds, and that is
+   correct, not a loophole to close. Recovery adds no streak day; finishing the
+   recovery menu HOLDS the existing streak rather than breaking it, so reporting
+   soreness honestly is never the day the flame goes out.
+
+   A MAIN ROUND COUNTS ON THE DOSE IT PRODUCED.
+
+   Every expected row present, nothing skipped, no single row below half its
+   dose, and the round's mean credit at least 80%. Deliberately not "every row
+   at its own full rule": a ten-year-old tapping Done a beat early on ONE hold
+   turned a round she physically trained into nothing, three times over, and the
+   finish screen printed "0 of 3". The per-row floor is what stops the mean from
+   laundering a move that was never really trained. Do not tighten this to
+   every-row-perfect, and do not remove the floor.
+
+   AND WORK IS NEVER LOST TO BOOKKEEPING.
+
+   A finished round is banked the instant its last row lands, before any prompt,
+   speech or rest. A day's progress is cleared only after the record replacing
+   it has actually reached storage. A block is finished only when every row it
+   asked for is done. Each of those was once the other way round, and each cost
+   a child work she had really done.
+   ============================================================ */
+
+/* ============================================================
    ONE SESSION-OUTCOME AUTHORITY
 
    "Did she train, how much, and does it pay?" used to be answered
