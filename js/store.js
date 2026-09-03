@@ -1333,6 +1333,14 @@ export function pendingDrawCount() {
   return j ? pendingDrawsFor(j) : 0;
 }
 
+/* A draw is owed but cannot be claimed yet, because this device has not been
+   able to settle the day's XP against the other one. Separate from "no draw
+   owed" so the screen can say which it is — "not yet" and "nothing here" are
+   very different messages to a kid who just finished a workout. */
+export function drawIsWaitingOnSync() {
+  return xpIsPending() && pendingDrawCount() > 0;
+}
+
 /* Prize ids must be unique across devices: the cloud merge unions wallets by
    id, so two prizes claimed in the same millisecond — or on two devices at
    once — used to collapse into one and silently lose a prize she had won. */
@@ -1348,6 +1356,18 @@ function prizeId() {
    turn one level-up into two prizes. */
 export function addPrize(prize) {
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
+  /* A DRAW WAITS FOR THE DAY TO SETTLE.
+
+     Prizes are drawn off the XP total, and while a device is offline that total
+     is its own honest guess: the other device may hold work for the same date,
+     and only once they have met does the date have a final value (see
+     settledDayXp). Claiming against an unsettled total is how an over-payment
+     bought a real thing that could not then be taken back.
+
+     The award itself is not withheld — she trained, the XP shows, the ladder
+     moves. Only the claim waits, and only while there is genuinely no way to
+     check. See drawIsWaitingOnSync for what the screen should say. */
+  if (xpIsPending()) { saveJourney(syncPendingDraws(j)); return j; }
   if (pendingDrawsFor(j) < 1) { saveJourney(syncPendingDraws(j)); return j; }
   j.prizesWon = [{ ...prize, date: todayISODate(), redeemed: false, id: prizeId() }, ...(j.prizesWon || [])];
   saveJourney(syncPendingDraws(j));
@@ -1645,6 +1665,95 @@ export function quizXpFromLedger(quiz) {
   return xp;
 }
 
+/* ---- ONE DAY OF TRAINING PAYS FOR ONE DAY, ON EVERY DEVICE ----------------
+
+   The live path already holds the line on one device and on two used in
+   sequence: claimSessionXp takes the larger of the banked budget row and what
+   the synced log says the date has already been paid (see loggedDayXp), so a
+   day started on the tablet and finished on the phone draws from one budget.
+
+   What neither could cover is two devices OFFLINE AT ONCE. Each grants a full
+   day against a budget the other has never seen, each stamps `xpEarned` on its
+   own record, and a rebuild then simply ADDED the two stamps: 360 + 360 for one
+   360 day. Both devices converged, honestly, on twice what the day was worth —
+   and prizes are drawn off that total, so the over-payment bought real things.
+
+   The stamp is still what a row is WORTH — re-pricing history is how a cloud
+   restore came to re-score sessions underneath her. What changes is that the
+   total is no longer the sum of the stamps: the log is grouped by the actual
+   Edmonton date the work happened on, and each date pays at most that date's
+   ceiling. Deterministic (no ordering, no clock), idempotent, and it settles to
+   the same number on every device the moment they have seen the same rows.
+
+   Sessions are aggregated by WORKOUT first, so the two fragments of a day
+   trained in two goes are the same workout and cannot each claim a day. */
+export function settledDayXp(sessions) {
+  const byDate = new Map();
+  (sessions || []).forEach(s => {
+    if (!s || s.practice) return;
+    const date = edmontonISO(s.isoDate);
+    if (!date) return;
+    if (!byDate.has(date)) byDate.set(date, []);
+    byDate.get(date).push(s);
+  });
+  const out = [];
+  byDate.forEach((rows, date) => {
+    /* Only rows priced by the CURRENT rules are capped. A legacy row carries a
+       stamp from a formula that had no daily ceiling and no rounds-planned to
+       derive one from, so dayXpCap reads 90 for it and capping would quietly
+       cut a real award to a quarter on the next boot. Re-scoring her history
+       underneath her is the thing this file refuses to do everywhere else; the
+       cap is a rule for days trained under the rule. */
+    const modern = rows.filter(s => s.xpVersion === XP_VERSION);
+    const legacy = rows.filter(s => s.xpVersion !== XP_VERSION);
+    const cap = modern.reduce((m, s) => Math.max(m, dayXpCap(s)), 0);
+    const claimed = modern.reduce((sum, s) => sum + sessionXp(s), 0);
+    const carried = legacy.reduce((sum, s) => sum + sessionXp(s), 0);
+    out.push({
+      date, cap, claimed, carried,
+      capped: claimed > cap,
+      settled: Math.min(claimed, cap) + carried
+    });
+  });
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function settledTrainingXp(sessions) {
+  return settledDayXp(sessions).reduce((sum, d) => sum + d.settled, 0);
+}
+
+/* XP THIS DEVICE HAS CALCULATED BUT CANNOT YET PROMISE.
+
+   Offline, a device can only see its own records, so the number it shows is its
+   own honest guess at what the date is worth — and the other device may be
+   holding work for the same date. The award is real either way; what is not
+   final until the two have met is the TOTAL, and prizes are drawn off the
+   total. So an unsynced day is reported as pending, and a draw waits for it.
+   Displaying it is the point: a kid who trained is told her work is counted,
+   not that it is missing. */
+let _syncFailed = false;
+let _everSynced = false;
+
+export function noteSyncResult(ok) {
+  _syncFailed = !ok;
+  if (ok) _everSynced = true;
+}
+export function lastSyncFailed() { return _syncFailed; }
+export function hasEverSynced() { return _everSynced; }
+
+export function xpIsPending() {
+  if (settings.cloudMirror === false) return false;   // no mirror, nothing to wait for
+  /* A mirror this device has never once reached is not a second opinion it is
+     waiting on — it is a project that was never configured, or a family running
+     on one device. Blocking a prize on a sync that is never going to arrive is
+     a worse failure than the over-payment this guards against, and it is silent
+     from where the kid is standing. So the guard only applies once there is
+     demonstrably something on the other end. */
+  if (!_everSynced) return false;
+  if (typeof navigator !== "undefined" && navigator && navigator.onLine === false) return true;
+  return _syncFailed;
+}
+
 /* Recompute the journey total from its two sources. Prizes already won are
    never touched. A rebuild does NOT grant draws for the levels it discovers:
    the same shared history rebuilds on every device, so crediting the climb
@@ -1653,7 +1762,7 @@ export function quizXpFromLedger(quiz) {
    derived from the level and the wallet instead. Returns the total. */
 export function rebuildJourneyXp() {
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
-  const fromSessions = loadSessions().reduce((sum, s) => sum + sessionXp(s), 0);
+  const fromSessions = settledTrainingXp(loadSessions());
   const fromQuiz = quizXpFromLedger();
   j.sessionXp = fromSessions;
   j.xp = fromSessions + fromQuiz;

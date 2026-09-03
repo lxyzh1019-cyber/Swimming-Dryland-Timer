@@ -6,6 +6,7 @@
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overloadWeek } from "../data.js";
 import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress, countsAsTrained, countsForStreak, streakFreezeDates, sessionXp, outcomeOf } from "../store.js";
+import { workoutInstances } from "../outcome.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
 import { assembleCircuits, estimateSessionSecs } from "../engine.js";
 
@@ -337,9 +338,29 @@ export function buildTodayVM(state) {
     // so once a session started paying a flat rate for its rounds, the day card
     // and the ladder disagreed about the same session — the card said +220
     // while the journey banked 360.
-    const dayRecord = currentWeekSessions()
-      .filter(s => s.dayKey === selectedKey && countsAsTrained(s)).pop();
-    const earnedXp = dayRecord ? sessionXp(dayRecord) : 0;
+    const dayFragments = currentWeekSessions()
+      .filter(s => s.dayKey === selectedKey && countsAsTrained(s));
+    const dayRecord = dayFragments[dayFragments.length - 1];
+    /* XP is the DAY's, not the last sitting's: a day trained in two goes pays
+       each fragment separately and showing only the second understated it. */
+    const earnedXp = dayFragments.reduce((a, s) => a + sessionXp(s), 0);
+    /* DID THIS DAY ACTUALLY EARN THE STREAK?
+
+       This card said "This day counts toward your streak." for ANY partial day,
+       while countsForStreak was computed right next to it and read by nobody. A
+       day at 40% of its plan was told it had earned the flame, and then the
+       week strip did not show one — the app contradicting itself to a
+       ten-year-old about the one number she cares about.
+
+       Judged on the whole workout rather than one fragment, so a day finished
+       across two sittings is scored on what it added up to. */
+    const dayInstance = workoutInstances(dayFragments)[0];
+    const streakEarned = dayInstance
+      ? dayInstance.outcome.countsForStreak
+      : !!(dayRecord && outcomeOf(dayRecord).countsForStreak);
+    const shortBy = dayInstance && Number.isFinite(dayInstance.outcome.workRatio)
+      ? Math.max(0, Math.round((0.75 - dayInstance.outcome.workRatio) * 100))
+      : 0;
     dayView = {
       badgeLabel: shortU + (isPartial ? " · PARTLY DONE ✓" : " · COMPLETED ✓"),
       title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"),
@@ -351,7 +372,10 @@ export function buildTodayVM(state) {
       doneSub: isSpaDay ? "No XP today — rest is part of the plan."
         // Per-block records only survive the calendar day they were written, so
         // name what's left only when we actually still know.
-        : isPartial ? ("This day counts toward your streak." + (doneBlocks.length && remainingLabel ? " Still open: " + remainingLabel + "." : ""))
+        : isPartial ? ((streakEarned
+            ? "This day counts toward your streak."
+            : "Your work is saved" + (shortBy ? " — about " + shortBy + "% more of the plan earns the streak." : ", but this one didn't earn a streak day."))
+          + (doneBlocks.length && remainingLabel ? " Still open: " + remainingLabel + "." : ""))
         : (allDone ? "Every block is checked off. Want extra reps?" : ("You skipped " + remainingLabel + " — finish up for XP.")),
       showCta: true,
       ctaLabel: isSpaDay ? "Do it again" : (allDone ? "Look at the moves" : "Finish remaining moves"),

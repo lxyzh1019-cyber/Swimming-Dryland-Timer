@@ -26,7 +26,7 @@
 
 import { settings, mergeSessions, loadSessions, sessionKey, belongsToAthlete, athleteId, athleteAliases,
          journeySnapshot, mergeCloudJourney, rebuildJourneyXp, logEvent,
-         loadReadinessLog, mergeReadinessLog } from "./store.js";
+         loadReadinessLog, mergeReadinessLog, noteSyncResult } from "./store.js";
 
 /* Exported so the rule itself can be tested, rather than inferred from a whole
    simulated sync. */
@@ -105,9 +105,16 @@ export async function restoreFromCloud() {
     if (added || uploaded || journeyChanged || checksAdded) {
       logEvent("cloud_sync", { added, uploaded, xp, checks: checksAdded });
     }
+    // The day's XP has been settled against everything the mirror holds, so a
+    // prize claimed from here on is claimed against a number both devices agree
+    // on. See xpIsPending / addPrize in js/store.js.
+    noteSyncResult(true);
     return { added, uploaded, xp };
   } catch (e) {
     console.warn("Cloud sync skipped:", e);
+    // Not an error worth showing: the app runs offline by design. It does mean
+    // the total on this device is its own, so a draw waits.
+    noteSyncResult(false);
     return idle;
   }
 }

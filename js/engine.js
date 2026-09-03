@@ -769,9 +769,37 @@ function logRoundShort(ci, round) {
     skipped: r.skipped, blockedBy: r.blockedBy ? r.blockedBy.name : null
   });
 }
-/* A block counts as trained if at least one move in it was really done. */
+/* A block counts as TRAINED if at least one move in it was really done. This is
+   the display counter's question ("how many blocks did she get into today") and
+   nothing else may use it to decide a block is FINISHED — see blockFullyDone. */
 function blockHadWork(ci) {
   return sess.ledger.some(l => l.ci === ci && l.status === "done");
+}
+
+/* A block is FINISHED when every row it was supposed to produce is there and
+   every one of them is done.
+
+   "At least one move was done" used to be the whole test, and recordBlockDone
+   then put the block on the day's done list and DELETED its move-by-move
+   record. So skipping one warm-up move retired the entire warm-up: come back
+   later and the whole block was skipped as already finished, the skipped move
+   included. The one move she owed was the one move she could never be given
+   again.
+
+   Counted against the circuit's own plan rather than the rows that happen to
+   exist, for the same reason countExpectedByRound exists: a block abandoned
+   three moves in leaves the rest simply missing, and "every row I can see is
+   done" is trivially true of three rows out of eight.
+
+   Main is not asked this question. Its size is set by the light, so its
+   progress is a count of rounds — see bankMainRounds. */
+function blockFullyDone(ci) {
+  const c = sess.circuits[ci];
+  if (!c) return false;
+  const expected = countExpectedWork([c]);
+  const rows = sess.ledger.filter(l => l.ci === ci);
+  if (rows.length < expected) return false;
+  return rows.every(l => l.status === "done");
 }
 
 /* Aggregate the ledger to the per-move shape the reports already read. A move
@@ -920,6 +948,10 @@ function bankMainRounds() {
 function recordBlockDone(blockKey, ci) {
   if (!blockKey || blockKey === "prep") return;
   if (!ownsDayProgress()) return;
+  // Not "some work happened" — every row the block asked for, done. A block with
+  // one move outstanding stays off the done list, and keeps its per-move record
+  // so the resume asks for exactly that move and nothing else.
+  if (blockKey !== "main" && !blockFullyDone(ci)) return;
   if (!blockHadWork(ci)) return;   // skipping everything doesn't finish a block
   if (blockKey === "main") {
     bankMainRounds();              // flushes whatever the round loop has not
