@@ -13,6 +13,8 @@
    Nothing else may re-derive completion.
    ============================================================ */
 
+import { edmontonISO } from "./util.js";
+
 /* Records written from this version carry `outcomeVersion`, which is what lets
    partial work count as work. Rows written before it keep the old done-only
    reading, so her existing history is not re-scored underneath her.
@@ -376,4 +378,86 @@ export function outcomeOf(entry) {
     outcomeVersion: entry.outcomeVersion,
     completedFully: entry.completedFully
   });
+}
+
+
+/* ============================================================
+   ONE WORKOUT, HOWEVER MANY SITTINGS IT TOOK
+
+   A day trained in two goes writes two session records. Nothing could say they
+   were the same workout: rows were told apart by `isoDate|dayKey` and resume
+   was keyed on the weekday, so the progress screen counted two sessions, the
+   average duration halved, and the completion rate was computed against a
+   denominator that had grown by one for work that was really one day's.
+
+   Records written from now on carry `workoutInstanceId` (minted in
+   js/engine.js when a plan starts, carried on the day's progress record so a
+   resume keeps it). Older rows and rows restored from the cloud have none, so
+   they fall back to the day and the actual Edmonton date — which is exactly
+   how they were already being grouped, so no history is re-read.
+
+   The fragments' ledgers are concatenated and scored ONCE through
+   deriveSessionOutcome, so a day that is complete only when both sittings are
+   counted together reads complete — and reads it the same way everywhere.
+   ============================================================ */
+export function instanceKeyOf(entry) {
+  if (!entry) return "";
+  if (entry.workoutInstanceId) return String(entry.workoutInstanceId);
+  return (edmontonISO(entry.isoDate) || "?") + "|" + String(entry.dayKey || "?");
+}
+
+export function workoutInstances(sessions) {
+  const byKey = new Map();
+  (sessions || []).forEach(s => {
+    if (!s || s.practice) return;
+    const key = instanceKeyOf(s);
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key).push(s);
+  });
+  const out = [];
+  byKey.forEach((rows, key) => {
+    // Oldest fragment first: it holds the plan the day was started against,
+    // and the newest holds how the day actually ended.
+    const frags = rows.slice().sort((a, b) =>
+      String(a.isoDate).localeCompare(String(b.isoDate)));
+    const first = frags[0];
+    const last = frags[frags.length - 1];
+    const ledger = frags.reduce((a, s) => a.concat(s.ledger || []), []);
+    /* The day's ask, not the sum of the sittings' asks. Adding them would count
+       the same plan once per attempt and make a finished day read as a third
+       of itself. Every fragment already carries the DAY's expectedWork (see
+       startSession), so the largest is the day's. */
+    const expectedWork = frags.reduce((m, s) =>
+      Number.isFinite(s.expectedWork) ? Math.max(m, s.expectedWork) : m, 0) || null;
+    const expectedByRound = frags.reduce((m, s) => ({ ...m, ...(s.expectedByRound || {}) }), {});
+    const outcome = deriveSessionOutcome({
+      ledger,
+      expectedWork,
+      expectedByRound: Object.keys(expectedByRound).length ? expectedByRound : null,
+      // Banked credit is already inside the concatenated ledger here: it is what
+      // the EARLIER fragments hold. Passing it again would pay for it twice.
+      bankedCredit: 0,
+      safetyStop: frags.some(s => s.safetyStop || s.pain),
+      explicitAbort: last.endedEarly === true,
+      sessionType: last.sessionType || first.sessionType || null,
+      practice: false,
+      outcomeVersion: frags.reduce((m, s) =>
+        Math.max(m, Number(s.outcomeVersion) || 0), 0) || null,
+      completedFully: frags.some(s => s.completedFully === true)
+    });
+    out.push({
+      key,
+      workoutInstanceId: last.workoutInstanceId || null,
+      isoDate: last.isoDate,
+      date: edmontonISO(last.isoDate),
+      dayKey: last.dayKey,
+      lightResult: last.lightResult || last.light || null,
+      sessionType: last.sessionType || null,
+      fragments: frags,
+      attempts: frags.length,
+      durationSecs: frags.reduce((a, s) => a + (Number(s.durationSecs) || 0), 0),
+      outcome
+    });
+  });
+  return out.sort((a, b) => String(a.isoDate).localeCompare(String(b.isoDate)));
 }
