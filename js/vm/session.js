@@ -94,6 +94,12 @@ export function buildSessionVM(state) {
         // The finish screen has to agree with the row that gets saved: on a
         // resume both are judged against the whole day, credit included.
         bankedCredit: sess.bankedCredit || 0,
+        // The live screen has to be judged by the same evidence the saved row
+        // will be: which rounds each asked for, and what the engine thinks it
+        // counted. Without these the running screen scored a round the record
+        // then scored differently.
+        expectedByRound: sess.expectedByRound || null,
+        roundsDone: Number.isFinite(sess.roundsCompleted) ? sess.roundsCompleted : null,
         safetyStop: !!sess.painFlag,
         explicitAbort: sess.endedEarly === true,
         sessionType: sess.mode === "recovery" ? "recovery" : sess.spa ? "spa" : null,
@@ -123,6 +129,26 @@ export function buildSessionVM(state) {
     : completionState === "recovery"
     ? (streakFrozen ? "recovery-held" : "recovery-short")
     : completionState;
+  const roundsDone = Math.max(0, Number(liveOutcome.mainRoundsDone) || 0);
+
+  /* One line per main round that did not count, naming the move that cost it.
+     Deliberately factual and never scolding: she is told what happened and what
+     "counting" means, not that she failed. A round short of ROWS is a round she
+     did not reach, which is a different sentence from a round she trained short. */
+  const roundShortNotes = (liveOutcome.roundReport || [])
+    .filter(r => !r.counts)
+    .map(r => {
+      if (r.skipped.length) return `Round ${r.round} didn't count — ${r.skipped[0]} got skipped.`;
+      if (r.missing > 0)    return `Round ${r.round} didn't count — you stopped partway through it.`;
+      const b = r.blockedBy;
+      if (!b || !Number.isFinite(Number(b.planned)) || Number(b.planned) <= 0)
+        return `Round ${r.round} didn't count — it was a bit short.`;
+      const got = Math.round(Number(b.got) || 0), planned = Math.round(Number(b.planned));
+      return b.driver === "reps"
+        ? `Round ${r.round} didn't count — ${b.name} was ${got} of ${planned} reps.`
+        : `Round ${r.round} didn't count — ${b.name} was ${got}s of ${planned}s.`;
+    });
+
   const isResting = phase === "rest" || phase === "roundRest" || phase === "sectionRest";
   const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath" || phase === "formcheck";
   const isBigRest = phase === "roundRest" || phase === "sectionRest";
@@ -326,12 +352,23 @@ export function buildSessionVM(state) {
     saveFailed: completionState === "save-failed",
     sessionMantra: day.mantra || "",
     sessionMinutes: Math.round(sess.elapsed / 60),
-    roundsCompleted: sess.roundsCompleted || 0,
+    /* THE LEDGER'S COUNT, not the engine's. This line used to read
+       `sess.roundsCompleted` — the raw counter, incremented at the bottom of the
+       round loop after the round rest — so a session interrupted during a
+       breather printed "0 of 3 main rounds" under thirty-four minutes of work.
+       It is the outcome authority's number now, the same one the XP is priced
+       on and the parent report will show tomorrow. */
+    roundsCompleted: roundsDone,
     // "N of M main rounds", not a count of every block plus every round added
     // into one number and labelled "rounds". A care session trains no rounds at
     // all, so it says nothing rather than "0 of 0".
     showRoundsLine: completionState !== "recovery",
-    roundsLine: `${sess.roundsCompleted || 0} of ${sess.roundsPlanned || 0} main round${(sess.roundsPlanned || 0) === 1 ? "" : "s"}`,
+    roundsLine: `${roundsDone} of ${sess.roundsPlanned || 0} main round${(sess.roundsPlanned || 0) === 1 ? "" : "s"}`,
+    /* And WHY a round did not count, in her own words, one line each. A bare
+       zero next to a session she remembers finishing is the thing that sent a
+       grown-up digging through an exported ledger — the app knew which move fell
+       short the whole time and simply never said. */
+    roundShortNotes,
     xpEarned: sess.xpEarned, leveledUp: sess.leveledUp,
     moodOpts, moodAck: sess.mood ? MOOD_ACK[sess.mood] : "", showReflection: sessionDone && !!sess.mood, reflectWellOpts, reflectNextOpts,
     quizQuestion: QZ.q, quizOpts, quizAnswered, quizWhy: QZ.why,

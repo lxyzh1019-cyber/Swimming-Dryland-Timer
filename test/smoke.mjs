@@ -1207,11 +1207,18 @@ ok(st(40, 0) === "done", "an exercise with no planned time is judged only on sho
    That paid 540 for a 360-day plan. */
 localStorage.clear();
 store.migrate();
+/* The ledger has to SHOW the rounds the row claims: XP is priced off the rows
+   now, not off `roundsDone`, precisely so a counter written at the wrong moment
+   cannot pay a full session the show-up credit alone. */
+const mainRound = (r, n = 2) => Array.from({ length: n }, (_, i) => ({
+  name: "m" + r + "-" + i, block: "main", round: r, status: "done" }));
 const partial = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
   xpVersion: store.XP_VERSION, roundsDone: 1, roundsPlanned: 3, sessionType: "main",
-  completedFully: false, endedEarly: true, ledger: [{ name: "x", status: "done" }] };
+  outcomeVersion: store.OUTCOME_VERSION,
+  completedFully: false, endedEarly: true, ledger: mainRound(1) };
 const firstPay = store.claimSessionXp(partial);
-const resumed = { ...partial, roundsDone: 2, completedFully: true, endedEarly: false };
+const resumed = { ...partial, roundsDone: 2, completedFully: true, endedEarly: false,
+  ledger: [...mainRound(1), ...mainRound(2)] };
 const secondPay = store.claimSessionXp(resumed);
 ok(firstPay === 180, "the partial pays for the one round it finished");
 ok(firstPay + secondPay === 360, "and the resume tops it up to exactly one full day, never 540");
@@ -1228,7 +1235,9 @@ const oneDate = new Date().toISOString();
 const mondayCard = { app: "swimming", dayKey: "monday", isoDate: oneDate,
   xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main",
   roundsDone: 3, roundsPlanned: 3, completedFully: true,
-  ledger: [{ name: "x", block: "main", round: 1, status: "done" }] };
+  // Three rounds' worth of rows, because three rounds is what this card claims
+  // and the rows are what it is now priced on.
+  ledger: [...mainRound(1), ...mainRound(2), ...mainRound(3)] };
 const tuesdayCard = { ...mondayCard, dayKey: "tuesday" };
 const mondayPay = store.claimSessionXp(mondayCard);
 const tuesdayPay = store.claimSessionXp(tuesdayCard);
@@ -1256,7 +1265,8 @@ ok(recPay + trainedAfter === 360,
 localStorage.clear();
 store.migrate();
 const bigFirst = store.claimSessionXp(mondayCard);
-const smallAfter = store.claimSessionXp({ ...mondayCard, dayKey: "wednesday", roundsDone: 1 });
+const smallAfter = store.claimSessionXp({ ...mondayCard, dayKey: "wednesday",
+  roundsDone: 1, ledger: mainRound(1) });
 ok(bigFirst + smallAfter === 360, "a lighter card after a full one adds nothing");
 
 /* The cap has to survive a REBUILD. XP is derived from the log on every boot
@@ -1273,7 +1283,7 @@ const spentDay = await runSession({ dayKey: "monday", light: "red", gateUnlocked
     isoDate: new Date().toISOString(), xpVersion: store.XP_VERSION,
     outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main",
     roundsDone: 3, roundsPlanned: 3, completedFully: true,
-    ledger: [{ name: "x", block: "main", round: 1, status: "done" }] })
+    ledger: [...mainRound(1), ...mainRound(2), ...mainRound(3)] })
 });
 ok(spentDay.xpEarned === 0, "a session run after the day's budget is spent is granted nothing");
 const spentRow = store.loadSessions().find(x => x.dayKey === "monday");
@@ -1361,12 +1371,27 @@ ok(store.countsForStreak(streakRow(Math.ceil(redPlan * 0.75), redPlan, { roundsD
    "three quarters of a Red day earns the streak with ZERO completed main rounds");
 ok(store.countsForStreak(streakRow(Math.floor(redPlan * 0.75) - 1, redPlan, { roundsDone: 0 })) === false,
    "and below three quarters earns nothing, rounds or no rounds");
-ok(outcome.deriveSessionOutcome({
-     ledger: streakRow(Math.ceil(redPlan * 0.75), redPlan).ledger,
-     expectedWork: redPlan, outcomeVersion: outcome.OUTCOME_VERSION,
-     sessionType: "main", roundsDone: 0
-   }).mainRoundsDone === 0,
+/* The round count and the streak are independent readings of the same rows, and
+   this says so from the other side: a short day that never finished a round
+   still earns the streak on dose alone.
+
+   It used to be asserted with a ledger whose rows DID prove a round, and a
+   `roundsDone: 0` that min() let override them — so it passed by way of the very
+   bug that reported "0 of 3 main rounds" after three rounds of work. The rows
+   are what is short now, which is what the case was always about. */
+const shortOfARound = streakRow(Math.ceil(redPlan * 0.75), redPlan).ledger;
+const shortRoundOutcome = outcome.deriveSessionOutcome({
+  ledger: shortOfARound, expectedWork: redPlan,
+  // The round asked for the whole plan and got three quarters of it: rows are
+  // MISSING, which is what "she did not finish the round" actually looks like.
+  expectedByRound: { 1: redPlan },
+  outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main", roundsDone: 0
+});
+ok(shortRoundOutcome.mainRoundsDone === 0,
    "the outcome says plainly that no round was completed, and pays the day anyway");
+ok(store.countsForStreak(streakRow(Math.ceil(redPlan * 0.75), redPlan,
+     { ledger: shortOfARound, roundsDone: 0 })) === true,
+   "the dose earns the streak with no completed round behind it");
 
 /* --- THE BAR IS THE DAY'S, NOT THE SITTING'S ------------------------------
    A day can be trained in two goes, and the second used to be judged against
@@ -1854,7 +1879,8 @@ const row = (o) => ({ app: "swimming", dayKey: "monday", dayTitle: "Mon", xpVers
   sessionType: "main", lightResult: "green", ...o });
 /* a real session, a GO-and-quit on the SAME day, a try-it row and a safety stop */
 store.saveSession(row({ isoDate: iso(1), durationSecs: 1500, completedFully: true, roundsDone: 3,
-  roundsPlanned: 3, ledger: [{ name: "a", status: "done" }], mood: "great", xpEarned: 360 }));
+  roundsPlanned: 3, ledger: [...mainRound(1), ...mainRound(2), ...mainRound(3)],
+  mood: "great", xpEarned: 360 }));
 store.saveSession(row({ isoDate: iso(1), durationSecs: 20, completedFully: true, roundsDone: 0,
   roundsPlanned: 3, ledger: [{ name: "a", status: "skipped" }], xpEarned: 0 }));
 store.saveSession(row({ isoDate: iso(2), durationSecs: 400, practice: true, sessionType: "try-it" }));
@@ -1862,7 +1888,8 @@ store.saveSession(row({ isoDate: iso(3), durationSecs: 300, safetyStop: true, pa
   endedEarly: true, completedFully: false, ledger: [{ name: "a", status: "done" }] }));
 /* a real session she never told the app how she felt about */
 store.saveSession(row({ isoDate: iso(4), durationSecs: 1200, completedFully: true, roundsDone: 2,
-  roundsPlanned: 2, lightResult: "yellow", ledger: [{ name: "a", status: "done" }], xpEarned: 270 }));
+  roundsPlanned: 2, lightResult: "yellow",
+  ledger: [...mainRound(1), ...mainRound(2)], xpEarned: 270 }));
 
 const pv0 = pvm.buildProgressVM({ progressScope: "4w", logScope: "month" });
 const zeroMin = pvm.logEntryView(store.loadSessions()[1]);

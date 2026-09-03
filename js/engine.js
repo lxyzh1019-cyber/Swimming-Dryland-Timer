@@ -8,7 +8,7 @@
      notify("tick")  → targeted per-second DOM writes only
    ============================================================ */
 
-import { deriveSessionOutcome, mainRoundsFromLedger, OUTCOME_VERSION } from "./outcome.js";
+import { deriveSessionOutcome, mainRoundsFromLedger, mainRoundReport, OUTCOME_VERSION } from "./outcome.js";
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA,
          exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
          VALGUS_FLOOR, VALGUS_PROGRESSIONS } from "./data.js";
@@ -55,7 +55,12 @@ function blankSession() {
     // Credit for moves finished EARLIER TODAY, carried in so a resumed sitting is
     // judged against the whole day rather than its own leftovers.
     bankedCredit: 0, dayExpectedWork: 0,
-    ledger: [], roundsCompleted: 0, roundsBanked: 0, roundsPlanned: 0, blocksCompleted: 0,
+    // `roundsCounted` is which rounds have already been committed, keyed
+    // "ci:absoluteRound" — a round is committed the instant its last row lands,
+    // and the check runs again at the bottom of the loop, so it has to be
+    // idempotent. See commitRoundIfDone.
+    ledger: [], roundsCompleted: 0, roundsBanked: 0, roundsCounted: {},
+    roundsPlanned: 0, blocksCompleted: 0, expectedByRound: {},
     repsCounted: 0, repsTarget: 0, segmentsDone: 0, segmentsPlanned: 0,
     sideLabel: "", segmentLabel: "",
     /* Live coach state. The engine has always known all of this; it just never
@@ -171,7 +176,7 @@ export function assembleCircuits(dayKey, light, opts = {}) {
          the resume runs what is LEFT of it as a round of its own, and only then
          the full rounds still owed. Two circuits, and they must not both call
          their first round "round 1": `roundBase` numbers each circuit's rounds
-         from where the day actually is, so the ledger, roundFullyDone and
+         from where the day actually is, so the ledger, commitRoundIfDone and
          countExpectedByRound all agree on which round a row belongs to.
 
          That numbering is what keeps the round-completion proof honest. The
@@ -686,11 +691,54 @@ function recordExercise(ex, circuit, ci, ei, r, wasSkipped) {
   return row;
 }
 
-/* A round counts only when every move in it was actually done — not when the
-   loop ran off the end of it. */
-function roundFullyDone(ci, round) {
+/* COMMIT A MAIN ROUND THE MOMENT ITS LAST ROW LANDS.
+
+   This used to run only at the bottom of the round loop in runSession — after
+   the intent-word prompt, after the round-rest speech, after the rest countdown.
+   Every one of those awaits can abort, and each abort path returns straight into
+   finalize(), so a round she had already finished was thrown away because she
+   stopped during the breather that followed it. That is a round of real work
+   deleted by the app's own bookkeeping order, and with `roundsDone` feeding both
+   the finish screen and the XP price, it was deleted from what she was paid too.
+
+   So the round is committed here, off the LEDGER, as soon as the ledger can
+   prove it — before any prompt, any speech and any rest. Nothing between the
+   last rep and the next round can cost her the one she just did.
+
+   Idempotent: the caller at the bottom of the loop is kept as a safety net for
+   the ragged-round shapes (a move capped by `ex.rounds` means the last exercise
+   of a round is not always the last INDEX of the circuit), so this may be called
+   twice for the same round and must count it once.
+
+   The rule itself is mainRoundReport's, in js/outcome.js — the one authority —
+   so the number the engine banks live and the number the saved record reports
+   cannot drift apart. That drift is exactly what min() used to paper over. */
+function commitRoundIfDone(ci, round) {
+  if (sess.roundsCounted[ci + ":" + round]) return;
   const rows = sess.ledger.filter(l => l.ci === ci && l.round === round);
-  return rows.length > 0 && rows.every(l => l.status === "done");
+  if (!rows.length) return;
+  const r = mainRoundReport(rows, sess.expectedByRound, OUTCOME_VERSION)
+    .find(x => x.round === round);
+  if (!r || !r.counts) return;
+  sess.roundsCounted[ci + ":" + round] = true;
+  sess.roundsCompleted += 1;
+  bankMainRounds();
+}
+
+/* Why a round did NOT count, said out loud into the event log at the moment it
+   closes. A "0 of 3" with no reason attached is what sent a parent hunting
+   through an exported ledger; the app knows the answer and can simply say it. */
+function logRoundShort(ci, round) {
+  if (sess.roundsCounted[ci + ":" + round]) return;
+  const rows = sess.ledger.filter(l => l.ci === ci && l.round === round);
+  if (!rows.length) return;
+  const r = mainRoundReport(rows, sess.expectedByRound, OUTCOME_VERSION)
+    .find(x => x.round === round);
+  if (!r || r.counts) return;
+  logEvent("round_short", {
+    round, ratio: Math.round(r.ratio * 100) / 100, missing: r.missing,
+    skipped: r.skipped, blockedBy: r.blockedBy ? r.blockedBy.name : null
+  });
 }
 /* A block counts as trained if at least one move in it was really done. */
 function blockHadWork(ci) {
@@ -1009,6 +1057,10 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     ? countExpectedWork(sess.circuits)
     : Math.max(sess.dayExpectedWork, countExpectedWork(sess.circuits));
   sess.roundsPlanned = (sess.spa || sess.recovery) ? 0 : mainOwed;
+  // Computed here rather than at finalize, because the LIVE round check and the
+  // saved record must be judged against the same expected counts. Deriving it
+  // twice is how the engine and the ledger came to disagree in the first place.
+  sess.expectedByRound = countExpectedByRound(sess.circuits);
   sess.spotChecks = pickSpotChecks(sess.circuits);
 
   logEvent("session_start", { day: dayKey, light: sess.light, mode: sessionMode });
@@ -1115,6 +1167,11 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
         // Banked NOW, not when the block ends — an interrupted session must keep
         // every move it actually finished. See bankMove.
         bankMove(row);
+        // And the ROUND is committed now too, for the same reason one move down:
+        // everything between here and the next round — the form check below, the
+        // round-rest speech, the rest itself — can abort, and each abort used to
+        // discard a round she had already finished. See commitRoundIfDone.
+        if (circuit.block === "main") commitRoundIfDone(ci, absRound);
         sess.exStatus[key] = row.status === "skipped" ? "skipped"
           : r === circuit.rounds ? row.status : sess.exStatus[key];
 
@@ -1197,11 +1254,16 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
       }
       // "Rounds" means MAIN rounds trained. Every one-round block used to add
       // to this same counter, so the finish screen showed a green day as 8.
-      if (circuit.block === "main" && roundFullyDone(ci, roundNumber(circuit, r))) {
-        sess.roundsCompleted += 1;
-        // Written NOW, not at the end of the block — an interrupted session must
-        // keep the rounds it actually finished. See bankMainRounds.
-        bankMainRounds();
+      //
+      // The round has normally been committed already, as its last row landed.
+      // This is the safety net for the ragged shapes: a move capped by
+      // `ex.rounds` means the last exercise of a round is not always the last
+      // INDEX of the circuit, so "its last row" is not a position we can trust.
+      // commitRoundIfDone counts a round once however often it is asked.
+      if (circuit.block === "main") {
+        const abs = roundNumber(circuit, r);
+        commitRoundIfDone(ci, abs);
+        logRoundShort(ci, abs);
       }
     }
     if (blockHadWork(ci)) sess.blocksCompleted += 1;
@@ -1294,7 +1356,7 @@ export function finalize(completed) {
     // What each main round asked for, so a completed round is provable from the
     // record alone — including a record that arrives back from the cloud or a
     // backup file, where the engine that ran it is long gone.
-    expectedByRound: countExpectedByRound(sess.circuits),
+    expectedByRound: sess.expectedByRound || countExpectedByRound(sess.circuits),
     // What the day had already been paid before this sitting started. Saved on
     // the row so the record scores the same tomorrow, and after a cloud restore,
     // as it did on the finish screen tonight.
@@ -1302,6 +1364,12 @@ export function finalize(completed) {
     outcomeVersion: OUTCOME_VERSION,
     completedFully: !!completed
   };
+  // WHY each main round did or did not count, saved with the row. A grown-up
+  // asking "she did three rounds, why does it say zero" should be able to read
+  // the answer off the record — or the CSV export — without reconstructing it
+  // from the raw ledger. Derived, never authoritative: every reader still scores
+  // the ledger itself through js/outcome.js.
+  entry.roundReport = mainRoundReport(entry.ledger, entry.expectedByRound, OUTCOME_VERSION);
   const finalOutcome = deriveSessionOutcome({
     ledger: entry.ledger, expectedWork: entry.expectedWork,
     expectedByRound: entry.expectedByRound, roundsDone: entry.roundsDone,
@@ -1311,12 +1379,14 @@ export function finalize(completed) {
   });
   entry.completedFully = finalOutcome.state === "complete";
   // The engine's own round count and the ledger's disagreeing means one of them
-  // is wrong about what happened. The smaller number is used either way; this
-  // makes the discrepancy visible instead of quietly absorbed.
+  // is wrong about what happened. The LEDGER is what gets reported now (see
+  // deriveSessionOutcome), and the engine commits its rounds under that same
+  // rule, so the two should agree exactly — a disagreement is a defect to look
+  // at, not a number to split the difference on.
   if (finalOutcome.roundsDisagree) {
     logEvent("rounds_disagree", {
       day: sess.dayKey, engine: entry.roundsDone,
-      ledger: mainRoundsFromLedger(entry.ledger, entry.expectedByRound)
+      ledger: mainRoundsFromLedger(entry.ledger, entry.expectedByRound, OUTCOME_VERSION)
     });
   }
   sess.perExercise = entry.perExercise;

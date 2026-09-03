@@ -793,7 +793,7 @@ export function buildGrownupVM(state) {
 
 /* CSV export — weekly summary ported from the old Coach Insights. */
 export function exportCsv() {
-  const rows = [["date", "day", "title", "type", "light", "minutes", "outcome", "countsAsTraining", "roundsDone", "roundsPlanned", "completedFully", "endedEarly", "pain", "skips", "pauses", "clean", "wobbly", "mood", "intentWord", "xpEarned"]];
+  const rows = [["date", "day", "title", "type", "light", "minutes", "outcome", "countsAsTraining", "roundsDone", "roundsPlanned", "completedFully", "endedEarly", "pain", "skips", "pauses", "clean", "wobbly", "mood", "intentWord", "xpEarned", "roundsShort"]];
   loadSessions().forEach(s => {
     rows.push([
       edmontonISO(s.isoDate), s.dayKey || "", s.dayTitle || "", s.sessionType || "",
@@ -803,7 +803,14 @@ export function exportCsv() {
       sessionRoundsDone(s), sessionRoundsPlanned(s),
       s.completedFully ? 1 : 0, s.endedEarly ? 1 : 0, s.pain ? 1 : 0,
       s.skippedCount || 0, s.pauseCount || 0, s.clean || 0, s.wobbly || 0,
-      s.mood || "", s.intentWord || "", s.xpEarned || 0
+      s.mood || "", s.intentWord || "", s.xpEarned || 0,
+      // WHY a round did not count, so "she did three rounds and it says one" is
+      // answerable from the export instead of from the raw ledger.
+      (outcomeOf(s).roundReport || []).filter(r => !r.counts)
+        .map(r => "R" + r.round + ":" + (r.missing ? "stopped partway"
+          : r.skipped.length ? "skipped " + r.skipped[0]
+          : r.blockedBy ? "short on " + r.blockedBy.name
+          : "short")).join("; ")
     ]);
   });
   const csv = rows.map(r => r.map(v => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v).join(",")).join("\n");

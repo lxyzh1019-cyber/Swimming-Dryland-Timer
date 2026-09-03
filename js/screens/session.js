@@ -236,6 +236,10 @@ function completeScreen(vm) {
     ${c.note ? `<div${c.alert ? ` role="alert"` : ""} style="font-size:15px;font-weight:800;${c.noteStyle}border-radius:16px;padding:10px 16px;max-width:480px;line-height:1.45;">${c.note}</div>` : ""}
     ${vm.sessionMantra && c.mantra ? `<div style="font-family:var(--font-hand);font-size:26px;font-weight:700;color:var(--aqua-ink);line-height:1.2;">${vm.sessionMantra}</div>` : ""}
     <div style="font-size:16px;font-weight:700;color:var(--ink-soft);">${vm.sessionDayTitle} · ${vm.sessionMinutes} min${vm.showRoundsLine ? ` · ${vm.roundsLine}` : ""}${vm.xpEarned ? ` · ⭐ +${vm.xpEarned} XP` : ""}</div>
+    ${vm.showRoundsLine && (vm.roundShortNotes || []).length ? `
+    <div style="font-size:14px;font-weight:700;color:var(--ink-soft);max-width:480px;line-height:1.5;">
+      ${vm.roundShortNotes.map(n => `<div>${n}</div>`).join("")}
+    </div>` : ""}
     ${vm.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="display:flex;align-items:center;gap:10px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:14px 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
     ${vm.sessionDone ? `
     <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;">

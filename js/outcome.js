@@ -15,8 +15,13 @@
 
 /* Records written from this version carry `outcomeVersion`, which is what lets
    partial work count as work. Rows written before it keep the old done-only
-   reading, so her existing history is not re-scored underneath her. */
-export const OUTCOME_VERSION = 2;
+   reading, so her existing history is not re-scored underneath her.
+
+   v1 let partial rows count as work at all. v2 added the streak dose bar. v3
+   judges a MAIN ROUND on its dose rather than demanding every move be perfect —
+   see mainRoundReport below. Each step is gated on the version that introduced
+   it, so a record is always read by the rules it was written under. */
+export const OUTCOME_VERSION = 3;
 
 /* How much of a session has to actually be there before the day counts toward
    the streak. Deliberately high: the streak is the app's loudest claim about
@@ -106,35 +111,92 @@ function legacyHadWork(entry) {
   return ((entry && entry.perExercise) || []).some(p => p && !p.skipped);
 }
 
-/* How many main rounds were actually finished — a round counts only when every
-   one of its rows is `done` AND all of its rows are actually there.
+/* How many main rounds were actually finished, and — when one did not count —
+   WHICH MOVE STOPPED IT.
 
-   "All the rows that exist are done" is trivially true of a round that was cut
-   short: abort three moves into an eight-move round two and the ledger holds
-   three done rows, which read as a finished round and paid like one. So the
-   record carries `expectedByRound` (see countExpectedByRound in js/engine.js)
-   and a round has to produce that many rows before it can complete.
+   The rule used to be "every row in the round is `done`". That is the same 80%
+   clock the engine already applies to a single move (DONE_WORK_FRACTION in
+   js/engine.js), except applied with no tolerance at all one level up: a
+   ten-year-old who taps Done a beat early on ONE hold turned a round she
+   physically trained into nothing, three times over, and the finish screen
+   printed "0 of 3" without naming the move. That is how a full session read as
+   the show-up credit alone.
 
-   Records written before this — legacy rows, and rows restored from the cloud
-   or a backup — have no expected count, so they keep the old reading rather than
-   being re-scored underneath her. */
-export function mainRoundsFromLedger(ledger, expectedByRound = null) {
+   So a round now counts on the DOSE it produced, by the same 80% floor:
+
+     · every row the round was supposed to produce is there, and
+     · nothing in it was SKIPPED — a move not attempted is not a short move, and
+       no amount of credit elsewhere in the round buys it back, and
+     · the round's mean credit is at least ROUND_DOSE_FRACTION.
+
+   The credit per row is `streakCredit` unchanged — 1 for a `done` row, and a
+   `partial` pro-rated by its own reps or seconds. Nothing new is measured and
+   nothing new is stored.
+
+   "All the rows that exist are done" was also trivially true of a round that was
+   cut short: abort three moves into an eight-move round and the ledger holds
+   three rows, which read as a finished round and paid like one. So the record
+   carries `expectedByRound` (see countExpectedByRound in js/engine.js) and a
+   round has to produce that many rows before it can count.
+
+   This rule is LOOSER than the one it replaces, so it applies only to records
+   written with it (outcomeVersion 3+). Older rows — and rows restored from the
+   cloud or a backup — keep the all-done reading rather than being re-scored
+   underneath her, the same way partial work and the streak bar are gated above. */
+export const ROUND_DOSE_FRACTION = 0.8;
+
+export function mainRoundReport(ledger, expectedByRound = null, outcomeVersion = null) {
   const rows = (ledger || []).filter(l => l && l.block === "main");
-  if (!rows.length) return 0;
+  if (!rows.length) return [];
+  const doseJudged = Number(outcomeVersion) >= 3;
   const byRound = new Map();
   rows.forEach(l => {
     const r = l.round || 1;
     if (!byRound.has(r)) byRound.set(r, []);
     byRound.get(r).push(l);
   });
-  let done = 0;
+  const report = [];
   byRound.forEach((rs, r) => {
-    if (!rs.every(l => l.status === "done")) return;
     const expected = expectedByRound ? Number(expectedByRound[r]) : NaN;
-    if (Number.isFinite(expected) && rs.length < expected) return;   // rows missing
-    done += 1;
+    const missing = Number.isFinite(expected) ? Math.max(0, expected - rs.length) : 0;
+    const skipped = rs.filter(l => l.status === "skipped");
+    const credit = rs.reduce((a, l) => a + streakCredit(l, true), 0);
+    const ratio = rs.length ? credit / rs.length : 0;
+    const counts = doseJudged
+      ? (missing === 0 && !skipped.length && ratio >= ROUND_DOSE_FRACTION)
+      : (rs.every(l => l.status === "done") && missing === 0);
+    report.push({
+      round: r, rows: rs.length, expected: Number.isFinite(expected) ? expected : null,
+      missing, skipped: skipped.map(l => l.name), credit, ratio, counts,
+      // The one move that cost her the round, so the screen can name it instead
+      // of printing a bare zero. A skipped move outranks a short one: it is the
+      // thing she can actually do differently next time.
+      blockedBy: counts ? null : worstRow(rs)
+    });
   });
-  return done;
+  return report.sort((a, b) => a.round - b.round);
+}
+
+/* The row that dragged the round down — lowest credit, skips first. */
+function worstRow(rs) {
+  const ranked = rs.slice().sort((a, b) => {
+    const sa = a.status === "skipped" ? -1 : streakCredit(a, true);
+    const sb = b.status === "skipped" ? -1 : streakCredit(b, true);
+    return sa - sb;
+  });
+  const l = ranked[0];
+  if (!l) return null;
+  return {
+    name: l.name, round: l.round || 1, status: l.status,
+    driver: l.driver || (l.repsPlanned ? "reps" : "time"),
+    got: l.driver === "reps" ? l.repsCounted : l.actualSecs,
+    planned: l.driver === "reps" ? l.repsPlanned : l.plannedSecs
+  };
+}
+
+export function mainRoundsFromLedger(ledger, expectedByRound = null, outcomeVersion = null) {
+  return mainRoundReport(ledger, expectedByRound, outcomeVersion)
+    .filter(r => r.counts).length;
 }
 
 /* The one function. Everything that has an opinion about a session asks this.
@@ -180,17 +242,29 @@ export function deriveSessionOutcome(input = {}) {
     : hasDetail ? legacyHadWork(input)
     : input.completedFully !== false;
 
-  /* Two independent witnesses to the same fact, and we believe the smaller one.
-     The LEDGER says which rounds have a full set of done rows; the ENGINE says
-     which rounds its own loop walked to the end without aborting (saved as
-     `roundsDone`). Either can be wrong on its own — the ledger can be short a
-     row the engine never wrote, and `roundsDone` is a bare number nothing else
-     can check — so a round is only counted when both agree it happened. */
-  const ledgerRounds = mainRoundsFromLedger(rows, expectedByRound);
+  /* THE LEDGER DECIDES. It used to be the smaller of two witnesses: the ledger,
+     which holds a row per move and can be re-checked by anything; and the
+     engine's own `roundsDone`, a bare number nothing can check. Believing the
+     smaller one meant either witness could erase the other in silence — and one
+     of them did. The engine increments its counter at the BOTTOM of the round
+     loop, after the round rest, so a round finished and then interrupted during
+     its rest was saved as `roundsDone: 0`; min() then threw away three rounds
+     the rows could prove, and the finish screen printed "0 of 3 main rounds"
+     next to thirty-four minutes of work.
+
+     So the evidence wins, and the bare number is kept only as a check on it:
+     `roundsDisagree` still fires and is still logged (see finalize in
+     js/engine.js), because the two SHOULD now agree — the engine commits a round
+     the moment its last row lands, under this same rule — and a disagreement is
+     a real defect worth seeing rather than an outcome worth splitting. Records
+     with no ledger at all — legacy rows, cloud restores — have no evidence to
+     read, so there the bare number is all there is. */
+  const roundReport = mainRoundReport(rows, expectedByRound, outcomeVersion);
+  const ledgerRounds = roundReport.filter(r => r.counts).length;
   const engineRounds = Number(roundsDone);
-  const mainRoundsDone = Number.isFinite(engineRounds)
-    ? Math.min(ledgerRounds, Math.max(0, engineRounds))
-    : ledgerRounds;
+  const mainRoundsDone = rows.length
+    ? ledgerRounds
+    : Number.isFinite(engineRounds) ? Math.max(0, engineRounds) : 0;
   const roundsDisagree = Number.isFinite(engineRounds) && engineRounds !== ledgerRounds;
 
   // Completion is "every expected instance was DONE" — never "the loop ended".
@@ -257,6 +331,9 @@ export function deriveSessionOutcome(input = {}) {
     meaningfulWork,
     completedFully: state === "complete",
     mainRoundsDone,
+    // Per-round detail, so a screen can say WHICH move cost her a round rather
+    // than leaving a "0 of 3" to be guessed at. See mainRoundReport.
+    roundReport,
     // Surfaced rather than logged here: this module stays pure and
     // dependency-free (store.js imports IT), so the caller does the logging.
     roundsDisagree,

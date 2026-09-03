@@ -1014,9 +1014,18 @@ export function sessionRounds(entry) {
     if (entry.mini) return 1;
     return Math.min(3, Math.max(1, entry.roundsDone || 1));
   }
-  // You cannot finish more rounds than the day asked for — a mini is one
-  // round however the traffic light was set.
-  return Math.min(sessionRoundsPlanned(entry), Math.max(0, entry.roundsDone || 0));
+  /* THE LEDGER PRICES THE SESSION, not the engine's bare counter.
+     `entry.roundsDone` is a number the engine wrote and nothing can re-check,
+     and it was written at the wrong moment: a round finished and then
+     interrupted during its rest was saved as zero, so a full Thursday was priced
+     at the 90 XP show-up credit alone. outcomeOf reads the rows instead — the
+     same authority the finish screen, the streak and the parent reports use, so
+     the number she is paid and the number she is shown cannot disagree.
+
+     Still capped by what the day asked for: you cannot finish more rounds than
+     were on offer, and a mini is one round however the traffic light was set. */
+  return Math.min(sessionRoundsPlanned(entry),
+                  Math.max(0, outcomeOf(entry).mainRoundsDone || 0));
 }
 
 /* Rounds the day asked for — the ceiling a day's XP is capped at. */
