@@ -7,7 +7,7 @@
 import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
 import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE } from "./data.js";
 import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION,
-         workoutInstances, streakDatesOf, freezeDatesOf } from "./outcome.js";
+         streakDatesOf, freezeDatesOf } from "./outcome.js";
 
 /* ---- keys (unchanged from the old app unless noted) ---- */
 export const SETTINGS_KEY     = "swimTrainingSettingsV2";

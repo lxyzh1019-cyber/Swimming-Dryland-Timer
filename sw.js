@@ -38,7 +38,7 @@
    on the same origin — see the activate handler. Every version name starts
    with it. BUMP THE VERSION, NEVER THE PREFIX. */
 const CACHE_PREFIX = "splash-";
-const CACHE_VERSION = CACHE_PREFIX + "v1";
+const CACHE_VERSION = CACHE_PREFIX + "v2";
 
 /* Everything needed to boot and run a whole workout with no network. Listed
    rather than discovered: a service worker cannot read a directory, and a
