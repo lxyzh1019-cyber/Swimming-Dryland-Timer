@@ -11,7 +11,9 @@ import { gateUnlocked, GATE_REASON } from "../gate.js";
 import { passkeySupported, hasPasskey } from "../passkey.js";
 import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal, outcomeOf,
          sessionRounds as sessionRoundsDone, sessionRoundsPlanned, plannedRoundsAcrossDays,
-         monthKeyOf, formVerdicts, latestFormVerdicts, loadReadinessLog } from "../store.js";
+         monthKeyOf, formVerdicts, latestFormVerdicts, loadReadinessLog,
+         settledXpInRange } from "../store.js";
+import { workoutInstances } from "../outcome.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
 import { sessionEffort, effortSummary, EFFORT_CAVEAT } from "../effort.js";
 
@@ -104,11 +106,22 @@ export function buildGrownupVM(state) {
   // GO-and-quit rows used to land in the minute totals and the average as if
   // they were workouts, which is how "avg session" drifted below any session
   // she actually did.
-  const trainingRows = sessions.filter(s => outcomeOf(s).countsAsTraining);
-  const done = sessions.filter(s => outcomeOf(s).state === "complete");
+  /* A WORKOUT, NOT A SITTING. Every rate on this board was computed per RECORD,
+     so a day she came back to finish made the session count go up, the average
+     duration go down and the completion rate fall — the denominator growing by
+     one for work that was really one day's. Sums (minutes, rounds) are correct
+     across fragments and stay as they are; anything with a session as its
+     DENOMINATOR, or that asks whether a workout was completed, is asked of the
+     whole workout. See workoutInstances in js/outcome.js.
+
+     The fragments themselves stay the unit for additive facts, which is what
+     `trainingFrags` is for. */
+  const trainingFrags = sessions.filter(s => outcomeOf(s).countsAsTraining);
+  const trainingRows = workoutInstances(trainingFrags);
+  const done = trainingRows.filter(w => w.outcome.state === "complete");
   const days = scopeDays(scope, all);
   const scheduled = scope === "week" ? days : Math.round(days);   // plan trains daily (Sun = recovery)
-  const totalMins = trainingRows.reduce((a, s) => a + mins(s), 0);
+  const totalMins = trainingFrags.reduce((a, s) => a + mins(s), 0);
   // Adherence is "how many of the days she was meant to train did she train",
   // so it counts DAYS, not records. Counting records let two attempts at one
   // Tuesday read as two days of adherence — and pushed the figure over 100%
@@ -123,10 +136,14 @@ export function buildGrownupVM(state) {
      RAN. One field was doing both jobs and therefore neither: every overridden
      day was filed under the light the grown-up chose, so the check could never
      be scored against what followed it. */
+  // Asked of workouts too: a day resumed under the same light is one day of
+  // that load, and reading it as two — one of them unfinished — is exactly the
+  // shape that made a light look like it was landing badly.
+  const scopeWorkouts = workoutInstances(sessions);
   const lightReport = (pick, noteFor) => ["green", "yellow", "red", "recovery"].map(light => {
-    const ss = sessions.filter(s => pick(s) === light);
+    const ss = scopeWorkouts.filter(w => pick(w.fragments[w.fragments.length - 1]) === light);
     if (!ss.length) return null;
-    const completed = ss.filter(s => outcomeOf(s).state === "complete").length;
+    const completed = ss.filter(w => w.outcome.state === "complete").length;
     return {
       light: light[0].toUpperCase() + light.slice(1), color: LIGHT_COLORS[light],
       sessions: ss.length, completed,
@@ -147,15 +164,18 @@ export function buildGrownupVM(state) {
 
   /* Where the two disagree, named. This is the override log a grown-up needs:
      not that an override happened, but which way it went and what came of it. */
-  const overrideRows = sessions.filter(s => bodyLight(s) !== ranLight(s)).map(s => ({
-    date: dstr(s.isoDate),
-    from: bodyLight(s), to: ranLight(s),
-    raised: wasRaised(s),
-    fromColor: LIGHT_COLORS[bodyLight(s)], toColor: LIGHT_COLORS[ranLight(s)],
-    finished: outcomeOf(s).state === "complete",
-    note: (wasRaised(s) ? "Raised above the body check" : "Lowered below the body check")
-      + " — " + (outcomeOf(s).state === "complete" ? "the session finished." : "the session did not finish.")
-  }));
+  const overrideRows = scopeWorkouts
+    .map(w => ({ w, s: w.fragments[w.fragments.length - 1] }))
+    .filter(({ s }) => bodyLight(s) !== ranLight(s))
+    .map(({ w, s }) => ({
+      date: dstr(s.isoDate),
+      from: bodyLight(s), to: ranLight(s),
+      raised: wasRaised(s),
+      fromColor: LIGHT_COLORS[bodyLight(s)], toColor: LIGHT_COLORS[ranLight(s)],
+      finished: w.outcome.state === "complete",
+      note: (wasRaised(s) ? "Raised above the body check" : "Lowered below the body check")
+        + " — " + (w.outcome.state === "complete" ? "the session finished." : "the session did not finish.")
+    }));
 
   /* ---- body map, over time ----
      The check used to be one overwritten record, so "left shoulder, three days
@@ -395,7 +415,11 @@ export function buildGrownupVM(state) {
     note: "Planned = the rounds each day actually asked for — green 3, yellow 2, red 1, mini 1." };
 
   /* ---- mood before → after ---- */
-  const moodRows = sessions.filter(s => s.mood).slice(-6).map(s => {
+  // One answer per WORKOUT: she is asked how it felt once, at the end. Counting
+  // both fragments of a resumed day made a single "tired" into two.
+  const moodRows = scopeWorkouts
+    .map(w => w.fragments.filter(f => f.mood).pop())
+    .filter(Boolean).slice(-6).map(s => {
     const before = LIGHT_BEFORE[s.lightResult || "green"] || "🙂";
     const after = MOOD_EMOJI[s.mood] || "🙂";
     const up = MOOD_RANK[after] > MOOD_RANK[before], same = MOOD_RANK[after] === MOOD_RANK[before];
@@ -408,29 +432,38 @@ export function buildGrownupVM(state) {
   let byWeekday = null, byTopic = null;
   if (scope === "week") {
     const isoDates = edmontonWeekISODates();
-    // The best attempt that day, not the first one found. A GO-and-quit at
-    // breakfast used to hide the full session she did after school.
-    const rank = x => (outcomeOf(x).state === "complete" ? 2 : 0) + (countsAsTrainedLocal(x) ? 1 : 0);
+    /* The best attempt that day, not the first one found. A GO-and-quit at
+       breakfast used to hide the full session she did after school. Asked of
+       WORKOUTS, so the two sittings of a day she came back to finish are one
+       finished day rather than two unfinished ones — which is how a completed
+       Tuesday could show up here as "partial". */
+    const allWorkouts = workoutInstances(all);
+    const rank = w => (w.outcome.state === "complete" ? 2 : 0) + (w.outcome.countsAsTraining ? 1 : 0);
     byWeekday = WEEK_ORDER.map(k => {
-      const sameDay = all.filter(x => edmontonISO(x.isoDate) === isoDates[k]);
-      const s = sameDay.sort((a, b) => rank(b) - rank(a) || (b.durationSecs || 0) - (a.durationSecs || 0))[0];
+      const sameDay = allWorkouts.filter(w => w.date === isoDates[k]);
+      const w = sameDay.sort((a, b) => rank(b) - rank(a) || b.durationSecs - a.durationSecs)[0];
+      const finished = !!(w && w.outcome.state === "complete");
+      const wMins = w ? Math.round(w.durationSecs / 60) : 0;
+      const wMood = w && w.fragments.map(f => f.mood).filter(Boolean).pop();
       return {
         k: DAY_SHORT[k], topic: DAYS[k].theme || DAYS[k].title,
-        mood: s && s.mood ? MOOD_EMOJI[s.mood] : "·",
-        done: !!(s && outcomeOf(s).state === "complete"), mins: s ? mins(s) : 0,
-        rowBg: s && outcomeOf(s).state === "complete" ? "var(--surface)" : "var(--surface-2)",
-        statusChip: s && outcomeOf(s).state === "complete" ? "✓ " + mins(s) + "m" : (s ? "partial" : "—"),
-        statusStyle: "font-size:11px;font-weight:900;border-radius:var(--radius-pill);padding:3px 9px;white-space:nowrap;" + (s && outcomeOf(s).state === "complete" ? "background:var(--mint-wash);color:var(--mint-ink);" : s ? "background:var(--sun-wash);color:var(--sun-ink);" : "background:var(--surface-2);color:var(--ink-faint);")
+        mood: wMood ? MOOD_EMOJI[wMood] : "·",
+        done: finished, mins: wMins,
+        rowBg: finished ? "var(--surface)" : "var(--surface-2)",
+        statusChip: finished ? "✓ " + wMins + "m" : (w ? "partial" : "—"),
+        statusStyle: "font-size:11px;font-weight:900;border-radius:var(--radius-pill);padding:3px 9px;white-space:nowrap;" + (finished ? "background:var(--mint-wash);color:var(--mint-ink);" : w ? "background:var(--sun-wash);color:var(--sun-ink);" : "background:var(--surface-2);color:var(--ink-faint);")
       };
     });
   } else {
     const topics = {};
-    sessions.forEach(s => {
+    scopeWorkouts.forEach(w => {
+      const s = w.fragments[w.fragments.length - 1];
       const t = (DAYS[s.dayKey] && DAYS[s.dayKey].theme) || s.dayTitle || "Other";
       topics[t] = topics[t] || { done: 0, planned: 0, moods: [] };
       topics[t].planned += 1;
-      if (outcomeOf(s).state === "complete") topics[t].done += 1;
-      if (s.mood) topics[t].moods.push(MOOD_EMOJI[s.mood]);
+      if (w.outcome.state === "complete") topics[t].done += 1;
+      const m = w.fragments.map(f => f.mood).filter(Boolean).pop();
+      if (m) topics[t].moods.push(MOOD_EMOJI[m]);
     });
     byTopic = Object.entries(topics).map(([k, v]) => ({
       k, done: v.done, planned: v.planned,
@@ -477,13 +510,19 @@ export function buildGrownupVM(state) {
   const trainedDays = trainedDaySet.size;
   const availableDays = Math.max(trainedDays, scopeDays(scope, all));
   const boardRounds = sessions.reduce((a, s) => a + sessionRoundsDone(s), 0);
-  const boardXp = sessions.reduce((a, s) => a + (s.xpEarned || 0), 0);
+  /* SETTLED, not the sum of the `xpEarned` stamps. A stamp is what a SITTING is
+     worth and a day has a ceiling, so a resumed day stamped 180 and 270 and
+     this tile reported 450 for a day the journey correctly paid 360. */
+  const boardXp = settledXpInRange(sessions);
+  // One answer per workout, same as the mood card above.
   const moodCount = { great: 0, okay: 0, tired: 0 };
-  sessions.forEach(s => { if (moodCount[s.mood] != null) moodCount[s.mood] += 1; });
+  scopeWorkouts.forEach(w => {
+    const m = w.fragments.map(f => f.mood).filter(Boolean).pop();
+    if (moodCount[m] != null) moodCount[m] += 1;
+  });
   const levelsUp = (() => {
     const j = loadJourney() || { xp: 0 };
-    const inWindow = sessions.reduce((a, s) => a + (s.xpEarned || 0), 0);
-    return Math.max(0, levelFromXp(j.xp || 0).level - levelFromXp(Math.max(0, (j.xp || 0) - inWindow)).level);
+    return Math.max(0, levelFromXp(j.xp || 0).level - levelFromXp(Math.max(0, (j.xp || 0) - boardXp)).level);
   })();
   const verifiedAll = latestFormVerdicts();
   const verified = Object.values(verifiedAll).reduce((a, v) => {
@@ -814,11 +853,22 @@ export function buildGrownupVM(state) {
 
 /* CSV export — weekly summary ported from the old Coach Insights. */
 export function exportCsv() {
-  const rows = [["date", "day", "title", "type", "light", "minutes", "outcome", "countsAsTraining", "roundsDone", "roundsPlanned", "completedFully", "endedEarly", "pain", "skips", "pauses", "clean", "wobbly", "mood", "intentWord", "xpEarned", "roundsShort"]];
-  loadSessions().forEach(s => {
+  /* One line per SITTING, because this is the raw log and a resumed day really
+     did happen in two goes — but with the workout it belongs to named beside
+     it, and the WORKOUT's verdict alongside the sitting's. Without those two
+     columns a day finished across two sittings exported as two unfinished
+     rows, and every total taken off the file double-counted the day. */
+  const allSessions = loadSessions();
+  const byFragment = new Map();
+  workoutInstances(allSessions).forEach(w =>
+    w.fragments.forEach(f => byFragment.set(f, w)));
+  const rows = [["date", "day", "title", "type", "light", "minutes", "workout", "workoutOutcome", "workoutAttempts", "outcome", "countsAsTraining", "roundsDone", "roundsPlanned", "completedFully", "endedEarly", "pain", "skips", "pauses", "clean", "wobbly", "mood", "intentWord", "xpEarned", "roundsShort"]];
+  allSessions.forEach(s => {
+    const w = byFragment.get(s);
     rows.push([
       edmontonISO(s.isoDate), s.dayKey || "", s.dayTitle || "", s.sessionType || "",
       s.lightResult || "", Math.round((s.durationSecs || 0) / 60),
+      w ? w.key : "", w ? w.outcome.state : "", w ? w.attempts : "",
       // The authoritative reading, alongside the raw flags it was derived from.
       outcomeOf(s).state, outcomeOf(s).countsAsTraining ? 1 : 0,
       sessionRoundsDone(s), sessionRoundsPlanned(s),

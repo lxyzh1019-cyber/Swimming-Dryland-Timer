@@ -6,7 +6,8 @@
 
 import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
 import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE } from "./data.js";
-import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION } from "./outcome.js";
+import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION,
+         workoutInstances, streakDatesOf, freezeDatesOf } from "./outcome.js";
 
 /* ---- keys (unchanged from the old app unless noted) ---- */
 export const SETTINGS_KEY     = "swimTrainingSettingsV2";
@@ -429,11 +430,12 @@ function gapHolds(fromISO, toISO, freeze) {
   return gap >= 1 && (gap <= STREAK_MAX_GAP || allFrozenBetween(fromISO, toISO, freeze));
 }
 
-// Longest run of active days under the same freeze rule as currentStreak —
-// otherwise "best" can read lower than the streak the kid is standing on.
-export function longestStreak(sessions, freezeDays = null) {
-  const days = activeDays(sessions);
-  const freeze = freezeDays instanceof Set ? freezeDays : new Set(freezeDays || []);
+/* The walk itself, over Edmonton DATE STRINGS, oldest first. Date objects here
+   would mix UTC-parsed and local clocks and break the streak every morning.
+   Kept separate from the session-shaped wrappers below because the streak's
+   real unit is a day, and which days those are is a question with exactly one
+   right answer — see streakDatesOf in js/outcome.js. */
+function longestFromDays(days, freeze) {
   let best = 0, run = 0, prev = null;
   days.forEach(d => {
     run = (prev !== null && gapHolds(prev, d, freeze)) ? run + 1 : 1;
@@ -441,12 +443,8 @@ export function longestStreak(sessions, freezeDays = null) {
   });
   return best;
 }
-// Current streak (Edmonton). Compares date STRINGS — Date objects here would
-// mix UTC-parsed and local clocks and break the streak every morning.
-export function currentStreak(sessions, freezeDays = null) {
-  const days = activeDays(sessions);
+function currentFromDays(days, freeze) {
   if (!days.length) return 0;
-  const freeze = freezeDays instanceof Set ? freezeDays : new Set(freezeDays || []);
   const last = days[days.length - 1];
   const today = todayISODate();
   // A rest day today is still inside the freeze — same gap rule as below, plus
@@ -459,6 +457,36 @@ export function currentStreak(sessions, freezeDays = null) {
     streak++; cur = days[i];
   }
   return streak;
+}
+const asSet = (v) => (v instanceof Set ? v : new Set(v || []));
+
+// Longest run of active days under the same freeze rule as currentStreak —
+// otherwise "best" can read lower than the streak the kid is standing on.
+export function longestStreak(sessions, freezeDays = null) {
+  return longestFromDays(activeDays(sessions), asSet(freezeDays));
+}
+export function currentStreak(sessions, freezeDays = null) {
+  return currentFromDays(activeDays(sessions), asSet(freezeDays));
+}
+
+/* ---- THE STREAK, ASKED OF WORKOUTS ----------------------------------------
+
+   Every screen used to build the streak itself, out of
+   `sessions.filter(countsForStreak)` — which judges each SITTING on its own. A
+   day trained in two goes was two short sessions, neither of which cleared the
+   bar, while the Today card (which had already learned to combine them) told
+   her the day counted. The app contradicting itself to a ten-year-old about the
+   one number she cares about.
+
+   These two are what every consumer asks now. The pair above stay exported for
+   the day-level tests and for any caller that already holds the days. */
+export function currentStreakOf(sessions) {
+  const rows = sessions || loadSessions();
+  return currentFromDays([...streakDatesOf(rows)].sort(), freezeDatesOf(rows));
+}
+export function longestStreakOf(sessions) {
+  const rows = sessions || loadSessions();
+  return longestFromDays([...streakDatesOf(rows)].sort(), freezeDatesOf(rows));
 }
 
 /* ---- skip history ---- */
@@ -1866,6 +1894,28 @@ export function settledDayXp(sessions) {
 
 export function settledTrainingXp(sessions) {
   return settledDayXp(sessions).reduce((sum, d) => sum + d.settled, 0);
+}
+
+/* ---- AND THE SAME NUMBER ON EVERY SCREEN ----------------------------------
+
+   The settlement above was correct and almost nobody used it. Today, Progress
+   and the Grown-up analytics each summed the raw `xpEarned` stamps instead, and
+   a stamp is what a SITTING is worth, not what a DAY paid. It does not take two
+   devices offline at once to break that: an ordinary resume writes two stamps
+   for one day — 180 and 270 — and the Today card read out "+450 XP earned"
+   beside a journey correctly holding 360.
+
+   One date, one answer, everywhere. `settledDayXp` is still the authority;
+   these are the two shapes the screens actually want. */
+export function settledXpByDate(sessions) {
+  const out = new Map();
+  settledDayXp(sessions).forEach(d => out.set(d.date, d.settled));
+  return out;
+}
+export function settledXpInRange(sessions, from, to) {
+  return settledDayXp(sessions)
+    .filter(d => (!from || d.date >= from) && (!to || d.date <= to))
+    .reduce((sum, d) => sum + d.settled, 0);
 }
 
 /* XP THIS DEVICE HAS CALCULATED BUT CANNOT YET PROMISE.

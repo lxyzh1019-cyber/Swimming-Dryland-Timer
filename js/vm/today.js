@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overloadWeek } from "../data.js";
-import { settings, loadSessions, loadJourney, levelFromXp, currentStreak, loadDayProgress, countsAsTrained, countsForStreak, streakFreezeDates, sessionXp, outcomeOf } from "../store.js";
+import { settings, loadSessions, loadJourney, levelFromXp, currentStreakOf, loadDayProgress, countsAsTrained, settledXpByDate, outcomeOf } from "../store.js";
 import { workoutInstances } from "../outcome.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
 import { assembleCircuits, estimateSessionSecs } from "../engine.js";
@@ -232,11 +232,17 @@ export function buildTodayVM(state) {
 
   const weekDoneCount = WEEK_ORDER.filter(k => statuses[k] === "done" || statuses[k] === "partial").length;
   const statChips = [
-    // The streak asks a stricter question than "did she train" — a day has to be
-    // a session, not a piece of one. Everything else here still counts any work.
-    { icon: "🔥", value: String(currentStreak(sessions.filter(countsForStreak), streakFreezeDates(sessions))), label: "day streak", color: "var(--ink)" },
+    /* The streak asks a stricter question than "did she train" — a day has to be
+       a session, not a piece of one. Everything else here still counts any work.
+       Asked of WORKOUTS: this line used to filter the raw records, which judges
+       each sitting alone, so a day finished in two goes could be told it counted
+       on the card below while this chip refused to move. */
+    { icon: "🔥", value: String(currentStreakOf(sessions)), label: "day streak", color: "var(--ink)" },
     { icon: "✅", value: weekDoneCount + "/7", label: "this week", color: "var(--mint-ink)" },
-    { icon: "🏊", value: String(sessions.length), label: "sessions", color: "var(--sea)" }
+    /* Sessions she has TRAINED, counted once each. This was `sessions.length` —
+       every stored row, try-it rehearsals and GO-and-quits included, and a
+       resumed day twice. */
+    { icon: "🏊", value: String(workoutInstances(sessions.filter(countsAsTrained)).length), label: "sessions", color: "var(--sea)" }
   ];
   const journey = buildJourney();
 
@@ -341,9 +347,13 @@ export function buildTodayVM(state) {
     const dayFragments = currentWeekSessions()
       .filter(s => s.dayKey === selectedKey && countsAsTrained(s));
     const dayRecord = dayFragments[dayFragments.length - 1];
-    /* XP is the DAY's, not the last sitting's: a day trained in two goes pays
-       each fragment separately and showing only the second understated it. */
-    const earnedXp = dayFragments.reduce((a, s) => a + sessionXp(s), 0);
+    /* XP is the DAY's, SETTLED — not the last sitting's, and not the sittings
+       added up. Showing only the second understated a day trained in two goes;
+       adding them overstated it, because a stamp is what a sitting is worth and
+       the day has a ceiling. This line read "+450 XP earned" for a 360 XP day
+       while the journey, which settles properly, held 360. */
+    const dayIso = dayRecord ? edmontonISO(dayRecord.isoDate) : null;
+    const earnedXp = dayIso ? (settledXpByDate(sessions).get(dayIso) || 0) : 0;
     /* DID THIS DAY ACTUALLY EARN THE STREAK?
 
        This card said "This day counts toward your streak." for ANY partial day,

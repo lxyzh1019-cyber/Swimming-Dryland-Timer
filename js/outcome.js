@@ -540,13 +540,15 @@ export function workoutOutcome(fragments) {
   const first = frags[0] || {};
   const last = frags[frags.length - 1] || {};
   const version = frags.reduce((m, s) => Math.max(m, Number(s.outcomeVersion) || 0), 0) || null;
-  /* The row merge is a correction to double-counting, not a change of rule, so
-     it is gated the way every rule change in this file is: records written
-     before the merge existed keep the reading they were written under, and are
-     not re-scored underneath her. Nothing can write a pre-v3 record any more,
-     so the loophole is closed for everything current. */
-  const raw = frags.reduce((a, s) => a.concat(s.ledger || []), []);
-  const ledger = Number(version) >= 3 ? mergeLedgerRows(raw) : raw;
+  /* Ungated, unlike the rule changes elsewhere in this file, because it is not
+     a rule change: concatenating was a COUNTING ERROR, and it read wrong in
+     both directions. It over-paid a move attempted twice, and it under-read a
+     move skipped in the morning and then actually done after school — the
+     ledger held both rows, the skip was still in it, and the day could not
+     read as finished however well it had gone the second time. The merge
+     answers "what is the best proof this planned move was performed", which is
+     the right question for a record of any age. */
+  const ledger = mergeLedgerRows(frags.reduce((a, s) => a.concat(s.ledger || []), []));
   /* The day's ask, not the sum of the sittings' asks. Adding them would count
      the same plan once per attempt and make a finished day read as a third
      of itself. Every fragment already carries the DAY's expectedWork (see
