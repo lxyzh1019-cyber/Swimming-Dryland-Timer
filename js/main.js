@@ -6,7 +6,7 @@
    delegated click listener below.
    ============================================================ */
 
-import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS } from "./store.js";
+import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS, migratePrizeAmnesty } from "./store.js";
 import { edmontonDayKey, escapeHtml } from "./util.js";
 import { restoreFromCloud, publishJourney, publishReadiness } from "./sync.js";
 import { downloadBackup, restoreBackupFile } from "./backup.js";
@@ -905,6 +905,11 @@ function boot() {
     const reached = !!(result && result.reachedCloud);
     const hasHistory = (loadSessions() || []).length > 0;
     setBootstrapState(hasHistory ? "restored" : reached ? "empty" : "offline-unverified");
+    /* A second amnesty pass, now that the other device's wallet has merged in:
+       prizes it still held as spent have only just arrived. The cutoff was
+       stamped on the first pass, so this forgives exactly the same set and
+       cannot reach anything redeemed since. */
+    migratePrizeAmnesty();
     // The XP total is rebuilt from the synced sources, so repaint regardless.
     if (!state.inSession) render();
   });

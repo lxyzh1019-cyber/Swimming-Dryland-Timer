@@ -1430,7 +1430,14 @@ function clearProgressIfReplaced() {
     logEvent("progress_kept", { day: sess.dayKey, reason: "save_failed" });
     return;
   }
-  if (!nothingLeftOwed()) {
+  /* Either proof is enough that there is nothing to come back to, and requiring
+     both is what leaves a stale record behind. nothingLeftOwed() re-derives the
+     day's block list at finalize time, so if the valgus gate unlocked mid-run
+     the list can name a block that was never actually offered — and the record
+     would then never clear, handing her a resume prompt for a day she finished.
+     A saved outcome of `complete` settles it on its own. */
+  const savedComplete = !!(sess.savedOutcome && sess.savedOutcome.state === "complete");
+  if (!savedComplete && !nothingLeftOwed()) {
     logEvent("progress_kept", {
       day: sess.dayKey,
       reason: (sess.savedOutcome && sess.savedOutcome.state) || "partial"

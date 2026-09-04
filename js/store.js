@@ -1517,6 +1517,118 @@ export function restorePrize(prizeId_) {
   return { restored: true, id: replacement.id, was: key, label: replacement.label || "" };
 }
 
+/* ============================================================
+   PRIZE AMNESTY — one dated forgiveness of every earlier redemption.
+
+   Her wallet showed all thirteen prizes as used. The cause is persisted legacy
+   data carrying `redeemed: true`, and the merge cannot second-guess it:
+   redemption always wins (see mergePrize), and it has to, because a device
+   still showing a prize as available is simply behind, and letting ITS copy win
+   is how one prize gets spent twice. The app therefore cannot tell a real spend
+   from one the duplicate-id bug invented, and restorePrize above exists so a
+   grown-up can decide one at a time.
+
+   An adult has decided for all of them at once. THE RULE, and it is the whole
+   rule: every redemption that happened BEFORE the moment this first ran is
+   forgiven, wherever it is later seen; anything redeemed after that moment is
+   hers to keep spent. That is what makes running it on every boot safe forever
+   rather than a switch that keeps handing back prizes she really used.
+
+   It cannot work by setting `redeemed: false` — the next sync from the other
+   device would quietly re-redeem it. It voids the corrupted id and issues a
+   replacement, exactly as restorePrize does.
+
+   AND THE REPLACEMENT ID IS DERIVED FROM THE ORIGINAL, not random. Both devices
+   run this independently on their own copy of the wallet. With a random id each
+   would mint a DIFFERENT replacement for the same prize, the union would carry
+   twenty-six, and reconcileWallet would then trim thirteen of them by date —
+   arbitrarily, since every replacement keeps its original earned date. A
+   derived id makes both devices produce the same prize, which the union
+   collapses back into one. This is load-bearing; do not make it random.
+
+   The wallet's SIZE is unchanged (one id swapped for one id), so the
+   reconcileWallet trim never fires on account of this. */
+export const PRIZE_AMNESTY_VERSION = 1;
+
+/* One prize whose label is being corrected at the same time, by adult request.
+   The DRAW POOL in js/data.js is deliberately untouched: it already holds a
+   chore-skip, and adding a second would quietly double its odds. */
+const AMNESTY_RELABEL = [
+  { match: /stay\s*up\s*20\s*min(ute)?s?\s*later/i, icon: "✨", label: "Skip a chore" }
+];
+
+/* Same charset prizeId() produces, so a derived id is safe everywhere an id is
+   written — including into a data-arg attribute. */
+function restoredIdFor(originalId) {
+  const clean = String(originalId).toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 40);
+  return "restored-" + (clean || "prize");
+}
+
+export function migratePrizeAmnesty(now = Date.now()) {
+  const j = loadJourney();
+  if (!j) return { restored: 0, relabelled: 0 };
+
+  // Stamped on the FIRST pass and never moved. Every later pass measures
+  // redemptions against this instant, which is what makes "before the amnesty"
+  // a fixed fact rather than a rolling window.
+  if (!j.prizeAmnesty || j.prizeAmnesty.v !== PRIZE_AMNESTY_VERSION) {
+    j.prizeAmnesty = { v: PRIZE_AMNESTY_VERSION, at: now, note: "" };
+  }
+  const cutoff = Number(j.prizeAmnesty.at) || now;
+
+  const wallet = j.prizesWon || [];
+  const voided = new Set((j.voidedPrizeIds || []).map(String));
+  let restored = 0, relabelled = 0;
+
+  const next = wallet.map(p => {
+    if (!p || p.id == null) return p;
+    let out = { ...p };
+
+    // The relabel applies to every copy, spent or not — it is a correction to
+    // what the prize SAYS, not to whether it has been used.
+    const rule = AMNESTY_RELABEL.find(r => r.match.test(String(out.label || "")));
+    if (rule) { out.icon = rule.icon; out.label = rule.label; relabelled++; }
+
+    if (!out.redeemed) return out;
+    /* A redemption with no date at all is precisely the legacy shape the audit
+       identified as corrupt, so it is forgiven; one dated after the amnesty is
+       a real spend and is left alone. */
+    const at = Number.isFinite(out.redeemedAt) ? out.redeemedAt : redeemedAtOf(out);
+    if (at != null && at >= cutoff) return out;
+
+    const replacementId = restoredIdFor(out.id);
+    voided.add(String(out.id));
+    restored++;
+    const replacement = { ...out, id: replacementId, redeemed: false, repairOf: String(out.id) };
+    delete replacement.redeemedAt;
+    return replacement;      // date untouched: the day she EARNED it is hers
+  });
+
+  // A replacement can collide with a prize already carrying that id if this has
+  // somehow run twice against one wallet; keep one.
+  const byId = new Map();
+  next.forEach(p => {
+    if (!p || p.id == null) return;
+    const k = String(p.id);
+    byId.set(k, byId.has(k) ? mergePrize(byId.get(k), p) : p);
+  });
+
+  j.prizesWon = [...byId.values()];
+  j.voidedPrizeIds = [...voided];
+  if (restored || relabelled) {
+    /* Not silent. This runs itself, and a wallet that changes behind a child's
+       back with no explanation is what produced the problem in the first place;
+       the Grown-up Zone renders this line. */
+    j.prizeAmnesty.note = restored
+      ? restored + " prize" + (restored === 1 ? " was" : "s were") + " made available again on "
+        + edmontonISO(now) + ". Prizes used after that stay used."
+      : j.prizeAmnesty.note;
+    logEvent("prize_amnesty", { restored, relabelled });
+  }
+  saveJourney(syncPendingDraws(j));
+  return { restored, relabelled };
+}
+
 /* Split quiz XP back out of the session rows that folded it in. The Coach's
    Quiz used to add its XP to BOTH the session record and the quiz ledger, and
    rebuildJourneyXp sums both — so every rebuild inflated the total by the
@@ -1766,25 +1878,53 @@ export function settledTrainingXp(sessions) {
    Displaying it is the point: a kid who trained is told her work is counted,
    not that it is missing. */
 let _syncFailed = false;
-let _everSynced = false;
 
+/* WHETHER THIS DEVICE HAS A WORKING MIRROR, remembered ACROSS LOADS.
+
+   This was a module-level boolean, which meant it reset on every page load — so
+   a COLD offline launch had the guard below switched off entirely, and a cold
+   offline launch is precisely the case it exists for. It lives on the journey
+   now, which is already persisted and already synced. */
 export function noteSyncResult(ok) {
   _syncFailed = !ok;
-  if (ok) _everSynced = true;
+  if (!ok) return;
+  const j = loadJourney();
+  if (!j) return;
+  j.lastSyncAt = Date.now();
+  saveJourney(j);
 }
 export function lastSyncFailed() { return _syncFailed; }
-export function hasEverSynced() { return _everSynced; }
+export function hasEverSynced() {
+  return Number.isFinite((loadJourney() || {}).lastSyncAt);
+}
 
-export function xpIsPending() {
+/* How long a successful sync counts as evidence that there IS another device to
+   disagree with. Past this, a mirror nobody has reached in weeks is treated as
+   gone: a Firebase project that breaks permanently must not silently block
+   every prize draw from then on, with nothing on screen to explain why. */
+export const SYNC_EVIDENCE_MS = 14 * DAY_MS;
+
+/* The online check, behind a seam so a test can be offline without a browser. */
+let _onlineOverride = null;
+export function setOnlineForTest(v) { _onlineOverride = v; }
+function deviceIsOnline() {
+  if (_onlineOverride !== null) return _onlineOverride;
+  if (typeof navigator === "undefined" || !navigator) return true;
+  return navigator.onLine !== false;
+}
+
+export function xpIsPending(now = Date.now()) {
   if (settings.cloudMirror === false) return false;   // no mirror, nothing to wait for
-  /* A mirror this device has never once reached is not a second opinion it is
-     waiting on — it is a project that was never configured, or a family running
-     on one device. Blocking a prize on a sync that is never going to arrive is
-     a worse failure than the over-payment this guards against, and it is silent
-     from where the kid is standing. So the guard only applies once there is
-     demonstrably something on the other end. */
-  if (!_everSynced) return false;
-  if (typeof navigator !== "undefined" && navigator && navigator.onLine === false) return true;
+  /* A mirror this device has never reached — or has not reached in weeks — is
+     not a second opinion it is waiting on. It is a project that was never
+     configured, a family running on one device, or a backend that has died.
+     Blocking a prize on a sync that is never going to arrive is a worse failure
+     than the over-payment this guards against, and it is silent from where the
+     kid is standing. */
+  const last = Number((loadJourney() || {}).lastSyncAt);
+  if (!Number.isFinite(last)) return false;
+  if (now - last > SYNC_EVIDENCE_MS) return false;
+  if (!deviceIsOnline()) return true;
   return _syncFailed;
 }
 
@@ -2129,6 +2269,11 @@ export function migrate() {
   // Establish the session-XP baseline BEFORE any cloud restore runs, so a
   // restore awards exactly the XP of the records it actually brings back.
   reconcileJourneyWithSessions();
+  /* Forgive every redemption that predates the amnesty. Runs here so an OFFLINE
+     device gets its wallet back too, and again after the cloud restore resolves
+     (see boot() in js/main.js) to catch spent prizes that arrive from the other
+     device. Both passes are safe: the cutoff is stamped once. */
+  migratePrizeAmnesty();
   const bootJourney = loadJourney();
   if (bootJourney) { reconcileWallet(bootJourney); saveJourney(bootJourney); }
 }

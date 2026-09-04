@@ -3749,4 +3749,145 @@ ok(/youtube\.com/.test(data.videoSearchUrl({ name: "Dead Bug" })),
 /* That it PAUSES the workout before she leaves is proved in test/actions.mjs,
    where the action layer and its real click listeners are driven. */
 
+
+/* ============================================================
+   PRIZE AMNESTY — every prize in the wallet is available again.
+
+   Her wallet showed all thirteen prizes as used. The audit's diagnosis was
+   persisted legacy data where `redeemed: true` already existed: redemption
+   always wins a wallet merge (mergePrize), and it has to, because a device
+   still showing a prize as available is simply behind and letting ITS copy win
+   is how one prize gets spent twice. The app cannot tell which of those were
+   real spends and which were the duplicate-id bug, so an adult decided: every
+   redemption that happened before this ran is forgiven.
+   ============================================================ */
+localStorage.clear(); store.migrate();
+const spentWallet = Array.from({ length: 13 }, (_, i) => ({
+  id: "old-prize-" + i,
+  icon: i === 4 ? "🛌" : "🎬",
+  label: i === 4 ? "Stay up 20 min later" : "Family movie pick " + i,
+  date: "2026-0" + (1 + (i % 8)) + "-1" + (i % 9),
+  redeemed: true,
+  redeemedAt: Date.now() - (i + 1) * 86400000
+}));
+/* A level high enough that the wallet is not trimmed for holding more prizes
+   than the ladder ever earned — reconcileWallet is a separate rule and this is
+   not a test of it. */
+store.saveJourney({ xp: 40000, sessionXp: 40000, maxLevelSeen: 40,
+                    prizesWon: spentWallet, pendingDraws: 0 });
+
+const amnesty = store.migratePrizeAmnesty();
+ok(amnesty && amnesty.restored === 13, "all thirteen spent prizes are forgiven in one pass");
+const freed = store.loadJourney().prizesWon;
+ok(freed.length === 13, "the wallet still holds thirteen — nothing was added or lost");
+ok(freed.every(p => !p.redeemed), "and every one of them is available again");
+ok(freed.every(p => !Number.isFinite(p.redeemedAt)), "with no redemption date left to re-lock them");
+ok(freed.every(p => p.repairOf), "each one says which corrupted prize it replaces");
+ok(freed.some(p => p.date === "2026-01-10"), "the day she EARNED a prize is hers, and is unchanged");
+
+/* The old ids are voided for good. Without that, the next sync from her other
+   device — which still holds them as redeemed — would simply put them back. */
+const amnestyVoided = new Set((store.loadJourney().voidedPrizeIds || []).map(String));
+ok(spentWallet.every(p => amnestyVoided.has(p.id)),
+   "every corrupted id is voided, so the other device cannot re-redeem them tonight");
+const staleMerge = store.mergeWalletsForTest(store.loadJourney().prizesWon, spentWallet,
+                                        store.loadJourney().voidedPrizeIds);
+ok(staleMerge.length === 13 && staleMerge.every(p => !p.redeemed),
+   "so merging the other device's stale, all-redeemed copy leaves them available");
+
+/* --- the swap, in her wallet and not in the draw pool -------------------- */
+const swapped = freed.find(p => p.repairOf === "old-prize-4");
+ok(swapped && swapped.label === "Skip a chore", "the bedtime prize now reads Skip a chore");
+ok(swapped.icon === "✨", "with the icon the chore-skip uses everywhere else, not the bed");
+ok(data.PRIZE_POOL.some(p => p.label === "Stay up 20 min later"),
+   "and the DRAW POOL is untouched — future draws keep the bedtime prize");
+ok(data.PRIZE_POOL.filter(p => /chore/i.test(p.label)).length === 1,
+   "so the pool still holds exactly one chore-skip and its odds are unchanged");
+
+/* --- it runs once, and never takes back a real spend --------------------- */
+const secondPass = store.migratePrizeAmnesty();
+ok(secondPass.restored === 0, "running it again forgives nothing — there is nothing left to forgive");
+ok(store.loadJourney().prizesWon.length === 13, "and the wallet is untouched by the second pass");
+
+const j2 = store.loadJourney();
+j2.prizesWon = j2.prizesWon.map((p, i) => i === 0
+  ? { ...p, redeemed: true, redeemedAt: Date.now() + 60000 } : p);
+store.saveJourney(j2);
+ok(store.migratePrizeAmnesty().restored === 0,
+   "a prize she spends AFTER the amnesty stays spent — the forgiveness is dated, not permanent");
+ok(store.loadJourney().prizesWon.filter(p => p.redeemed).length === 1,
+   "so exactly the one she really used is still marked used");
+
+/* --- two devices, run independently, converge -----------------------------
+   Both devices run this migration on their own copy. With a random replacement
+   id each would mint a DIFFERENT prize for the same original, the union would
+   carry twenty-six, and reconcileWallet would then trim thirteen of them at
+   random. The replacement id is derived from the original so both devices
+   produce the same one. */
+localStorage.clear(); store.migrate();
+store.saveJourney({ xp: 40000, sessionXp: 40000, maxLevelSeen: 40,
+                    prizesWon: spentWallet.map(p => ({ ...p })), pendingDraws: 0 });
+store.migratePrizeAmnesty();
+const deviceA = store.loadJourney();
+
+localStorage.clear(); store.migrate();
+store.saveJourney({ xp: 40000, sessionXp: 40000, maxLevelSeen: 40,
+                    prizesWon: spentWallet.map(p => ({ ...p })), pendingDraws: 0 });
+store.migratePrizeAmnesty();
+const deviceB = store.loadJourney();
+
+const converged = store.mergeWalletsForTest(deviceA.prizesWon, deviceB.prizesWon,
+  [...(deviceA.voidedPrizeIds || []), ...(deviceB.voidedPrizeIds || [])]);
+ok(converged.length === 13,
+   "two devices that ran the amnesty separately still hold thirteen prizes, not twenty-six");
+ok(converged.every(p => !p.redeemed), "and all of them are available on both");
+
+/* --- it is not silent ---------------------------------------------------- */
+ok(/13 prize/i.test(store.loadJourney().prizeAmnesty.note || ""),
+   "the wallet says what was done to it, so a grown-up is not left to notice");
+
+/* --- the note reaches the screen a grown-up actually reads ---------------- */
+localStorage.clear(); store.migrate();
+store.saveJourney({ xp: 40000, sessionXp: 40000, maxLevelSeen: 40, pendingDraws: 0,
+                    prizesWon: spentWallet.map(p => ({ ...p })) });
+store.migratePrizeAmnesty();
+const noteMarkup = gscreen.grownupScreen(gvm.buildGrownupVM({ grownupTab: "settings", scope: "all" }));
+ok(/made available again/i.test(noteMarkup),
+   "the Grown-up Zone says the wallet was repaired and when — the amnesty runs itself, so it must say so");
+
+/* --- a finished day clears even if the plan shifted under it --------------
+   nothingLeftOwed() re-derives the day's blocks at finalize time. If the
+   valgus gate unlocks mid-session that list can name a block that was never
+   offered, and the record would then never clear — a resume prompt for a day
+   she finished. A saved outcome of `complete` settles it on its own. */
+const gateShift = await runSession({ dayKey: "monday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    // Open the gate mid-run, which is what changes the assembled block list.
+    store.saveGate({ unlocked: true, cleanWeeks: [] });
+  }
+});
+ok(gateShift.savedOutcome && gateShift.savedOutcome.state === "complete",
+   "the day really did finish");
+ok(!store.loadDayProgress("monday"),
+   "so its progress is cleared, even though the plan it is compared against moved underneath it");
+
+/* --- the draw hold survives a page load ----------------------------------
+   `_everSynced` was a module-level flag with no persistence, so it reset on
+   every load: a COLD offline launch had the guard switched off entirely, which
+   is the one case it exists for. */
+localStorage.clear(); store.migrate();
+ok(store.xpIsPending() === false, "a device that has never reached the mirror waits for nothing");
+store.noteSyncResult(true);
+ok(Number.isFinite((store.loadJourney() || {}).lastSyncAt),
+   "a successful sync is remembered on the journey, not in a variable that dies on reload");
+store.setOnlineForTest(false);
+ok(store.xpIsPending() === true, "so an offline launch after a real sync does hold the total as pending");
+const jStale = store.loadJourney();
+jStale.lastSyncAt = Date.now() - 30 * 86400000;
+store.saveJourney(jStale);
+ok(store.xpIsPending() === false,
+   "but a mirror nobody has reached for a month stops blocking prizes — a dead project must not lock the wallet forever");
+store.setOnlineForTest(true);
+
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

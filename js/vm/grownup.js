@@ -757,8 +757,13 @@ export function buildGrownupVM(state) {
     safetyTrack: onTrack(settings.safetyVoiceOn !== false, "var(--coral)"), safetyKnob: onKnob(settings.safetyVoiceOn !== false),
     prizePool: activePrizePool(),
     isDefaultPool: !(Array.isArray(settings.prizePool) && settings.prizePool.length),
-    // A wallet trim removes prizes she can see, so it is never silent.
-    walletRepairNote: state.walletRepairNote || "",
+    /* A wallet trim removes prizes she can see, so it is never silent — and
+       neither is the amnesty, which runs itself on boot and hands thirteen
+       prizes back. A wallet that changes behind a child's back with no
+       explanation is what produced the problem it repairs. */
+    walletRepairNote: state.walletRepairNote
+      || ((loadJourney() || {}).prizeAmnesty || {}).note
+      || "",
     // The grown-up gate, and the redeemed prizes it protects.
     gateAsk: state.gateAsk || null,
     gateError: state.gateError || "",
