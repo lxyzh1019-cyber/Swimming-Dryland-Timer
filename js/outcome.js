@@ -70,9 +70,12 @@ import { edmontonISO } from "./util.js";
 
    v1 let partial rows count as work at all. v2 added the streak dose bar. v3
    judges a MAIN ROUND on its dose rather than demanding every move be perfect —
-   see mainRoundReport below. Each step is gated on the version that introduced
-   it, so a record is always read by the rules it was written under. */
-export const OUTCOME_VERSION = 3;
+   see mainRoundReport below. v4 numbers a resumed sitting's main rounds from
+   what the day has already banked, which is what makes its ledger rows safe to
+   merge per planned move — see mergeLedgerRows. Each step is gated on the
+   version that introduced it, so a record is always read by the rules it was
+   written under. */
+export const OUTCOME_VERSION = 4;
 
 /* How much of a session has to actually be there before the day counts toward
    the streak. Deliberately high: the streak is the app's loudest claim about
@@ -540,15 +543,22 @@ export function workoutOutcome(fragments) {
   const first = frags[0] || {};
   const last = frags[frags.length - 1] || {};
   const version = frags.reduce((m, s) => Math.max(m, Number(s.outcomeVersion) || 0), 0) || null;
-  /* Ungated, unlike the rule changes elsewhere in this file, because it is not
-     a rule change: concatenating was a COUNTING ERROR, and it read wrong in
-     both directions. It over-paid a move attempted twice, and it under-read a
-     move skipped in the morning and then actually done after school — the
-     ledger held both rows, the skip was still in it, and the day could not
-     read as finished however well it had gone the second time. The merge
-     answers "what is the best proof this planned move was performed", which is
-     the right question for a record of any age. */
-  const ledger = mergeLedgerRows(frags.reduce((a, s) => a.concat(s.ledger || []), []));
+  /* GATED ON v4, AND THE GATE IS THE WHOLE POINT.
+
+     The merge asks "what is the best proof this planned move was performed",
+     which is the right question — but only of a ledger whose rows say which
+     move they are. Before v4 a resume numbered its main rounds from one again
+     (see roundOffset in js/engine.js), so the second sitting's round-two rows
+     were written as round one and carry the SAME logical id as the first
+     sitting's. Merging those collapses two real rounds into one: a green day
+     already saved on the device would drop from complete to partial and lose
+     the streak day she is standing on — which is exactly the re-scoring this
+     file refuses to do anywhere else.
+
+     So records written before the numbering was fixed keep the concatenated
+     reading they were written under, and records written since get the merge. */
+  const raw = frags.reduce((a, s) => a.concat(s.ledger || []), []);
+  const ledger = Number(version) >= 4 ? mergeLedgerRows(raw) : raw;
   /* The day's ask, not the sum of the sittings' asks. Adding them would count
      the same plan once per attempt and make a finished day read as a third
      of itself. Every fragment already carries the DAY's expectedWork (see

@@ -250,7 +250,40 @@ ok(!/<img\s+src=x/i.test(painted),
 ok(!/onerror="alert/i.test(painted), "with no live handler anywhere in the markup");
 
 /* ============================================================
-   6. THE SERVICE WORKER CLEANS UP AFTER ITSELF AND NOBODY ELSE
+   6. HER HISTORY IS NOT RE-SCORED UNDERNEATH HER
+
+   Every rule in js/outcome.js is gated on the version that introduced it, so a
+   record is read by the rules it was written under. The row merge needs that
+   gate more than any of them: before v4 a resume numbered its main rounds from
+   one again, so the second sitting's round-two rows were SAVED as round one and
+   share a logical id with the first sitting's. Merging those collapses two real
+   rounds into one — and a green day already on the device drops from complete
+   to partial and loses the streak day she is standing on.
+
+   This is what a corpus diff against the pre-fix tree caught, and what this
+   keeps caught.
+   ============================================================ */
+
+const collided = v => [
+  { workoutInstanceId: "hist" + v, isoDate: "2026-08-02T12:00:00.000Z", dayKey: "monday",
+    outcomeVersion: v, expectedWork: 4, expectedByRound: { 1: 2, 2: 2 }, endedEarly: true,
+    ledger: [doneRow("a"), doneRow("b")].map(r => ({ ...r, block: "main" })) },
+  // Written by the old engine: round TWO's rows, saved as round one.
+  { workoutInstanceId: "hist" + v, isoDate: "2026-08-02T19:00:00.000Z", dayKey: "monday",
+    outcomeVersion: v, expectedWork: 4, expectedByRound: { 1: 2 }, completedFully: true,
+    ledger: [doneRow("a"), doneRow("b")].map(r => ({ ...r, block: "main" })) }
+];
+same(outcome.workoutInstances(collided(3))[0].outcome.state, "complete",
+  "a pre-v4 record keeps the reading it was written under — four rows, four asked for");
+same(outcome.workoutInstances(collided(3))[0].outcome.countsForStreak, true,
+  "so the streak day she is standing on survives the fix that follows it");
+same(outcome.workoutInstances(collided(outcome.OUTCOME_VERSION))[0].outcome.state, "partial",
+  "while a record written since the numbering was fixed is merged per planned move");
+ok(outcome.OUTCOME_VERSION >= 4,
+  "and the version that gates it is stamped on everything written from now on");
+
+/* ============================================================
+   7. THE SERVICE WORKER CLEANS UP AFTER ITSELF AND NOBODY ELSE
    ============================================================ */
 
 const swSrc = await (await import("node:fs/promises")).readFile(

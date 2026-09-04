@@ -438,11 +438,18 @@ export function buildGrownupVM(state) {
        finished day rather than two unfinished ones — which is how a completed
        Tuesday could show up here as "partial". */
     const allWorkouts = workoutInstances(all);
-    const rank = w => (w.outcome.state === "complete" ? 2 : 0) + (w.outcome.countsAsTraining ? 1 : 0);
+    /* Finished if the WORKOUT finished, or if any single sitting did. Two
+       same-day records without a workout id are grouped by date, and for a
+       record written before the id existed that grouping is a guess: it may be
+       one day resumed, or a GO-and-quit at breakfast and the real session after
+       school. Either reading has to end with the good one showing. */
+    const workoutDone = w => w.outcome.state === "complete"
+      || w.fragments.some(f => outcomeOf(f).state === "complete");
+    const rank = w => (workoutDone(w) ? 2 : 0) + (w.outcome.countsAsTraining ? 1 : 0);
     byWeekday = WEEK_ORDER.map(k => {
       const sameDay = allWorkouts.filter(w => w.date === isoDates[k]);
       const w = sameDay.sort((a, b) => rank(b) - rank(a) || b.durationSecs - a.durationSecs)[0];
-      const finished = !!(w && w.outcome.state === "complete");
+      const finished = !!(w && workoutDone(w));
       const wMins = w ? Math.round(w.durationSecs / 60) : 0;
       const wMood = w && w.fragments.map(f => f.mood).filter(Boolean).pop();
       return {
