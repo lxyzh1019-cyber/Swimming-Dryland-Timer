@@ -132,6 +132,18 @@ export function roundsForLight(light) {
   return Number.isFinite(n) ? n : 1;
 }
 
+/* Which of two lights asks for LESS. Recovery is the lightest dose there is —
+   no training rounds at all — and green the heaviest. Used to hold a workout to
+   the light it started under while still letting a later, worse body check
+   shorten what is left of it (see startSession). */
+export const LIGHT_ORDER = ["recovery", "red", "yellow", "green"];
+export function lowerLight(a, b) {
+  const ia = LIGHT_ORDER.indexOf(a), ib = LIGHT_ORDER.indexOf(b);
+  if (ia < 0) return b;
+  if (ib < 0) return a;
+  return ia <= ib ? a : b;
+}
+
 export function assembleCircuits(dayKey, light, opts = {}) {
   const day = DAYS[dayKey];
   if (!day) return [];
@@ -150,6 +162,20 @@ export function assembleCircuits(dayKey, light, opts = {}) {
      than a shorter block, so it is handled separately below. */
   const skipMoves = opts.skipMoves || {};
   const mainPartial = opts.mainPartialRound || [];
+  /* HOW MANY MAIN ROUNDS OF THE DAY ARE ALREADY BEHIND US.
+
+     A resume's rounds are rounds 2 and 3 of the day, not rounds 1 and 2 of a
+     new one, and the ledger has to say so. Without this offset the second
+     sitting wrote rows that COLLIDED with the first sitting's: a green day
+     finished across two goes held twelve rows under "round 1" and no round 3 at
+     all, so the reports read 2 of 3 while the finish screen — which counts the
+     day's banked rounds separately — read 3 of 3. Worse, a move skipped in the
+     evening was then blamed on the round she had finished before lunch.
+
+     See startSession, which passes the rounds bankMainRounds has already put on
+     disk. Zero for a first sitting, which is why nothing about a single-sitting
+     day moves. */
+  const roundOffset = Math.max(0, Number(opts.roundOffset) || 0);
   const circuits = [];
   /* The light decides which blocks run, not just how many main rounds. One
      policy object drives assembly, and everything downstream — the duration
@@ -188,23 +214,33 @@ export function assembleCircuits(dayKey, light, opts = {}) {
 
          A main round interrupted halfway is neither finished nor untouched, so
          the resume runs what is LEFT of it as a round of its own, and only then
-         the full rounds still owed. Two circuits, and they must not both call
-         their first round "round 1": `roundBase` numbers each circuit's rounds
-         from where the day actually is, so the ledger, commitRoundIfDone and
-         countExpectedByRound all agree on which round a row belongs to.
+         the full rounds still owed. Two circuits, and neither may call its first
+         round "round 1" when the day already has rounds behind it: `roundBase`
+         numbers each circuit's rounds from `roundOffset` above, so the ledger,
+         commitRoundIfDone and countExpectedByRound all agree on which round of
+         THE DAY a row belongs to — across sittings, not just within one.
 
          That numbering is what keeps the round-completion proof honest. The
          remainder circuit declares its OWN expected size, so finishing those
          moves credits the interrupted round exactly once — and a remainder
          round cut short again still cannot pass for a finished one. */
       const remainder = exs.filter(ex => !mainPartial.includes(ex.name));
-      const base = mainPartial.length && remainder.length ? 2 : 1;
-      if (mainPartial.length && remainder.length) {
+      const ragged = !!(mainPartial.length && remainder.length);
+      /* The interrupted round is ONE OF THE ROUNDS STILL OWED, not an extra one
+         in front of them. `rounds` is the remainder the caller computed from
+         the day's plan, and finishing the ragged round finishes the first of
+         them — so the full rounds that follow are one fewer. Counting it as
+         extra ran a green day for four main rounds and printed "4 of 3". */
+      const fullRounds = Math.max(0, rounds - (ragged ? 1 : 0));
+      // Both numbered from where the day actually is.
+      const base = roundOffset + (ragged ? 2 : 1);
+      if (ragged) {
         circuits.push({ name: BLOCK_LABEL[bk], block: bk, rounds: 1,
-                        roundBase: 1, partialRound: true, exercises: remainder });
+                        roundBase: roundOffset + 1, partialRound: true,
+                        exercises: remainder });
       }
-      if (rounds > 0) {
-        circuits.push({ name: BLOCK_LABEL[bk], block: bk, rounds,
+      if (fullRounds > 0) {
+        circuits.push({ name: BLOCK_LABEL[bk], block: bk, rounds: fullRounds,
                         roundBase: base, exercises: exs });
       }
     } else {
@@ -701,7 +737,24 @@ function recordExercise(ex, circuit, ci, ei, r, wasSkipped) {
   const actualSecs = sess.exElapsed;
   const row = {
     name: ex.name,
-    block: ex.block || circuit.block,
+    /* THE CIRCUIT THE RUNNER ACTUALLY RAN IT IN, not the block the move is
+       authored under. Several prep moves are authored `block: "main"` (see
+       prepMenu in js/data.js — they are main-block movements borrowed as
+       movement prep), and `ex.block || circuit.block` let that authoring
+       decide the LEDGER. Two consequences, both silent:
+
+         · mainRoundReport filters on `block === "main"`, so every prep row
+           landed inside main round one — inflating its row count and averaging
+           prep's credit into a round prep is not part of. A short prep could
+           fail a round she trained, and a good prep could launder a short one.
+
+         · bankMove banks by `row.block` and deliberately never banks prep, so
+           prep rows banked themselves into the main partial-round list — which
+           is what a resume reads to decide a main round was interrupted.
+
+       The circuit is what the plan asked for and what recordBlockDone,
+       commitRoundIfDone and the round numbering all already use. */
+    block: circuit.block,
     ci, ei, round: r,
     driver: ex.driver || (ex.byReps ? "reps" : "time"),
     dose: ex.dose || ex.repsDetail || "",
@@ -869,6 +922,13 @@ function readDayProgress() {
   // Every write goes through here, so this is the one place the id has to be
   // stamped for a resume to be able to read it back.
   if (sess.workoutInstanceId) prog.workoutInstanceId = sess.workoutInstanceId;
+  /* And the light this workout is being trained under, so the resume cannot
+     quietly run it under a bigger one. Written once and then only ever lowered:
+     startSession has already resolved a later, worse check into sess.light, so
+     taking the lower of the two here is the same decision recorded rather than
+     a second one. */
+  prog.lockedLight = prog.lockedLight
+    ? lowerLight(prog.lockedLight, sess.light) : sess.light;
   return prog;
 }
 
@@ -1067,10 +1127,33 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
   const resolvedSuggestion = day.spa ? "recovery" : (suggestedLight || resolvedLight);
   const isRecovery = resolvedLight === "recovery";
   const sessionMode = isRecovery ? "recovery" : (mode || "normal");
+  /* THE LIGHT A WORKOUT STARTS UNDER IS THE LIGHT IT FINISHES UNDER.
+
+     The day's progress record has carried the light all along and nothing read
+     it back, so a resume simply took whatever the newest check said. A Red
+     workout picked up in the evening under Green grew from one main round to
+     three, and with it the completion denominator, the streak bar and the XP
+     ceiling of a day that was already part-trained — the plan moving underneath
+     her, mid-workout, with no one saying so.
+
+     A later check may still LOWER it: if her body has more to say between two
+     sittings, that is the whole point of the traffic light and shortening the
+     rest of the day is always allowed. Raising it is not, because a bigger plan
+     is a different workout — start one, deliberately, and it gets its own
+     identity and its own denominator.
+
+     Care never reads or locks anything: a recovery pass is not the training
+     day's work, which is the same reason it never touches its progress record.
+     Only a locked light already on disk can hold: a first sitting has nothing
+     to lock, so nothing about a single-sitting day moves. */
+  const careRun = !!day.spa || isRecovery;
+  const dayProg = careRun ? null : loadDayProgress(dayKey);
+  const lockedLight = dayProg && dayProg.lockedLight;
+  const finalLight = lockedLight ? lowerLight(lockedLight, resolvedLight) : resolvedLight;
   Object.assign(sess, blankSession(), {
     running: true, dayKey, mode: sessionMode,
     practice: false,
-    light: resolvedLight,
+    light: finalLight,
     // What the readiness check produced, before any grown-up moved it. Kept so
     // readiness analytics can read the body's answer and executed-load
     // analytics can read what was actually trained.
@@ -1093,8 +1176,9 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
   stampReadinessOutcome(resolvedLight, resolvedSuggestion !== resolvedLight);
 
   // Same-day resume: blocks already completed today are skipped. A care session
-  // does not even READ the training day's progress — see isCareSession.
-  const prog = isCareSession() ? null : loadDayProgress(dayKey);
+  // does not even READ the training day's progress — see isCareSession. Read
+  // once, above, because the locked light has to be known before the plan is.
+  const prog = dayProg;
   const skipBlocks = (prog && prog.done) || [];
   /* Main resumes by ROUNDS, never by name. A finished-block list cannot say that
      one round of a Red day is banked while a Green day still wants two more, so
@@ -1118,7 +1202,10 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
         skip: skipBlocks.filter(b => !(b === "main" && mainOwed > 0)),
         mainRounds: mainOwed,
         skipMoves: bankedMoves,
-        mainPartialRound: bankedMoves.main || []
+        mainPartialRound: bankedMoves.main || [],
+        // Rounds already on disk, so this sitting's rows are numbered as rounds
+        // OF THE DAY and cannot collide with the earlier sitting's.
+        roundOffset: bankedRounds
       });
   if (!sess.circuits.length) { sess.running = false; return; }
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
