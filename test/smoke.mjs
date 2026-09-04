@@ -1150,7 +1150,15 @@ async function runSession(opts, script = {}) {
   }
   await run;
   clock.restore();
-  return engine.sess;
+  /* A SNAPSHOT, not the live object. `engine.sess` is a module-level singleton,
+     so two runs used to return the SAME reference — and the two-sitting test
+     below then built its "two fragments" out of one record twice, verified:
+     inst1.savedEntry === inst2.savedEntry. That test could never fail, which is
+     exactly how a resume came to write ledger rows that collided with the
+     sitting before it and nothing noticed. A shallow copy is enough: every run
+     starts from a fresh blankSession(), so the arrays and the saved record a
+     snapshot points at are that run's own. */
+  return { ...engine.sess };
 }
 
 /* --- a straight, honest green session --- */

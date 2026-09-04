@@ -92,11 +92,26 @@ build step.
   every release. Nothing from the mirror is ever cached: it carries body-map
   notes and readiness answers, and a stale copy of current data is worse than
   none.
-- **A workout has an identity.** A day trained in two goes writes two session
-  records carrying the same `workoutInstanceId` (minted when the plan starts,
-  carried on the day's progress record so a resume keeps it). Every report
-  aggregates on it before counting, so resuming a day does not turn it into two
-  sessions with half the duration each.
+- **A workout has an identity, and one answer.** A day trained in two goes
+  writes two session records carrying the same `workoutInstanceId` (minted when
+  the plan starts, carried on the day's progress record so a resume keeps it).
+  Every screen that answers for a day — the finish screen, Today, Progress and
+  the Grown-up Zone — aggregates on it before counting, so resuming a day does
+  not turn it into two sessions with half the duration each. Its main rounds are
+  numbered from what is already banked, so the second sitting's rows cannot
+  collide with the first's; its rows are merged per planned move, keeping the
+  best credit anything proved, so a move attempted twice is paid once; and its
+  XP is the *settled* day total, never the sum of the sittings' stamps.
+  `test/invariants.mjs` asserts those numbers agree ACROSS screens rather than
+  inside one module — the class of defect that outlives a per-module test.
+- **A workout keeps the light it started under.** A later body check may lower
+  it — a body with more to say shortens what is left of the day — but never
+  raise it. A bigger plan is a different workout, started deliberately, with its
+  own identity and its own completion denominator.
+- **Only saved history syncs, not an unfinished workout.** The day's progress
+  record (completed moves, banked rounds, the resume position, the locked light)
+  is local to the device. A workout is finished on the device it was started on;
+  what crosses devices is the log, the journey and the readiness checks, below.
 - **The mirror syncs both ways on every boot** (`js/sync.js`), all of it
   additive — nothing is overwritten or deleted on either side:
   1. *pull* — any session this browser is missing is merged into the local log,
