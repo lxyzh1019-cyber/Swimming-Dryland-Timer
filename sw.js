@@ -20,8 +20,12 @@
        network and are never stored.
 
      · The cache is VERSIONED, and activating a new version deletes every older
-       one. A half-updated app — new JS against an old HTML — is a class of bug
-       nobody can debug from a bug report by a ten-year-old.
+       one OF THIS APP'S. A half-updated app — new JS against an old HTML — is a
+       class of bug nobody can debug from a bug report by a ten-year-old. But
+       Cache Storage is per ORIGIN, not per app, and this is deployed to GitHub
+       Pages: "delete every key that is not mine" was deleting the caches of
+       whatever else lives on the same origin. Only keys under this app's own
+       prefix are ever touched.
 
      · Cache-first for the shell, because the shell is what has to work with no
        network at all; a release changes CACHE_VERSION, which fetches the lot
@@ -30,7 +34,11 @@
    BUMP CACHE_VERSION ON EVERY RELEASE. Nothing else here needs touching.
    ============================================================ */
 
-const CACHE_VERSION = "splash-v1";
+/* One prefix, so activation can tell this app's caches apart from a neighbour's
+   on the same origin — see the activate handler. Every version name starts
+   with it. BUMP THE VERSION, NEVER THE PREFIX. */
+const CACHE_PREFIX = "splash-";
+const CACHE_VERSION = CACHE_PREFIX + "v1";
 
 /* Everything needed to boot and run a whole workout with no network. Listed
    rather than discovered: a service worker cannot read a directory, and a
@@ -102,7 +110,10 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.map(k => (k === CACHE_VERSION ? null : caches.delete(k))));
+    // Ours, and older than this one. A key belonging to another project on the
+    // same origin is none of this worker's business.
+    await Promise.all(keys.map(k =>
+      (k.startsWith(CACHE_PREFIX) && k !== CACHE_VERSION) ? caches.delete(k) : null));
     await self.clients.claim();
   })());
 });
