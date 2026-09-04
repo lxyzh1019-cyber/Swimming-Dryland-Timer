@@ -5,8 +5,8 @@
    ============================================================ */
 
 import { LADDER, RANK_LORE, RANK_TEASE, fmtXp } from "../data.js";
-import { sessionXp, levelFromXp, sessionRounds, plannedRoundsAcrossDays } from "../store.js";
-import { loadSessions, loadJourney, currentStreak, redeemPrize, countsAsTrained, countsForStreak, streakFreezeDates, prizeUndoOpen, outcomeOf } from "../store.js";
+import { levelFromXp, sessionRounds, plannedRoundsAcrossDays, settledXpByDate, settledXpInRange } from "../store.js";
+import { loadSessions, loadJourney, currentStreakOf, redeemPrize, countsAsTrained, prizeUndoOpen, outcomeOf } from "../store.js";
 import { workoutInstances } from "../outcome.js";
 import { edmontonWeekISODates, edmontonISO, DAY_MS } from "../util.js";
 import { buildJourney } from "./today.js";
@@ -154,7 +154,7 @@ export function buildProgressVM(state) {
   // Streak days are the ones that cleared the bar, not every day with work on it.
   // Recovery days are handed over separately: they hold the run together without
   // being counted in it.
-  const streak = currentStreak(sessions.filter(countsForStreak), streakFreezeDates(sessions));
+  const streak = currentStreakOf(sessions);
   /* Per WORKOUT, not per record — a day finished in two goes is one workout of
      thirty minutes, not two of fifteen. */
   const weekWorkouts = workoutInstances(weekSessions);
@@ -167,7 +167,9 @@ export function buildProgressVM(state) {
   const milestones = [];
   if (streak > 1) milestones.push({ icon: "🔥", label: streak + "-day streak", style: chip("var(--coral-wash)", "var(--coral-ink)") });
   if (j.level > 1 || trained.length) milestones.push({ icon: "🌊", label: "Reached " + j.rankName, style: chip("var(--sun-wash)", "var(--sun-ink)") });
-  if (trained.length) milestones.push({ icon: "🏊", label: trained.length + " session" + (trained.length === 1 ? "" : "s"), style: chip("var(--aqua-wash)", "var(--aqua-ink)") });
+  // Workouts, not records: a day she came back to finish is one session.
+  const trainedWorkouts = workoutInstances(trained).length;
+  if (trainedWorkouts) milestones.push({ icon: "🏊", label: trainedWorkouts + " session" + (trainedWorkouts === 1 ? "" : "s"), style: chip("var(--aqua-wash)", "var(--aqua-ink)") });
   if ((journeyStore.xp || 0) > 0) milestones.push({ icon: "💯", label: fmtXp(journeyStore.xp) + " XP earned", style: chip("var(--mint-wash)", "var(--mint-ink)") });
   if (!milestones.length) milestones.push({ icon: "🌱", label: "Your first splash is one GO away!", style: chip("var(--aqua-wash)", "var(--aqua-ink)") });
 
@@ -237,7 +239,11 @@ export function buildProgressVM(state) {
   // rather than once per sitting: a day trained in two goes asked for its
   // rounds once, however many times she sat down to them.
   const pPlannedRounds = plannedRoundsAcrossDays(pSessions);
-  const pXp = pSessions.reduce((a, s) => a + sessionXp(s), 0);
+  /* SETTLED, not the sum of the stamps. A stamp is what a SITTING is worth; a
+     day has a ceiling, and a resumed day stamps two of them (180 + 270 for a
+     360 day). This row read 450 while the journey held 360 — and the average
+     underneath it divided that 450 by one workout. See settledXpInRange. */
+  const pXp = settledXpInRange(pSessions, range.from, range.to);
   const xpNow = journeyStore.xp || 0;
   // Levels gained inside the window, from the training XP it actually banked.
   const pLevels = Math.max(0, levelFromXp(xpNow).level - levelFromXp(Math.max(0, xpNow - pXp)).level);
@@ -289,13 +295,14 @@ export function buildProgressVM(state) {
     ],
     // One bar per day: a good run and a dead patch are both obvious at a glance.
     xpByDay: (() => {
-      const byIso = {};
-      pSessions.forEach(s => { const k = edmontonISO(s.isoDate); byIso[k] = (byIso[k] || 0) + sessionXp(s); });
-      const max = Math.max(...days.map(d => byIso[d] || 0), 1);
+      // Same settled authority as the row above, so a bar can never stand
+      // taller than the day it draws was actually paid.
+      const byIso = settledXpByDate(pSessions);
+      const max = Math.max(...days.map(d => byIso.get(d) || 0), 1);
       return days.map(d => ({
-        iso: d, xp: byIso[d] || 0,
-        barStyle: "flex:1;min-width:2px;height:" + Math.max(2, Math.round(((byIso[d] || 0) / max) * 46)) + "px;border-radius:2px 2px 0 0;background:"
-          + ((byIso[d] || 0) > 0 ? "var(--aqua)" : "var(--hairline)") + ";"
+        iso: d, xp: byIso.get(d) || 0,
+        barStyle: "flex:1;min-width:2px;height:" + Math.max(2, Math.round(((byIso.get(d) || 0) / max) * 46)) + "px;border-radius:2px 2px 0 0;background:"
+          + ((byIso.get(d) || 0) > 0 ? "var(--aqua)" : "var(--hairline)") + ";"
       }));
     })(),
     xpFirstLabel: new Date(range.from + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Edmonton" }),
@@ -308,7 +315,10 @@ export function buildProgressVM(state) {
     logItems, logScopeTabs, hasLog: allLog.length > 0,
     prizesWon, hasPrizes: prizesWon.length > 0,
     dayStreakVal: String(streak),
-    sessionsVal: String(weekSessions.length),
+    /* The number and the word under it are the same fact. This tile printed a
+       raw record count beside a workout-counted label, so a day trained in two
+       goes rendered "2" directly above "1 session". */
+    sessionsVal: String(weekWorkouts.length),
     sessionsLabel: weekWorkouts.length + " session" + (weekWorkouts.length === 1 ? "" : "s"),
     minAvgVal: String(avgMins)
   };

@@ -1150,7 +1150,15 @@ async function runSession(opts, script = {}) {
   }
   await run;
   clock.restore();
-  return engine.sess;
+  /* A SNAPSHOT, not the live object. `engine.sess` is a module-level singleton,
+     so two runs used to return the SAME reference — and the two-sitting test
+     below then built its "two fragments" out of one record twice, verified:
+     inst1.savedEntry === inst2.savedEntry. That test could never fail, which is
+     exactly how a resume came to write ledger rows that collided with the
+     sitting before it and nothing noticed. A shallow copy is enough: every run
+     starts from a fresh blankSession(), so the arrays and the saved record a
+     snapshot points at are that run's own. */
+  return { ...engine.sess };
 }
 
 /* --- a straight, honest green session --- */
@@ -2770,30 +2778,55 @@ ok(!noWarm.some(c => c.block === "warmup"),
 /* --- MAIN RESUMES INTO A RAGGED ROUND -------------------------------------
    Main's unit is the round, so a round interrupted halfway is neither finished
    nor untouched. What is LEFT of it runs as a round of its own, and only then
-   the full rounds still owed. The two circuits must not both call their first
-   round "round 1" — roundBase numbers each from where the day actually is, and
-   that numbering is what keeps the round-completion proof honest. */
+   the full rounds still owed. No circuit may call its first round "round 1"
+   when the day already has rounds behind it — roundBase numbers each from where
+   the day actually is, and that numbering is what keeps the round-completion
+   proof honest ACROSS SITTINGS, not merely within one.
+
+   The scenario is the real one startSession produces: round one is banked, so
+   two rounds are owed, and round two was interrupted half-way through. */
 const greenMain = engine.assembleCircuits("tuesday", "green", {})
   .find(c => c.block === "main");
 const halfRound = greenMain.exercises.slice(0, 3).map(ex => ex.name);
 const ragged = engine.assembleCircuits("tuesday", "green",
-  { mainRounds: 2, mainPartialRound: halfRound });
+  { mainRounds: 2, roundOffset: 1, mainPartialRound: halfRound });
 const raggedMains = ragged.filter(c => c.block === "main");
 ok(raggedMains.length === 2, "a partly-done round produces a remainder circuit AND the rounds still owed");
 ok(raggedMains[0].partialRound === true && raggedMains[0].rounds === 1
    && raggedMains[0].exercises.length === greenMain.exercises.length - 3,
    "the remainder round holds exactly the moves that were not finished");
-ok(raggedMains[0].roundBase === 1 && raggedMains[1].roundBase === 2,
-   "and the rounds are numbered from where the day is, so the two circuits never collide");
+ok(raggedMains[0].roundBase === 2 && raggedMains[1].roundBase === 3,
+   "and the rounds are numbered from where the day is, so no circuit collides with the sitting before it");
+/* The interrupted round is one of the rounds owed, not an extra in front of
+   them: finishing it finishes round two, leaving round three. Counting it as
+   extra ran a green day for four main rounds and printed "4 of 3". */
+ok(raggedMains[1].rounds === 1,
+   "the ragged round IS one of the two owed, so exactly one full round follows it");
 const raggedByRound = engine.countExpectedByRound(ragged);
-ok(raggedByRound[1] === greenMain.exercises.length - 3,
+ok(raggedByRound[1] === undefined,
+   "round one is behind us — nothing in this sitting claims it");
+ok(raggedByRound[2] === greenMain.exercises.length - 3,
    "the remainder round declares its OWN smaller size — which is what lets it prove itself finished");
-ok(raggedByRound[2] === greenMain.exercises.length && raggedByRound[3] === greenMain.exercises.length,
-   "while the full rounds after it still declare a full round's worth");
+ok(raggedByRound[3] === greenMain.exercises.length,
+   "while the full round after it still declares a full round's worth");
+
+/* A resume with no ragged round is numbered the same way: one banked round
+   means this sitting runs rounds two and three, never one and two. This is the
+   collision that made a green day trained in two goes report 2 of 3 main rounds
+   while the finish screen — counting the day's banked rounds separately — said
+   3 of 3, and that blamed a move skipped in the evening on the round she had
+   finished before lunch. */
+const cleanResume = engine.assembleCircuits("tuesday", "green",
+  { mainRounds: 2, roundOffset: 1 }).find(c => c.block === "main");
+ok(cleanResume.roundBase === 2 && cleanResume.rounds === 2,
+   "a clean resume runs the rounds it still owes, numbered as rounds of the DAY");
+const cleanByRound = engine.countExpectedByRound([cleanResume]);
+ok(cleanByRound[1] === undefined && cleanByRound[2] && cleanByRound[3],
+   "so its expected-work map names rounds two and three, not one and two");
 
 /* The proof still refuses a remainder round that was cut short again. */
 const shortRemainder = raggedMains[0].exercises.slice(0, 1)
-  .map((ex, i) => ({ name: ex.name, block: "main", round: 1, status: "done" }));
+  .map((ex, i) => ({ name: ex.name, block: "main", round: 2, status: "done" }));
 ok(outcome.mainRoundsFromLedger(shortRemainder, raggedByRound) === 0,
    "a remainder round cut short again credits nothing — the proof survives the ragged round");
 const wholeRemainder = raggedMains[0].exercises

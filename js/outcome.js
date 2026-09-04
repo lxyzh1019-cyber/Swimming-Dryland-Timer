@@ -70,9 +70,12 @@ import { edmontonISO } from "./util.js";
 
    v1 let partial rows count as work at all. v2 added the streak dose bar. v3
    judges a MAIN ROUND on its dose rather than demanding every move be perfect —
-   see mainRoundReport below. Each step is gated on the version that introduced
-   it, so a record is always read by the rules it was written under. */
-export const OUTCOME_VERSION = 3;
+   see mainRoundReport below. v4 numbers a resumed sitting's main rounds from
+   what the day has already banked, which is what makes its ledger rows safe to
+   merge per planned move — see mergeLedgerRows. Each step is gated on the
+   version that introduced it, so a record is always read by the rules it was
+   written under. */
+export const OUTCOME_VERSION = 4;
 
 /* How much of a session has to actually be there before the day counts toward
    the streak. Deliberately high: the streak is the app's loudest claim about
@@ -455,6 +458,139 @@ export function instanceKeyOf(entry) {
   return (edmontonISO(entry.isoDate) || "?") + "|" + String(entry.dayKey || "?");
 }
 
+/* ============================================================
+   ONE PLANNED MOVE IS ONE PLANNED MOVE, HOWEVER OFTEN IT WAS ATTEMPTED
+
+   The fragments' ledgers used to be CONCATENATED, which quietly turned "how
+   much of the day did she do" into "how many rows are there". Two consequences,
+   both of them wrong in her favour:
+
+     · A move attempted again pays again. Six goes at the same thirty-second
+       hold, half-finished each time, added up to three whole units of credit —
+       enough to clear the 75% streak bar on a four-move day where exactly one
+       move had ever been touched. The streak is the app's loudest claim about
+       effort and that is not a training day.
+
+     · Prep is re-run in full every sitting by design (see bankMove in
+       js/engine.js — running main cold is the thing it exists to prevent), so
+       a day trained in two goes paid for its prep twice.
+
+   So rows are merged by the PLANNED INSTANCE they belong to, and the instance
+   keeps the best credit anything ever proved for it. A retry is a second chance
+   at a move, not a second move.
+
+   The id is block + round + name. Name, not index: the same block assembles
+   differently depending on the valgus gate and on whether the day is a double
+   pool day (see assembleCircuits), so an index would point at a different move
+   on the next sitting — which is exactly why bankMove already banks by name.
+   Round, because a main move in round two is a different unit of work from the
+   same move in round one; `roundBase` numbers those absolutely across sittings
+   so the two cannot collide. */
+export function logicalRowId(row) {
+  if (!row) return "";
+  return String(row.block || "?") + "|" + String(row.round || 1) + "|" + String(row.name || "?");
+}
+
+/* How good a proof of one planned move a row is. A finished move outranks every
+   partial, including a partial the arithmetic scores at 1 — `done` is the
+   engine's own verdict against the 80% floor (DONE_WORK_FRACTION) and it is not
+   re-litigated here. A skip proves nothing and ranks last, but is still kept
+   when it is all there is: a move only ever skipped must stay visibly skipped,
+   because the main-round rule turns on exactly that. */
+function rowProofRank(row) {
+  if (!row) return -1;
+  if (row.status === "done") return 3;
+  if (row.status === "partial") return 1 + streakCredit(row, true);
+  return 0;
+}
+
+export function mergeLedgerRows(rows) {
+  const best = new Map();
+  (rows || []).forEach(row => {
+    if (!row) return;
+    const id = logicalRowId(row);
+    const held = best.get(id);
+    if (!held || rowProofRank(row) > rowProofRank(held)) best.set(id, row);
+  });
+  return [...best.values()];
+}
+
+/* ============================================================
+   ONE WORKOUT, HOWEVER MANY SITTINGS IT TOOK
+
+   A day trained in two goes writes two session records. Nothing could say they
+   were the same workout: rows were told apart by `isoDate|dayKey` and resume
+   was keyed on the weekday, so the progress screen counted two sessions, the
+   average duration halved, and the completion rate was computed against a
+   denominator that had grown by one for work that was really one day's.
+
+   Records written from now on carry `workoutInstanceId` (minted in
+   js/engine.js when a plan starts, carried on the day's progress record so a
+   resume keeps it). Older rows and rows restored from the cloud have none, so
+   they fall back to the day and the actual Edmonton date — which is exactly
+   how they were already being grouped, so no history is re-read.
+
+   The fragments' ledgers are merged per planned move (see mergeLedgerRows) and
+   scored ONCE through deriveSessionOutcome, so a day that is complete only when
+   both sittings are counted together reads complete — and reads it the same way
+   everywhere.
+   ============================================================ */
+export function workoutOutcome(fragments) {
+  // Oldest fragment first: it holds the plan the day was started against,
+  // and the newest holds how the day actually ended.
+  const frags = (fragments || []).slice().sort((a, b) =>
+    String(a.isoDate).localeCompare(String(b.isoDate)));
+  const first = frags[0] || {};
+  const last = frags[frags.length - 1] || {};
+  const version = frags.reduce((m, s) => Math.max(m, Number(s.outcomeVersion) || 0), 0) || null;
+  /* GATED ON v4, AND THE GATE IS THE WHOLE POINT.
+
+     The merge asks "what is the best proof this planned move was performed",
+     which is the right question — but only of a ledger whose rows say which
+     move they are. Before v4 a resume numbered its main rounds from one again
+     (see roundOffset in js/engine.js), so the second sitting's round-two rows
+     were written as round one and carry the SAME logical id as the first
+     sitting's. Merging those collapses two real rounds into one: a green day
+     already saved on the device would drop from complete to partial and lose
+     the streak day she is standing on — which is exactly the re-scoring this
+     file refuses to do anywhere else.
+
+     So records written before the numbering was fixed keep the concatenated
+     reading they were written under, and records written since get the merge. */
+  const raw = frags.reduce((a, s) => a.concat(s.ledger || []), []);
+  const ledger = Number(version) >= 4 ? mergeLedgerRows(raw) : raw;
+  /* The day's ask, not the sum of the sittings' asks. Adding them would count
+     the same plan once per attempt and make a finished day read as a third
+     of itself. Every fragment already carries the DAY's expectedWork (see
+     startSession), so the largest is the day's. */
+  const expectedWork = frags.reduce((m, s) =>
+    Number.isFinite(s.expectedWork) ? Math.max(m, s.expectedWork) : m, 0) || null;
+  /* And per round, the LARGEST any fragment declares — not the last one to
+     mention it. A resume's ragged round declares only what was left of it, and
+     spreading the fragments in order let that smaller number overwrite the
+     day's real ask: a remainder round cut short a second time then had every
+     row it still knew about, and passed for a finished round. Taking the
+     maximum asks each round for everything it was ever supposed to produce. */
+  const expectedByRound = {};
+  frags.forEach(s => Object.entries(s.expectedByRound || {}).forEach(([r, n]) => {
+    expectedByRound[r] = Math.max(Number(expectedByRound[r]) || 0, Number(n) || 0);
+  }));
+  return deriveSessionOutcome({
+    ledger,
+    expectedWork,
+    expectedByRound: Object.keys(expectedByRound).length ? expectedByRound : null,
+    // Banked credit is already inside the merged ledger here: it is what the
+    // EARLIER fragments hold. Passing it again would pay for it twice.
+    bankedCredit: 0,
+    safetyStop: frags.some(s => s.safetyStop || s.pain),
+    explicitAbort: last.endedEarly === true,
+    sessionType: last.sessionType || first.sessionType || null,
+    practice: false,
+    outcomeVersion: version,
+    completedFully: frags.some(s => s.completedFully === true)
+  });
+}
+
 export function workoutInstances(sessions) {
   const byKey = new Map();
   (sessions || []).forEach(s => {
@@ -465,35 +601,9 @@ export function workoutInstances(sessions) {
   });
   const out = [];
   byKey.forEach((rows, key) => {
-    // Oldest fragment first: it holds the plan the day was started against,
-    // and the newest holds how the day actually ended.
     const frags = rows.slice().sort((a, b) =>
       String(a.isoDate).localeCompare(String(b.isoDate)));
-    const first = frags[0];
     const last = frags[frags.length - 1];
-    const ledger = frags.reduce((a, s) => a.concat(s.ledger || []), []);
-    /* The day's ask, not the sum of the sittings' asks. Adding them would count
-       the same plan once per attempt and make a finished day read as a third
-       of itself. Every fragment already carries the DAY's expectedWork (see
-       startSession), so the largest is the day's. */
-    const expectedWork = frags.reduce((m, s) =>
-      Number.isFinite(s.expectedWork) ? Math.max(m, s.expectedWork) : m, 0) || null;
-    const expectedByRound = frags.reduce((m, s) => ({ ...m, ...(s.expectedByRound || {}) }), {});
-    const outcome = deriveSessionOutcome({
-      ledger,
-      expectedWork,
-      expectedByRound: Object.keys(expectedByRound).length ? expectedByRound : null,
-      // Banked credit is already inside the concatenated ledger here: it is what
-      // the EARLIER fragments hold. Passing it again would pay for it twice.
-      bankedCredit: 0,
-      safetyStop: frags.some(s => s.safetyStop || s.pain),
-      explicitAbort: last.endedEarly === true,
-      sessionType: last.sessionType || first.sessionType || null,
-      practice: false,
-      outcomeVersion: frags.reduce((m, s) =>
-        Math.max(m, Number(s.outcomeVersion) || 0), 0) || null,
-      completedFully: frags.some(s => s.completedFully === true)
-    });
     out.push({
       key,
       workoutInstanceId: last.workoutInstanceId || null,
@@ -505,8 +615,32 @@ export function workoutInstances(sessions) {
       fragments: frags,
       attempts: frags.length,
       durationSecs: frags.reduce((a, s) => a + (Number(s.durationSecs) || 0), 0),
-      outcome
+      outcome: workoutOutcome(frags)
     });
   });
   return out.sort((a, b) => String(a.isoDate).localeCompare(String(b.isoDate)));
+}
+
+/* ---- THE DAYS THE STREAK IS BUILT FROM -----------------------------------
+
+   The streak used to be `currentStreak(sessions.filter(countsForStreak))`,
+   which judges each SITTING on its own. A day trained in two goes was then two
+   short sessions, neither of which cleared the bar, while Today — which had
+   already learned to combine them — told her the day counted. The app
+   contradicting itself to a ten-year-old about the one number she cares about.
+
+   A workout is the unit. These are the Edmonton dates its outcome earned. */
+export function streakDatesOf(sessions) {
+  return new Set(workoutInstances(sessions)
+    .filter(w => w.outcome.countsForStreak)
+    .map(w => w.date).filter(Boolean));
+}
+
+/* And the dates a finished recovery pass HOLDS without adding to — care is not
+   training, so it cannot pay into a training streak, but the day she reports
+   soreness honestly must not be the day the flame goes out. */
+export function freezeDatesOf(sessions) {
+  return new Set(workoutInstances(sessions)
+    .filter(w => w.outcome.streakFreeze)
+    .map(w => w.date).filter(Boolean));
 }
