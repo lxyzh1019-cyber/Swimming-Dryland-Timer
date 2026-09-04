@@ -1333,6 +1333,14 @@ export function pendingDrawCount() {
   return j ? pendingDrawsFor(j) : 0;
 }
 
+/* A draw is owed but cannot be claimed yet, because this device has not been
+   able to settle the day's XP against the other one. Separate from "no draw
+   owed" so the screen can say which it is — "not yet" and "nothing here" are
+   very different messages to a kid who just finished a workout. */
+export function drawIsWaitingOnSync() {
+  return xpIsPending() && pendingDrawCount() > 0;
+}
+
 /* Prize ids must be unique across devices: the cloud merge unions wallets by
    id, so two prizes claimed in the same millisecond — or on two devices at
    once — used to collapse into one and silently lose a prize she had won. */
@@ -1348,6 +1356,18 @@ function prizeId() {
    turn one level-up into two prizes. */
 export function addPrize(prize) {
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
+  /* A DRAW WAITS FOR THE DAY TO SETTLE.
+
+     Prizes are drawn off the XP total, and while a device is offline that total
+     is its own honest guess: the other device may hold work for the same date,
+     and only once they have met does the date have a final value (see
+     settledDayXp). Claiming against an unsettled total is how an over-payment
+     bought a real thing that could not then be taken back.
+
+     The award itself is not withheld — she trained, the XP shows, the ladder
+     moves. Only the claim waits, and only while there is genuinely no way to
+     check. See drawIsWaitingOnSync for what the screen should say. */
+  if (xpIsPending()) { saveJourney(syncPendingDraws(j)); return j; }
   if (pendingDrawsFor(j) < 1) { saveJourney(syncPendingDraws(j)); return j; }
   j.prizesWon = [{ ...prize, date: todayISODate(), redeemed: false, id: prizeId() }, ...(j.prizesWon || [])];
   saveJourney(syncPendingDraws(j));
@@ -1497,6 +1517,118 @@ export function restorePrize(prizeId_) {
   return { restored: true, id: replacement.id, was: key, label: replacement.label || "" };
 }
 
+/* ============================================================
+   PRIZE AMNESTY — one dated forgiveness of every earlier redemption.
+
+   Her wallet showed all thirteen prizes as used. The cause is persisted legacy
+   data carrying `redeemed: true`, and the merge cannot second-guess it:
+   redemption always wins (see mergePrize), and it has to, because a device
+   still showing a prize as available is simply behind, and letting ITS copy win
+   is how one prize gets spent twice. The app therefore cannot tell a real spend
+   from one the duplicate-id bug invented, and restorePrize above exists so a
+   grown-up can decide one at a time.
+
+   An adult has decided for all of them at once. THE RULE, and it is the whole
+   rule: every redemption that happened BEFORE the moment this first ran is
+   forgiven, wherever it is later seen; anything redeemed after that moment is
+   hers to keep spent. That is what makes running it on every boot safe forever
+   rather than a switch that keeps handing back prizes she really used.
+
+   It cannot work by setting `redeemed: false` — the next sync from the other
+   device would quietly re-redeem it. It voids the corrupted id and issues a
+   replacement, exactly as restorePrize does.
+
+   AND THE REPLACEMENT ID IS DERIVED FROM THE ORIGINAL, not random. Both devices
+   run this independently on their own copy of the wallet. With a random id each
+   would mint a DIFFERENT replacement for the same prize, the union would carry
+   twenty-six, and reconcileWallet would then trim thirteen of them by date —
+   arbitrarily, since every replacement keeps its original earned date. A
+   derived id makes both devices produce the same prize, which the union
+   collapses back into one. This is load-bearing; do not make it random.
+
+   The wallet's SIZE is unchanged (one id swapped for one id), so the
+   reconcileWallet trim never fires on account of this. */
+export const PRIZE_AMNESTY_VERSION = 1;
+
+/* One prize whose label is being corrected at the same time, by adult request.
+   The DRAW POOL in js/data.js is deliberately untouched: it already holds a
+   chore-skip, and adding a second would quietly double its odds. */
+const AMNESTY_RELABEL = [
+  { match: /stay\s*up\s*20\s*min(ute)?s?\s*later/i, icon: "✨", label: "Skip a chore" }
+];
+
+/* Same charset prizeId() produces, so a derived id is safe everywhere an id is
+   written — including into a data-arg attribute. */
+function restoredIdFor(originalId) {
+  const clean = String(originalId).toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 40);
+  return "restored-" + (clean || "prize");
+}
+
+export function migratePrizeAmnesty(now = Date.now()) {
+  const j = loadJourney();
+  if (!j) return { restored: 0, relabelled: 0 };
+
+  // Stamped on the FIRST pass and never moved. Every later pass measures
+  // redemptions against this instant, which is what makes "before the amnesty"
+  // a fixed fact rather than a rolling window.
+  if (!j.prizeAmnesty || j.prizeAmnesty.v !== PRIZE_AMNESTY_VERSION) {
+    j.prizeAmnesty = { v: PRIZE_AMNESTY_VERSION, at: now, note: "" };
+  }
+  const cutoff = Number(j.prizeAmnesty.at) || now;
+
+  const wallet = j.prizesWon || [];
+  const voided = new Set((j.voidedPrizeIds || []).map(String));
+  let restored = 0, relabelled = 0;
+
+  const next = wallet.map(p => {
+    if (!p || p.id == null) return p;
+    let out = { ...p };
+
+    // The relabel applies to every copy, spent or not — it is a correction to
+    // what the prize SAYS, not to whether it has been used.
+    const rule = AMNESTY_RELABEL.find(r => r.match.test(String(out.label || "")));
+    if (rule) { out.icon = rule.icon; out.label = rule.label; relabelled++; }
+
+    if (!out.redeemed) return out;
+    /* A redemption with no date at all is precisely the legacy shape the audit
+       identified as corrupt, so it is forgiven; one dated after the amnesty is
+       a real spend and is left alone. */
+    const at = Number.isFinite(out.redeemedAt) ? out.redeemedAt : redeemedAtOf(out);
+    if (at != null && at >= cutoff) return out;
+
+    const replacementId = restoredIdFor(out.id);
+    voided.add(String(out.id));
+    restored++;
+    const replacement = { ...out, id: replacementId, redeemed: false, repairOf: String(out.id) };
+    delete replacement.redeemedAt;
+    return replacement;      // date untouched: the day she EARNED it is hers
+  });
+
+  // A replacement can collide with a prize already carrying that id if this has
+  // somehow run twice against one wallet; keep one.
+  const byId = new Map();
+  next.forEach(p => {
+    if (!p || p.id == null) return;
+    const k = String(p.id);
+    byId.set(k, byId.has(k) ? mergePrize(byId.get(k), p) : p);
+  });
+
+  j.prizesWon = [...byId.values()];
+  j.voidedPrizeIds = [...voided];
+  if (restored || relabelled) {
+    /* Not silent. This runs itself, and a wallet that changes behind a child's
+       back with no explanation is what produced the problem in the first place;
+       the Grown-up Zone renders this line. */
+    j.prizeAmnesty.note = restored
+      ? restored + " prize" + (restored === 1 ? " was" : "s were") + " made available again on "
+        + edmontonISO(now) + ". Prizes used after that stay used."
+      : j.prizeAmnesty.note;
+    logEvent("prize_amnesty", { restored, relabelled });
+  }
+  saveJourney(syncPendingDraws(j));
+  return { restored, relabelled };
+}
+
 /* Split quiz XP back out of the session rows that folded it in. The Coach's
    Quiz used to add its XP to BOTH the session record and the quiz ledger, and
    rebuildJourneyXp sums both — so every rebuild inflated the total by the
@@ -1594,21 +1726,55 @@ function stripCloudFields(doc) {
   return entry;
 }
 
+/* IS THIS SHAPED LIKE A SESSION THIS APP WROTE?
+
+   Everything merged here arrives from somewhere the app does not control: a
+   collection with no sign-in in front of it, or a JSON file a grown-up picked
+   off a disk. A row that is merely the wrong shape is enough to do damage
+   without anyone being hostile — a `ledger` that is a string rather than an
+   array reaches every screen that iterates it, and a NaN duration poisons an
+   average. So a row is checked before it joins the log, and a row that fails is
+   quarantined (counted and logged, never merged) rather than being allowed in
+   to break a screen later, somewhere with no clue where it came from.
+
+   Deliberately shallow: this is a shape check, not a re-scoring. Interpreting
+   what a row MEANS is js/outcome.js's job and stays there. */
+function looksLikeSession(entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+  if (typeof entry.isoDate !== "string" || !entry.isoDate) return false;
+  if (isNaN(new Date(entry.isoDate))) return false;
+  if (entry.dayKey != null && typeof entry.dayKey !== "string") return false;
+  // The fields every reader ITERATES have to be iterable, or they take a screen
+  // down at render time rather than here.
+  if (entry.ledger != null && !Array.isArray(entry.ledger)) return false;
+  if (entry.perExercise != null && !Array.isArray(entry.perExercise)) return false;
+  if (entry.formChecks != null && !Array.isArray(entry.formChecks)) return false;
+  // And the fields that get summed have to be numbers, or one row turns every
+  // total on the progress screen into NaN.
+  const numeric = ["durationSecs", "xpEarned", "roundsDone", "roundsPlanned", "expectedWork"];
+  return numeric.every(k => entry[k] == null || Number.isFinite(Number(entry[k])));
+}
+
 /* Add any incoming records the local log doesn't already have.
    Returns how many were added. */
 export function mergeSessions(incoming) {
   const local = loadSessions();
   const seen = new Set(local.map(sessionKey));
   let added = 0;
+  let rejected = 0;
   (incoming || []).forEach(doc => {
     const entry = stripCloudFields(doc);
     if (!entry.isoDate) return;
+    if (!looksLikeSession(entry)) { rejected++; return; }
     const key = sessionKey(entry);
     if (seen.has(key)) return;
     seen.add(key);
     local.push(entry);
     added++;
   });
+  // Quarantined, not silently dropped: a grown-up looking at why a restore was
+  // short should find the count rather than have to guess.
+  if (rejected) logEvent("merge_rejected", { rejected, source: "sessions" });
   if (added) {
     local.sort((a, b) => String(a.isoDate).localeCompare(String(b.isoDate)));
     writeStorage(LS_SESSIONS, local);
@@ -1645,6 +1811,123 @@ export function quizXpFromLedger(quiz) {
   return xp;
 }
 
+/* ---- ONE DAY OF TRAINING PAYS FOR ONE DAY, ON EVERY DEVICE ----------------
+
+   The live path already holds the line on one device and on two used in
+   sequence: claimSessionXp takes the larger of the banked budget row and what
+   the synced log says the date has already been paid (see loggedDayXp), so a
+   day started on the tablet and finished on the phone draws from one budget.
+
+   What neither could cover is two devices OFFLINE AT ONCE. Each grants a full
+   day against a budget the other has never seen, each stamps `xpEarned` on its
+   own record, and a rebuild then simply ADDED the two stamps: 360 + 360 for one
+   360 day. Both devices converged, honestly, on twice what the day was worth —
+   and prizes are drawn off that total, so the over-payment bought real things.
+
+   The stamp is still what a row is WORTH — re-pricing history is how a cloud
+   restore came to re-score sessions underneath her. What changes is that the
+   total is no longer the sum of the stamps: the log is grouped by the actual
+   Edmonton date the work happened on, and each date pays at most that date's
+   ceiling. Deterministic (no ordering, no clock), idempotent, and it settles to
+   the same number on every device the moment they have seen the same rows.
+
+   Sessions are aggregated by WORKOUT first, so the two fragments of a day
+   trained in two goes are the same workout and cannot each claim a day. */
+export function settledDayXp(sessions) {
+  const byDate = new Map();
+  (sessions || []).forEach(s => {
+    if (!s || s.practice) return;
+    const date = edmontonISO(s.isoDate);
+    if (!date) return;
+    if (!byDate.has(date)) byDate.set(date, []);
+    byDate.get(date).push(s);
+  });
+  const out = [];
+  byDate.forEach((rows, date) => {
+    /* Only rows priced by the CURRENT rules are capped. A legacy row carries a
+       stamp from a formula that had no daily ceiling and no rounds-planned to
+       derive one from, so dayXpCap reads 90 for it and capping would quietly
+       cut a real award to a quarter on the next boot. Re-scoring her history
+       underneath her is the thing this file refuses to do everywhere else; the
+       cap is a rule for days trained under the rule. */
+    const modern = rows.filter(s => s.xpVersion === XP_VERSION);
+    const legacy = rows.filter(s => s.xpVersion !== XP_VERSION);
+    const cap = modern.reduce((m, s) => Math.max(m, dayXpCap(s)), 0);
+    const claimed = modern.reduce((sum, s) => sum + sessionXp(s), 0);
+    const carried = legacy.reduce((sum, s) => sum + sessionXp(s), 0);
+    out.push({
+      date, cap, claimed, carried,
+      capped: claimed > cap,
+      settled: Math.min(claimed, cap) + carried
+    });
+  });
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function settledTrainingXp(sessions) {
+  return settledDayXp(sessions).reduce((sum, d) => sum + d.settled, 0);
+}
+
+/* XP THIS DEVICE HAS CALCULATED BUT CANNOT YET PROMISE.
+
+   Offline, a device can only see its own records, so the number it shows is its
+   own honest guess at what the date is worth — and the other device may be
+   holding work for the same date. The award is real either way; what is not
+   final until the two have met is the TOTAL, and prizes are drawn off the
+   total. So an unsynced day is reported as pending, and a draw waits for it.
+   Displaying it is the point: a kid who trained is told her work is counted,
+   not that it is missing. */
+let _syncFailed = false;
+
+/* WHETHER THIS DEVICE HAS A WORKING MIRROR, remembered ACROSS LOADS.
+
+   This was a module-level boolean, which meant it reset on every page load — so
+   a COLD offline launch had the guard below switched off entirely, and a cold
+   offline launch is precisely the case it exists for. It lives on the journey
+   now, which is already persisted and already synced. */
+export function noteSyncResult(ok) {
+  _syncFailed = !ok;
+  if (!ok) return;
+  const j = loadJourney();
+  if (!j) return;
+  j.lastSyncAt = Date.now();
+  saveJourney(j);
+}
+export function lastSyncFailed() { return _syncFailed; }
+export function hasEverSynced() {
+  return Number.isFinite((loadJourney() || {}).lastSyncAt);
+}
+
+/* How long a successful sync counts as evidence that there IS another device to
+   disagree with. Past this, a mirror nobody has reached in weeks is treated as
+   gone: a Firebase project that breaks permanently must not silently block
+   every prize draw from then on, with nothing on screen to explain why. */
+export const SYNC_EVIDENCE_MS = 14 * DAY_MS;
+
+/* The online check, behind a seam so a test can be offline without a browser. */
+let _onlineOverride = null;
+export function setOnlineForTest(v) { _onlineOverride = v; }
+function deviceIsOnline() {
+  if (_onlineOverride !== null) return _onlineOverride;
+  if (typeof navigator === "undefined" || !navigator) return true;
+  return navigator.onLine !== false;
+}
+
+export function xpIsPending(now = Date.now()) {
+  if (settings.cloudMirror === false) return false;   // no mirror, nothing to wait for
+  /* A mirror this device has never reached — or has not reached in weeks — is
+     not a second opinion it is waiting on. It is a project that was never
+     configured, a family running on one device, or a backend that has died.
+     Blocking a prize on a sync that is never going to arrive is a worse failure
+     than the over-payment this guards against, and it is silent from where the
+     kid is standing. */
+  const last = Number((loadJourney() || {}).lastSyncAt);
+  if (!Number.isFinite(last)) return false;
+  if (now - last > SYNC_EVIDENCE_MS) return false;
+  if (!deviceIsOnline()) return true;
+  return _syncFailed;
+}
+
 /* Recompute the journey total from its two sources. Prizes already won are
    never touched. A rebuild does NOT grant draws for the levels it discovers:
    the same shared history rebuilds on every device, so crediting the climb
@@ -1653,7 +1936,7 @@ export function quizXpFromLedger(quiz) {
    derived from the level and the wallet instead. Returns the total. */
 export function rebuildJourneyXp() {
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
-  const fromSessions = loadSessions().reduce((sum, s) => sum + sessionXp(s), 0);
+  const fromSessions = settledTrainingXp(loadSessions());
   const fromQuiz = quizXpFromLedger();
   j.sessionXp = fromSessions;
   j.xp = fromSessions + fromQuiz;
@@ -1693,6 +1976,14 @@ export function journeySnapshot() {
    when something changed. */
 export function mergeCloudJourney(snap) {
   if (!snap || snap.kind !== "journey") return false;
+  /* Same rule as the session merge above: what arrives from the mirror is not
+     trusted to be the shape it claims. The wallet is iterated and rendered, and
+     the ledger is keyed and priced, so both have to be the right kind of thing
+     before either is unioned into what is already here. */
+  if (snap.prizesWon != null && !Array.isArray(snap.prizesWon)) return false;
+  if (snap.voidedPrizeIds != null && !Array.isArray(snap.voidedPrizeIds)) return false;
+  if (snap.qLedger != null && (typeof snap.qLedger !== "object" || Array.isArray(snap.qLedger))) return false;
+  if (snap.quizItems != null && (typeof snap.quizItems !== "object" || Array.isArray(snap.quizItems))) return false;
   let changed = false;
 
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
@@ -1978,6 +2269,11 @@ export function migrate() {
   // Establish the session-XP baseline BEFORE any cloud restore runs, so a
   // restore awards exactly the XP of the records it actually brings back.
   reconcileJourneyWithSessions();
+  /* Forgive every redemption that predates the amnesty. Runs here so an OFFLINE
+     device gets its wallet back too, and again after the cloud restore resolves
+     (see boot() in js/main.js) to catch spent prizes that arrive from the other
+     device. Both passes are safe: the cutoff is stamped once. */
+  migratePrizeAmnesty();
   const bootJourney = loadJourney();
   if (bootJourney) { reconcileWallet(bootJourney); saveJourney(bootJourney); }
 }

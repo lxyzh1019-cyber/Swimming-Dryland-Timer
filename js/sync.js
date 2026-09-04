@@ -26,7 +26,7 @@
 
 import { settings, mergeSessions, loadSessions, sessionKey, belongsToAthlete, athleteId, athleteAliases,
          journeySnapshot, mergeCloudJourney, rebuildJourneyXp, logEvent,
-         loadReadinessLog, mergeReadinessLog } from "./store.js";
+         loadReadinessLog, mergeReadinessLog, noteSyncResult } from "./store.js";
 
 /* Exported so the rule itself can be tested, rather than inferred from a whole
    simulated sync. */
@@ -43,7 +43,11 @@ const BACKFILL_LIMIT = 40;
    restored", and the app carries on with whatever is on the device.
    Returns { added, uploaded, xp }. */
 export async function restoreFromCloud() {
-  const idle = { added: 0, uploaded: 0, xp: 0 };
+  /* `reachedCloud` says whether the mirror actually ANSWERED, which is a
+     different question from whether anything came back. The gate needs it to
+     tell "this family is new" apart from "we could not ask" — see
+     setBootstrapState in js/gate.js. */
+  const idle = { added: 0, uploaded: 0, xp: 0, reachedCloud: false };
   if (_done) return idle;
   _done = true;
   // Mirroring off (privacy opt-out) means there is nothing of ours up there,
@@ -105,9 +109,16 @@ export async function restoreFromCloud() {
     if (added || uploaded || journeyChanged || checksAdded) {
       logEvent("cloud_sync", { added, uploaded, xp, checks: checksAdded });
     }
-    return { added, uploaded, xp };
+    // The day's XP has been settled against everything the mirror holds, so a
+    // prize claimed from here on is claimed against a number both devices agree
+    // on. See xpIsPending / addPrize in js/store.js.
+    noteSyncResult(true);
+    return { added, uploaded, xp, reachedCloud: true };
   } catch (e) {
     console.warn("Cloud sync skipped:", e);
+    // Not an error worth showing: the app runs offline by design. It does mean
+    // the total on this device is its own, so a draw waits.
+    noteSyncResult(false);
     return idle;
   }
 }

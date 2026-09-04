@@ -241,7 +241,13 @@ function completeScreen(vm) {
       ${vm.roundShortNotes.map(n => `<div>${n}</div>`).join("")}
     </div>` : ""}
     ${vm.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="display:flex;align-items:center;gap:10px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:14px 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
-    ${vm.sessionDone ? `
+    ${vm.saveFailed ? `
+    <div style="display:flex;flex-direction:column;gap:10px;background:var(--stop-wash, var(--surface));border:2px solid var(--stop);border-radius:20px;padding:18px 22px;max-width:600px;width:100%;box-sizing:border-box;text-align:left;">
+      <div style="font-family:var(--font-display);font-weight:600;font-size:19px;color:var(--stop-ink);">This one didn't save 😕</div>
+      <div style="font-size:14px;font-weight:700;color:var(--ink);line-height:1.5;">You did the work — the iPad just had no room left to write it down. Nothing has been counted for it yet, so there's no XP or streak from this session.</div>
+      <div style="font-size:14px;font-weight:700;color:var(--ink);line-height:1.5;"><strong>Show this to a grown-up.</strong> In the Grown-up Zone they can free up space, and your progress for today is still saved — you can pick this session back up where you left it.</div>
+    </div>` : ""}
+    ${vm.showCompletionExtras ? `
     <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;">
       <div style="display:flex;align-items:center;gap:10px;">
         <img src="assets/poses/think.png" alt="" style="height:64px;object-fit:contain;">
@@ -366,6 +372,10 @@ function centerStack(vm, wide) {
 
 function controls(vm, wide) {
   return `
+  ${vm.pausedByBackground ? `
+  <div style="background:var(--sun-wash);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:8px;font-size:13px;font-weight:800;color:var(--sun-ink);line-height:1.4;text-align:center;">
+    ⏸ You left the app, so I stopped the clock. Nothing was counted while you were away — tap Resume when you're ready.
+  </div>` : ""}
   <button type="button" data-action="advance" style="width:100%;min-height:${wide ? 48 : 52}px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--mint);color:#fff;box-shadow:0 4px 0 var(--mint-deep);font-family:inherit;">${vm.doneLabel}</button>
   ${vm.notConfirmingEnd ? `
   <div style="display:flex;gap:${wide ? 14 : 8}px;">

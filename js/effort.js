@@ -27,6 +27,23 @@
        good she happened to feel, which she does not control.
 
    Grown-up-facing only. A score the kid can see is a score to game.
+
+   WHAT THIS NUMBER IS NOT.
+
+   The weights above are chosen, not validated. Nothing here was calibrated
+   against an outcome that matters — nobody has shown that 72 predicts anything
+   a coach would act on differently from 68, and the neutral 0.7 handed to a
+   session that was never spot-checked is a guess standing in for evidence.
+   Combining five judgements into one 0–100 with a label on it looks exactly
+   like a measurement, which is the problem: "Barely there" reads as a finding
+   about a child, and it is arithmetic on five proxies.
+
+   So it is presented as its COMPONENTS, which are all observable and all
+   honest — moves finished, moves skipped, time on the clock, form checks
+   clean, the light she trained under — with the composite shown as the rough
+   summary it is, explicitly labelled unvalidated. The bands say what was
+   observed rather than what she is. It must not drive a training decision, and
+   nothing in the app reads it to make one.
    ============================================================ */
 
 import { LIGHT_ROUNDS } from "./data.js";
@@ -35,12 +52,24 @@ import { outcomeOf } from "./outcome.js";
 export const EFFORT_WEIGHTS = { form: 30, finish: 30, hardDay: 15, stuckWithIt: 15, clock: 10 };
 const LIGHT_CREDIT = { red: 15, yellow: 12, recovery: 10, green: 8 };
 
+/* The bands describe the SESSION, not the child. "Barely there" and "going
+   through the motions" are verdicts on a person, delivered by a weighted sum
+   nobody validated; a parent reading one about a ten-year-old is being handed a
+   judgement dressed as a measurement. These say what was observed instead. */
 export const EFFORT_BANDS = [
-  { min: 85, band: "All in",        tone: "mint"  },
-  { min: 70, band: "Solid",         tone: "aqua"  },
-  { min: 50, band: "Going through the motions", tone: "sun" },
-  { min: 0,  band: "Barely there",  tone: "coral" }
+  { min: 85, band: "Full session, clean",   tone: "mint"  },
+  { min: 70, band: "Most of it, steady",    tone: "aqua"  },
+  { min: 50, band: "Partly done",           tone: "sun"   },
+  { min: 0,  band: "Little of it completed", tone: "coral" }
 ];
+
+/* Said out loud wherever the number appears. It is not a hedge — the score is
+   genuinely not evidence, and a parent deciding anything from it should know
+   that before they do. */
+export const EFFORT_CAVEAT =
+  "A rough summary of five things the app can see — moves finished, moves skipped, "
+  + "time on the clock, form checks and the light she trained under. The weights "
+  + "behind it are chosen, not validated: read the parts, not the number.";
 export function effortBand(score) {
   return (EFFORT_BANDS.find(b => score >= b.min) || EFFORT_BANDS[EFFORT_BANDS.length - 1]).band;
 }

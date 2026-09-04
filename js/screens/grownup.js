@@ -273,7 +273,8 @@ function analyticsTab(vm) {
           ${a.isSheTrying.gapNote ? `<div style="font-size:13px;font-weight:800;color:${a.isSheTrying.formGap != null && a.isSheTrying.formGap <= -15 ? "var(--coral)" : "var(--mint-ink)"};line-height:1.4;">${a.isSheTrying.gapNote}</div>` : ""}
         </div>
       </div>
-      <div style="font-size:12px;font-weight:700;color:var(--ink-faint);line-height:1.45;margin-top:12px;background:var(--surface-2);border-radius:12px;padding:9px 12px;">${a.isSheTrying.note}</div>`)}
+      <div style="font-size:12px;font-weight:700;color:var(--ink-faint);line-height:1.45;margin-top:12px;background:var(--surface-2);border-radius:12px;padding:9px 12px;">${a.isSheTrying.note}</div>
+      <div style="font-size:12px;font-weight:800;color:var(--sun-ink);line-height:1.45;margin-top:8px;background:var(--sun-wash);border-radius:12px;padding:9px 12px;">⚠️ ${escapeHtml(a.isSheTrying.caveat)}</div>`)}
 
     ${divider("🚨 Safety &amp; flags")}
     ${flagsCard(a, vm.scopeLabel)}

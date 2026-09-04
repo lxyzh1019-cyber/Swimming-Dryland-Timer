@@ -1,4 +1,53 @@
 /* ============================================================
+   THE RULES, WRITTEN DOWN ONCE
+
+   These are requirements, not preferences, and they have each been broken by a
+   well-meaning change at least once. They are stated here, next to the code
+   that enforces them, so a future repair has to disagree with them on purpose.
+
+   THE TRAFFIC LIGHT DECIDES THE DOSE.
+
+     Green     3 main rounds   warm-up, coordination, main, prep, finisher, swim-skill
+     Yellow    2               warm-up, coordination, main, swim-skill
+     Red       1               warm-up, main, swim-skill
+     Recovery  0               the recovery menu only
+
+   The light that counts is the FINAL one — what the adult chose and the session
+   actually ran under. Blocks, rounds, the completion denominator, the streak
+   denominator, the XP ceiling and every report use it. The body's own
+   suggestion is stored beside it (`suggestedLight`) and never overwritten, so
+   an override cannot rewrite the history of what her body reported.
+
+   THE STREAK IS 75% OF THE FINAL LIGHT'S PLAN, AND NOTHING ELSE.
+
+     streak = credit earned / the final light's expected work >= 0.75
+
+   For green, yellow and red alike. It is INDEPENDENT of main rounds: a red day
+   can earn its streak at 75% with zero complete main rounds, and that is
+   correct, not a loophole to close. Recovery adds no streak day; finishing the
+   recovery menu HOLDS the existing streak rather than breaking it, so reporting
+   soreness honestly is never the day the flame goes out.
+
+   A MAIN ROUND COUNTS ON THE DOSE IT PRODUCED.
+
+   Every expected row present, nothing skipped, no single row below half its
+   dose, and the round's mean credit at least 80%. Deliberately not "every row
+   at its own full rule": a ten-year-old tapping Done a beat early on ONE hold
+   turned a round she physically trained into nothing, three times over, and the
+   finish screen printed "0 of 3". The per-row floor is what stops the mean from
+   laundering a move that was never really trained. Do not tighten this to
+   every-row-perfect, and do not remove the floor.
+
+   AND WORK IS NEVER LOST TO BOOKKEEPING.
+
+   A finished round is banked the instant its last row lands, before any prompt,
+   speech or rest. A day's progress is cleared only after the record replacing
+   it has actually reached storage. A block is finished only when every row it
+   asked for is done. Each of those was once the other way round, and each cost
+   a child work she had really done.
+   ============================================================ */
+
+/* ============================================================
    ONE SESSION-OUTCOME AUTHORITY
 
    "Did she train, how much, and does it pay?" used to be answered
@@ -12,6 +61,8 @@
    store, the view-models and the tests can all import it without a cycle.
    Nothing else may re-derive completion.
    ============================================================ */
+
+import { edmontonISO } from "./util.js";
 
 /* Records written from this version carry `outcomeVersion`, which is what lets
    partial work count as work. Rows written before it keep the old done-only
@@ -376,4 +427,86 @@ export function outcomeOf(entry) {
     outcomeVersion: entry.outcomeVersion,
     completedFully: entry.completedFully
   });
+}
+
+
+/* ============================================================
+   ONE WORKOUT, HOWEVER MANY SITTINGS IT TOOK
+
+   A day trained in two goes writes two session records. Nothing could say they
+   were the same workout: rows were told apart by `isoDate|dayKey` and resume
+   was keyed on the weekday, so the progress screen counted two sessions, the
+   average duration halved, and the completion rate was computed against a
+   denominator that had grown by one for work that was really one day's.
+
+   Records written from now on carry `workoutInstanceId` (minted in
+   js/engine.js when a plan starts, carried on the day's progress record so a
+   resume keeps it). Older rows and rows restored from the cloud have none, so
+   they fall back to the day and the actual Edmonton date — which is exactly
+   how they were already being grouped, so no history is re-read.
+
+   The fragments' ledgers are concatenated and scored ONCE through
+   deriveSessionOutcome, so a day that is complete only when both sittings are
+   counted together reads complete — and reads it the same way everywhere.
+   ============================================================ */
+export function instanceKeyOf(entry) {
+  if (!entry) return "";
+  if (entry.workoutInstanceId) return String(entry.workoutInstanceId);
+  return (edmontonISO(entry.isoDate) || "?") + "|" + String(entry.dayKey || "?");
+}
+
+export function workoutInstances(sessions) {
+  const byKey = new Map();
+  (sessions || []).forEach(s => {
+    if (!s || s.practice) return;
+    const key = instanceKeyOf(s);
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key).push(s);
+  });
+  const out = [];
+  byKey.forEach((rows, key) => {
+    // Oldest fragment first: it holds the plan the day was started against,
+    // and the newest holds how the day actually ended.
+    const frags = rows.slice().sort((a, b) =>
+      String(a.isoDate).localeCompare(String(b.isoDate)));
+    const first = frags[0];
+    const last = frags[frags.length - 1];
+    const ledger = frags.reduce((a, s) => a.concat(s.ledger || []), []);
+    /* The day's ask, not the sum of the sittings' asks. Adding them would count
+       the same plan once per attempt and make a finished day read as a third
+       of itself. Every fragment already carries the DAY's expectedWork (see
+       startSession), so the largest is the day's. */
+    const expectedWork = frags.reduce((m, s) =>
+      Number.isFinite(s.expectedWork) ? Math.max(m, s.expectedWork) : m, 0) || null;
+    const expectedByRound = frags.reduce((m, s) => ({ ...m, ...(s.expectedByRound || {}) }), {});
+    const outcome = deriveSessionOutcome({
+      ledger,
+      expectedWork,
+      expectedByRound: Object.keys(expectedByRound).length ? expectedByRound : null,
+      // Banked credit is already inside the concatenated ledger here: it is what
+      // the EARLIER fragments hold. Passing it again would pay for it twice.
+      bankedCredit: 0,
+      safetyStop: frags.some(s => s.safetyStop || s.pain),
+      explicitAbort: last.endedEarly === true,
+      sessionType: last.sessionType || first.sessionType || null,
+      practice: false,
+      outcomeVersion: frags.reduce((m, s) =>
+        Math.max(m, Number(s.outcomeVersion) || 0), 0) || null,
+      completedFully: frags.some(s => s.completedFully === true)
+    });
+    out.push({
+      key,
+      workoutInstanceId: last.workoutInstanceId || null,
+      isoDate: last.isoDate,
+      date: edmontonISO(last.isoDate),
+      dayKey: last.dayKey,
+      lightResult: last.lightResult || last.light || null,
+      sessionType: last.sessionType || null,
+      fragments: frags,
+      attempts: frags.length,
+      durationSecs: frags.reduce((a, s) => a + (Number(s.durationSecs) || 0), 0),
+      outcome
+    });
+  });
+  return out.sort((a, b) => String(a.isoDate).localeCompare(String(b.isoDate)));
 }

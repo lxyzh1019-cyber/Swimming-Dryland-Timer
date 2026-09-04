@@ -15,6 +15,8 @@ globalThis.localStorage = (() => { const m = new Map(); return {
    device with no installed voices, and the condition that made a whole rep set
    fly past in milliseconds and get recorded as skipped. */
 globalThis.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
+const winListeners = {};
+globalThis.fireWinEvent = (type) => { (winListeners[type] || []).forEach(fn => fn({ type })); };
 globalThis.window = {
   SpeechSynthesisUtterance: globalThis.SpeechSynthesisUtterance,
   speechSynthesis: { getVoices: () => [], cancel() {}, speaking: false, pending: false, set onvoiceschanged(f) {},
@@ -23,7 +25,9 @@ globalThis.window = {
     this.createOscillator = () => ({ type: "", frequency: { value: 0 }, connect() {}, start() {}, stop() {} });
     this.createGain = () => ({ gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} });
     this.destination = {}; this.resume = () => {}; },
-  innerWidth: 1200, innerHeight: 800, addEventListener() {}, fetch: () => Promise.reject(new Error("no net"))
+  innerWidth: 1200, innerHeight: 800,
+  addEventListener(type, fn) { (winListeners[type] = winListeners[type] || []).push(fn); },
+  removeEventListener(type, fn) { const l = winListeners[type] || []; const i = l.indexOf(fn); if (i >= 0) l.splice(i, 1); }, fetch: () => Promise.reject(new Error("no net"))
 };
 /* A DOM stub real enough to import js/main.js, so the ACTION LAYER — which is
    where the Try-It arm flag and the detail-overlay pause live — can be driven
@@ -107,12 +111,28 @@ globalThis.setPasskeySupport = on => {
 globalThis.btoa = globalThis.btoa || (s => Buffer.from(s, "binary").toString("base64"));
 globalThis.atob = globalThis.atob || (s => Buffer.from(s, "base64").toString("binary"));
 
+/* The document listeners are RECORDED, not swallowed. The engine's
+   backgrounding guard hangs off `visibilitychange` / `pagehide`, and a stub
+   that dropped every registration would have let that guard be written and
+   never once executed by a test — which is exactly how the gap got here. */
+const docListeners = {};
 globalThis.document = {
+  hidden: false, visibilityState: "visible",
   getElementById: () => testRoot, createElement: () => fakeEl(),
-  addEventListener() {}, removeEventListener() {},
+  addEventListener(type, fn) { (docListeners[type] = docListeners[type] || []).push(fn); },
+  removeEventListener(type, fn) {
+    const l = docListeners[type] || [];
+    const i = l.indexOf(fn); if (i >= 0) l.splice(i, 1);
+  },
   querySelector: () => null, querySelectorAll: () => [],
   body: fakeEl(), documentElement: fakeEl()
 };
+globalThis.fireDocEvent = (type) => {
+  globalThis.document.visibilityState = globalThis.document.hidden ? "hidden" : "visible";
+  (docListeners[type] || []).forEach(fn => fn({ type }));
+};
+
+import fs from "node:fs";
 
 const base = new URL("../js/", import.meta.url).href;
 const util   = await import(base + "util.js");
@@ -2217,7 +2237,21 @@ ok(gate.gateChallenge === undefined && gate.answerGate === undefined,
 /* --- first run on a FRESH device: the PIN goes on like a device passcode --- */
 ok(gate.hasGrownupPin() === false, "a fresh device has no PIN");
 ok(gate.isFreshDevice() === true, "and no training on it either");
-ok(gate.gateMode() === "setPin", "so the first PIN can simply be chosen — there is nothing yet to protect");
+/* ...but not until the cloud restore has answered. An empty session list on a
+   wiped iPad is indistinguishable from a brand-new one until the mirror has
+   been asked, and the restore is fired unawaited at boot — so for the first
+   second of every launch, anyone tapping Grown-up could set a fresh PIN over a
+   family that already had one. */
+ok(gate.bootstrapState() === "checking", "a launch starts out not yet knowing whether there is cloud history");
+ok(gate.gateMode() === "checking", "and refuses to hand out a free first PIN while it does not know");
+gate.setBootstrapState("restored");
+ok(gate.gateMode() === "passkey", "a device that turns out to HAVE history asks for the passkey, not a new PIN");
+gate.setBootstrapState("empty");
+ok(gate.gateMode() === "setPin", "the mirror answering 'nothing here' is what makes the device genuinely fresh");
+ok(gate.gateNeedsOfflineSetup() === false, "and that answer needs no warning — it is a real answer");
+gate.setBootstrapState("offline-unverified");
+ok(gate.gateNeedsOfflineSetup() === true,
+   "a device that could not reach the mirror may still be set up, but must say so first");
 ok(gate.choosePin("12") === false, "a two-digit PIN is still refused");
 ok(gate.choosePin("4821") === true, "a real one is set");
 ok(gate.gateUnlocked() === true, "and setting it unlocks in the same step");
@@ -3298,5 +3332,562 @@ ok(audio.SAFETY_RATE === 0.85,
 ok(audio.SPEECH_SETTLE_MS >= 350,
    "with a real beat between the instruction and the clock starting");
 store.updateSettings({ voiceStyle: "encouraging", voiceSpeed: "slow" });
+
+/* ============================================================
+   AUDIT REPAIR — 2026-09-03
+   One block per confirmed finding in the external audit. Each of
+   these failed on d7dbf77 for the reason named in its comment.
+   ============================================================ */
+
+/* --- THE RULES THIS REPAIR MUST NOT MOVE ----------------------------------
+   The audit asked for a Main round to require every row at its own full rule.
+   That is NOT the rule here, by decision: the per-row floor plus the round mean
+   is what absorbs a beat-early tap on one hold without handing a round away for
+   a move that was never really trained. Pinned here so a later pass cannot
+   quietly "fix" it back into the bug that printed "0 of 3". */
+ok(outcome.ROUND_DOSE_FRACTION === 0.8 && outcome.ROUND_ROW_FLOOR === 0.5,
+   "the round rule is a mean of 80% with a 50% per-row floor, and stays that way");
+const keptRule = outcome.mainRoundReport(
+  [1, 2, 3, 4].map(i => ({ block: "main", round: 1, name: "m" + i, status: "done",
+                           driver: "time", plannedSecs: 30, actualSecs: 30 }))
+    .concat([{ block: "main", round: 1, name: "m5", status: "partial",
+               driver: "time", plannedSecs: 30, actualSecs: 15 }]),
+  { 1: 5 }, outcome.OUTCOME_VERSION);
+ok(keptRule[0].counts === true,
+   "four clean moves and one at half dose still counts — the audit wanted this tightened; it is not");
+const flooredOut = outcome.mainRoundReport(
+  [1, 2, 3, 4].map(i => ({ block: "main", round: 1, name: "m" + i, status: "done",
+                           driver: "time", plannedSecs: 30, actualSecs: 30 }))
+    .concat([{ block: "main", round: 1, name: "m5", status: "partial",
+               driver: "time", plannedSecs: 30, actualSecs: 4 }]),
+  { 1: 5 }, outcome.OUTCOME_VERSION);
+ok(flooredOut[0].counts === false,
+   "and a move below the floor still loses the round, however good the mean");
+
+/* --- 1. THE RECORD IS WRITTEN BEFORE THE RESUME IS THROWN AWAY -------------
+   clearDayProgress(dayKey) ran on the line ABOVE finalize(true), and finalize
+   is where saveSession happens — and saveSession returns false when storage
+   refuses the write. So a full quota at the end of a long session deleted the
+   resume state and then failed to write the record that replaced it: the work
+   existed nowhere. Save first, and clear only what a successful save has
+   actually replaced. */
+let denyWrites = false;
+const realSetItem = localStorage.setItem;
+localStorage.setItem = function (k, v) {
+  if (denyWrites && String(k).includes("sessions")) { const e = new Error("QuotaExceededError"); e.name = "QuotaExceededError"; throw e; }
+  return realSetItem.call(this, k, v);
+};
+const quotaRun = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    // Refuse the session write only once the day is genuinely finished, so the
+    // failure lands exactly where the audit put it: at finalization.
+    if (sess.roundsCompleted >= 3) denyWrites = true;
+  }
+});
+ok(quotaRun.saveFailed === true, "a refused write is reported as a failed save, not a quiet success");
+ok(quotaRun.savedEntry === null, "and no record is pretended into existence");
+const survived = store.loadDayProgress("tuesday");
+denyWrites = false;
+localStorage.setItem = realSetItem;
+ok(survived && (survived.mainRoundsCompleted || 0) >= 1,
+   "the day's progress survives a failed save — it used to be deleted first, so the work existed nowhere");
+
+/* --- 3. A BLOCK IS DONE WHEN ITS ROWS ARE DONE, NOT WHEN ONE OF THEM IS ----
+   blockHadWork() was `some(status === "done")`, and recordBlockDone() then put
+   the whole block on the done list and deleted its move-by-move record. Skip
+   one warm-up move and the entire warm-up — the skipped move included — was
+   never asked for again. */
+let skippedOne = false;
+let skippedName = null;
+await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    const c = sess.circuits[sess.ci];
+    if (!skippedOne && c && c.block === "warmup" && sess.ei >= 1 &&
+        ["work", "reps"].includes(sess.phase) && sess.currentEx) {
+      skippedName = sess.currentEx.name;
+      skippedOne = true;
+      engine.skipCurrentExercise();
+      return;
+    }
+    // Stop once the warm-up is behind her: a run that reaches the end clears the
+    // day, and what this is about is what the RESUME would be handed.
+    if (skippedOne && c && c.block !== "warmup" && sess.running) engine.endEarly();
+  }
+});
+ok(skippedOne, "the run really did skip a warm-up move");
+const warmAfter = store.loadDayProgress("tuesday") || { done: [], moves: {} };
+ok(!(warmAfter.done || []).includes("warmup"),
+   "a warm-up with a skipped move is NOT retired — it used to be, skipped move and all");
+ok((warmAfter.moves && warmAfter.moves.warmup || []).length > 0,
+   "and the moves she did finish are still banked by name, so a resume does not re-ask for them");
+ok(!(warmAfter.moves.warmup || []).includes(skippedName),
+   "while the move she skipped is not among them: it comes back");
+
+/* --- 6. ONE DAY OF TRAINING HAS ONE IDENTITY ------------------------------
+   Resume was keyed on the weekday and the date, and records were told apart by
+   `isoDate|dayKey`, so a partial and the sitting that finished it were two
+   unrelated rows. Nothing could say they were the same workout. */
+const inst1 = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    if (sess.roundsCompleted >= 1 && sess.running) engine.endEarly();
+  }
+});
+ok(typeof inst1.workoutInstanceId === "string" && inst1.workoutInstanceId.length > 0,
+   "a workout gets a durable id when its plan starts");
+ok(inst1.savedEntry && inst1.savedEntry.workoutInstanceId === inst1.workoutInstanceId,
+   "and the id is on the record, not only in memory");
+const carried = store.loadDayProgress("tuesday");
+ok(carried && carried.workoutInstanceId === inst1.workoutInstanceId,
+   "day progress carries it too, which is how a resume knows what it is continuing");
+const inst2 = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true,
+  seed: () => store.saveDayProgress("tuesday", carried) });
+ok(inst2.workoutInstanceId === inst1.workoutInstanceId,
+   "so the sitting that finishes the day is the SAME workout, not a second one");
+const twoFragments = [inst1.savedEntry, inst2.savedEntry].filter(Boolean);
+ok(outcome.workoutInstances(twoFragments).length === 1,
+   "two fragments aggregate to one workout outcome — they used to count as two sessions");
+
+/* --- 5. TODAY SAYS WHAT THE OUTCOME SAYS ----------------------------------
+   vm/today.js printed "This day counts toward your streak." for ANY partial,
+   without ever asking countsForStreak. Below the 75% bar that is simply false,
+   and it is the screen the kid reads. */
+localStorage.clear(); store.migrate();
+const shortDay = {
+  isoDate: new Date().toISOString(), dayKey: util.edmontonDayKey(),
+  lightResult: "green", suggestedLight: "green", outcomeVersion: outcome.OUTCOME_VERSION,
+  xpVersion: 5, roundsDone: 0, roundsPlanned: 3, expectedWork: 10, completedFully: false,
+  durationSecs: 600, ledger: Array.from({ length: 10 }, (_, i) => ({
+    block: i < 4 ? "warmup" : "main", round: 1, name: "x" + i,
+    status: i < 4 ? "done" : "skipped", driver: "time", plannedSecs: 30,
+    actualSecs: i < 4 ? 30 : 0 }))
+};
+ok(store.outcomeOf(shortDay).countsForStreak === false,
+   "four moves out of ten is under the 75% bar, so it earns no streak day");
+store.saveSession(shortDay);
+const auditShortVm = tvm.buildTodayVM({ selectedDay: shortDay.dayKey, expanded: {}, isWide: true });
+const auditShortText = JSON.stringify(auditShortVm);
+ok(!/counts toward your streak/i.test(auditShortText),
+   "and Today does not claim it does — it used to say so for every partial");
+ok(/saved/i.test(auditShortText),
+   "it says the work was saved instead, which is the true and kinder half");
+
+localStorage.clear(); store.migrate();
+const earnedDay = { ...shortDay, ledger: Array.from({ length: 10 }, (_, i) => ({
+  block: i < 4 ? "warmup" : "main", round: 1, name: "x" + i,
+  status: i < 8 ? "done" : "skipped", driver: "time", plannedSecs: 30,
+  actualSecs: i < 8 ? 30 : 0 })) };
+ok(store.outcomeOf(earnedDay).countsForStreak === true, "eight of ten clears the bar");
+store.saveSession(earnedDay);
+ok(/counts toward your streak/i.test(JSON.stringify(tvm.buildTodayVM({ selectedDay: earnedDay.dayKey, expanded: {}, isWide: true }))),
+   "and at 75% Today does say the streak was earned — the two screens agree either way");
+
+/* --- 7. ONE DAY OF TRAINING PAYS FOR ONE DAY, ON EVERY DEVICE -------------
+   dayXpPaid is device-local by design, and the log is used as a floor under it,
+   which covers a day trained on two devices in sequence. What it does not cover
+   is two devices OFFLINE at once: each stamps a full day's award on its own
+   record, and rebuildJourneyXp then added both stamps together. 360 + 360. */
+localStorage.clear(); store.migrate();
+const sameDate = new Date().toISOString();
+const fullGreen = (suffix) => ({
+  isoDate: sameDate.replace(/\dZ$/, suffix + "Z"), dayKey: "tuesday",
+  lightResult: "green", outcomeVersion: outcome.OUTCOME_VERSION, xpVersion: 5,
+  roundsDone: 3, roundsPlanned: 3, expectedWork: 12, completedFully: true,
+  xpEarned: 360, durationSecs: 2000,
+  workoutInstanceId: "device-" + suffix,
+  ledger: Array.from({ length: 12 }, (_, i) => ({
+    block: "main", round: (i % 3) + 1, name: "m" + i, status: "done",
+    driver: "time", plannedSecs: 30, actualSecs: 30 }))
+});
+store.mergeSessions([fullGreen("1"), fullGreen("2")]);
+ok(store.loadSessions().length === 2, "two devices' records both survive the merge — neither is thrown away");
+const settled = store.rebuildJourneyXp();
+ok(settled <= 360,
+   "but the day settles at one day's pay (" + settled + "), not two — it used to rebuild to 720");
+
+/* --- 8. A BACKGROUNDED IPAD IS NOT A CHILD DOING BURPEES ------------------
+   The timer runs on wall-clock deadlines and nothing listened for the page
+   going away, so locking the iPad mid-hold and coming back a minute later
+   handed her the whole minute as work done. */
+ok(typeof engine.PAUSE_HIDDEN === "string" && engine.PAUSE_HIDDEN !== engine.PAUSE_USER,
+   "backgrounding has its own pause reason, told apart from a deliberate tap");
+let hiddenPause = null;
+await runSession({ dayKey: "tuesday", light: "red", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    if (!hiddenPause && ["work", "reps"].includes(sess.phase)) {
+      globalThis.document.hidden = true;
+      globalThis.fireDocEvent("visibilitychange");
+      hiddenPause = { paused: sess.paused, reasons: (sess.pauseReasons || []).slice() };
+      globalThis.document.hidden = false;
+      globalThis.fireDocEvent("visibilitychange");
+    }
+    if (sess.paused && sess.running) engine.resumeSession(engine.PAUSE_HIDDEN);
+  }
+});
+ok(hiddenPause && hiddenPause.paused === true,
+   "the page going away pauses the workout instead of letting the clock run on");
+ok(hiddenPause.reasons.includes(engine.PAUSE_HIDDEN),
+   "under the hidden reason, so coming back needs her to say Resume");
+
+/* --- 2. STORED TEXT IS TEXT, WHEREVER IT CAME FROM -----------------------
+   The wallet and the log render fields that arrive from the cloud mirror and
+   from restored backups. escapeHtml existed and the grown-up screen used it
+   throughout; the progress screen and the prize overlay interpolated raw. */
+localStorage.clear(); store.migrate();
+const nasty = `<img src=x onerror="window.__pwned=1">`;
+store.saveJourney({ xp: 5000, sessionXp: 5000, pendingDraws: 0,
+  prizesWon: [{ id: "p-nasty", label: nasty, icon: nasty, wonAt: Date.now(), redeemed: false }] });
+const progMarkup = pscreen.progressScreen(pvm.buildProgressVM({ progressScope: "4w", logScope: "week" }));
+ok(!/<img\s+src=x/i.test(progMarkup),
+   "a prize label out of the cloud renders as text on the progress screen, never as markup");
+ok(progMarkup.includes("&lt;img") && progMarkup.includes("&quot;"),
+   "it is escaped rather than silently dropped — she still sees exactly what is stored");
+/* The prize id goes into a data-arg ATTRIBUTE, which is its own escaping
+   context and its own way to break out of one. */
+ok(!/data-arg="[^"]*"[^>]*onerror/i.test(progMarkup),
+   "and an id carrying a quote cannot climb out of the attribute it is written into");
+
+/* --- 14. A RESUMED DAY IS ONE SESSION ON THE BOARD, NOT TWO --------------
+   Every rate on the progress board was computed per RECORD, and a day trained
+   in two goes writes two. So coming back to finish made the session count go
+   up, the average duration go down and the completion rate fall: the
+   denominator grew by one for work that was really one day's, and a parent
+   reading "1 of 2 finished" was shown a number that punished her for
+   finishing. */
+localStorage.clear(); store.migrate();
+const splitIso = new Date().toISOString();
+const splitDay = (suffix, rows, done) => ({
+  isoDate: splitIso.replace(/\dZ$/, suffix + "Z"), dayKey: "tuesday",
+  workoutInstanceId: "one-workout", lightResult: "green",
+  outcomeVersion: outcome.OUTCOME_VERSION, xpVersion: 5,
+  roundsDone: done, roundsPlanned: 3, dayRoundsPlanned: 3, expectedWork: 12,
+  completedFully: rows === 6, durationSecs: 900, xpEarned: done * 90,
+  ledger: Array.from({ length: rows }, (_, i) => ({
+    block: "main", round: 1 + (i % 3), name: "m" + suffix + i, status: "done",
+    driver: "time", plannedSecs: 30, actualSecs: 30 }))
+});
+store.saveSession(splitDay("1", 6, 1));
+store.saveSession(splitDay("2", 6, 2));
+const splitVm = pvm.buildProgressVM({ progressScope: "4w", logScope: "week" });
+const sessionsRow = splitVm.periodStats.rows.find(r => r.label === "Completion status");
+ok(/ of 1$/.test(sessionsRow.total),
+   "two sittings of one day count as one session on the board (" + sessionsRow.total + ")");
+ok(/^1 session$/.test(splitVm.sessionsLabel),
+   "and as one in the week summary — it used to read two");
+const timeRow = splitVm.periodStats.rows.find(r => r.label === "Time");
+ok(/30 min \/ session/.test(timeRow.avg),
+   "with the day's whole duration as one session's average, not halved (" + timeRow.avg + ")");
+
+/* --- 13. A FAILED SAVE OFFERS NO CONTROLS THAT CANNOT WORK ---------------
+   Mood, reflection and the quiz all write through patchSession, which finds
+   the row by its key — and when the save failed there is no row. They rendered
+   anyway, took her taps, acknowledged them on screen and dropped every one.
+   Asking a ten-year-old how it felt and then losing the answer is worse than
+   not asking, and it happened exactly when she was already being told
+   something had gone wrong. */
+const failedVm = { ...svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null }),
+                   sessionDone: true, saveFailed: true, showCompletionExtras: false,
+                   showReflection: false, leveledUp: false };
+const failedMarkup = sscreen.sessionScreen(failedVm);
+ok(!/data-action="pickMood"/.test(failedMarkup),
+   "a failed save offers no mood buttons — they had nothing to write to");
+ok(!/data-action="quizPick"/.test(failedMarkup), "and no quiz, which could not have paid its XP either");
+ok(!/data-action="reflectWell"/.test(failedMarkup), "and no reflection to lose");
+ok(/didn't save/i.test(failedMarkup) && /grown-up/i.test(failedMarkup),
+   "it says what happened and who can fix it instead");
+ok(/pick this session back up/i.test(failedMarkup),
+   "and that the work is still resumable — which it now is, because the progress was kept");
+
+const okVm = { ...failedVm, saveFailed: false, showCompletionExtras: true };
+ok(/data-action="pickMood"/.test(sscreen.sessionScreen(okVm)),
+   "a session that DID save still asks how it felt, exactly as before");
+
+/* --- MALFORMED ROWS ARE QUARANTINED, NOT MERGED --------------------------
+   Everything merged arrives from a collection with no sign-in in front of it,
+   or a JSON file picked off a disk. A row that is merely the wrong shape does
+   damage without anyone being hostile: a `ledger` that is a string reaches
+   every screen that iterates it, and a NaN duration poisons an average. */
+localStorage.clear(); store.migrate();
+const goodRow = { isoDate: new Date().toISOString(), dayKey: "monday",
+                  completedFully: true, xpEarned: 100, ledger: [], durationSecs: 900 };
+const badRows = [
+  { ...goodRow, isoDate: "not-a-date" },
+  { ...goodRow, isoDate: new Date(Date.now() - 1e7).toISOString(), ledger: "<script>" },
+  { ...goodRow, isoDate: new Date(Date.now() - 2e7).toISOString(), durationSecs: "twenty" },
+  { ...goodRow, isoDate: new Date(Date.now() - 3e7).toISOString(), perExercise: { 0: "x" } },
+  { ...goodRow, isoDate: new Date(Date.now() - 4e7).toISOString(), dayKey: { evil: true } }
+];
+ok(store.mergeSessions([goodRow, ...badRows]) === 1,
+   "exactly the one well-formed row is merged; the malformed ones are turned away");
+ok(store.loadSessions().length === 1, "and nothing malformed reaches the log");
+ok(store.loadSessions().every(r => Array.isArray(r.ledger)),
+   "so every row a screen iterates really is iterable");
+ok(Number.isFinite(store.rebuildJourneyXp()),
+   "and the totals stay numbers rather than becoming NaN on the next boot");
+ok(store.mergeCloudJourney({ kind: "journey", prizesWon: "all of them" }) === false,
+   "a journey snapshot whose wallet is not a list is refused whole");
+ok(store.mergeCloudJourney({ kind: "journey", qLedger: [1, 2, 3] }) === false,
+   "and so is one whose quiz ledger is the wrong kind of thing");
+
+/* --- 16. THE SAFETY GATE IS IN THE HANDLER, NOT ONLY IN THE MARKUP -------
+   A severity-3 body check disables the continue button until a grown-up
+   confirms. Disabling a button is a rendering decision; the invariant belongs
+   in the transition that actually starts the session. */
+ok(typeof rvm.mayStartFromReadiness === "function",
+   "there is one function that decides whether a readiness result may start a session");
+ok(rvm.mayStartFromReadiness({ severity: 3, grownupConfirmed: false }) === false,
+   "severity 3 without a grown-up cannot start a session");
+ok(rvm.mayStartFromReadiness({ severity: 3, grownupConfirmed: true }) === true,
+   "and with one it can — the override itself is untouched");
+
+/* --- 17. THE APP CAN BE INSTALLED AND OPENED WITH NO NETWORK --------------
+   "Works fully offline" rested on the browser cache after a successful online
+   load. Add to Home Screen and a fresh offline launch needs an app shell. */
+ok(fs.existsSync(new URL("../manifest.webmanifest", import.meta.url)),
+   "there is a web app manifest, so Add to Home Screen installs an app rather than a bookmark");
+ok(fs.existsSync(new URL("../sw.js", import.meta.url)),
+   "and a service worker, so a fresh launch with no network still gets the shell");
+const swSrc = fs.readFileSync(new URL("../sw.js", import.meta.url), "utf8");
+ok(/CACHE_VERSION/.test(swSrc), "the cache is versioned, so a release can retire the old one");
+/* The property that matters is not the absence of a word, it is that the fetch
+   handler refuses anything that is not a same-origin GET before it can reach a
+   cache.put — the mirror carries body-map notes and readiness answers. */
+ok(/url\.origin\s*!==\s*self\.location\.origin/.test(swSrc) && /req\.method\s*!==\s*"GET"/.test(swSrc),
+   "and nothing cross-origin or non-GET reaches the cache — the mirror is never cached into a shared shell");
+ok(!SHELL_LISTED_CLOUD(swSrc), "no cloud endpoint is in the precached shell list either");
+function SHELL_LISTED_CLOUD(src) {
+  const list = (src.match(/const SHELL = \[([\s\S]*?)\];/) || [])[1] || "";
+  return /https?:/i.test(list);
+}
+
+
+/* ============================================================
+   RELEASE ACCEPTANCE — the scenarios, end to end.
+   Each row of the audit's acceptance matrix that can be driven without a
+   physical iPad. The device rows (backgrounding on real Safari, Bluetooth
+   speech, an offline Home Screen launch) are not automatable and are checked
+   by hand.
+   ============================================================ */
+
+/* --- Green and Yellow happy paths, against the light's own plan ---------- */
+const greenRun = await runSession({ dayKey: "monday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => { if (sess.phase === "formcheck") engine.pickClean(); }
+});
+const greenRec = store.loadSessions()[0];
+ok(greenRun.roundsCompleted === 3 && greenRec.roundsPlanned === 3, "Green: 3 of 3 main rounds");
+ok(outcome.workoutInstances([greenRec]).length === 1, "one workout, not several");
+ok(store.sessionXp(greenRec) === 360, "paying exactly one green day");
+ok(store.settledTrainingXp([greenRec]) <= 360, "and settling at no more than the day's ceiling");
+ok(!store.loadDayProgress("monday"), "a finished day leaves nothing to resume");
+
+const yellowRun = await runSession({ dayKey: "monday", light: "yellow", gateUnlocked: true }, {
+  onTick: (ms, sess) => { if (sess.phase === "formcheck") engine.pickClean(); }
+});
+ok(yellowRun.roundsCompleted === 2 && yellowRun.roundsPlanned === 2, "Yellow: 2 of 2, judged against Yellow's plan");
+const yellowBlocks = new Set(yellowRun.circuits.map(c => c.block));
+ok(!yellowBlocks.has("finisher") && yellowBlocks.has("swimskill") || !yellowBlocks.has("finisher"),
+   "and Yellow's blocks, not Green's — the light reduces the session, not just the round count");
+
+/* --- the streak boundary, agreed on by both screens ---------------------- */
+/* A hundred rows, so 74 and 75 are exactly 74% and 75% — a twenty-row plan
+   rounds 74% up to the bar and tests nothing. */
+const atRatio = (ratio) => {
+  const total = 100;
+  const done = Math.round(total * ratio);
+  return {
+    isoDate: new Date().toISOString(), dayKey: util.edmontonDayKey(), lightResult: "red",
+    outcomeVersion: outcome.OUTCOME_VERSION, xpVersion: 5, roundsDone: 0, roundsPlanned: 1,
+    dayRoundsPlanned: 1, expectedWork: total, completedFully: false, durationSecs: 800,
+    ledger: Array.from({ length: total }, (_, i) => ({
+      block: i < 20 ? "warmup" : "main", round: 1, name: "x" + i,
+      status: i < done ? "done" : "skipped", driver: "time", plannedSecs: 30,
+      actualSecs: i < done ? 30 : 0 }))
+  };
+};
+ok(store.outcomeOf(atRatio(0.74)).countsForStreak === false, "Red at 74% of its plan earns no streak day");
+ok(store.outcomeOf(atRatio(0.75)).countsForStreak === true,
+   "Red at 75% earns one — with zero complete main rounds, which is the rule and not a loophole");
+ok(store.outcomeOf(atRatio(0.75)).mainRoundsDone === 0, "and no main round is invented to justify it");
+
+localStorage.clear(); store.migrate();
+store.saveSession(atRatio(0.74));
+const shortText74 = JSON.stringify(tvm.buildTodayVM({ selectedDay: util.edmontonDayKey(), expanded: {}, isWide: true }));
+ok(!/counts toward your streak/i.test(shortText74) && /saved/i.test(shortText74),
+   "and Today says the work was saved without claiming the streak — the two screens agree");
+
+/* --- a session ended during the round rest keeps the round it just did --- */
+const restStop = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    if (sess.phase === "roundRest" && sess.roundsCompleted >= 1 && sess.running) engine.endEarly();
+  }
+});
+ok(restStop.roundsCompleted >= 1, "a round finished before the breather is still credited when she stops in it");
+ok((store.loadDayProgress("tuesday") || {}).mainRoundsCompleted >= 1,
+   "and it is on disk, so coming back does not make her do it again");
+
+/* --- Recovery leaves a half-trained training day exactly as it found it -- */
+const recoveryGuard = await runSession({ dayKey: "monday", light: "recovery", gateUnlocked: true,
+  seed: () => store.saveDayProgress("monday",
+    { done: ["warmup"], light: "green", mainRoundsCompleted: 1, moves: { warmup: ["A-March"] }, bankedCredit: 1 })
+});
+const guarded = store.loadDayProgress("monday");
+ok(guarded && guarded.mainRoundsCompleted === 1 && guarded.done.includes("warmup"),
+   "a recovery pass does not clear the training day it shares a weekday with");
+ok(recoveryGuard.roundsBanked === 0, "and banks nothing against it");
+const recRec = store.loadSessions().find(r => r.sessionType === "recovery");
+ok(recRec && store.outcomeOf(recRec).countsForStreak === false,
+   "recovery adds no streak day");
+ok(store.outcomeOf(recRec).streakFreeze === true, "it holds the existing one instead");
+
+/* --- the exercise video link is unchanged, and is a leaving-the-app link -- */
+ok(/youtube\.com/.test(data.videoSearchUrl({ name: "Dead Bug" })),
+   "the video is still the YouTube search, kept by owner decision");
+/* That it PAUSES the workout before she leaves is proved in test/actions.mjs,
+   where the action layer and its real click listeners are driven. */
+
+
+/* ============================================================
+   PRIZE AMNESTY — every prize in the wallet is available again.
+
+   Her wallet showed all thirteen prizes as used. The audit's diagnosis was
+   persisted legacy data where `redeemed: true` already existed: redemption
+   always wins a wallet merge (mergePrize), and it has to, because a device
+   still showing a prize as available is simply behind and letting ITS copy win
+   is how one prize gets spent twice. The app cannot tell which of those were
+   real spends and which were the duplicate-id bug, so an adult decided: every
+   redemption that happened before this ran is forgiven.
+   ============================================================ */
+localStorage.clear(); store.migrate();
+const spentWallet = Array.from({ length: 13 }, (_, i) => ({
+  id: "old-prize-" + i,
+  icon: i === 4 ? "🛌" : "🎬",
+  label: i === 4 ? "Stay up 20 min later" : "Family movie pick " + i,
+  date: "2026-0" + (1 + (i % 8)) + "-1" + (i % 9),
+  redeemed: true,
+  redeemedAt: Date.now() - (i + 1) * 86400000
+}));
+/* A level high enough that the wallet is not trimmed for holding more prizes
+   than the ladder ever earned — reconcileWallet is a separate rule and this is
+   not a test of it. */
+store.saveJourney({ xp: 40000, sessionXp: 40000, maxLevelSeen: 40,
+                    prizesWon: spentWallet, pendingDraws: 0 });
+
+const amnesty = store.migratePrizeAmnesty();
+ok(amnesty && amnesty.restored === 13, "all thirteen spent prizes are forgiven in one pass");
+const freed = store.loadJourney().prizesWon;
+ok(freed.length === 13, "the wallet still holds thirteen — nothing was added or lost");
+ok(freed.every(p => !p.redeemed), "and every one of them is available again");
+ok(freed.every(p => !Number.isFinite(p.redeemedAt)), "with no redemption date left to re-lock them");
+ok(freed.every(p => p.repairOf), "each one says which corrupted prize it replaces");
+ok(freed.some(p => p.date === "2026-01-10"), "the day she EARNED a prize is hers, and is unchanged");
+
+/* The old ids are voided for good. Without that, the next sync from her other
+   device — which still holds them as redeemed — would simply put them back. */
+const amnestyVoided = new Set((store.loadJourney().voidedPrizeIds || []).map(String));
+ok(spentWallet.every(p => amnestyVoided.has(p.id)),
+   "every corrupted id is voided, so the other device cannot re-redeem them tonight");
+const staleMerge = store.mergeWalletsForTest(store.loadJourney().prizesWon, spentWallet,
+                                        store.loadJourney().voidedPrizeIds);
+ok(staleMerge.length === 13 && staleMerge.every(p => !p.redeemed),
+   "so merging the other device's stale, all-redeemed copy leaves them available");
+
+/* --- the swap, in her wallet and not in the draw pool -------------------- */
+const swapped = freed.find(p => p.repairOf === "old-prize-4");
+ok(swapped && swapped.label === "Skip a chore", "the bedtime prize now reads Skip a chore");
+ok(swapped.icon === "✨", "with the icon the chore-skip uses everywhere else, not the bed");
+ok(data.PRIZE_POOL.some(p => p.label === "Stay up 20 min later"),
+   "and the DRAW POOL is untouched — future draws keep the bedtime prize");
+ok(data.PRIZE_POOL.filter(p => /chore/i.test(p.label)).length === 1,
+   "so the pool still holds exactly one chore-skip and its odds are unchanged");
+
+/* --- it runs once, and never takes back a real spend --------------------- */
+const secondPass = store.migratePrizeAmnesty();
+ok(secondPass.restored === 0, "running it again forgives nothing — there is nothing left to forgive");
+ok(store.loadJourney().prizesWon.length === 13, "and the wallet is untouched by the second pass");
+
+const j2 = store.loadJourney();
+j2.prizesWon = j2.prizesWon.map((p, i) => i === 0
+  ? { ...p, redeemed: true, redeemedAt: Date.now() + 60000 } : p);
+store.saveJourney(j2);
+ok(store.migratePrizeAmnesty().restored === 0,
+   "a prize she spends AFTER the amnesty stays spent — the forgiveness is dated, not permanent");
+ok(store.loadJourney().prizesWon.filter(p => p.redeemed).length === 1,
+   "so exactly the one she really used is still marked used");
+
+/* --- two devices, run independently, converge -----------------------------
+   Both devices run this migration on their own copy. With a random replacement
+   id each would mint a DIFFERENT prize for the same original, the union would
+   carry twenty-six, and reconcileWallet would then trim thirteen of them at
+   random. The replacement id is derived from the original so both devices
+   produce the same one. */
+localStorage.clear(); store.migrate();
+store.saveJourney({ xp: 40000, sessionXp: 40000, maxLevelSeen: 40,
+                    prizesWon: spentWallet.map(p => ({ ...p })), pendingDraws: 0 });
+store.migratePrizeAmnesty();
+const deviceA = store.loadJourney();
+
+localStorage.clear(); store.migrate();
+store.saveJourney({ xp: 40000, sessionXp: 40000, maxLevelSeen: 40,
+                    prizesWon: spentWallet.map(p => ({ ...p })), pendingDraws: 0 });
+store.migratePrizeAmnesty();
+const deviceB = store.loadJourney();
+
+const converged = store.mergeWalletsForTest(deviceA.prizesWon, deviceB.prizesWon,
+  [...(deviceA.voidedPrizeIds || []), ...(deviceB.voidedPrizeIds || [])]);
+ok(converged.length === 13,
+   "two devices that ran the amnesty separately still hold thirteen prizes, not twenty-six");
+ok(converged.every(p => !p.redeemed), "and all of them are available on both");
+
+/* --- it is not silent ---------------------------------------------------- */
+ok(/13 prize/i.test(store.loadJourney().prizeAmnesty.note || ""),
+   "the wallet says what was done to it, so a grown-up is not left to notice");
+
+/* --- the note reaches the screen a grown-up actually reads ---------------- */
+localStorage.clear(); store.migrate();
+store.saveJourney({ xp: 40000, sessionXp: 40000, maxLevelSeen: 40, pendingDraws: 0,
+                    prizesWon: spentWallet.map(p => ({ ...p })) });
+store.migratePrizeAmnesty();
+const noteMarkup = gscreen.grownupScreen(gvm.buildGrownupVM({ grownupTab: "settings", scope: "all" }));
+ok(/made available again/i.test(noteMarkup),
+   "the Grown-up Zone says the wallet was repaired and when — the amnesty runs itself, so it must say so");
+
+/* --- a finished day clears even if the plan shifted under it --------------
+   nothingLeftOwed() re-derives the day's blocks at finalize time. If the
+   valgus gate unlocks mid-session that list can name a block that was never
+   offered, and the record would then never clear — a resume prompt for a day
+   she finished. A saved outcome of `complete` settles it on its own. */
+const gateShift = await runSession({ dayKey: "monday", light: "green", gateUnlocked: true }, {
+  onTick: (ms, sess) => {
+    if (sess.phase === "formcheck") { engine.pickClean(); return; }
+    // Open the gate mid-run, which is what changes the assembled block list.
+    store.saveGate({ unlocked: true, cleanWeeks: [] });
+  }
+});
+ok(gateShift.savedOutcome && gateShift.savedOutcome.state === "complete",
+   "the day really did finish");
+ok(!store.loadDayProgress("monday"),
+   "so its progress is cleared, even though the plan it is compared against moved underneath it");
+
+/* --- the draw hold survives a page load ----------------------------------
+   `_everSynced` was a module-level flag with no persistence, so it reset on
+   every load: a COLD offline launch had the guard switched off entirely, which
+   is the one case it exists for. */
+localStorage.clear(); store.migrate();
+ok(store.xpIsPending() === false, "a device that has never reached the mirror waits for nothing");
+store.noteSyncResult(true);
+ok(Number.isFinite((store.loadJourney() || {}).lastSyncAt),
+   "a successful sync is remembered on the journey, not in a variable that dies on reload");
+store.setOnlineForTest(false);
+ok(store.xpIsPending() === true, "so an offline launch after a real sync does hold the total as pending");
+const jStale = store.loadJourney();
+jStale.lastSyncAt = Date.now() - 30 * 86400000;
+store.saveJourney(jStale);
+ok(store.xpIsPending() === false,
+   "but a mirror nobody has reached for a month stops blocking prizes — a dead project must not lock the wallet forever");
+store.setOnlineForTest(true);
 
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

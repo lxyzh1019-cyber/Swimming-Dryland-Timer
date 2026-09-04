@@ -65,6 +65,15 @@ function blankSession() {
     // before this sitting started. A resume needs all three — see
     // dayRoundsPlanned in js/store.js.
     roundsPlanned: 0, dayRoundsPlanned: 0, bankedRounds: 0,
+    /* WHICH WORKOUT THIS IS — not which sitting. A day trained in two goes is
+       one workout with two records, and until this existed nothing could say
+       so: records were told apart by `isoDate|dayKey` and resume was keyed on
+       the weekday, so a partial and the sitting that finished it were two
+       unrelated rows. Reports counted them as two sessions and XP paid them as
+       two. Minted when a plan starts, carried on the day's progress record, and
+       written onto every session row and event the workout produces. */
+    workoutInstanceId: null,
+    savedEntry: null, savedOutcome: null, saveFailed: false,
     blocksCompleted: 0, expectedByRound: {},
     repsCounted: 0, repsTarget: 0, repNow: 0, segmentsDone: 0, segmentsPlanned: 0,
     sideLabel: "", segmentLabel: "",
@@ -760,9 +769,37 @@ function logRoundShort(ci, round) {
     skipped: r.skipped, blockedBy: r.blockedBy ? r.blockedBy.name : null
   });
 }
-/* A block counts as trained if at least one move in it was really done. */
+/* A block counts as TRAINED if at least one move in it was really done. This is
+   the display counter's question ("how many blocks did she get into today") and
+   nothing else may use it to decide a block is FINISHED — see blockFullyDone. */
 function blockHadWork(ci) {
   return sess.ledger.some(l => l.ci === ci && l.status === "done");
+}
+
+/* A block is FINISHED when every row it was supposed to produce is there and
+   every one of them is done.
+
+   "At least one move was done" used to be the whole test, and recordBlockDone
+   then put the block on the day's done list and DELETED its move-by-move
+   record. So skipping one warm-up move retired the entire warm-up: come back
+   later and the whole block was skipped as already finished, the skipped move
+   included. The one move she owed was the one move she could never be given
+   again.
+
+   Counted against the circuit's own plan rather than the rows that happen to
+   exist, for the same reason countExpectedByRound exists: a block abandoned
+   three moves in leaves the rest simply missing, and "every row I can see is
+   done" is trivially true of three rows out of eight.
+
+   Main is not asked this question. Its size is set by the light, so its
+   progress is a count of rounds — see bankMainRounds. */
+function blockFullyDone(ci) {
+  const c = sess.circuits[ci];
+  if (!c) return false;
+  const expected = countExpectedWork([c]);
+  const rows = sess.ledger.filter(l => l.ci === ci);
+  if (rows.length < expected) return false;
+  return rows.every(l => l.status === "done");
 }
 
 /* Aggregate the ledger to the per-move shape the reports already read. A move
@@ -813,13 +850,25 @@ function ownsDayProgress() {
   return sess.mode !== "tryit" && !isCareSession();
 }
 
+/* A workout's identity. Random rather than derived from the date, because two
+   devices offline on the same day must not mint the SAME id for two different
+   workouts — that is the mirror image of the bug this closes, and it would
+   silently merge work that never belonged together. */
+export function newWorkoutInstanceId() {
+  return "w-" + Date.now().toString(36) + "-" +
+         Math.random().toString(36).slice(2, 10);
+}
+
 function readDayProgress() {
   const prog = loadDayProgress(sess.dayKey)
     || { done: [], light: sess.light, mainRoundsCompleted: 0 };
-  // Both added after the record already existed on devices, so they are filled
-  // in on read rather than migrated.
+  // All three added after the record already existed on devices, so they are
+  // filled in on read rather than migrated.
   if (!prog.moves) prog.moves = {};
   if (!Number.isFinite(Number(prog.bankedCredit))) prog.bankedCredit = 0;
+  // Every write goes through here, so this is the one place the id has to be
+  // stamped for a resume to be able to read it back.
+  if (sess.workoutInstanceId) prog.workoutInstanceId = sess.workoutInstanceId;
   return prog;
 }
 
@@ -899,6 +948,10 @@ function bankMainRounds() {
 function recordBlockDone(blockKey, ci) {
   if (!blockKey || blockKey === "prep") return;
   if (!ownsDayProgress()) return;
+  // Not "some work happened" — every row the block asked for, done. A block with
+  // one move outstanding stays off the done list, and keeps its per-move record
+  // so the resume asks for exactly that move and nothing else.
+  if (blockKey !== "main" && !blockFullyDone(ci)) return;
   if (!blockHadWork(ci)) return;   // skipping everything doesn't finish a block
   if (blockKey === "main") {
     bankMainRounds();              // flushes whatever the round loop has not
@@ -1053,6 +1106,12 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
      the record is what the banking wrote and it is per-day by construction. */
   const bankedMoves = (prog && prog.moves) || {};
   sess.bankedCredit = isCareSession() ? 0 : (Number(prog && prog.bankedCredit) || 0);
+  /* A resume continues the SAME workout; anything else starts a new one. Care
+     never joins the training day's workout — it is not that day's work, which
+     is the same reason it never touches its progress record. */
+  sess.workoutInstanceId = (!isCareSession() && prog && prog.workoutInstanceId)
+    ? prog.workoutInstanceId
+    : newWorkoutInstanceId();
   sess.circuits = isCareSession()
     ? assembleCircuits(dayKey, sess.light, { skip: [] })
     : assembleCircuits(dayKey, sess.light, {
@@ -1099,7 +1158,8 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
   sess.expectedByRound = countExpectedByRound(sess.circuits);
   sess.spotChecks = pickSpotChecks(sess.circuits);
 
-  logEvent("session_start", { day: dayKey, light: sess.light, mode: sessionMode });
+  logEvent("session_start", { day: dayKey, light: sess.light, mode: sessionMode,
+                              workout: sess.workoutInstanceId });
 
   const circuits = sess.circuits;
   const dayMantra = day.mantra || MANTRA;
@@ -1319,10 +1379,72 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     if (sess.abort) return finalize(false);
   }
 
+  finalize(true);
   // A CARE session is not the day — finishing a Recovery pass must leave a
   // half-trained Monday exactly as it found it.
-  if (!isCareSession()) clearDayProgress(sess.dayKey);
-  finalize(true);
+  if (!isCareSession()) clearProgressIfReplaced();
+}
+
+/* THE RECORD IS WRITTEN BEFORE THE RESUME IT REPLACES IS THROWN AWAY.
+
+   clearDayProgress used to run on the line ABOVE finalize(true) — and finalize
+   is where saveSession happens, and saveSession returns false when storage
+   refuses the write. So a full quota at the end of a long session deleted the
+   only resumable copy and then failed to write the record that was supposed to
+   replace it. The work existed in neither place. A child cannot be asked to
+   notice that; the app has to be the one that does not throw the last copy
+   away before the new one has landed.
+
+   Two conditions, both required:
+
+     · the save actually reached storage (a `false` from writeStorage is not a
+       saved session, whatever the loop did), and
+     · the day has nothing left owed — every block of its plan retired and every
+       main round the light asks for banked.
+
+   The second condition is deliberately the DAY's ledger and not this sitting's
+   outcome score. A resume is judged against the whole day's ask while its own
+   ledger holds only the second half, so a genuinely finished day can score
+   `partial` on the sitting that finished it — and clearing on the score would
+   then keep a record with nothing in it to come back to, while a day that
+   really does have moves outstanding is the case that matters. What decides it
+   is the only question worth asking: is there anything here she could resume?
+
+   Everything else keeps the progress record. Keeping one costs a resume prompt
+   she can decline; clearing one costs work she already did. */
+function nothingLeftOwed() {
+  const prog = loadDayProgress(sess.dayKey);
+  if (!prog) return true;                       // nothing there to come back to
+  if ((Number(prog.mainRoundsCompleted) || 0) < roundsForLight(sess.light)) return false;
+  const done = new Set(prog.done || []);
+  // The day's WHOLE plan, not the remainder this sitting was handed.
+  return assembleCircuits(sess.dayKey, sess.light, {})
+    .map(c => c.block)
+    .filter(b => b && b !== "prep")             // prep is never recorded — see recordBlockDone
+    .every(b => done.has(b));
+}
+
+function clearProgressIfReplaced() {
+  if (!ownsDayProgress()) return;
+  if (!sess.savedEntry) {
+    logEvent("progress_kept", { day: sess.dayKey, reason: "save_failed" });
+    return;
+  }
+  /* Either proof is enough that there is nothing to come back to, and requiring
+     both is what leaves a stale record behind. nothingLeftOwed() re-derives the
+     day's block list at finalize time, so if the valgus gate unlocked mid-run
+     the list can name a block that was never actually offered — and the record
+     would then never clear, handing her a resume prompt for a day she finished.
+     A saved outcome of `complete` settles it on its own. */
+  const savedComplete = !!(sess.savedOutcome && sess.savedOutcome.state === "complete");
+  if (!savedComplete && !nothingLeftOwed()) {
+    logEvent("progress_kept", {
+      day: sess.dayKey,
+      reason: (sess.savedOutcome && sess.savedOutcome.state) || "partial"
+    });
+    return;
+  }
+  clearDayProgress(sess.dayKey);
 }
 
 /* ============================================================
@@ -1354,6 +1476,10 @@ export function finalize(completed) {
     athlete: athleteId(),      // the cloud mirror is shared; a restore filters on this
     dayKey: sess.dayKey,
     dayTitle: day.title || sess.dayKey,
+    /* WHICH WORKOUT this record is a fragment of. A day trained in two goes
+       writes two rows carrying the same id, and every report aggregates on it
+       before counting anything — see workoutInstances in js/outcome.js. */
+    workoutInstanceId: sess.workoutInstanceId || null,
     isoDate: new Date().toISOString(),
     durationSecs: elapsedSecs,
     session: "morning",
@@ -1419,6 +1545,10 @@ export function finalize(completed) {
     outcomeVersion: OUTCOME_VERSION, completedFully: !!completed
   });
   entry.completedFully = finalOutcome.state === "complete";
+  // Surfaced so the caller can decide what to do with the day's progress record
+  // from what was actually SAVED, rather than from the loop having reached its
+  // end. See clearProgressIfReplaced.
+  sess.savedOutcome = finalOutcome;
   // The engine's own round count and the ledger's disagreeing means one of them
   // is wrong about what happened. The LEDGER is what gets reported now (see
   // deriveSessionOutcome), and the engine commits its rounds under that same
@@ -1521,6 +1651,50 @@ export function finalize(completed) {
    counts. */
 export const PAUSE_USER = "user";
 
+/* THE PAGE GOING AWAY IS NOT A CHILD DOING BURPEES.
+
+   Every timer in here runs on a wall-clock deadline, and nothing listened for
+   the page going away. Safari suspends a backgrounded tab and freezes a locked
+   screen, so locking the iPad thirty seconds into a forty-second hold and
+   coming back a minute later handed her the whole minute as work performed —
+   recorded done, paid for, and counted toward a round she was not there for.
+   The one thing the app must never do is credit work a child did not do.
+
+   So the workout pauses itself the moment the page is hidden, under its own
+   reason so it is told apart from a deliberate tap: coming back needs an
+   explicit Resume, which is also the only honest thing to show someone who has
+   just returned to a screen and cannot know where the clock got to. Speech is
+   cancelled with it, because a cue that resumes on return is a cue for a phase
+   that has already gone.
+
+   Registered once, at module load, and never removed: the guard has to be live
+   for every session, not only the one that installed it. When nothing is
+   running it does nothing. */
+export const PAUSE_HIDDEN = "hidden";
+
+function onPageHidden() {
+  if (!sess.running) return;
+  const hidden = typeof document !== "undefined" && document
+    ? (document.hidden === true || document.visibilityState === "hidden")
+    : true;
+  if (!hidden) return;
+  pauseSession(PAUSE_HIDDEN);
+  // A countdown or a tempo cue queued behind a suspended page comes back late
+  // and lands on the wrong exercise. Nothing spoken survives the trip.
+  cancelSpeech();
+}
+
+/* `pagehide` as well as `visibilitychange`: iOS fires pagehide for the cases
+   where a tab is frozen outright, and firing both only pauses twice, which the
+   reason set already makes a no-op. */
+if (typeof document !== "undefined" && document && document.addEventListener) {
+  document.addEventListener("visibilitychange", onPageHidden);
+  document.addEventListener("pagehide", onPageHidden);
+}
+if (typeof window !== "undefined" && window && window.addEventListener) {
+  window.addEventListener("pagehide", onPageHidden);
+}
+
 function pauseReasons() {
   if (!Array.isArray(sess.pauseReasons)) sess.pauseReasons = [];
   return sess.pauseReasons;
@@ -1557,10 +1731,31 @@ export function resumeSession(reason = PAUSE_USER) {
   notify("phase");
 }
 
-/* The Pause button. Everything else names its own reason. */
+/* The Pause button. Everything else names its own reason.
+
+   Resuming releases the BACKGROUNDING hold as well as her own, because the
+   button she comes back to is this one and there is no second control she could
+   be expected to know about. Without that, a workout the app paused for her
+   while the iPad was locked could not be restarted from the workout screen at
+   all — the reason set would still be holding it, and the app would look
+   broken to a ten-year-old who had done nothing wrong.
+
+   Overlay holds ("instructions", "video") are deliberately NOT released here:
+   their overlay is still open in front of her, and closing it is what says she
+   is done reading. */
 export function togglePause() {
-  if (sess.paused) resumeSession(PAUSE_USER);
-  else pauseSession(PAUSE_USER);
+  if (sess.paused) {
+    resumeSession(PAUSE_HIDDEN);
+    resumeSession(PAUSE_USER);
+  } else pauseSession(PAUSE_USER);
+}
+
+/* Was the workout stopped BY the app rather than by her? The screen needs to
+   say so: "you paused this" and "the iPad went to sleep, and I stopped the
+   clock so nothing was counted while you were away" are different messages,
+   and only the second explains a timer that is not where she left it. */
+export function pausedByBackground() {
+  return !!sess.paused && (sess.pauseReasons || []).includes(PAUSE_HIDDEN);
 }
 
 export function advance() {

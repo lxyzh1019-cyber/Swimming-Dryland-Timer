@@ -19,6 +19,18 @@ rules_version = '2';
      - `journey-<athlete>`         (kind: "journey")
      - `readiness-<athlete>`       (kind: "readiness", abnormal checks only)
 
+   THIS IS NOT SECURITY, AND MUST NOT BE DESCRIBED AS IT. Reads are public and
+   writes are unauthenticated, by an explicit owner decision to keep the
+   sign-in-free two-device mirror and accept the risk. Anyone who can reach the
+   Firebase project can read training and body-map data and write forged
+   records. What these rules do is confine a MISBEHAVING CLIENT to one
+   collection and three shapes; they do nothing about a hostile one. The app
+   defends itself separately, by rendering every stored string as text (see
+   js/screens/progress.js) rather than trusting what comes back.
+
+   The deferred upgrade is Firebase Authentication with family-owned document
+   paths and server-side ownership rules. It is not in the current scope.
+
    NOT VERIFIED FROM THE REPOSITORY. Rules only do anything once deployed —
    see the deploy steps in README.md. Until then, treat cross-device saving as
    untested, whatever this file says.
@@ -34,17 +46,28 @@ service cloud.firestore {
          see. fsGetRecent and fsGetAll both order by `createdAt`. */
       allow read: if true;
 
-      /* Size is the one hard limit worth enforcing: a runaway client that
-         appends to a document forever is the realistic failure here, not an
-         attacker. 1 MB is Firestore's own ceiling; 200 KB is far above any
-         real session and far below anything that could quietly rot the store. */
-      allow create: if request.resource.data.size() < 200 * 1024
+      /* SIZE, MEASURED IN THE UNIT THE FUNCTION ACTUALLY RETURNS.
+
+         This read `request.resource.data.size() < 200 * 1024` and the comment
+         under it talked about kilobytes. rules.Map.size() returns the number of
+         ENTRIES in the map, not its byte length, so the test was "this document
+         has fewer than 204,800 top-level fields" — which nothing has ever
+         exceeded and nothing ever will. It was not a size limit; it read like
+         one, which is worse than having none, because it is a limit everybody
+         downstream believes is being enforced.
+
+         A real session document is around forty top-level fields. Firestore
+         enforces its own 1 MB ceiling on the byte size, so what is left to
+         guard here is a runaway client appending fields forever — a count, and
+         a count is exactly what size() gives. 200 is far above any real record
+         and far below anything that could quietly rot the store. */
+      allow create: if request.resource.data.size() < 200
                     && isKnownShape(request.resource.data);
 
       /* fsUpdateSession patches a session row after the fact (mood, reflection,
          the quiz) and fsSaveReadiness / fsSetJourney rewrite their own single
          doc wholesale. A write may not change what KIND of document this is. */
-      allow update: if request.resource.data.size() < 200 * 1024
+      allow update: if request.resource.data.size() < 200
                     && isKnownShape(request.resource.data)
                     && sameKind(resource.data, request.resource.data);
 

@@ -37,6 +37,31 @@ export function moreCautious(a, b) {
 /* Toggle the "a grown-up said it's OK" confirmation (pain severity 3 gate). */
 export function confirmGrownup(r) { r.grownupOk = !r.grownupOk; }
 
+/* MAY THIS READINESS RESULT START A SESSION?
+
+   Severity 3 means "the pain changed how she moves", and the rule is that a
+   grown-up has to say so out loud before she trains on it. That rule lived in
+   exactly one place: the Continue button was rendered with `disabled` until the
+   confirmation arrived. A disabled attribute is a rendering decision — it is
+   what a normal tap meets, and it is the only thing standing between a stale
+   screen, a replayed action or a future caller and a child training on a
+   changed-movement injury.
+
+   A safety invariant belongs in the transition that acts on it. Both the
+   markup and the handler ask this one function now, so they cannot come to
+   different conclusions and the answer cannot be skipped by reaching the
+   handler another way.
+
+   Takes the flow object OR a plain { severity, grownupConfirmed } shape, so the
+   rule can be stated and tested without building a whole flow. */
+export function mayStartFromReadiness(r) {
+  if (!r) return false;
+  const severity = Number(r.severity) || 0;
+  const confirmed = r.grownupOk !== undefined ? !!r.grownupOk : !!r.grownupConfirmed;
+  if (severity >= 3 && BODY_RESULTS[3] && BODY_RESULTS[3].needsGrownup) return confirmed;
+  return true;
+}
+
 /* ---- flow transitions (called from main.js actions) ---- */
 
 export function answerQuestion(r, id, val) {
@@ -326,6 +351,8 @@ export function buildReadinessVM(r, isWide) {
        drive the light past Red took the grown-up confirmation away with it —
        exactly backwards, since that is a day with pain AND a flat body. */
     needsGrownupConfirm: (r.severity || 0) >= 3 && !!BODY_RESULTS[3].needsGrownup,
+    // The same answer the handler enforces — see mayStartFromReadiness.
+    mayStart: mayStartFromReadiness(r),
     grownupConfirmed: !!r.grownupOk,
     questions,
     // Only offer the one-tap reuse when there is genuinely a recent check to

@@ -10,9 +10,32 @@
   <link rel="stylesheet" href="css/tokens/typography.css">
   <link rel="stylesheet" href="css/tokens/spacing.css">
   <link rel="stylesheet" href="css/app.css">
+
+  <!-- Add to Home Screen: an installed app rather than a bookmark, and a shell
+       that boots with no network. See sw.js. -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#06B6D4">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Splash">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 </head>
 <body>
   <div id="app"></div>
   <script type="module" src="js/main.js"></script>
+  <script>
+    /* Registered from the page rather than from a module, so a browser that
+       has no service workers at all (or a file:// open) simply skips it and
+       the app runs exactly as it always did. Failure is never fatal: the
+       worker is what makes an OFFLINE launch reliable, not what makes the app
+       work. */
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(err => {
+          console.warn("Offline shell unavailable:", err && err.message);
+        });
+      });
+    }
+  </script>
 </body>
 </html>

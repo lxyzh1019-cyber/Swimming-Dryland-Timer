@@ -8,7 +8,7 @@ import { PRIZE_POOL } from "../data.js";
 import { settings, loadQuiz, saveQuiz, logEvent, addXp, addPrize, pendingDrawCount,
          movePool, rankPool, questionBank, quizPaidToday, quizBankStatus,
          quizQuestionKey, payQuizQuestion } from "../store.js";
-import { todayISODate } from "../util.js";
+import { todayISODate, escapeHtml } from "../util.js";
 
 /* ---- quiz engine (port of _movePool/_makeQ/_buildQuizDeck) ----
    The move pool, the question bank and the XP ledger rules live in store.js
@@ -270,7 +270,7 @@ export function prizeDrawHtml(pd) {
           return `
           <button type="button" data-action="pickPrize" data-arg="${i}" style="width:140px;height:170px;border-radius:20px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:14px;box-sizing:border-box;transition:transform 0.2s;border:3px solid ${revealed ? "var(--sun)" : "var(--hairline)"};background:${revealed ? "var(--sun-wash)" : "var(--aqua-wash)"};${dim}font-family:inherit;">
             ${revealed
-              ? `<span style="font-size:46px;line-height:1;">${c.icon}</span><span style="font-size:14px;font-weight:900;color:var(--ink);line-height:1.25;">${c.label}</span>`
+              ? `<span style="font-size:46px;line-height:1;">${escapeHtml(c.icon)}</span><span style="font-size:14px;font-weight:900;color:var(--ink);line-height:1.25;">${escapeHtml(c.label)}</span>`
               : `<span style="font-size:46px;line-height:1;">✉️</span><span style="font-size:13px;font-weight:900;color:var(--ink-soft);">Tap to open</span>`}
           </button>`;
         }).join("")}

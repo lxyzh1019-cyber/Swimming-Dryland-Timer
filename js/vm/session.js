@@ -3,7 +3,7 @@
    values from the engine's `sess` view-state.
    ============================================================ */
 
-import { sess, refTime, screenRepsDetail } from "../engine.js";
+import { sess, refTime, screenRepsDetail, pausedByBackground } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork, videoSearchUrl } from "../data.js";
 import { fmtMMSS, exercisePhotoUrl } from "../util.js";
 import { loadSessions } from "../store.js";
@@ -302,6 +302,10 @@ export function buildSessionVM(state) {
     timerZone, timerZoneType, timerUrgent,
     timerProgress: sess.timerMax > 0 ? Math.max(0, sess.timerSecs / sess.timerMax) : 1,
     timerIsPaused: sess.paused, timerNotPaused: !sess.paused,
+    // Paused BY the app, because the page went away — see PAUSE_HIDDEN in
+    // js/engine.js. Worth its own line on the screen: the clock is not where
+    // she left it, and she is owed the reason.
+    pausedByBackground: pausedByBackground(),
     isResting, notResting: !isResting && !isPrompt, isBigRest,
     // Only offer the instructions when there is actually a move to describe.
     // During the lead-in there is no current exercise, so the old ⓘ button
@@ -387,7 +391,22 @@ export function buildSessionVM(state) {
        short the whole time and simply never said. */
     roundShortNotes,
     xpEarned: sess.xpEarned, leveledUp: sess.leveledUp,
-    moodOpts, moodAck: sess.mood ? MOOD_ACK[sess.mood] : "", showReflection: sessionDone && !!sess.mood, reflectWellOpts, reflectNextOpts,
+    /* MOOD, REFLECTION AND THE QUIZ ONLY EXIST IF THERE IS A RECORD TO PUT
+       THEM ON.
+
+       All three write through patchSession, which finds the row by its key —
+       and when the save failed there IS no row. So the controls rendered, took
+       her taps, acknowledged them on screen, and dropped every one: the quiz
+       could not pay its XP either. Asking a kid how it felt and then losing the
+       answer is worse than not asking, and it happens exactly when she is
+       already being told something went wrong.
+
+       A failed save shows what to do about it instead — see the recovery block
+       on the finish screen. */
+    showCompletionExtras: sessionDone && completionState !== "save-failed",
+    moodOpts, moodAck: sess.mood ? MOOD_ACK[sess.mood] : "",
+    showReflection: sessionDone && completionState !== "save-failed" && !!sess.mood,
+    reflectWellOpts, reflectNextOpts,
     quizQuestion: QZ.q, quizOpts, quizAnswered, quizWhy: QZ.why,
     quizFeedback,
     quizFeedbackColor: quizCorrect ? "var(--mint-ink)" : "var(--coral)"
