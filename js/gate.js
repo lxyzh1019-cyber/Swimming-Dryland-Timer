@@ -67,7 +67,8 @@ export const UNGATED_ACTIONS = [
   // her own session, start to finish
   "goSession", "goTryIt", "exitTryIt", "tryItDetail",
   "advance", "pauseTimer", "skipEx", "stopNow", "resumeFromStop", "endFromStop",
-  "askEnd", "cancelEnd", "confirmEndEarly", "pickIntent", "answerMicro",
+  "askEnd", "cancelEnd", "confirmEndEarly",
+  "askSkip", "cancelSkip", "confirmSkipEx", "pickIntent", "answerMicro",
   "pickClean", "pickWobbly", "skipFormCheck", "pickMood", "reflectWell",
   "reflectNext", "quizPick", "exitSession",
   "openDetail", "openDetailCur", "openDetailAt", "watchVideo", "closeDetail", "resumeFromDetail",
