@@ -276,6 +276,7 @@ export function buildSessionVM(state) {
     isWide: state.isWide, isNarrow: !state.isWide,
     sessionDone, sessionInProgress: !sessionDone,
     stopOverlay: sess.stopOverlay, confirmEnd: sess.confirmEnd, notConfirmingEnd: !sess.confirmEnd,
+    confirmSkip: !!sess.confirmSkip && !sess.confirmEnd,
     detailOverlay: state.detailOverlay,
     detailName: de.name || "", detailDose: de.dose || "", detailCue: de.cue || "",
     detailWatchFor: de.parentWatch || "", detailFix: de.redFlag || de.fix || "",

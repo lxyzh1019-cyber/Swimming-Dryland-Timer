@@ -16,15 +16,15 @@ function timerRing(vm, size) {
   const color = vm.timerUrgent ? "var(--stop)" : (RING_ZONE_COLOR[vm.timerZoneType] || "var(--aqua)");
   const offset = c * (1 - Math.max(0, Math.min(1, vm.timerProgress)));
   return `
-  <div data-action="advance" title="Tap the ring when you're done" style="width:${size}px;height:${size}px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;${vm.timerUrgent ? "animation:splash-pulse-ring 1s ease-in-out infinite;" : ""}">
-    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg);position:absolute;inset:0;">
+  <div data-action="advance" title="Tap the ring when you're done" style="flex:0 1 ${size}px;max-width:${size}px;min-width:${size >= 300 ? 200 : 140}px;aspect-ratio:1;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;${vm.timerUrgent ? "animation:splash-pulse-ring 1s ease-in-out infinite;" : ""}">
+    <svg width="100%" height="100%" viewBox="0 0 ${size} ${size}" preserveAspectRatio="xMidYMid meet" style="transform:rotate(-90deg);position:absolute;inset:0;">
       <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="var(--surface)" stroke="var(--surface-2)" stroke-width="${stroke}"></circle>
       <circle id="s-ring-arc" cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
         stroke-dasharray="${c}" stroke-dashoffset="${offset}" style="transition:stroke-dashoffset 0.9s linear;"></circle>
     </svg>
     <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;">
       <span style="font-size:${size >= 300 ? 13 : 11}px;font-weight:900;letter-spacing:0.12em;color:${color};">${vm.timerZone}</span>
-      <span id="s-timer-text" style="font-family:var(--font-display);font-weight:600;font-size:${size >= 300 ? 76 : 46}px;line-height:1;color:${vm.timerUrgent ? "var(--stop)" : "var(--ink)"};">${vm.timerDisplay}</span>
+      <span id="s-timer-text" style="font-family:var(--font-display);font-weight:600;font-size:${size >= 300 ? "clamp(44px, 6.5vw, 76px)" : "46px"};line-height:1;color:${vm.timerUrgent ? "var(--stop)" : "var(--ink)"};">${vm.timerDisplay}</span>
       ${vm.timerIsPaused ? `<span style="font-size:12px;font-weight:900;color:var(--sun-ink);">PAUSED</span>` : ""}
     </div>
   </div>`;
@@ -33,7 +33,7 @@ function timerRing(vm, size) {
 function repRing(vm, size) {
   const border = size >= 300 ? 10 : 8;
   return `
-  <div data-action="advance" title="Tap the ring when you're done" style="cursor:pointer;width:${size}px;height:${size}px;border-radius:50%;background:var(--grape-wash);border:${border}px solid var(--grape);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;box-sizing:border-box;padding:${size >= 300 ? 26 : 14}px;">
+  <div data-action="advance" title="Tap the ring when you're done" style="cursor:pointer;flex:0 1 ${size}px;max-width:${size}px;min-width:${size >= 300 ? 220 : 160}px;aspect-ratio:1;border-radius:50%;background:var(--grape-wash);border:${border}px solid var(--grape);display:flex;flex-direction:column;align-items:center;justify-content:center;box-sizing:border-box;padding:${size >= 300 ? 26 : 14}px;">
     <div style="font-weight:900;font-size:${size >= 300 ? 15 : 11}px;letter-spacing:0.1em;color:var(--grape-deep);">${size >= 300 ? "DO YOUR REPS" : "REPS"}</div>
     <div style="font-family:var(--font-display);font-size:${size >= 300 ? 50 : 32}px;font-weight:600;color:var(--grape);text-align:center;line-height:1.05;margin:${size >= 300 ? 8 : 4}px 0;">${vm.curExDose}</div>
     <div style="font-weight:900;font-size:${size >= 300 ? 20 : 14}px;color:${vm.paceColor};">⏱ <span id="s-timer-text">${vm.exActualDisplay}</span>${size >= 300 ? ` <span style="font-weight:700;opacity:0.65;">/ ${vm.exPlannedDisplay}</span>` : ""}</div>
@@ -45,7 +45,7 @@ function repRing(vm, size) {
 function promptCard(vm, size) {
   if (vm.phase === "intent") {
     return `
-    <div style="width:${size}px;min-height:${Math.round(size * 0.8)}px;border-radius:26px;background:var(--sun-wash);border:3px solid var(--sun);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;box-sizing:border-box;flex-shrink:0;">
+    <div style="flex:0 1 ${size}px;max-width:${size}px;min-width:240px;min-height:${Math.round(size * 0.8)}px;border-radius:26px;background:var(--sun-wash);border:3px solid var(--sun);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;box-sizing:border-box;">
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--ink);text-align:center;">After Round 1 — pick ONE word</div>
       <div style="font-size:14px;font-weight:700;color:var(--ink-soft);text-align:center;">What fixes what you just felt? Say it out loud for the next rounds.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
@@ -55,7 +55,7 @@ function promptCard(vm, size) {
   }
   if (vm.phase === "microloop") {
     return `
-    <div style="width:${size}px;min-height:${Math.round(size * 0.8)}px;border-radius:26px;background:var(--aqua-wash);border:3px solid var(--aqua);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;box-sizing:border-box;flex-shrink:0;">
+    <div style="flex:0 1 ${size}px;max-width:${size}px;min-width:240px;min-height:${Math.round(size * 0.8)}px;border-radius:26px;background:var(--aqua-wash);border:3px solid var(--aqua);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;box-sizing:border-box;">
       <img src="assets/poses/think.png" alt="" style="height:70px;object-fit:contain;">
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--ink);text-align:center;">${vm.microQ}</div>
       <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
@@ -73,7 +73,7 @@ function promptCard(vm, size) {
   }
   // breath rehearsal
   return `
-  <div style="width:${size}px;min-height:${Math.round(size * 0.8)}px;border-radius:26px;background:var(--mint-wash);border:3px solid var(--mint);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;box-sizing:border-box;flex-shrink:0;">
+  <div style="flex:0 1 ${size}px;max-width:${size}px;min-width:240px;min-height:${Math.round(size * 0.8)}px;border-radius:26px;background:var(--mint-wash);border:3px solid var(--mint);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;box-sizing:border-box;">
     <img src="assets/poses/breath.png" alt="" style="height:90px;object-fit:contain;">
     <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--mint-ink);text-align:center;">Breath rehearsal</div>
     <div style="font-size:15px;font-weight:700;color:var(--ink);text-align:center;line-height:1.45;">${vm.breathText}</div>
@@ -97,7 +97,7 @@ function badge(variant, label) {
    until then a watercolor-wash placeholder shows through. */
 function photoSlot(photoUrl, w, h, radius) {
   return `
-  <div style="width:${w}px;height:${h}px;flex-shrink:0;border-radius:${radius}px;overflow:hidden;position:relative;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+  <div style="flex:1 1 ${w}px;max-width:${w}px;min-width:0;aspect-ratio:${w} / ${h};border-radius:${radius}px;overflow:hidden;position:relative;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
     <span style="font-size:${Math.round(w / 6)}px;" aria-hidden="true">🏊</span>
     <span style="font-size:12px;font-weight:800;color:var(--aqua-ink);opacity:0.75;text-align:center;padding:0 14px;">Form photo coming soon</span>
     <img src="${photoUrl}" alt="" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
@@ -311,7 +311,7 @@ function centerStack(vm, wide) {
     : vm.timerIsReps ? repRing(vm, ringSize)
     : timerRing(vm, ringSize);
   return `
-  <div style="display:flex;gap:${wide ? 24 : 16}px;align-items:center;justify-content:center;width:100%;flex-shrink:0;flex-wrap:wrap;">
+  <div style="display:flex;gap:${wide ? 24 : 16}px;align-items:center;justify-content:center;width:100%;min-width:0;flex-shrink:0;flex-wrap:${wide ? "nowrap" : "wrap"};">
     ${vm.notResting && !vm.isPrompt ? photoSlot(vm.curExPhotoUrl, wide ? 360 : 210, wide ? 480 : 280, wide ? 20 : 16) : ""}
     ${ring}
   </div>
@@ -383,9 +383,19 @@ function controls(vm, wide) {
     ${vm.timerNotPaused
       ? `<button type="button" data-action="pauseTimer" style="flex:1;min-height:${wide ? 50 : 48}px;border-radius:var(--radius-md);border:2px solid var(--sun-deep);font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--sun-wash);color:var(--sun-ink);font-family:inherit;">❚❚ ${wide ? "Pause" : ""}</button>`
       : `<button type="button" data-action="pauseTimer" style="flex:1;min-height:${wide ? 50 : 48}px;border-radius:var(--radius-md);border:2px solid var(--mint-deep);font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--mint-wash);color:var(--mint-ink);font-family:inherit;">▶ ${wide ? "Resume" : ""}</button>`}
-    <button type="button" data-action="skipEx" style="flex:1;min-height:${wide ? 50 : 48}px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">⏭ ${wide ? "Skip" : ""}</button>
     <button type="button" data-action="askEnd" style="flex:1;min-height:${wide ? 50 : 48}px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:${wide ? 14 : 12}px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">End${wide ? " session" : ""}</button>
+  </div>
+  ${vm.confirmSkip ? `
+  <div style="display:flex;${wide ? "align-items:center;gap:12px;" : "flex-direction:column;gap:8px;"}background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-md);padding:10px 14px;box-sizing:border-box;">
+    <span style="${wide ? "flex:1;" : ""}font-weight:800;font-size:${wide ? 15 : 14}px;color:var(--sun-ink);">Skip this exercise? It won't count.</span>
+    <div style="display:flex;gap:8px;flex-shrink:0;">
+      <button type="button" data-action="cancelSkip" style="${wide ? "" : "flex:1;"}min-height:44px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;padding:0 18px;background:var(--mint);color:#fff;box-shadow:0 3px 0 var(--mint-deep);font-family:inherit;">Keep going</button>
+      <button type="button" data-action="confirmSkipEx" style="${wide ? "" : "flex:1;"}min-height:44px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;padding:0 16px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">⏭ Skip it</button>
+    </div>
   </div>` : `
+  <div style="display:flex;justify-content:center;border-top:1.5px solid var(--hairline);padding-top:10px;">
+    <button type="button" data-action="askSkip" style="flex:0 0 auto;min-height:44px;border-radius:var(--radius-pill);border:none;font-weight:900;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 18px;background:transparent;color:var(--ink-faint);font-family:inherit;">⏭ Skip this exercise</button>
+  </div>`}` : `
   <div style="display:flex;${wide ? "align-items:center;gap:14px;" : "flex-direction:column;gap:8px;"}background:var(--surface-2);border-radius:var(--radius-md);padding:10px 14px;">
     ${wide ? `<img src="assets/poses/seeyou.png" alt="" style="height:52px;object-fit:contain;flex-shrink:0;">` : ""}
     <span style="${wide ? "flex:1;" : ""}font-weight:800;font-size:${wide ? 15 : 14}px;color:var(--ink);">End early? Your progress is saved.</span>
@@ -452,7 +462,7 @@ export function sessionScreen(vm) {
 
   if (vm.isWide) {
     return `
-    <div style="display:flex;background:var(--surface);border-radius:30px;box-shadow:0 18px 44px rgba(20,59,74,0.16);overflow:hidden;height:800px;position:relative;">
+    <div style="display:flex;background:var(--surface);border-radius:30px;box-shadow:0 18px 44px rgba(20,59,74,0.16);overflow:hidden;height:min(800px, calc(100dvh - 36px));min-height:600px;position:relative;">
       ${overlays}
       <div style="width:32%;flex-shrink:0;overflow-y:auto;padding:18px 16px;background:var(--surface-2);border-right:1.5px solid var(--hairline);box-sizing:border-box;display:flex;flex-direction:column;gap:14px;">
         <div>
@@ -492,7 +502,7 @@ export function sessionScreen(vm) {
         <div style="flex:1;min-height:0;padding:22px 28px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;box-sizing:border-box;overflow-y:auto;">
           ${centerStack(vm, true)}
         </div>
-        <div style="flex:none;padding:14px 28px 18px;border-top:1.5px solid var(--hairline);background:var(--surface);display:flex;flex-direction:column;gap:12px;">
+        <div style="flex:none;padding:14px 28px 18px;border-top:1.5px solid var(--hairline);background:var(--surface);display:flex;flex-direction:column;gap:18px;">
           ${controls(vm, true)}
         </div>
       </div>
@@ -518,7 +528,7 @@ export function sessionScreen(vm) {
         ${centerStack(vm, false)}
       </div>
 
-      <div style="flex-shrink:0;padding:0 16px 14px;display:flex;flex-direction:column;gap:10px;">
+      <div style="flex-shrink:0;padding:0 16px 14px;display:flex;flex-direction:column;gap:16px;">
         ${controls(vm, false)}
       </div>
 

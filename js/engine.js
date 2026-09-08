@@ -685,6 +685,10 @@ function nextExercise(circuits, ci, r, ei) {
 
 function setPhase(phase) {
   sess.phase = phase;
+  // A pending "Skip this exercise?" ask belongs to the phase it was raised in.
+  // Left standing, a countdown that expires mid-ask would point the confirm at
+  // whatever came next — so every transition clears it.
+  sess.confirmSkip = false;
   notify("phase");
 }
 
