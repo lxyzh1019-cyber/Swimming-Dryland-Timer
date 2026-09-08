@@ -6,7 +6,7 @@
 
 import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
 import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE } from "./data.js";
-import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION,
+import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION, roundPayCredit,
          streakDatesOf, freezeDatesOf } from "./outcome.js";
 
 /* ---- keys (unchanged from the old app unless noted) ---- */
@@ -198,9 +198,10 @@ export const DEFAULT_SETTINGS = {
    session after it; then it expired after two hours.
 
    None of that is needed to read an instruction. Every launchable day now has
-   its own "Explore the moves" button straight to the list, GO always means GO,
-   and there is no state to leave switched on. The settings keys are gone with
-   it; an old saved value simply goes unread.  */
+   its own "Explore the moves" button, which opens the ordinary workout screen
+   with nothing counting down and nothing saved (runExplore in js/engine.js);
+   GO always means GO, and there is no state to leave switched on. The settings
+   keys are gone with it; an old saved value simply goes unread.  */
 
 export let settings = loadSettings();
 
@@ -1061,6 +1062,30 @@ export function sessionRounds(entry) {
                   Math.max(0, outcomeOf(entry).mainRoundsDone || 0));
 }
 
+/* WHAT THE ROUNDS ARE WORTH, as a fraction rather than a count.
+
+   `sessionRounds` above answers "how many whole rounds did she finish", which is
+   the right question for every screen that prints "2 of 3 main rounds" — and the
+   wrong one for pricing, because it paid a round with one skipped move exactly
+   what it paid a round she never started. roundPayCredit (js/outcome.js) states
+   the rule; this applies the same ceiling `sessionRounds` uses, so a record can
+   never be paid for more rounds than the sitting asked for.
+
+   Gated on the version that introduced it: a record written before v5 is priced
+   by the whole-rounds rule it was written under, so no history moves. Most rows
+   never reach either path — sessionXp returns the `xpEarned` stamp the engine
+   wrote at the time. */
+export function sessionRoundCredit(entry) {
+  if (!entry) return 0;
+  // `>=`, not `< 5`: a row with no outcomeVersion at all gives NaN, and every
+  // comparison against NaN is false — so the negative form silently sent legacy
+  // rows down the NEW path, which is the opposite of a version gate.
+  if (!(Number(entry.outcomeVersion) >= 5)) return sessionRounds(entry);
+  const report = outcomeOf(entry).roundReport || [];
+  const credit = report.reduce((a, r) => a + roundPayCredit(r), 0);
+  return Math.min(sessionRoundsPlanned(entry), Math.max(0, credit));
+}
+
 /* Rounds THIS SITTING was asked for — the ceiling on what one row may be paid.
 
    On a resume this is a REMAINDER: a green day with one round already banked
@@ -1156,7 +1181,9 @@ export function xpForSession(entry) {
   // A practice / try-it row can carry a full ledger and must still pay nothing.
   if (!outcomeOf(entry).xpEligible) return 0;
   if (!didRealWork(entry)) return 0;
-  return XP_SHOWED_UP + XP_PER_ROUND * sessionRounds(entry);
+  // Rounded once, here, rather than per round: two fragments of one day each
+  // rounding up could otherwise creep past the day's ceiling.
+  return XP_SHOWED_UP + Math.round(XP_PER_ROUND * sessionRoundCredit(entry));
 }
 
 /* ---- one training day pays for one training day --------------------------

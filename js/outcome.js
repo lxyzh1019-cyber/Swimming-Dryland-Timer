@@ -72,10 +72,11 @@ import { edmontonISO } from "./util.js";
    judges a MAIN ROUND on its dose rather than demanding every move be perfect —
    see mainRoundReport below. v4 numbers a resumed sitting's main rounds from
    what the day has already banked, which is what makes its ledger rows safe to
-   merge per planned move — see mergeLedgerRows. Each step is gated on the
-   version that introduced it, so a record is always read by the rules it was
-   written under. */
-export const OUTCOME_VERSION = 4;
+   merge per planned move — see mergeLedgerRows. v5 pays a round that fell short
+   the fraction of it she actually did, instead of nothing — see roundPayCredit.
+   Each step is gated on the version that introduced it, so a record is always
+   read by the rules it was written under. */
+export const OUTCOME_VERSION = 5;
 
 /* How much of a session has to actually be there before the day counts toward
    the streak. Deliberately high: the streak is the app's loudest claim about
@@ -261,6 +262,38 @@ function worstRow(rs) {
 export function mainRoundsFromLedger(ledger, expectedByRound = null, outcomeVersion = null) {
   return mainRoundReport(ledger, expectedByRound, outcomeVersion)
     .filter(r => r.counts).length;
+}
+
+/* WHAT A ROUND IS WORTH TO THE XP, from 0 to 1.
+
+   Whether a round COUNTS is a yes-or-no question, and it should be: a round
+   with a skipped move in it is not a round she trained, and every report says
+   so. Pricing it that way was a different matter. A round paid 90 XP or nothing,
+   so one skipped move in an eight-move round cost the whole 90 — the same as
+   skipping all eight. Two things followed, both bad. Once a round was lost there
+   was no reason left to do its other seven moves properly; and skipping a move
+   that felt wrong was punished harder than grinding through it badly, which is
+   exactly backwards for a ten-year-old we are trying to teach to stop when
+   something hurts.
+
+   So the cliff becomes a slope, in the one direction that is safe:
+
+     · a round that COUNTS still pays in full — nothing she earns today gets
+       smaller because this rule changed, and
+     · a round that fell short pays the fraction of it she actually produced.
+
+   The denominator is what the round ASKED FOR, not the rows that happen to
+   exist: a round abandoned after three of eight moves has a perfect ratio over
+   its three rows, and paying that as a whole round would pay a full round's XP
+   for three eighths of one. */
+export function roundPayCredit(r) {
+  if (!r) return 0;
+  if (r.counts) return 1;
+  const rows = Number(r.rows) || 0;
+  const asked = Number.isFinite(Number(r.expected)) && Number(r.expected) > 0
+    ? Number(r.expected) : rows;
+  if (asked <= 0) return 0;
+  return Math.min(1, Math.max(0, (Number(r.credit) || 0) / asked));
 }
 
 /* The one function. Everything that has an opinion about a session asks this.

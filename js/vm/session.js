@@ -3,9 +3,9 @@
    values from the engine's `sess` view-state.
    ============================================================ */
 
-import { sess, refTime, screenRepsDetail, pausedByBackground } from "../engine.js";
+import { sess, refTime, screenRepsDetail, pausedByBackground, canGoBack } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork, videoSearchUrl } from "../data.js";
-import { fmtMMSS, exercisePhotoUrl } from "../util.js";
+import { fmtMMSS, exercisePhotoUrl, plural } from "../util.js";
 import { loadSessions } from "../store.js";
 import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION } from "../outcome.js";
 
@@ -78,6 +78,7 @@ export function buildSessionVM(state) {
   const phase = sess.phase;
 
   const sessionDone = phase === "done";
+  const explore = !!sess.explore;
   /* The finish screen reads THE SAVED RECORD. Not `endedEarly === false`, which
      only ever meant "the loop reached its end" and therefore called a Recovery
      pass, and a session of nothing but skips, a completed workout. The record is
@@ -110,7 +111,7 @@ export function buildSessionVM(state) {
   /* The one value the finish screen switches on. Six states, in priority order:
      a failed save outranks everything (nothing was recorded, so nothing may be
      claimed), then safety, then care, then what the ledger can actually prove. */
-  const completionState = sess.saveFailed ? "save-failed" : liveOutcome.state;
+  const completionState = explore ? "explore" : sess.saveFailed ? "save-failed" : liveOutcome.state;
 
   /* A partial is not one outcome, it is two: the day that cleared the streak
      bar and the day that did not. Both were shown the same words — "part of the
@@ -124,12 +125,49 @@ export function buildSessionVM(state) {
   const streakShortBy = Number.isFinite(ratio)
     ? Math.max(1, Math.round((STREAK_WORK_FRACTION - ratio) * (sess.expectedWork || 0)))
     : null;
-  const completionKey = completionState === "partial"
+  const completionKey = explore ? "explore" : completionState === "partial"
     ? (streakEarned ? "partial-streak" : "partial-short")
     : completionState === "recovery"
     ? (streakFrozen ? "recovery-held" : "recovery-short")
     : completionState;
   const roundsDone = Math.max(0, Number(liveOutcome.mainRoundsDone) || 0);
+
+  /* HOW FAR SHE GOT, AND WHAT IS LEFT — in numbers, on the screen.
+
+     Every partial day got one fixed sentence. The two numbers a kid actually
+     wants ("how close was I?" and "what did I miss?") were computed for the
+     streak and shown to nobody, so "part of the way" covered both a day three
+     moves short and a day half done. */
+  const donePercent = Number.isFinite(ratio)
+    ? Math.max(0, Math.min(100, Math.round(ratio * 100))) : null;
+  const skippedRows = (sess.ledger || []).filter(l => l && l.status === "skipped");
+  const skippedCount = skippedRows.length;
+  const skippedNames = [...new Set(skippedRows.map(l => l.name).filter(Boolean))];
+  const skippedPhrase = skippedCount
+    ? (skippedNames.length && skippedNames.length <= 3
+        ? plural(skippedCount, "move") + " got skipped (" + skippedNames.join(", ") + ")"
+        : plural(skippedCount, "move") + " got skipped")
+    : "";
+  /* THE SECOND CHANCE, SAID OUT LOUD AND ONLY WHILE IT IS TRUE.
+
+     A skipped move is never banked (see bankMove in js/engine.js), so it is
+     offered again the moment she comes back — for the rest of today. That has
+     always worked and was never mentioned anywhere, so the one thing she could
+     do about a short day was the one thing the screen never told her. It is
+     today's offer only: a partial does not carry into a new training day (the
+     No-Debt rule, js/store.js), and promising otherwise would be a promise the
+     next morning breaks. */
+  const comeBackLine = "Everything you did is saved, so you can come back later today and finish the rest — that would make it a full day.";
+  const partialNote = donePercent === null ? null
+    : streakEarned
+      ? `You got ${donePercent}% of today done${skippedPhrase ? ", and " + skippedPhrase : ""}. Your streak keeps going — today counts. 🔥 ` + comeBackLine
+      : `You got ${donePercent}% of today done${skippedPhrase ? ", and " + skippedPhrase : ""}. Everything you DID do is saved — the moves, the minutes and the XP for them. Today didn't reach the streak${Number.isFinite(streakShortBy) && streakShortBy > 0 ? ` — about ${plural(streakShortBy, "more move")} would do it` : ""}. Come back later today and finish the rest; it still counts for today. 💛`;
+  const completionNote = completionState === "partial" ? partialNote : null;
+
+  /* A DAY SHE CAME BACK AND FINISHED reads differently from one done in a
+     single go, and should: coming back is the harder thing. bankedCredit is
+     only ever above zero on a resumed sitting. */
+  const finishedAResume = completionState === "complete" && (Number(sess.bankedCredit) || 0) > 0;
 
   /* THE DAY'S ROUNDS, not this sitting's.
 
@@ -155,19 +193,26 @@ export function buildSessionVM(state) {
   const roundShortNotes = (liveOutcome.roundReport || [])
     .filter(r => !r.counts)
     .map(r => {
-      if (r.skipped.length) return `Round ${r.round} didn't count — ${r.skipped[0]} got skipped.`;
-      if (r.missing > 0)    return `Round ${r.round} didn't count — you stopped partway through it.`;
+      if (r.skipped.length) return `Round ${r.round} wasn't a full round — ${r.skipped[0]} got skipped.`;
+      if (r.missing > 0)    return `Round ${r.round} wasn't a full round — you stopped partway through it.`;
       const b = r.blockedBy;
       if (!b || !Number.isFinite(Number(b.planned)) || Number(b.planned) <= 0)
-        return `Round ${r.round} didn't count — it was a bit short.`;
+        return `Round ${r.round} wasn't a full round — it was a bit short.`;
       const got = Math.round(Number(b.got) || 0), planned = Math.round(Number(b.planned));
       return b.driver === "reps"
-        ? `Round ${r.round} didn't count — ${b.name} was ${got} of ${planned} reps.`
-        : `Round ${r.round} didn't count — ${b.name} was ${got}s of ${planned}s.`;
+        ? `Round ${r.round} wasn't a full round — ${b.name} was ${got} of ${planned} reps.`
+        : `Round ${r.round} wasn't a full round — ${b.name} was ${got}s of ${planned}s.`;
     });
 
   const isResting = phase === "rest" || phase === "roundRest" || phase === "sectionRest";
   const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath" || phase === "formcheck";
+  // The clean-check is asked ABOUT a move, so the move stays on screen — the
+  // photo and the ring's spot hold the question, not the breath card.
+  const isFormCheck = phase === "formcheck";
+  // A move is only skippable while it is underway. Elsewhere Done already says
+  // "skip rest", and a "Skip this exercise? It won't count." over a breather
+  // was a question about a move that had already been recorded.
+  const canSkipExercise = phase === "work" || phase === "reps" || phase === "sideswitch";
   const isBigRest = phase === "roundRest" || phase === "sectionRest";
   const timerIsReps = phase === "reps";
   const timerIsTime = !timerIsReps && !isPrompt;
@@ -289,7 +334,21 @@ export function buildSessionVM(state) {
     // Opening instructions PAUSES the run, and closing them asks for an
     // explicit Resume — the countdown is timestamp-based, so it used to keep
     // running (and finish the exercise) while she was reading or on YouTube.
-    detailShowResume: sess.running && sess.paused,
+    detailShowResume: sess.running && sess.paused && !explore,
+
+    /* ---- explore: the same screen with nothing counting down --------------
+       One flag, read by the screen to drop the controls that only mean
+       something when a clock is running: pause, stop, the session time, the
+       end-early confirm. */
+    explore,
+    exploreBanner: explore ? "🧪 EXPLORE — just looking. Tap Next to move on. Nothing counts down and nothing is recorded." : "",
+    showClock: !explore,
+    showPause: !explore, showStop: !explore,
+    // "◀ Back a move" — only where the engine can honour it (see canGoBack).
+    canGoBack: canGoBack(),
+    canSkipExercise,
+    isFormCheck,
+    formCheckTitle: "How did that feel?",
 
     sessionDayTitle: day.title || "",
     elapsedDisplay: fmtMMSS(sess.elapsed),
@@ -311,7 +370,7 @@ export function buildSessionVM(state) {
     // Only offer the instructions when there is actually a move to describe.
     // During the lead-in there is no current exercise, so the old ⓘ button
     // rendered there and did nothing at all when tapped.
-    canOpenDetail: !!sess.currentEx && !isResting && !isPrompt,
+    canOpenDetail: !!sess.currentEx && !isResting && (!isPrompt || isFormCheck),
     stageTitle, blockBadgeVariant, blockLabel, roundLabelText,
     curExName: ex.name || "", curExDose,
     curExCue: isResting ? sess.restCue : (ex.cue || ""),
@@ -348,7 +407,7 @@ export function buildSessionVM(state) {
       ? "Were your " + sess.cleanCheckMove + " reps clean?"
       : "Were your reps clean?",
     wobblyBanner: !!sess.lastWobbly && !isResting && !isPrompt,
-    doneLabel: isResting ? "⏭ Skip Rest" : (timerIsReps ? "✓ Done — Next" : "✓ Done — Next"),
+    doneLabel: explore ? "Next move ▶" : isResting ? "⏭ Skip Rest" : isFormCheck ? "Move on →" : "✓ Done — Next",
 
     // prompts
     intentWords: INTENT_WORDS, microQ: MICRO_LOOP.q, microOpts: ["the hips", "the arms", "the knees"],
@@ -365,6 +424,11 @@ export function buildSessionVM(state) {
     // What the finish screen actually switches on — the state, split where a
     // single state hides an answer she is owed.
     completionKey,
+    // Set only where the screen should say something the static row cannot —
+    // the percentage, the skipped moves, and today's second chance.
+    completionNote,
+    donePercent, skippedCount, skippedNames,
+    finishedAResume,
     streakEarned, streakFrozen, streakShortBy,
     isComplete:   completionState === "complete",
     isPartial:    completionState === "partial",
@@ -384,7 +448,7 @@ export function buildSessionVM(state) {
     // "N of M main rounds", not a count of every block plus every round added
     // into one number and labelled "rounds". A care session trains no rounds at
     // all, so it says nothing rather than "0 of 0".
-    showRoundsLine: completionState !== "recovery",
+    showRoundsLine: completionState !== "recovery" && !explore,
     roundsLine: `${dayRoundsDone} of ${dayRoundsAsked} main round${dayRoundsAsked === 1 ? "" : "s"}`,
     /* And WHY a round did not count, in her own words, one line each. A bare
        zero next to a session she remembers finishing is the thing that sent a
@@ -404,7 +468,7 @@ export function buildSessionVM(state) {
 
        A failed save shows what to do about it instead — see the recovery block
        on the finish screen. */
-    showCompletionExtras: sessionDone && completionState !== "save-failed",
+    showCompletionExtras: sessionDone && completionState !== "save-failed" && !explore,
     moodOpts, moodAck: sess.mood ? MOOD_ACK[sess.mood] : "",
     showReflection: sessionDone && completionState !== "save-failed" && !!sess.mood,
     reflectWellOpts, reflectNextOpts,

@@ -8,7 +8,7 @@ import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overlo
 import { settings, loadSessions, loadJourney, levelFromXp, currentStreakOf, loadDayProgress, countsAsTrained, settledXpByDate, outcomeOf } from "../store.js";
 import { workoutInstances } from "../outcome.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
-import { assembleCircuits, estimateSessionSecs } from "../engine.js";
+import { assembleCircuits, estimateSessionSecs, planResume } from "../engine.js";
 
 /* Whole-plan stats for a day card.
 
@@ -53,12 +53,26 @@ export function weekStatuses() {
   // and paid half XP; it now shows a softer ✓ so the app stops contradicting
   // itself. A GO-then-quit with nothing done still reads as "catch up".
   const trained = sessions.filter(countsAsTrained);
-  // A MINI is a defined subset, never the whole day's plan — a completed mini
-  // used to tick the day off entirely and clear what was left of it.
-  // "Complete" is the one authority's answer, not the engine's loop flag.
-  const isWholeDay = s => outcomeOf(s).state === "complete" && !s.mini && s.sessionType !== "mini";
-  const doneKeys = new Set(trained.filter(isWholeDay).map(s => s.dayKey).filter(Boolean));
-  const partialKeys = new Set(trained.filter(s => !isWholeDay(s)).map(s => s.dayKey).filter(Boolean));
+  /* THE WORKOUT, NOT THE SITTING.
+
+     A day can be trained in two goes, and this strip was still asking each
+     ROW whether it was a complete day. Neither half of a day split across
+     lunch is a complete day on its own — the morning holds the move she
+     skipped, and the evening that fixes it is judged against the whole day's
+     ask while its own ledger holds only the leftovers. So a day she came back
+     and genuinely finished kept a "partly done" tick, directly under a card
+     that (correctly) told her the day counted toward her streak.
+
+     workoutInstances merges the fragments that share a workout id and keeps the
+     best proof of each planned move (see mergeLedgerRows in js/outcome.js), so
+     a move skipped in the morning and done after school reads as done — which
+     is what every other reader of the day already asks. A MINI is a defined
+     subset, never the whole day's plan, and still cannot tick a day off. */
+  const isWholeDay = w => w.outcome.state === "complete"
+    && !w.fragments.some(s => s.mini || s.sessionType === "mini");
+  const workouts = workoutInstances(trained);
+  const doneKeys = new Set(workouts.filter(isWholeDay).map(w => w.dayKey).filter(Boolean));
+  const partialKeys = new Set(workouts.filter(w => !isWholeDay(w)).map(w => w.dayKey).filter(Boolean));
   const todayIdx = WEEK_ORDER.indexOf(todayKey);
   const out = {};
   WEEK_ORDER.forEach((k, i) => {
@@ -334,10 +348,27 @@ export function buildTodayVM(state) {
     if (isSpaDay) { dayView.isRest = true; dayView.isActive = true;
       dayView.recoveryItems = (fullDay.recovery || []).slice(0, 3).map(r => ({ text: r.name + (r.dose ? " · " + r.dose : "") })); }
   } else if (status === "done") {
-    const remaining = blocks.filter(b => !b.isBlockDone).map(b => b.name);
-    // An ended-early day is never "all done", even once its per-block record has
-    // aged out (day progress only survives the calendar day it was written).
-    const allDone = !isPartial && (remaining.length === 0 || !doneBlocks.length);
+    /* WHAT IS ACTUALLY LEFT, asked of the same function the runner starts from.
+
+       This used to be "the five named blocks minus the done list", which knows
+       nothing about the light: a Red day never asks for Coordination or the
+       Finisher, so a Red day fully trained was told it had "skipped" them and
+       offered "Finish remaining moves" — which then walked her through the Body
+       Check into a start with nothing in it. planResume applies the locked
+       light and the banked moves exactly as startSession does, so this card
+       cannot offer a session the engine will refuse. */
+    const dayLight = (dayProg && (dayProg.lockedLight || dayProg.light)) || "green";
+    const owed = dayProg ? planResume(selectedKey, dayLight).circuits.filter(c => c.block !== "prep") : [];
+    const remaining = [...new Set(owed.map(c => c.name))];
+    /* The MOVES she has left, not just the blocks they live in: "Still open:
+       Warm-Up" reads like another whole session, while "Still to do: Wall
+       Slides, Dead Bug" reads like the ten minutes it actually is. Taken from
+       the circuits the resume would run, capped so the line stays a line. */
+    const owedMoves = [...new Set(owed.flatMap(c => c.exercises.map(e => e.name)))];
+    const skippedLabel = owedMoves.length && owedMoves.length <= 3 ? owedMoves.join(", ") : "";
+    // An ended-early day whose per-block record has aged out (day progress only
+    // survives the calendar day it was written) is never "all done" either.
+    const allDone = dayProg ? remaining.length === 0 : !isPartial;
     const remainingLabel = remaining.join(", ");
     // Read what the session ACTUALLY earned instead of recomputing it here.
     // This line used to carry its own copy of the XP formula (moves × 10 + 40),
@@ -385,14 +416,21 @@ export function buildTodayVM(state) {
         : isPartial ? ((streakEarned
             ? "This day counts toward your streak."
             : "Your work is saved" + (shortBy ? " — about " + shortBy + "% more of the plan earns the streak." : ", but this one didn't earn a streak day."))
-          + (doneBlocks.length && remainingLabel ? " Still open: " + remainingLabel + "." : ""))
+          /* WHAT IS LEFT, BY NAME, and only while it is still today's to
+             finish. A skipped move is never banked, so it comes back the
+             moment she does — but only for the rest of the training day (the
+             No-Debt rule, js/store.js), which is why this line is written off
+             the day's live progress record rather than off the session log. */
+          + (skippedLabel ? " Still to do: " + skippedLabel + " — finish today and it's a full day."
+             : remainingLabel ? " Still open: " + remainingLabel + " — finish today and it's a full day."
+             : (dayProg ? " Every block for today's light is done." : "")))
         : (allDone ? "Every block is checked off. Want extra reps?" : ("You skipped " + remainingLabel + " — finish up for XP.")),
       showCta: true,
       ctaLabel: isSpaDay ? "Do it again" : (allDone ? "Look at the moves" : "Finish remaining moves"),
       ctaIcon: isSpaDay ? "🧘" : (allDone ? "🧪" : "▶️"),
       ctaVariant: (isSpaDay || allDone) ? "secondary" : "primary",
-      ctaSubtext: isSpaDay ? "Doesn't change progress" : (allDone ? "Just look at the moves — nothing is recorded" : ""),
-      ctaAction: (isSpaDay || allDone) ? "goTryIt" : "goSession",
+      ctaSubtext: isSpaDay ? "Doesn't change progress" : (allDone ? "The workout screen, nothing counting down, nothing recorded" : ""),
+      ctaAction: (isSpaDay || allDone) ? "goExplore" : "goSession",
       showSettings: false
     };
   } else if (status === "missed") {
@@ -435,6 +473,9 @@ export function buildTodayVM(state) {
   }
 
   dayView.showBackToToday = selectedKey !== todayKey;
+  // Why the last GO did not open a session, if it did not. Cleared by the next
+  // GO / Explore / day change (see js/main.js).
+  dayView.startNote = state.startNote || "";
 
   /* ---- try-it control ------------------------------------------------------
      This used to be a bare underlined text link, ~16px tall, in the bottom-right
@@ -448,7 +489,7 @@ export function buildTodayVM(state) {
      move list until something disarmed it again. Arming a mode to read an
      instruction is a lot of machinery for "what does this one look like?", and
      while it was armed the real GO button was not where she left it. */
-  dayView.showTryIt = canLaunch;
+  dayView.showExplore = canLaunch;
   if (dayView.isActive && !dayView.ctaSubtext) dayView.ctaSubtext = (dayView.movesLabel || "") + " · about " + (dayView.mins || "?") + " min · that’s the whole thing — no surprises.";
   dayView.showBlocksList = !!(dayView.isActive || dayView.isDone || dayView.isPreview || dayView.isMissed) && !isSpaDay;
   dayView.blocksHint = dayView.isDone ? "REVIEW WHAT YOU DID 👀" : dayView.isPreview ? "PEEK AT WHAT'S COMING 👀" : dayView.isMissed ? "READY WHEN YOU ARE — PEEK INSIDE 👀" : "TAP A BLOCK TO PEEK INSIDE 👀";
@@ -460,7 +501,7 @@ export function buildTodayVM(state) {
   const coachIconBtnStyle = "width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;flex-shrink:0;font-size:15px;display:flex;align-items:center;justify-content:center;"
     + (settings.coachVoiceOn ? "background:#fff;color:var(--aqua-deep);" : "background:rgba(255,255,255,0.18);color:#fff;");
   const practiceLinkLabel = "🧪 Explore the moves";
-  const practiceHintLine = "Instructions and videos — no timer, nothing recorded.";
+  const practiceHintLine = "The workout screen at your own pace — nothing counts down, nothing is recorded.";
   const practiceBtnStyle = "width:100%;min-height:48px;display:flex;align-items:center;justify-content:center;gap:9px;border-radius:var(--radius-pill);cursor:pointer;font-family:inherit;font-weight:900;font-size:14px;padding:0 18px;"
     + "background:rgba(255,255,255,0.14);color:#fff;border:2px solid rgba(255,255,255,0.45);";
 

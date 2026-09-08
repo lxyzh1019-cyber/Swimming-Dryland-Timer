@@ -121,6 +121,7 @@ const passkey = await import(base + "passkey.js");
 const main   = await import(base + "main.js");
 const rvm    = await import(base + "vm/readiness.js");
 const data   = await import(base + "data.js");
+const tvm    = await import(base + "vm/today.js");
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
@@ -155,31 +156,54 @@ localStorage.clear(); store.migrate();
 await unlockGrownup();
 gate.lockGate(); resetGateState();
 
-/* Straight to the list, with no grown-up and nothing to arm first. Reading an
+/* Straight into explore, with no grown-up and nothing to arm first. Reading an
    instruction was never something a child should need an adult to unlock. */
-main.actions.goTryIt("monday");
+main.actions.goExplore("monday");
 ok(main.state.gateAsk === null, "a child can look at the moves on her own");
-ok(main.state.tryIt === "monday", "the move list opens on the day she asked for");
+ok(main.state.inSession === true && engine.sess.explore === true, "explore opens the workout screen for the day she asked for");
 ok(main.state.readiness === null, "with no Body Check in the way");
+ok(engine.sess.running === true && engine.sess.dayKey === "monday", "and the engine is walking that day's moves");
 
-main.actions.exitTryIt();
-ok(main.state.tryIt === null, "closing it closes it");
+main.actions.goBack();
+ok(main.state.gateAsk === null, "Back is hers too");
+main.actions.exitExplore();
+ok(main.state.inSession === false && engine.sess.running === false, "Done looking closes it");
+ok(main.state.selectedDay === "monday", "and leaves her on the day she was looking at");
 
 /* ...and closing it leaves nothing behind. The old arm flag survived the close,
    so every later GO reopened Try-It and she could not reach a real session
    without finding the toggle again. */
 main.actions.goSession("monday");
 ok(main.state.readiness !== null, "the next GO opens Body Check");
-ok(main.state.tryIt === null, "not the move list again");
+ok(main.state.inSession === false, "not explore again");
 ok(store.loadSessions().length === 0, "and looking at the moves wrote no session record at all");
 ok(main.actionNames().includes("togglePractice") === false, "there is no mode left to toggle");
+
+/* A DAY WITH NOTHING LEFT NEVER OPENS A DEAD SCREEN. A Red day fully trained
+   used to be offered "Finish remaining moves" for blocks Red never asked for;
+   the engine then assembled nothing and went quiet, and the app sat on a
+   session screen with a clock at zero and buttons wired to nothing. */
+main.state.readiness = null;
+localStorage.clear(); store.migrate();
+store.saveDayProgress("monday", { done: ["warmup", "main", "swimskill"], mainRoundsCompleted: 1,
+                                  lockedLight: "red", light: "red", moves: {}, bankedCredit: 12 });
+const doneCard = tvm.buildTodayVM({ selectedDay: "monday", expanded: {}, isWide: true }).dayView;
+ok(doneCard.ctaAction !== "goSession" || !/Finish remaining/.test(doneCard.ctaLabel),
+   "the Today card does not offer to finish moves the light never asked for");
+main.actions.goSession("monday");
+["q_sleep", "q_light", "q_ready", "q_pain"].forEach(q => main.actions.rAnswer(q + "|yes"));
+main.actions.rResultCta("continue");
+ok(main.state.inSession === false, "a GO with nothing to run steps back out instead of showing a dead session screen");
+ok(engine.sess.running === false, "with no runner pretending otherwise");
+ok(/nothing left|already done/i.test(main.state.startNote), "and says why");
+localStorage.clear(); store.migrate();
 
 /* Mini is gone as a thing that can be started, so there is no second door into
    a session that skips the arming rules — or into a shortened workout at all. */
 ok(main.actionNames().includes("startMini") === false, "there is no startMini action left");
 main.state.readiness = null;
 main.actions.startMini("monday");
-ok(main.state.readiness === null && main.state.tryIt === null,
+ok(main.state.readiness === null && main.state.inSession === false,
    "and dispatching the retired name does nothing at all");
 
 /* ---- C. closing the instructions is not resuming the workout ----------- */

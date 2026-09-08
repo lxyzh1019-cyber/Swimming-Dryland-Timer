@@ -90,13 +90,18 @@ const rowOf = label => pv.periodStats.rows.find(r => r.label === label);
 same(rowOf("XP earned").total, "360", "Progress reports the settled XP, not the sum of the stamps");
 same(rowOf("Main rounds").total, "3 of 3", "and all three main rounds");
 same(rowOf("Completion status").total, "1 of 1", "and one workout, finished");
-same(rowOf("Time").total, "30m", "minutes still add across the sittings — they are additive facts");
+/* Derived from the two fragments, not written down as a constant: the point is
+   that the minutes ADD, and pinning the sum meant any change to rest lengths
+   (setup time for band and pull-up moves, say) failed this as if the additivity
+   had broken. */
+const bothMins = Math.round((frag1.durationSecs + frag2.durationSecs) / 60);
+same(rowOf("Time").total, bothMins + "m", "minutes still add across the sittings — they are additive facts");
 
 const gv = gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics" });
 const indOf = label => gv.analytics.indicators.find(r => r.label === label);
 same(indOf("Completed").total, "1 of 1", "the Grown-up board counts the workout, not the sittings");
 same(indOf("XP earned").total, "360", "and the settled XP");
-same(gv.analytics.avgMins, 30, "the average duration is the workout's, not half of it");
+same(gv.analytics.avgMins, bothMins, "the average duration is the workout's, not half of it");
 
 /* THE INVARIANT ITSELF: no two screens may disagree about this day. */
 const xpEverywhere = [

@@ -14,7 +14,10 @@ the **Splash — Kids Swim Training** design system.
   recovery)
 - **Session** — guided timer with a real speech coach (cues, counts, tempo
   reps), portrait form-photo slots, STOP rule overlay, clean/wobbly checks,
+  "◀ Back a move" (redo the previous move; not across a counted round),
   mood + reflection on the complete screen
+- **Explore the moves** — the same session screen with nothing counting
+  down: every move once, advanced by tap, no Body Check, nothing recorded
 - **Progress** — streaks, prize wallet, milestones, training log, Ocean Story
 - **Grown-up Zone** — Overview, Analytics (incl. ACWR + CSV export), Coaching
   (valgus gate, Independence Ladder, PR board, engagement systems), Move
@@ -27,13 +30,24 @@ the **Splash — Kids Swim Training** design system.
 - **Training** is the open-ended way up: a session pays a flat rate for the
   rounds actually trained — **0 rounds 90 (showing up), 1 round 180, 2 rounds
   270, 3 rounds 360**, and nothing for Sunday's spa day or a session stopped for
-  pain. A session ended early is not halved: it is paid for the rounds it
+  pain. A round that falls short is **paid the fraction of it she actually did**
+  rather than nothing: one skipped move in an eight-move round costs about 11 XP,
+  not the whole 90. A round that counts still pays in full, so nothing she earned
+  before got smaller — and whether a round *counts* is unchanged, it is only the
+  price that stopped being all-or-nothing. Records written before this rule keep
+  the value they were awarded (outcome version 5). A session ended early is not halved: it is paid for the rounds it
   finished, which is what "half for one ended early" used to approximate badly.
   An easy day is worth half a full one, and the number no longer wobbles with
   the move count of that weekday. Sessions logged before this rule keep the
   value they were awarded.
 - **A day pays for a day.** The ceiling is the day's, not the sitting's, so a
-  green day trained in two goes pays 360 in total rather than 360 twice. Since
+  green day trained in two goes pays 360 in total rather than 360 twice. A move
+  she skipped is never banked, so it is offered again the same day: come back
+  before the day is out, finish what is left, and the day reads **complete**
+  everywhere — the week strip, the day card, the streak and the day's XP all ask
+  the merged workout rather than each sitting. That window is the training day
+  only (plus a 6-hour grace past midnight for a session that crossed it): a
+  partial never carries into a new day, which is the No-Debt rule. Since
   two devices offline at once cannot see each other's budget, the total is
   settled per calendar date when the log is rebuilt — and a prize draw waits
   while a device is offline with a mirror it has previously reached, because

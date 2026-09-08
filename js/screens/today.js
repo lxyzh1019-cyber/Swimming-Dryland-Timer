@@ -236,9 +236,10 @@ function dayPane(vm, wide) {
         <span style="font-size:22px;">${dv.ctaIcon}</span> ${dv.ctaLabel}
       </button>
       ${dv.ctaSubtext ? `<div style="text-align:center;font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.8;padding-top:8px;">${dv.ctaSubtext}</div>` : ""}` : ""}
-    ${dv.showTryIt ? `
+    ${dv.startNote ? `<div role="status" style="margin-bottom:10px;background:rgba(255,255,255,0.18);border:2px solid rgba(255,255,255,0.55);border-radius:var(--radius-lg);padding:10px 14px;font-size:13px;font-weight:800;line-height:1.4;">ℹ️ ${dv.startNote}</div>` : ""}
+    ${dv.showExplore ? `
       <div style="padding-top:${wide ? 10 : 8}px;">
-        <button type="button" data-action="goTryIt" data-arg="${vm.selectedKey}" style="${vm.practiceBtnStyle}">
+        <button type="button" data-action="goExplore" data-arg="${vm.selectedKey}" style="${vm.practiceBtnStyle}">
           ${vm.practiceLinkLabel}
         </button>
         <div style="text-align:center;font-size:12px;font-weight:700;opacity:0.8;padding-top:6px;">${vm.practiceHintLine}</div>

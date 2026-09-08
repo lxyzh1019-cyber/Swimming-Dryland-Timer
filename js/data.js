@@ -462,6 +462,9 @@ export function X(o) {
     parentEcho: !!o.parentEcho,           // anti-extension breath gate
     searchableName: o.searchableName || o.name,
     demoUrl: o.demoUrl || null,
+    /* Needs gear fetched or rigged before the clock starts — see needsSetup.
+       Set explicitly only where the NAME does not already say so. */
+    setup: o.setup === true,
     rest: o.rest != null ? o.rest : 5
   };
   if (driver === "reps") {
@@ -542,7 +545,7 @@ const FINISHER = () => [
 ];
 
 const SWIMSKILL_A = () => [
-  X({ name: "Chair High-Elbow Catch", block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
+  X({ name: "Chair High-Elbow Catch", setup: true, block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
       cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm. [free/back/fly]",
       swimTransfer: "High-elbow catch", searchableName: "high elbow catch drill chair" }),
   X({ name: "Towel-Band Catch Pull", block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
@@ -559,7 +562,7 @@ const SWIMSKILL_A = () => [
       swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
 ];
 const SWIMSKILL_B = () => [
-  X({ name: "Chair High-Elbow Catch", block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
+  X({ name: "Chair High-Elbow Catch", setup: true, block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
       cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm. [free/back/fly]",
       swimTransfer: "High-elbow catch", searchableName: "high elbow catch drill chair" }),
   X({ name: "Forearm Plank Dolphin Undulation", block: "swimskill", driver: "reps", repsDetail: "~24", dose: "~24",
@@ -573,7 +576,7 @@ const SWIMSKILL_B = () => [
       swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
 ];
 const SWIMSKILL_SAT = () => [
-  X({ name: "Chair High-Elbow Catch", block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
+  X({ name: "Chair High-Elbow Catch", setup: true, block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
       cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm. [free/back/fly]",
       swimTransfer: "High-elbow catch", searchableName: "high elbow catch drill chair" }),
   X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
@@ -680,7 +683,7 @@ export const DAYS = {
             reset: "Flat back.", cue: "Flat back, no hip rotation.",
             parentWatch: "Hips rotate", fix: "Slow down, reduce reach.",
             swimTransfer: "Posterior body line" }),
-        X({ name: "Hip Hinge", block: "main", driver: "reps", repsDetail: "8 · 2-1-2", dose: "8 · 2-1-2 (dowel)",
+        X({ name: "Hip Hinge", setup: true, block: "main", driver: "reps", repsDetail: "8 · 2-1-2", dose: "8 · 2-1-2 (dowel)",
             reset: "Hips load back.", cue: "Hips load back, dowel touches 3 points.",
             parentWatch: "Rounding the back", fix: "Hinge from the hip, flat back.",
             swimTransfer: "Hip drive for the start" }),
@@ -693,7 +696,7 @@ export const DAYS = {
       swimskill: SWIMSKILL_B()
     },
     prepMenu: [
-      X({ name: "Pallof Press", block: "main", driver: "reps", repsDetail: "10/side · 2s hold", dose: "10/side · 2s hold",
+      X({ name: "Pallof Press", setup: true, block: "main", driver: "reps", repsDetail: "10/side · 2s hold", dose: "10/side · 2s hold",
           cue: "Press out, hold, hips square — resist the twist.",
           parentWatch: "Body rotates on the press", fix: "Lower tension, hips square.",
           swimTransfer: "Anti-rotation / less roll" }),
@@ -820,7 +823,7 @@ export const DAYS = {
           cue: "Elbow pinned to the side, rotate slow.",
           parentWatch: "Elbow drifts off the ribs", fix: "Pin the elbow, slow down.",
           swimTransfer: "Shoulder durability" }),
-      X({ name: "Side-Lying ER", block: "main", driver: "reps", repsDetail: "10/side", dose: "10/side",
+      X({ name: "Side-Lying ER", setup: true, block: "main", driver: "reps", repsDetail: "10/side", dose: "10/side",
           cue: "Second cuff angle — light, slow.",
           parentWatch: "Rushing / too heavy", fix: "Lighter, slower.",
           swimTransfer: "Shoulder durability" })
@@ -866,7 +869,7 @@ export const DAYS = {
             reset: "Flat back.", cue: "Flat back, no hip rotation.",
             parentWatch: "Hips rotate", fix: "Slow down, reduce reach.",
             swimTransfer: "Posterior body line" }),
-        X({ name: "Hip Hinge", block: "main", driver: "reps", repsDetail: "8 · 2-1-2", dose: "8 · 2-1-2 (dowel)",
+        X({ name: "Hip Hinge", setup: true, block: "main", driver: "reps", repsDetail: "8 · 2-1-2", dose: "8 · 2-1-2 (dowel)",
             reset: "Hips load back.", cue: "Hips load back, dowel touches 3 points.",
             parentWatch: "Rounding the back", fix: "Hinge from the hip, flat back.",
             swimTransfer: "Hip drive for the start" }),
@@ -879,7 +882,7 @@ export const DAYS = {
       swimskill: SWIMSKILL_A()
     },
     prepMenu: [
-      X({ name: "Pallof Press", block: "main", driver: "reps", repsDetail: "10/side · 2s hold", dose: "10/side · 2s hold",
+      X({ name: "Pallof Press", setup: true, block: "main", driver: "reps", repsDetail: "10/side · 2s hold", dose: "10/side · 2s hold",
           cue: "Resist the twist, hips square.",
           parentWatch: "Body rotates on the press", fix: "Lower tension, hips square.",
           swimTransfer: "Anti-rotation / less roll" }),
@@ -951,11 +954,11 @@ export const DAYS = {
       swimskill: SWIMSKILL_SAT()
     },
     prepMenu: [
-      X({ name: "Partner Ball Toss", block: "main", driver: "reps", repsDetail: "2×8", dose: "2×8",
+      X({ name: "Partner Ball Toss", setup: true, block: "main", driver: "reps", repsDetail: "2×8", dose: "2×8",
           cue: "Throw from the hips and core, not just arms.",
           parentWatch: "All arms, no hip", fix: "Load the hip, then throw.",
           swimTransfer: "Rotation production" }),
-      X({ name: "Half-Kneeling Chop/Lift", block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side",
+      X({ name: "Half-Kneeling Chop/Lift", setup: true, block: "main", driver: "reps", repsDetail: "8/side", dose: "8/side",
           cue: "Rotate through the hip, controlled.",
           parentWatch: "Twisting from the low back", fix: "Rotate through the hip, slow.",
           swimTransfer: "Cleaner stroke roll" })
@@ -1034,6 +1037,26 @@ export const BLOCK_META = {
   swimskill:    { emoji: "🏊", color: "var(--aqua)",   wash: "var(--aqua-wash)",   ink: "var(--aqua-ink)" },
   recovery:     { emoji: "🧊", color: "var(--grape)",  wash: "var(--grape-wash)",  ink: "var(--grape-ink)" }
 };
+
+/* ---- moves that need setting up ------------------------------------------
+   A band has to be anchored, a bar walked to, a rope untangled. Those moves
+   used to start on the same five-second rest as a floor move, so the clock was
+   already running while she was still rigging the band — the timer punishing
+   the one part of the session she cannot rush.
+
+   Recognised two ways on purpose. An explicit `setup: true` marks the moves
+   whose names say nothing about their gear (Pallof Press is a band move; Hip
+   Hinge wants a dowel), and a name test catches everything that announces
+   itself — including the band move somebody adds next year without knowing
+   this list exists. HARD_EXERCISES in js/engine.js is a hand-kept list of
+   names and it went stale exactly that way. */
+export const SETUP_SECONDS = 5;
+const SETUP_NAME = /\bband\b|pull-?up|dead hang|jump rope|roller|massage gun/i;
+export function needsSetup(ex) {
+  if (!ex) return false;
+  if (ex.setup === true) return true;
+  return SETUP_NAME.test(String(ex.name || ""));
+}
 
 export const MIN_REST = 3;
 /* Re-exported from util so the constant has exactly one definition. */
