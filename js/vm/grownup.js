@@ -209,11 +209,14 @@ export function buildGrownupVM(state) {
   // A day is only coloured in if something was actually trained on it. A GO
   // followed immediately by a stop — or a run where every move was skipped —
   // used to paint the day as a partial training day.
+  /* Asked of the WORKOUT, not of each sitting: a day trained in two goes is one
+     day, and judging its halves separately painted a day she came back and
+     finished as merely partial. Same reading as the week strip and the streak. */
   const byIso = {};
-  all.forEach(s => {
-    if (!countsAsTrainedLocal(s)) return;
-    const k = edmontonISO(s.isoDate);
-    const st = (outcomeOf(s).state === "complete" && !s.mini && s.sessionType !== "mini") ? "done" : "partial";
+  workoutInstances(all.filter(countsAsTrainedLocal)).forEach(w => {
+    const k = w.date || edmontonISO(w.isoDate);
+    const st = (w.outcome.state === "complete"
+      && !w.fragments.some(s => s.mini || s.sessionType === "mini")) ? "done" : "partial";
     if (byIso[k] !== "done") byIso[k] = st;
   });
   let consistency;

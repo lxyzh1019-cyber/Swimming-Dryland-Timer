@@ -53,12 +53,26 @@ export function weekStatuses() {
   // and paid half XP; it now shows a softer ✓ so the app stops contradicting
   // itself. A GO-then-quit with nothing done still reads as "catch up".
   const trained = sessions.filter(countsAsTrained);
-  // A MINI is a defined subset, never the whole day's plan — a completed mini
-  // used to tick the day off entirely and clear what was left of it.
-  // "Complete" is the one authority's answer, not the engine's loop flag.
-  const isWholeDay = s => outcomeOf(s).state === "complete" && !s.mini && s.sessionType !== "mini";
-  const doneKeys = new Set(trained.filter(isWholeDay).map(s => s.dayKey).filter(Boolean));
-  const partialKeys = new Set(trained.filter(s => !isWholeDay(s)).map(s => s.dayKey).filter(Boolean));
+  /* THE WORKOUT, NOT THE SITTING.
+
+     A day can be trained in two goes, and this strip was still asking each
+     ROW whether it was a complete day. Neither half of a day split across
+     lunch is a complete day on its own — the morning holds the move she
+     skipped, and the evening that fixes it is judged against the whole day's
+     ask while its own ledger holds only the leftovers. So a day she came back
+     and genuinely finished kept a "partly done" tick, directly under a card
+     that (correctly) told her the day counted toward her streak.
+
+     workoutInstances merges the fragments that share a workout id and keeps the
+     best proof of each planned move (see mergeLedgerRows in js/outcome.js), so
+     a move skipped in the morning and done after school reads as done — which
+     is what every other reader of the day already asks. A MINI is a defined
+     subset, never the whole day's plan, and still cannot tick a day off. */
+  const isWholeDay = w => w.outcome.state === "complete"
+    && !w.fragments.some(s => s.mini || s.sessionType === "mini");
+  const workouts = workoutInstances(trained);
+  const doneKeys = new Set(workouts.filter(isWholeDay).map(w => w.dayKey).filter(Boolean));
+  const partialKeys = new Set(workouts.filter(w => !isWholeDay(w)).map(w => w.dayKey).filter(Boolean));
   const todayIdx = WEEK_ORDER.indexOf(todayKey);
   const out = {};
   WEEK_ORDER.forEach((k, i) => {
@@ -346,6 +360,12 @@ export function buildTodayVM(state) {
     const dayLight = (dayProg && (dayProg.lockedLight || dayProg.light)) || "green";
     const owed = dayProg ? planResume(selectedKey, dayLight).circuits.filter(c => c.block !== "prep") : [];
     const remaining = [...new Set(owed.map(c => c.name))];
+    /* The MOVES she has left, not just the blocks they live in: "Still open:
+       Warm-Up" reads like another whole session, while "Still to do: Wall
+       Slides, Dead Bug" reads like the ten minutes it actually is. Taken from
+       the circuits the resume would run, capped so the line stays a line. */
+    const owedMoves = [...new Set(owed.flatMap(c => c.exercises.map(e => e.name)))];
+    const skippedLabel = owedMoves.length && owedMoves.length <= 3 ? owedMoves.join(", ") : "";
     // An ended-early day whose per-block record has aged out (day progress only
     // survives the calendar day it was written) is never "all done" either.
     const allDone = dayProg ? remaining.length === 0 : !isPartial;
@@ -396,7 +416,14 @@ export function buildTodayVM(state) {
         : isPartial ? ((streakEarned
             ? "This day counts toward your streak."
             : "Your work is saved" + (shortBy ? " — about " + shortBy + "% more of the plan earns the streak." : ", but this one didn't earn a streak day."))
-          + (remainingLabel ? " Still open: " + remainingLabel + "." : (dayProg ? " Every block for today's light is done." : "")))
+          /* WHAT IS LEFT, BY NAME, and only while it is still today's to
+             finish. A skipped move is never banked, so it comes back the
+             moment she does — but only for the rest of the training day (the
+             No-Debt rule, js/store.js), which is why this line is written off
+             the day's live progress record rather than off the session log. */
+          + (skippedLabel ? " Still to do: " + skippedLabel + " — finish today and it's a full day."
+             : remainingLabel ? " Still open: " + remainingLabel + " — finish today and it's a full day."
+             : (dayProg ? " Every block for today's light is done." : "")))
         : (allDone ? "Every block is checked off. Want extra reps?" : ("You skipped " + remainingLabel + " — finish up for XP.")),
       showCta: true,
       ctaLabel: isSpaDay ? "Do it again" : (allDone ? "Look at the moves" : "Finish remaining moves"),

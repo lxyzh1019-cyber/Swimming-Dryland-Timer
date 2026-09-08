@@ -11,6 +11,7 @@
 import { deriveSessionOutcome, mainRoundsFromLedger, mainRoundReport, OUTCOME_VERSION } from "./outcome.js";
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA,
          exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
+         needsSetup, SETUP_SECONDS,
          VALGUS_FLOOR, VALGUS_PROGRESSIONS } from "./data.js";
 import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent,
          loadDayProgress, saveDayProgress, clearDayProgress, gateLocked, creditValgusWeek, addSkipRecord,
@@ -27,6 +28,14 @@ const HARD_EXERCISES = new Set([
   "Box Jump", "Box Jump-Down", "Bosu Squat", "Drop-and-Stick",
   "Clean Pull-Ups", "Scap Pull-Up + Dead Hang"
 ]);
+
+/* Seconds added to the break BEFORE a move that has to be set up — a band
+   anchored, a bar reached, a rope untangled. See needsSetup in js/data.js.
+   Applied to every break that precedes the move (the opening lead-in, the rest
+   between exercises, the round break and the block break) so she gets the same
+   time to get ready wherever in the workout it falls, and counted in
+   estimateSessionSecs so the day's "about N min" stays honest. */
+function setupSecs(ex) { return needsSetup(ex) ? SETUP_SECONDS : 0; }
 
 /* ---- session view-state (the single source the UI renders from) ---- */
 export const sess = blankSession();
@@ -361,6 +370,9 @@ export function estimateSessionSecs(circuits) {
       c.exercises.forEach(ex => {
         if (ex.rounds && r > ex.rounds) return;
         exInRound++;
+        // Every setup move is preceded by some break, and the runner lengthens
+        // that break by exactly this much — see setupSecs.
+        total += setupSecs(ex);
         if (ex.byReps) {
           // Straight from the prescription: every rep of every segment, plus a
           // reset between segments. The old guess re-derived reps from the
@@ -1383,8 +1395,11 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
   startElapsed();
 
   setPhase("getready");
-  await speakAndWait("Five seconds to the first block.");
-  const rGo = await countdown(5);
+  const firstLead = 5 + setupSecs(circuits[0].exercises[0]);
+  await speakAndWait(firstLead > 5
+    ? `${firstLead} seconds to the first block — grab what you need for ${firstEx}.`
+    : "Five seconds to the first block.");
+  const rGo = await countdown(firstLead);
   if (rGo === "abort") return finalize(false);
 
   let preAnnounced = false;
@@ -1530,7 +1545,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
         if (wentBack()) { back(); continue; }
         if (voiceOn()) speakIfIdle("Did that feel different from the first round? Just ask yourself.");
         const leadTime = upcomingEx && HARD_EXERCISES.has(upcomingEx.name) ? 8 : 5;
-        const result = await countdown(configuredRoundRest(), {
+        const result = await countdown(configuredRoundRest() + setupSecs(upcomingEx), {
           onTick: (rem) => {
             if (rem === leadTime && upcomingEx) {
               speakIfIdle("Get ready for " + upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : ""));
@@ -1548,7 +1563,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
         await speakAndWait(`Block done! Next up: ${circuits[ci + 1].name}.`);
         if (sess.abort) return finalize(false);
         if (wentBack()) { back(); continue; }
-        const result = await countdown(configuredSectionRest(), {
+        const result = await countdown(configuredSectionRest() + setupSecs(upcomingEx), {
           onTick: (rem) => {
             if (rem === 4 && upcomingEx) {
               speakIfIdle("Get ready for " + upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : ""));
@@ -1561,11 +1576,17 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
         let restDuration = configuredExerciseRest();
         if (sess.justSkipped) restDuration = Math.max(restDuration, 4);
         sess.justSkipped = false;
+        // The gear comes out of the rest, not out of her working time.
+        const setup = setupSecs(upcomingEx);
+        restDuration += setup;
         playCue("rest");
-        sess.restCue = upcomingEx && upcomingEx.reset ? `Next: ${upcomingEx.reset}` : "Breathe and reset.";
+        sess.restCue = setup && upcomingEx ? `Get set up: ${upcomingEx.name}`
+          : upcomingEx && upcomingEx.reset ? `Next: ${upcomingEx.reset}` : "Breathe and reset.";
         setPhase("rest");
         const nextName = upcomingEx ? upcomingEx.name : "";
-        if (voiceOn()) await speakAndWait(nextName ? `Rest. Next: ${nextName}.` : "Rest.");
+        if (voiceOn()) await speakAndWait(nextName
+          ? (setup ? `Rest. Next: ${nextName} — get it set up.` : `Rest. Next: ${nextName}.`)
+          : "Rest.");
         if (sess.abort) return finalize(false);
         if (wentBack()) { back(); continue; }
         let said = {};

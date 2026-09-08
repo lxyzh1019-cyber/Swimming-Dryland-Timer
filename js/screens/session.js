@@ -245,11 +245,19 @@ const COMPLETION = {
 
 function completeScreen(vm) {
   const c = COMPLETION[vm.completionKey] || COMPLETION[vm.completionState] || COMPLETION.none;
+  // The note the VM built for this particular day — the percentage she reached,
+  // what got skipped and today's second chance — in place of the fixed sentence
+  // the row carries. The row's own words are the fallback, for a record with no
+  // expected size to measure against.
+  const note = vm.completionNote || c.note;
+  // Coming back to finish a day is harder than doing it in one go, and the
+  // screen should say which one just happened.
+  const title = vm.finishedAResume ? "You came back and finished it! 🎉" : c.title;
   return `
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:16px;padding:40px;text-align:center;background:${c.bg};overflow-y:auto;">
     <img src="assets/poses/${c.pose}.png" alt="" style="height:${c.poseH}px;object-fit:contain;flex-shrink:0;">
-    <div style="font-family:var(--font-display);font-weight:600;font-size:34px;color:${c.ink};">${c.title}</div>
-    ${c.note ? `<div${c.alert ? ` role="alert"` : ""} style="font-size:15px;font-weight:800;${c.noteStyle}border-radius:16px;padding:10px 16px;max-width:480px;line-height:1.45;">${c.note}</div>` : ""}
+    <div style="font-family:var(--font-display);font-weight:600;font-size:34px;color:${c.ink};">${title}</div>
+    ${note ? `<div${c.alert ? ` role="alert"` : ""} style="font-size:15px;font-weight:800;${c.noteStyle || "color:var(--mint-ink);background:var(--mint-wash);"}border-radius:16px;padding:10px 16px;max-width:480px;line-height:1.45;">${note}</div>` : ""}
     ${vm.sessionMantra && c.mantra ? `<div style="font-family:var(--font-hand);font-size:26px;font-weight:700;color:var(--aqua-ink);line-height:1.2;">${vm.sessionMantra}</div>` : ""}
     <div style="font-size:16px;font-weight:700;color:var(--ink-soft);">${vm.sessionDayTitle}${vm.explore ? "" : ` · ${vm.sessionMinutes} min`}${vm.showRoundsLine ? ` · ${vm.roundsLine}` : ""}${vm.xpEarned ? ` · ⭐ +${vm.xpEarned} XP` : ""}</div>
     ${vm.showRoundsLine && (vm.roundShortNotes || []).length ? `

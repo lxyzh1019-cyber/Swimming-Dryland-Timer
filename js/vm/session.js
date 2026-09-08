@@ -5,7 +5,7 @@
 
 import { sess, refTime, screenRepsDetail, pausedByBackground, canGoBack } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork, videoSearchUrl } from "../data.js";
-import { fmtMMSS, exercisePhotoUrl } from "../util.js";
+import { fmtMMSS, exercisePhotoUrl, plural } from "../util.js";
 import { loadSessions } from "../store.js";
 import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION } from "../outcome.js";
 
@@ -132,6 +132,43 @@ export function buildSessionVM(state) {
     : completionState;
   const roundsDone = Math.max(0, Number(liveOutcome.mainRoundsDone) || 0);
 
+  /* HOW FAR SHE GOT, AND WHAT IS LEFT — in numbers, on the screen.
+
+     Every partial day got one fixed sentence. The two numbers a kid actually
+     wants ("how close was I?" and "what did I miss?") were computed for the
+     streak and shown to nobody, so "part of the way" covered both a day three
+     moves short and a day half done. */
+  const donePercent = Number.isFinite(ratio)
+    ? Math.max(0, Math.min(100, Math.round(ratio * 100))) : null;
+  const skippedRows = (sess.ledger || []).filter(l => l && l.status === "skipped");
+  const skippedCount = skippedRows.length;
+  const skippedNames = [...new Set(skippedRows.map(l => l.name).filter(Boolean))];
+  const skippedPhrase = skippedCount
+    ? (skippedNames.length && skippedNames.length <= 3
+        ? plural(skippedCount, "move") + " got skipped (" + skippedNames.join(", ") + ")"
+        : plural(skippedCount, "move") + " got skipped")
+    : "";
+  /* THE SECOND CHANCE, SAID OUT LOUD AND ONLY WHILE IT IS TRUE.
+
+     A skipped move is never banked (see bankMove in js/engine.js), so it is
+     offered again the moment she comes back — for the rest of today. That has
+     always worked and was never mentioned anywhere, so the one thing she could
+     do about a short day was the one thing the screen never told her. It is
+     today's offer only: a partial does not carry into a new training day (the
+     No-Debt rule, js/store.js), and promising otherwise would be a promise the
+     next morning breaks. */
+  const comeBackLine = "Everything you did is saved, so you can come back later today and finish the rest — that would make it a full day.";
+  const partialNote = donePercent === null ? null
+    : streakEarned
+      ? `You got ${donePercent}% of today done${skippedPhrase ? ", and " + skippedPhrase : ""}. Your streak keeps going — today counts. 🔥 ` + comeBackLine
+      : `You got ${donePercent}% of today done${skippedPhrase ? ", and " + skippedPhrase : ""}. Everything you DID do is saved — the moves, the minutes and the XP for them. Today didn't reach the streak${Number.isFinite(streakShortBy) && streakShortBy > 0 ? ` — about ${plural(streakShortBy, "more move")} would do it` : ""}. Come back later today and finish the rest; it still counts for today. 💛`;
+  const completionNote = completionState === "partial" ? partialNote : null;
+
+  /* A DAY SHE CAME BACK AND FINISHED reads differently from one done in a
+     single go, and should: coming back is the harder thing. bankedCredit is
+     only ever above zero on a resumed sitting. */
+  const finishedAResume = completionState === "complete" && (Number(sess.bankedCredit) || 0) > 0;
+
   /* THE DAY'S ROUNDS, not this sitting's.
 
      A day can be trained in two goes, and this line was the only thing on the
@@ -156,15 +193,15 @@ export function buildSessionVM(state) {
   const roundShortNotes = (liveOutcome.roundReport || [])
     .filter(r => !r.counts)
     .map(r => {
-      if (r.skipped.length) return `Round ${r.round} didn't count — ${r.skipped[0]} got skipped.`;
-      if (r.missing > 0)    return `Round ${r.round} didn't count — you stopped partway through it.`;
+      if (r.skipped.length) return `Round ${r.round} wasn't a full round — ${r.skipped[0]} got skipped.`;
+      if (r.missing > 0)    return `Round ${r.round} wasn't a full round — you stopped partway through it.`;
       const b = r.blockedBy;
       if (!b || !Number.isFinite(Number(b.planned)) || Number(b.planned) <= 0)
-        return `Round ${r.round} didn't count — it was a bit short.`;
+        return `Round ${r.round} wasn't a full round — it was a bit short.`;
       const got = Math.round(Number(b.got) || 0), planned = Math.round(Number(b.planned));
       return b.driver === "reps"
-        ? `Round ${r.round} didn't count — ${b.name} was ${got} of ${planned} reps.`
-        : `Round ${r.round} didn't count — ${b.name} was ${got}s of ${planned}s.`;
+        ? `Round ${r.round} wasn't a full round — ${b.name} was ${got} of ${planned} reps.`
+        : `Round ${r.round} wasn't a full round — ${b.name} was ${got}s of ${planned}s.`;
     });
 
   const isResting = phase === "rest" || phase === "roundRest" || phase === "sectionRest";
@@ -387,6 +424,11 @@ export function buildSessionVM(state) {
     // What the finish screen actually switches on — the state, split where a
     // single state hides an answer she is owed.
     completionKey,
+    // Set only where the screen should say something the static row cannot —
+    // the percentage, the skipped moves, and today's second chance.
+    completionNote,
+    donePercent, skippedCount, skippedNames,
+    finishedAResume,
     streakEarned, streakFrozen, streakShortBy,
     isComplete:   completionState === "complete",
     isPartial:    completionState === "partial",

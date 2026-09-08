@@ -3330,7 +3330,7 @@ const shortVm = svm.buildSessionVM({ inSession: true, isWide: true, detailOverla
 ok(shortMove, "a main move in round two really was cut short (" + shortMove + ")");
 ok(shortVm.roundsLine === "2 of 3 main rounds",
    "the other two rounds still count — one short move costs its own round, not the session");
-ok(shortVm.roundShortNotes.length === 1 && /^Round 2 didn't count/.test(shortVm.roundShortNotes[0]),
+ok(shortVm.roundShortNotes.length === 1 && /^Round 2 wasn't a full round/.test(shortVm.roundShortNotes[0]),
    "and the screen names the round: " + JSON.stringify(shortVm.roundShortNotes));
 ok(shortVm.roundShortNotes[0].includes(shortMove),
    "and the move inside it, so she is told what happened instead of shown a bare number");
@@ -4090,6 +4090,243 @@ store.setOnlineForTest(true);
   const greenCard = tvm.buildTodayVM({ selectedDay: "tuesday", expanded: {}, isWide: true }).dayView;
   ok(/Finish remaining/.test(greenCard.ctaLabel) && greenCard.ctaAction === "goSession", "a day with moves left is still offered them");
   ok(/Still open:/.test(greenCard.doneSub) && !/Still open:[^.]*Warm-Up/.test(greenCard.doneSub), "and the list of what is open leaves out the finished warm-up");
+  localStorage.clear(); store.migrate();
+}
+
+
+/* =====================================================================
+   A SHORT ROUND PAYS WHAT IT WAS WORTH.
+
+   A round paid 90 XP or nothing, so one skipped move in an eight-move round
+   cost the same as skipping all eight — and once a round was lost there was
+   no reason left to do its other seven moves properly.
+   ===================================================================== */
+{
+  const OV = outcome.OUTCOME_VERSION;
+  ok(OV >= 5, "the pro-rated rule has its own outcome version, so no history is re-scored");
+
+  // r.counts is decided by mainRoundReport; these exercise roundPayCredit directly.
+  ok(outcome.roundPayCredit({ counts: true, rows: 8, expected: 8, credit: 6 }) === 1,
+     "a round that counts still pays in full — nothing she earns today got smaller");
+  ok(Math.abs(outcome.roundPayCredit({ counts: false, rows: 8, expected: 8, credit: 7 }) - 0.875) < 1e-9,
+     "a round with one skipped move out of eight is worth seven eighths, not nothing");
+  ok(Math.abs(outcome.roundPayCredit({ counts: false, rows: 3, expected: 8, credit: 3 }) - 0.375) < 1e-9,
+     "a round abandoned three moves into eight is worth three eighths — measured against what it ASKED for");
+  ok(outcome.roundPayCredit({ counts: false, rows: 8, expected: 8, credit: 0 }) === 0,
+     "and a round where nothing was done is worth nothing");
+
+  const mainRow = (name, status) => ({ name, block: "main", round: 1, driver: "time",
+    status, actualSecs: status === "done" ? 30 : 0, plannedSecs: 30 });
+  const row = (ledger) => ({
+    app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
+    sessionType: "main", xpVersion: store.XP_VERSION, outcomeVersion: OV,
+    durationSecs: 900, roundsPlanned: 1, dayRoundsPlanned: 1, roundsDone: 0,
+    expectedWork: 8, expectedByRound: { 1: 8 }, ledger,
+    perExercise: ledger.map(l => ({ name: l.name, skipped: l.status === "skipped" }))
+  });
+  const clean = row(Array.from({ length: 8 }, (_, i) => mainRow("m" + i, "done")));
+  const oneSkip = row(Array.from({ length: 8 }, (_, i) => mainRow("m" + i, i === 3 ? "skipped" : "done")));
+  const stopped = row(Array.from({ length: 3 }, (_, i) => mainRow("m" + i, "done")));
+  ok(store.xpForSession(clean) === 180, "a clean round still pays exactly 90 + 90");
+  ok(store.xpForSession(oneSkip) === 169,
+     "one skipped move costs 11 XP, not the whole round (got " + store.xpForSession(oneSkip) + ")");
+  ok(store.xpForSession(oneSkip) > store.xpForSession(stopped),
+     "and finishing seven of eight is worth more than stopping after three");
+  ok(store.xpForSession(stopped) === 90 + Math.round(90 * 3 / 8),
+     "a round abandoned partway is priced on what the round asked for, not on the rows that exist");
+  ok(outcome.outcomeOf(oneSkip).mainRoundsDone === 0,
+     "the round still does not COUNT — the report is unchanged, only the price is");
+
+  // The ceiling is untouched: a session can never be paid for more than it asked.
+  ok(store.xpForSession(clean) <= store.dayXpCap(clean), "a session still cannot outrun the day's cap");
+
+  /* History is priced by the rules it was written under. */
+  const legacy = { ...oneSkip, outcomeVersion: 4 };
+  ok(store.xpForSession(legacy) === 90,
+     "a pre-v5 record keeps the all-or-nothing price it was written under");
+  ok(store.xpForSession({ perExercise: [1,2,3,4,5,6], roundsDone: 3 }) === 100,
+     "and a record with no outcome version at all is still read as legacy");
+}
+
+/* =====================================================================
+   THE FINISH SCREEN SAYS HOW FAR SHE GOT AND WHAT IS LEFT.
+   ===================================================================== */
+{
+  const partialVm2 = (ledger, expectedWork, banked) => {
+    engine.exitSession();
+    Object.assign(engine.sess, {
+      running: false, phase: "done", dayKey: "monday", light: "green", mode: "normal",
+      ledger, expectedWork, roundsCompleted: 2, roundsPlanned: 3, endedEarly: true,
+      elapsed: 900, savedEntry: null, spa: false, recovery: false,
+      bankedCredit: banked || 0
+    });
+    return svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+  };
+  const mk = (n, status) => Array.from({ length: n }, (_, i) => ({
+    name: "Move " + i, block: "main", round: 1, driver: "time", status,
+    actualSecs: status === "done" ? 30 : 0, plannedSecs: 30 }));
+
+  const held = partialVm2([...mk(17, "done"), ...mk(2, "skipped")], 20);
+  ok(held.completionKey === "partial-streak", "a day over the bar is still the streak-earned outcome");
+  ok(held.donePercent === 85, "and it says how much of the day she got (got " + held.donePercent + ")");
+  ok(held.skippedCount === 2, "and how many moves were skipped");
+  const heldHtml = sscreen.sessionScreen(held);
+  ok(/85% of today done/.test(heldHtml), "the screen prints the percentage");
+  ok(/2 moves got skipped/.test(heldHtml), "and the skipped count");
+  ok(/today counts/i.test(heldHtml), "and still says plainly that the day counted");
+  ok(/come back later today/i.test(heldHtml), "and invites her back to finish it today");
+
+  const missed2 = partialVm2([...mk(8, "done"), ...mk(12, "skipped")], 20);
+  ok(missed2.completionKey === "partial-short", "a day under the bar is the other outcome");
+  const missedHtml = sscreen.sessionScreen(missed2);
+  ok(/40% of today done/.test(missedHtml), "which also says how far she got");
+  ok(/didn.t reach the streak/i.test(missedHtml), "and that it fell short");
+  ok(/more moves? would do it/.test(missedHtml), "naming how many more moves would have done it");
+  ok(/everything you DID do is saved/i.test(missedHtml), "without taking the work away");
+
+  // Coming back and finishing is its own headline.
+  engine.exitSession();
+  Object.assign(engine.sess, {
+    running: false, phase: "done", dayKey: "monday", light: "green", mode: "normal",
+    ledger: mk(10, "done"), expectedWork: 20, bankedCredit: 10, roundsCompleted: 3,
+    roundsPlanned: 3, dayRoundsPlanned: 3, bankedRounds: 0, endedEarly: false,
+    elapsed: 600, savedEntry: null, spa: false, recovery: false
+  });
+  const resumedVm = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+  ok(resumedVm.completionState === "complete", "a sitting that finishes a part-trained day reads complete");
+  ok(resumedVm.finishedAResume === true, "and knows it was a day she came back to");
+  ok(/came back and finished/i.test(sscreen.sessionScreen(resumedVm)), "so the screen says so");
+  engine.exitSession();
+}
+
+/* =====================================================================
+   GEAR MOVES GET FIVE SECONDS TO SET UP.
+   ===================================================================== */
+{
+  ok(data.SETUP_SECONDS === 5, "the setup allowance is five seconds");
+  ok(data.needsSetup({ name: "Band Row" }), "a band move needs setting up");
+  ok(data.needsSetup({ name: "Clean Pull-Ups" }), "so does a pull-up");
+  ok(data.needsSetup({ name: "Jump Rope" }), "and a rope");
+  ok(data.needsSetup({ name: "Pallof Press", setup: true }), "a band move whose name hides it is flagged in the data");
+  ok(!data.needsSetup({ name: "Superman" }), "a floor move does not");
+  ok(!data.needsSetup({ name: "Dead Bug" }), "and neither does another");
+  // Every Pallof Press in the plan carries the flag, not just the one in the test.
+  const allMoves = Object.values(data.DAYS).flatMap(d =>
+    Object.values(d.blocks || {}).flat().concat(d.prepMenu || []));
+  ok(allMoves.filter(e => e.name === "Pallof Press").every(e => data.needsSetup(e)),
+     "every Pallof Press in the plan is marked, not only the first");
+
+  /* The runner really does spend it. Measured as the rest actually LASTS —
+     counting the seconds the session sits in `rest` with that move up next —
+     rather than by reading timerMax, which still holds the previous phase's
+     value in the moment between setPhase("rest") and the countdown starting. */
+  const restTicks = {}, restEpisodes = {};
+  let lastRestFor = null;
+  await runSession({ dayKey: "thursday", light: "green", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      if (sess.phase === "formcheck") { engine.pickClean(); return; }
+      if (sess.phase !== "rest" || !sess.upNextName) { lastRestFor = null; return; }
+      const n = sess.upNextName;
+      // A main move comes round once per round, so the seconds have to be read
+      // per BREAK — summing them made a floor move seen three times look like a
+      // gear move seen once.
+      if (lastRestFor !== n) { restEpisodes[n] = (restEpisodes[n] || 0) + 1; lastRestFor = n; }
+      restTicks[n] = (restTicks[n] || 0) + 1;
+    }
+  });
+  /* Classified from the REAL exercise objects: a move flagged `setup: true` in
+     the data (Pallof Press, Side-Lying ER) says nothing about its gear in its
+     name, so a fabricated { name } would read as a floor move. */
+  const byName = new Map();
+  Object.values(data.DAYS).forEach(d => Object.values(d.blocks || {}).flat()
+    .concat(d.prepMenu || []).forEach(e => { if (e && e.name) byName.set(e.name, e); }));
+  const perBreak = Object.keys(restTicks).map(n => [n, restTicks[n] / restEpisodes[n]]);
+  const isSetup = n => data.needsSetup(byName.get(n) || { name: n });
+  const setupRests = perBreak.filter(([n]) => isSetup(n));
+  const plainRests = perBreak.filter(([n]) => !isSetup(n));
+  ok(setupRests.length > 0 && plainRests.length > 0, "the run met both kinds of move");
+  const longestPlain = Math.max(...plainRests.map(([, t]) => t));
+  ok(setupRests.every(([, t]) => t >= longestPlain + data.SETUP_SECONDS - 1),
+     "every gear move got about five seconds more break before it than any floor move did: "
+     + JSON.stringify(setupRests.slice(0, 3)) + " vs longest plain " + longestPlain);
+
+  /* And the estimate counts it, so the day card's "about N min" stays honest. */
+  const circuits = engine.assembleCircuits("thursday", "green");
+  let setupCount = 0;
+  circuits.forEach(c => { for (let r = 1; r <= c.rounds; r++)
+    c.exercises.forEach(e => { if (!(e.rounds && r > e.rounds) && data.needsSetup(e)) setupCount++; }); });
+  ok(setupCount > 0, "Thursday really does contain gear moves");
+  ok(engine.estimateSessionSecs(circuits) >= setupCount * data.SETUP_SECONDS,
+     "and the session estimate includes the time they take to set up");
+  // The lighter days must still be materially shorter than a green one.
+  const g = engine.estimateSessionSecs(engine.assembleCircuits("thursday", "green"));
+  const r = engine.estimateSessionSecs(engine.assembleCircuits("thursday", "red"));
+  ok(r / g < 0.62, "a red day is still far shorter than a green one (" + (r / g).toFixed(2) + ")");
+}
+
+/* =====================================================================
+   THE SECOND CHANCE IS THE SAME DAY, AND IT SHOWS EVERYWHERE.
+   ===================================================================== */
+{
+  localStorage.clear(); store.migrate();
+  const iso = new Date().toISOString();
+  const day = util.edmontonDayKey();
+  const frag = (id, ledger, extra) => ({
+    app: "swimming", dayKey: day, dayTitle: "T", isoDate: iso, sessionType: "main",
+    workoutInstanceId: id, xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION,
+    durationSecs: 600, expectedWork: 4, expectedByRound: {}, roundsPlanned: 0, dayRoundsPlanned: 0,
+    ledger, perExercise: ledger.map(l => ({ name: l.name, skipped: l.status === "skipped" })),
+    completedFully: false, endedEarly: true, ...extra });
+  const w = (name, status) => ({ name, block: "warmup", round: 1, driver: "time",
+    status, actualSecs: status === "done" ? 30 : 0, plannedSecs: 30 });
+  // Morning: one move skipped. Afternoon: she comes back and does it.
+  store.saveSession(frag("w-same", [w("A", "done"), w("B", "done"), w("C", "done"), w("D", "skipped")]));
+  store.saveSession(frag("w-same", [w("D", "done")], { completedFully: true, endedEarly: false }));
+  const merged = outcome.workoutInstances(store.loadSessions());
+  ok(merged.length === 1, "the two sittings are one workout");
+  ok(merged[0].outcome.state === "complete", "and the day she came back to finish reads complete");
+  const strip = tvm.weekStatuses();
+  ok(strip[day] === "done",
+     "the week strip ticks the day off — it used to judge each sitting alone and show 'partly done'");
+  const gVm = gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics" });
+  // The grid paints a done day mint and a partial day sun; today's cell is the
+  // one this day's two sittings landed on.
+  const todayCell = gVm.analytics.consistency.cells.find(c => c.d === data.DAY_SHORT[day]);
+  ok(todayCell && /var\(--mint\)/.test(todayCell.cellStyle) && !/var\(--sun\)/.test(todayCell.cellStyle),
+     "and the grown-up's consistency grid agrees with it, rather than painting the day partial");
+
+  /* The Today card names what is still owed, so the offer reads like the ten
+     minutes it is rather than another whole session. */
+  localStorage.clear(); store.migrate();
+  const warm = (data.DAYS[day].blocks.warmup || []).map(e => e.name);
+  ok(warm.length >= 3, "the day has a warm-up to leave part-finished");
+  store.saveSession(frag("w-open2", [w(warm[0], "done"), w(warm[1], "done"), w(warm[2], "skipped")]));
+  store.saveDayProgress(day, { done: [], moves: { warmup: warm.slice(0, 2) },
+    mainRoundsCompleted: 0, bankedCredit: 2, lockedLight: "green", light: "green",
+    workoutInstanceId: "w-open2" });
+  const openCard = tvm.buildTodayVM({ selectedDay: day, expanded: {}, isWide: true }).dayView;
+  ok(/Finish remaining moves/.test(openCard.ctaLabel), "the card offers to finish what is left");
+  ok(/Still to do:|Still open:/.test(openCard.doneSub),
+     "and names it: " + JSON.stringify(openCard.doneSub));
+  ok(/finish today and it's a full day/i.test(openCard.doneSub),
+     "saying plainly that finishing today makes it a full day");
+
+  /* Down to a couple of moves, it names the MOVES rather than the blocks. */
+  localStorage.clear(); store.migrate();
+  const allButOne = warm.slice(0, warm.length - 1);
+  store.saveSession(frag("w-open3", allButOne.map(n => w(n, "done")).concat([w(warm[warm.length - 1], "skipped")])));
+  store.saveDayProgress(day, { done: ["coordination", "main", "prep", "finisher", "swimskill"],
+    moves: { warmup: allButOne }, mainRoundsCompleted: 3, bankedCredit: allButOne.length,
+    lockedLight: "green", light: "green", workoutInstanceId: "w-open3" });
+  const oneLeft = tvm.buildTodayVM({ selectedDay: day, expanded: {}, isWide: true }).dayView;
+  ok(oneLeft.doneSub.includes(warm[warm.length - 1]),
+     "with one move outstanding it names that move: " + JSON.stringify(oneLeft.doneSub));
+
+  /* But a partial that is never finished stays partial — the No-Debt rule is
+     not weakened, and yesterday's leftovers are not offered today. */
+  localStorage.clear(); store.migrate();
+  store.saveSession(frag("w-open", [w("A", "done"), w("B", "skipped")]));
+  ok(tvm.weekStatuses()[day] === "partial", "a day left unfinished still reads partly done");
   localStorage.clear(); store.migrate();
 }
 
