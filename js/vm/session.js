@@ -3,7 +3,7 @@
    values from the engine's `sess` view-state.
    ============================================================ */
 
-import { sess, refTime, screenRepsDetail, pausedByBackground } from "../engine.js";
+import { sess, refTime, screenRepsDetail, pausedByBackground, canGoBack } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork, videoSearchUrl } from "../data.js";
 import { fmtMMSS, exercisePhotoUrl } from "../util.js";
 import { loadSessions } from "../store.js";
@@ -78,6 +78,7 @@ export function buildSessionVM(state) {
   const phase = sess.phase;
 
   const sessionDone = phase === "done";
+  const explore = !!sess.explore;
   /* The finish screen reads THE SAVED RECORD. Not `endedEarly === false`, which
      only ever meant "the loop reached its end" and therefore called a Recovery
      pass, and a session of nothing but skips, a completed workout. The record is
@@ -110,7 +111,7 @@ export function buildSessionVM(state) {
   /* The one value the finish screen switches on. Six states, in priority order:
      a failed save outranks everything (nothing was recorded, so nothing may be
      claimed), then safety, then care, then what the ledger can actually prove. */
-  const completionState = sess.saveFailed ? "save-failed" : liveOutcome.state;
+  const completionState = explore ? "explore" : sess.saveFailed ? "save-failed" : liveOutcome.state;
 
   /* A partial is not one outcome, it is two: the day that cleared the streak
      bar and the day that did not. Both were shown the same words — "part of the
@@ -124,7 +125,7 @@ export function buildSessionVM(state) {
   const streakShortBy = Number.isFinite(ratio)
     ? Math.max(1, Math.round((STREAK_WORK_FRACTION - ratio) * (sess.expectedWork || 0)))
     : null;
-  const completionKey = completionState === "partial"
+  const completionKey = explore ? "explore" : completionState === "partial"
     ? (streakEarned ? "partial-streak" : "partial-short")
     : completionState === "recovery"
     ? (streakFrozen ? "recovery-held" : "recovery-short")
@@ -168,6 +169,13 @@ export function buildSessionVM(state) {
 
   const isResting = phase === "rest" || phase === "roundRest" || phase === "sectionRest";
   const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath" || phase === "formcheck";
+  // The clean-check is asked ABOUT a move, so the move stays on screen — the
+  // photo and the ring's spot hold the question, not the breath card.
+  const isFormCheck = phase === "formcheck";
+  // A move is only skippable while it is underway. Elsewhere Done already says
+  // "skip rest", and a "Skip this exercise? It won't count." over a breather
+  // was a question about a move that had already been recorded.
+  const canSkipExercise = phase === "work" || phase === "reps" || phase === "sideswitch";
   const isBigRest = phase === "roundRest" || phase === "sectionRest";
   const timerIsReps = phase === "reps";
   const timerIsTime = !timerIsReps && !isPrompt;
@@ -289,7 +297,21 @@ export function buildSessionVM(state) {
     // Opening instructions PAUSES the run, and closing them asks for an
     // explicit Resume — the countdown is timestamp-based, so it used to keep
     // running (and finish the exercise) while she was reading or on YouTube.
-    detailShowResume: sess.running && sess.paused,
+    detailShowResume: sess.running && sess.paused && !explore,
+
+    /* ---- explore: the same screen with nothing counting down --------------
+       One flag, read by the screen to drop the controls that only mean
+       something when a clock is running: pause, stop, the session time, the
+       end-early confirm. */
+    explore,
+    exploreBanner: explore ? "🧪 EXPLORE — just looking. Tap Next to move on. Nothing counts down and nothing is recorded." : "",
+    showClock: !explore,
+    showPause: !explore, showStop: !explore,
+    // "◀ Back a move" — only where the engine can honour it (see canGoBack).
+    canGoBack: canGoBack(),
+    canSkipExercise,
+    isFormCheck,
+    formCheckTitle: "How did that feel?",
 
     sessionDayTitle: day.title || "",
     elapsedDisplay: fmtMMSS(sess.elapsed),
@@ -311,7 +333,7 @@ export function buildSessionVM(state) {
     // Only offer the instructions when there is actually a move to describe.
     // During the lead-in there is no current exercise, so the old ⓘ button
     // rendered there and did nothing at all when tapped.
-    canOpenDetail: !!sess.currentEx && !isResting && !isPrompt,
+    canOpenDetail: !!sess.currentEx && !isResting && (!isPrompt || isFormCheck),
     stageTitle, blockBadgeVariant, blockLabel, roundLabelText,
     curExName: ex.name || "", curExDose,
     curExCue: isResting ? sess.restCue : (ex.cue || ""),
@@ -348,7 +370,7 @@ export function buildSessionVM(state) {
       ? "Were your " + sess.cleanCheckMove + " reps clean?"
       : "Were your reps clean?",
     wobblyBanner: !!sess.lastWobbly && !isResting && !isPrompt,
-    doneLabel: isResting ? "⏭ Skip Rest" : (timerIsReps ? "✓ Done — Next" : "✓ Done — Next"),
+    doneLabel: explore ? "Next move ▶" : isResting ? "⏭ Skip Rest" : isFormCheck ? "Move on →" : "✓ Done — Next",
 
     // prompts
     intentWords: INTENT_WORDS, microQ: MICRO_LOOP.q, microOpts: ["the hips", "the arms", "the knees"],
@@ -384,7 +406,7 @@ export function buildSessionVM(state) {
     // "N of M main rounds", not a count of every block plus every round added
     // into one number and labelled "rounds". A care session trains no rounds at
     // all, so it says nothing rather than "0 of 0".
-    showRoundsLine: completionState !== "recovery",
+    showRoundsLine: completionState !== "recovery" && !explore,
     roundsLine: `${dayRoundsDone} of ${dayRoundsAsked} main round${dayRoundsAsked === 1 ? "" : "s"}`,
     /* And WHY a round did not count, in her own words, one line each. A bare
        zero next to a session she remembers finishing is the thing that sent a
@@ -404,7 +426,7 @@ export function buildSessionVM(state) {
 
        A failed save shows what to do about it instead — see the recovery block
        on the finish screen. */
-    showCompletionExtras: sessionDone && completionState !== "save-failed",
+    showCompletionExtras: sessionDone && completionState !== "save-failed" && !explore,
     moodOpts, moodAck: sess.mood ? MOOD_ACK[sess.mood] : "",
     showReflection: sessionDone && completionState !== "save-failed" && !!sess.mood,
     reflectWellOpts, reflectNextOpts,

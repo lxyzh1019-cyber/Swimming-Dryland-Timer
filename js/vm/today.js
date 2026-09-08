@@ -8,7 +8,7 @@ import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overlo
 import { settings, loadSessions, loadJourney, levelFromXp, currentStreakOf, loadDayProgress, countsAsTrained, settledXpByDate, outcomeOf } from "../store.js";
 import { workoutInstances } from "../outcome.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
-import { assembleCircuits, estimateSessionSecs } from "../engine.js";
+import { assembleCircuits, estimateSessionSecs, planResume } from "../engine.js";
 
 /* Whole-plan stats for a day card.
 
@@ -334,10 +334,21 @@ export function buildTodayVM(state) {
     if (isSpaDay) { dayView.isRest = true; dayView.isActive = true;
       dayView.recoveryItems = (fullDay.recovery || []).slice(0, 3).map(r => ({ text: r.name + (r.dose ? " · " + r.dose : "") })); }
   } else if (status === "done") {
-    const remaining = blocks.filter(b => !b.isBlockDone).map(b => b.name);
-    // An ended-early day is never "all done", even once its per-block record has
-    // aged out (day progress only survives the calendar day it was written).
-    const allDone = !isPartial && (remaining.length === 0 || !doneBlocks.length);
+    /* WHAT IS ACTUALLY LEFT, asked of the same function the runner starts from.
+
+       This used to be "the five named blocks minus the done list", which knows
+       nothing about the light: a Red day never asks for Coordination or the
+       Finisher, so a Red day fully trained was told it had "skipped" them and
+       offered "Finish remaining moves" — which then walked her through the Body
+       Check into a start with nothing in it. planResume applies the locked
+       light and the banked moves exactly as startSession does, so this card
+       cannot offer a session the engine will refuse. */
+    const dayLight = (dayProg && (dayProg.lockedLight || dayProg.light)) || "green";
+    const owed = dayProg ? planResume(selectedKey, dayLight).circuits.filter(c => c.block !== "prep") : [];
+    const remaining = [...new Set(owed.map(c => c.name))];
+    // An ended-early day whose per-block record has aged out (day progress only
+    // survives the calendar day it was written) is never "all done" either.
+    const allDone = dayProg ? remaining.length === 0 : !isPartial;
     const remainingLabel = remaining.join(", ");
     // Read what the session ACTUALLY earned instead of recomputing it here.
     // This line used to carry its own copy of the XP formula (moves × 10 + 40),
@@ -385,14 +396,14 @@ export function buildTodayVM(state) {
         : isPartial ? ((streakEarned
             ? "This day counts toward your streak."
             : "Your work is saved" + (shortBy ? " — about " + shortBy + "% more of the plan earns the streak." : ", but this one didn't earn a streak day."))
-          + (doneBlocks.length && remainingLabel ? " Still open: " + remainingLabel + "." : ""))
+          + (remainingLabel ? " Still open: " + remainingLabel + "." : (dayProg ? " Every block for today's light is done." : "")))
         : (allDone ? "Every block is checked off. Want extra reps?" : ("You skipped " + remainingLabel + " — finish up for XP.")),
       showCta: true,
       ctaLabel: isSpaDay ? "Do it again" : (allDone ? "Look at the moves" : "Finish remaining moves"),
       ctaIcon: isSpaDay ? "🧘" : (allDone ? "🧪" : "▶️"),
       ctaVariant: (isSpaDay || allDone) ? "secondary" : "primary",
-      ctaSubtext: isSpaDay ? "Doesn't change progress" : (allDone ? "Just look at the moves — nothing is recorded" : ""),
-      ctaAction: (isSpaDay || allDone) ? "goTryIt" : "goSession",
+      ctaSubtext: isSpaDay ? "Doesn't change progress" : (allDone ? "The workout screen, nothing counting down, nothing recorded" : ""),
+      ctaAction: (isSpaDay || allDone) ? "goExplore" : "goSession",
       showSettings: false
     };
   } else if (status === "missed") {
@@ -435,6 +446,9 @@ export function buildTodayVM(state) {
   }
 
   dayView.showBackToToday = selectedKey !== todayKey;
+  // Why the last GO did not open a session, if it did not. Cleared by the next
+  // GO / Explore / day change (see js/main.js).
+  dayView.startNote = state.startNote || "";
 
   /* ---- try-it control ------------------------------------------------------
      This used to be a bare underlined text link, ~16px tall, in the bottom-right
@@ -448,7 +462,7 @@ export function buildTodayVM(state) {
      move list until something disarmed it again. Arming a mode to read an
      instruction is a lot of machinery for "what does this one look like?", and
      while it was armed the real GO button was not where she left it. */
-  dayView.showTryIt = canLaunch;
+  dayView.showExplore = canLaunch;
   if (dayView.isActive && !dayView.ctaSubtext) dayView.ctaSubtext = (dayView.movesLabel || "") + " · about " + (dayView.mins || "?") + " min · that’s the whole thing — no surprises.";
   dayView.showBlocksList = !!(dayView.isActive || dayView.isDone || dayView.isPreview || dayView.isMissed) && !isSpaDay;
   dayView.blocksHint = dayView.isDone ? "REVIEW WHAT YOU DID 👀" : dayView.isPreview ? "PEEK AT WHAT'S COMING 👀" : dayView.isMissed ? "READY WHEN YOU ARE — PEEK INSIDE 👀" : "TAP A BLOCK TO PEEK INSIDE 👀";
@@ -460,7 +474,7 @@ export function buildTodayVM(state) {
   const coachIconBtnStyle = "width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;flex-shrink:0;font-size:15px;display:flex;align-items:center;justify-content:center;"
     + (settings.coachVoiceOn ? "background:#fff;color:var(--aqua-deep);" : "background:rgba(255,255,255,0.18);color:#fff;");
   const practiceLinkLabel = "🧪 Explore the moves";
-  const practiceHintLine = "Instructions and videos — no timer, nothing recorded.";
+  const practiceHintLine = "The workout screen at your own pace — nothing counts down, nothing is recorded.";
   const practiceBtnStyle = "width:100%;min-height:48px;display:flex;align-items:center;justify-content:center;gap:9px;border-radius:var(--radius-pill);cursor:pointer;font-family:inherit;font-weight:900;font-size:14px;padding:0 18px;"
     + "background:rgba(255,255,255,0.14);color:#fff;border:2px solid rgba(255,255,255,0.45);";
 

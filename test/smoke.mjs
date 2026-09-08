@@ -152,8 +152,6 @@ const gscreen = await import(base + "screens/grownup.js");
 const rscreen = await import(base + "screens/readiness.js");
 const sync    = await import(base + "sync.js");
 const overlays = await import(base + "screens/overlays.js");
-const tryvm   = await import(base + "vm/tryit.js");
-const tryscreen = await import(base + "screens/tryit.js");
 const outcome = await import(base + "outcome.js");
 const gate    = await import(base + "gate.js");
 const passkey = await import(base + "passkey.js");
@@ -581,48 +579,84 @@ ok(store.tryItArmed === undefined && store.setTryIt === undefined,
 ok(store.loadSettings().tryItArmed === undefined, "and so is its setting");
 
 const launchDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-const tryItGaps = { noButton: [], notAButton: [], goHijacked: [] };
+const exploreGaps = { noButton: [], notAButton: [], goHijacked: [] };
 launchDays.forEach(d => {
   const vm = tvm.buildTodayVM({ selectedDay: d, expanded: {}, isWide: true });
   const dv = vm.dayView;
   if (!(dv.isActive || dv.isDone || dv.isMissed || dv.isPreview)) return;   // nothing to launch
-  if (!dv.showTryIt) tryItGaps.noButton.push(d);
+  if (!dv.showExplore) exploreGaps.noButton.push(d);
   const html = tscreen.todayWide(vm);
-  if (!new RegExp('data-action="goTryIt" data-arg="' + d + '"').test(html)) tryItGaps.notAButton.push(d);
-  // GO always means GO — nothing can re-point it at the move list.
-  if (dv.showCta && dv.ctaAction === "goTryIt" && !dv.isDone && !dv.isRest) tryItGaps.goHijacked.push(d);
+  if (!new RegExp('data-action="goExplore" data-arg="' + d + '"').test(html)) exploreGaps.notAButton.push(d);
+  // GO always means GO — nothing can re-point it at explore.
+  if (dv.showCta && dv.ctaAction === "goExplore" && !dv.isDone && !dv.isRest) exploreGaps.goHijacked.push(d);
 });
-ok(tryItGaps.noButton.length === 0, "every day a run can start from offers a direct look at the moves");
-ok(tryItGaps.notAButton.length === 0, "and it goes straight to that day's list, with no mode to arm first");
-ok(tryItGaps.goHijacked.length === 0, "while the start button still starts the workout");
+ok(exploreGaps.noButton.length === 0, "every day a run can start from offers a direct look at the moves");
+ok(exploreGaps.notAButton.length === 0, "and it goes straight into explore for that day, with no mode to arm first");
+ok(exploreGaps.goHijacked.length === 0, "while the start button still starts the workout");
 const tryVM = tvm.buildTodayVM({ selectedDay: launchDays[0], expanded: {}, isWide: true });
 ok(/min-height:48px/.test(tryVM.practiceBtnStyle), "with a 48px tap target — the old link was ~16px");
 ok(tryVM.practiceMode === undefined, "and there is no armed state left for a screen to read");
 
-/* TRY-IT IS NOT A WORKOUT. It used to run the entire session engine — Body
-   Check, traffic light, rounds, timers, clean-checks, a finish screen —
-   behind a purple banner, so a kid could complete a whole workout that was
-   never going to count. It is a list of moves now. */
-const tryItVM = tryvm.buildTryItVM({ selectedDay: "monday", isWide: true, detailOverlay: false, detailEx: null });
-const tryItHtml = tryscreen.tryItScreen(tryItVM);
-ok(tryItVM.moves.length > 0, "the try-it screen lists the day's moves");
-ok(tryItVM.moves.every(m => m.videoUrl && m.videoUrl !== "#"), "every one links to a demo video");
-ok(/data-action="tryItDetail"/.test(tryItHtml), "and each is tappable for instructions");
-ok(!/data-action="(advance|pauseTimer|skipEx|stopNow)"/.test(tryItHtml),
-   "with no timer controls anywhere — there is nothing running to control");
-ok(/data-action="exitTryIt"/.test(tryItHtml), "and a plain way out");
-/* prepMenu moves are inserted by the session assembly but were missing from
-   every "what's in today" count — in try-it there is nothing to assemble. */
-ok(tryvm.tryItMoves("tuesday").some(m => m.name === "Pallof Press"),
-   "try-it lists prepMenu moves too, which the plan counts never included");
+/* EXPLORE IS THE WORKOUT SCREEN WITH NOTHING COUNTING DOWN.
 
-/* The engine itself refuses the mode, so no stale caller can start a real,
-   recorded workout in "test" mode. */
+   It was a list of moves with a popup that opened off the bottom of the page.
+   It is the session screen now — photo, ring, the list, Next / Back / Skip —
+   walking every move once, advancing only on a tap, and recording nothing. */
+const settle = async () => { for (let i = 0; i < 5; i++) await new Promise(r => setImmediate(r)); };
 localStorage.clear();
 store.migrate();
-await engine.startSession({ dayKey: "monday", light: "green", mode: "tryit" });
-ok(engine.sess.running === false, "the engine refuses to start a try-it session at all");
-ok(store.loadSessions().length === 0, "so try-it can never write a session record");
+engine.exitSession();
+const exploreRun = engine.startSession({ dayKey: "tuesday", mode: "explore" });
+ok(engine.sess.running === true && engine.sess.explore === true, "explore starts at once — no Body Check, no lead-in");
+ok(["work", "reps"].includes(engine.sess.phase), "and opens on the first move, not a greeting");
+ok(engine.sess.timerSecs === engine.sess.timerMax, "with the ring full: nothing is counting down");
+ok(engine.sess.circuits.every(c => c.rounds === 1), "every block runs once");
+ok(engine.sess.circuits.some(c => c.exercises.some(e => e.name === "Pallof Press")),
+   "explore includes the prepMenu moves, which the plan counts never included");
+const exploreVm = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+const exploreHtml = sscreen.sessionScreen(exploreVm);
+ok(exploreVm.explore === true && /EXPLORE/.test(exploreHtml), "the screen says so, in a banner");
+ok(/data-action="advance"/.test(exploreHtml) && /Next move/.test(exploreHtml), "Next is the way forward");
+ok(/data-action="exitExplore"/.test(exploreHtml), "and Done looking the way out");
+ok(!/data-action="(pauseTimer|stopNow|askEnd)"/.test(exploreHtml), "nothing to pause, stop or confirm — nothing is running");
+ok(!/data-action="goBack"/.test(exploreHtml), "no Back on the very first move");
+const exploreTotal = engine.sess.totalSteps;
+let holdTicks = 0;
+// A clock going by changes nothing: explore has no timers at all.
+await settle();
+ok(engine.sess.stepIdx === 0, "time passing does not move it on");
+engine.advance(); await settle();
+ok(engine.sess.stepIdx === 1, "a tap does");
+ok(engine.sess.exStatus["0-0"] === "done" && engine.sess.exDone === 1, "and the list marks the move she looked at");
+const exploreVm2 = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+ok(exploreVm2.canGoBack === true && /data-action="goBack"/.test(sscreen.sessionScreen(exploreVm2)), "Back is offered from the second move");
+engine.goBackExercise(); await settle();
+ok(engine.sess.stepIdx === 0 && engine.sess.exStatus["0-0"] === undefined && engine.sess.exDone === 0,
+   "Back returns to the previous move and clears its mark");
+engine.pauseSession("instructions");
+ok(engine.sess.paused === false, "reading the instructions does not 'pause' a screen with no clock");
+for (let i = 0; i < exploreTotal; i++) { engine.advance(); await settle(); }
+await exploreRun;
+ok(engine.sess.running === false && engine.sess.phase === "done" && engine.sess.explore === true,
+   "tapping through every move ends on the explore finish screen");
+const exploreDoneVm = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+ok(exploreDoneVm.completionKey === "explore" && /Nothing was recorded/.test(sscreen.sessionScreen(exploreDoneVm)),
+   "which says plainly that nothing was recorded");
+ok(!exploreDoneVm.showCompletionExtras, "and asks no mood, reflection or quiz");
+ok(store.loadSessions().length === 0, "no session record was written");
+ok(store.loadDayProgress("tuesday") === null, "and no day progress");
+// Done looking, mid-run.
+engine.exitSession();
+const exploreRun2 = engine.startSession({ dayKey: "monday", mode: "explore" });
+engine.advance(); await settle();
+engine.endEarly(); engine.exitSession(); await exploreRun2;
+ok(store.loadSessions().length === 0, "leaving explore part-way writes nothing either");
+ok(engine.sess.running === false, "and leaves no runner behind");
+// A spa day explores its recovery menu.
+engine.exitSession();
+const spaRun = engine.startSession({ dayKey: "sunday", mode: "explore" });
+ok(engine.sess.running && engine.sess.circuits[0].block === "recovery", "a spa day explores the recovery menu");
+engine.endEarly(); engine.exitSession(); await spaRun;
 
 /* Legacy try-it rows may still sit in a history; they are not training. */
 store.saveSession({ app: "swimming", practice: true, dayKey: "monday", dayTitle: "Mon",
@@ -3922,5 +3956,141 @@ store.saveJourney(jStale);
 ok(store.xpIsPending() === false,
    "but a mirror nobody has reached for a month stops blocking prizes — a dead project must not lock the wallet forever");
 store.setOnlineForTest(true);
+
+
+/* =====================================================================
+   "◀ BACK A MOVE", and the two Skip defects it was reported alongside.
+   ===================================================================== */
+
+/* Back during a move returns to the move before it. The ledger is one row
+   per step, so going back drops exactly the previous row, and the redo lands
+   in the same place — the record ends up the same length it would have been. */
+{
+  let backDone = false, sawRewind = false, invariantHeld = true;
+  const sBack = await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      if (sess.phase === "formcheck") { engine.pickClean(); return; }
+      if (sess.ledger.length !== sess.exDone) invariantHeld = false;
+      if (!backDone && sess.stepIdx === 2 && ["work", "reps"].includes(sess.phase) && ms % 1000 === 0) {
+        // Two moves recorded, on the third: back to the second.
+        const vm = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+        if (!vm.canGoBack) return;
+        backDone = true;
+        engine.goBackExercise();
+      }
+      if (backDone && !sawRewind && sess.stepIdx === 1 && sess.ledger.length === 1) sawRewind = true;
+    }
+  });
+  ok(backDone, "the test really did press Back on the third move");
+  ok(sawRewind, "the runner went back to the second move with only the first row left in the ledger");
+  ok(invariantHeld, "the ledger always held exactly one row per step walked");
+  ok(sBack.ledger.length === sBack.totalSteps, "and the finished record has one row per step — the redo replaced, not doubled");
+  ok(sBack.ledger[1].name === sBack.steps[1].ex.name, "with the redone move in its own slot");
+  ok(sBack.phase === "done" && sBack.endedEarly === false, "and the session still finished normally");
+}
+
+/* Back during the breather redoes the move that has just been recorded. */
+{
+  let backAt = -1, redid = false;
+  const sRest = await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      if (sess.phase === "formcheck") { engine.pickClean(); return; }
+      if (backAt < 0 && sess.phase === "rest" && sess.stepIdx === 1 && sess.ledger.length === 2) {
+        const vm = svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+        if (!vm.canGoBack) return;
+        backAt = sess.stepIdx;
+        engine.goBackExercise();
+      }
+      if (backAt >= 0 && !redid && sess.stepIdx === 1 && sess.ledger.length === 1 && ["work", "reps"].includes(sess.phase)) redid = true;
+    }
+  });
+  ok(backAt === 1, "Back was pressed during the rest after the second move");
+  ok(redid, "and the second move came round again, its row removed");
+  ok(sRest.ledger.length === sRest.totalSteps, "one row per step at the end");
+}
+
+/* Back is NOT offered across a committed main round or into an earlier
+   block: those have been written to the day's progress record. */
+{
+  let offeredAcrossRound = false, offeredAcrossBlock = false, sawRoundRest = false, sawSectionRest = false;
+  await runSession({ dayKey: "monday", light: "yellow", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      if (sess.phase === "formcheck") { engine.pickClean(); return; }
+      if (sess.phase === "roundRest") { sawRoundRest = true; if (engine.canGoBack()) offeredAcrossRound = true; }
+      // The section rest is still inside the block (its close runs after the
+      // rest), so redoing its last move is honoured there; the first move of
+      // the NEXT block is where the previous block is behind her.
+      if (sess.phase === "sectionRest") sawSectionRest = true;
+      if (["work", "reps"].includes(sess.phase) && sess.ei === 0 && sess.stepIdx > 0 && engine.canGoBack()) offeredAcrossBlock = true;
+    }
+  });
+  ok(sawRoundRest && sawSectionRest, "the run passed a round break and a block break");
+  ok(!offeredAcrossRound, "Back is not offered during the breather after a main round that counted");
+  ok(!offeredAcrossBlock, "nor back into a block that has already closed");
+}
+
+/* During the clean-check, Done moves on with no verdict — it used to do
+   nothing at all for thirty seconds, and Skip with it. */
+{
+  let tapped = false, releasedAt = -1, askedAt = -1;
+  const sFc = await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      if (sess.phase === "formcheck") {
+        if (askedAt < 0) askedAt = ms;
+        if (!tapped) { tapped = true; engine.advance(); }
+        return;
+      }
+      if (tapped && releasedAt < 0) releasedAt = ms;
+      if (sess.phase === "formcheck") engine.pickClean();
+    }
+  });
+  ok(tapped, "a clean-check came up and Done was tapped on it");
+  ok(releasedAt - askedAt <= 2000, "Done ended the check on the next tick, not after the thirty-second timeout");
+  ok(sFc.formChecks.length === 0, "and recorded no verdict for it");
+}
+
+/* The Skip-this-exercise ask is only offered while a move is underway. */
+{
+  let restHtml = "", workHtml = "", fcHtml = "";
+  await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      const vm = () => svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+      if (sess.phase === "rest" && !restHtml) restHtml = sscreen.sessionScreen(vm());
+      if (["work", "reps"].includes(sess.phase) && !workHtml) workHtml = sscreen.sessionScreen(vm());
+      if (sess.phase === "formcheck") { if (!fcHtml) fcHtml = sscreen.sessionScreen(vm()); engine.pickClean(); }
+    }
+  });
+  ok(/data-action="askSkip"/.test(workHtml), "Skip this exercise is offered during a move");
+  ok(!/data-action="askSkip"/.test(restHtml), "and not during a rest, where Done already skips the wait");
+  ok(fcHtml && !/Breath rehearsal/.test(fcHtml) && /How did that feel/.test(fcHtml),
+     "the clean-check shows its own question, not the breath-rehearsal card");
+}
+
+/* The Today card asks the engine what is left, so a Red day fully trained is
+   never offered "Finish remaining moves" for blocks Red never asked for. */
+{
+  localStorage.clear(); store.migrate();
+  store.saveDayProgress("monday", { done: ["warmup", "main", "swimskill"], mainRoundsCompleted: 1,
+                                    lockedLight: "red", light: "red", moves: {}, bankedCredit: 12 });
+  store.saveSession({ app: "swimming", dayKey: "monday", dayTitle: "Mon", isoDate: new Date().toISOString(),
+    durationSecs: 900, sessionType: "main", light: "red", completedFully: false, endedEarly: true,
+    expectedWork: 12, outcomeVersion: outcome.OUTCOME_VERSION,
+    ledger: Array.from({ length: 10 }, (_, i) => ({ name: "m" + i, block: i < 4 ? "warmup" : "main", round: 1, status: "done" })) });
+  ok(engine.planResume("monday", "red").circuits.length === 0, "the engine has nothing left to run for that day");
+  const card = tvm.buildTodayVM({ selectedDay: "monday", expanded: {}, isWide: true }).dayView;
+  ok(!/Finish remaining/.test(card.ctaLabel || ""), "so the card does not offer to finish anything");
+  ok(!/Coordination|Finisher/.test(card.doneSub || ""), "and does not claim she skipped blocks the light never asked for");
+  // A green day with only the warm-up banked still names what is left — without the warm-up.
+  localStorage.clear(); store.migrate();
+  store.saveDayProgress("tuesday", { done: ["warmup"], mainRoundsCompleted: 0, lockedLight: "green", light: "green", moves: {}, bankedCredit: 4 });
+  store.saveSession({ app: "swimming", dayKey: "tuesday", dayTitle: "Tue", isoDate: new Date().toISOString(),
+    durationSecs: 300, sessionType: "main", light: "green", completedFully: false, endedEarly: true,
+    expectedWork: 30, outcomeVersion: outcome.OUTCOME_VERSION,
+    ledger: Array.from({ length: 4 }, (_, i) => ({ name: "w" + i, block: "warmup", round: 1, status: "done" })) });
+  const greenCard = tvm.buildTodayVM({ selectedDay: "tuesday", expanded: {}, isWide: true }).dayView;
+  ok(/Finish remaining/.test(greenCard.ctaLabel) && greenCard.ctaAction === "goSession", "a day with moves left is still offered them");
+  ok(/Still open:/.test(greenCard.doneSub) && !/Still open:[^.]*Warm-Up/.test(greenCard.doneSub), "and the list of what is open leaves out the finished warm-up");
+  localStorage.clear(); store.migrate();
+}
 
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

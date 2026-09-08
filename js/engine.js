@@ -90,6 +90,15 @@ function blankSession() {
     // traffic light is the one dial that shortens a session now — but records
     // written when it existed are still read everywhere they are reported.
     mode: "normal",
+    /* THE RUNNER'S POSITION, as a flat index. The workout is walked as one
+       ordered list of steps (see buildSteps) rather than three nested loops,
+       which is what lets "back a move" exist at all: `stepIdx` is where she is,
+       `backTo` is where she asked to return to, and the ledger holds exactly one
+       row per step already walked, so rewinding is a truncation. */
+    stepIdx: 0, totalSteps: 0, backTo: null, steps: [],
+    /* EXPLORE — the same screen with nothing counting down and nothing saved.
+       `holdResolver` is how a move ends in explore: not a clock, a tap. */
+    explore: false, holdResolver: null,
     dayKey: null, light: "green", practice: false, spa: false, recovery: false,
     endedEarly: false, xpEarned: 0, leveledUp: false,
     mood: null, wentWell: null, nextTime: null, quizPick: null, quizXp: 0,
@@ -391,6 +400,7 @@ function countdown(seconds, opts = {}) {
     let lastWhole = seconds;
     const id = setInterval(() => {
       if (sess.abort)        { clearInterval(id); resolve("abort"); return; }
+      if (sess.backTo != null) { clearInterval(id); resolve("back"); return; }
       // Honor a Done-tap only if it landed AFTER this countdown began — a stale
       // flag from the previous phase must not skip a freshly-started one.
       if (sess.forceDone && sess.forceDoneAt >= started) { sess.forceDone = false; clearInterval(id); endBeep(); resolve("done"); return; }
@@ -418,6 +428,7 @@ function sleep(ms) {
     let elapsed = 0, last = started;
     const id = setInterval(() => {
       if (sess.abort)        { clearInterval(id); resolve("abort"); return; }
+      if (sess.backTo != null) { clearInterval(id); resolve("back"); return; }
       if (sess.forceDone && sess.forceDoneAt >= started) { sess.forceDone = false; clearInterval(id); resolve("done"); return; }
       if (sess.forceDone && sess.forceDoneAt < started) sess.forceDone = false;
       if (sess.skipExercise) { clearInterval(id); resolve("skip");  return; }
@@ -456,7 +467,7 @@ function repSleep(ms, stopped) {
     const started = Date.now();
     let elapsed = 0, last = started;
     const id = setInterval(() => {
-      if (stopped() || sess.abort || sess.skipExercise) { clearInterval(id); resolve("interrupt"); return; }
+      if (stopped() || sess.abort || sess.skipExercise || sess.backTo != null) { clearInterval(id); resolve("interrupt"); return; }
       const now = Date.now();
       if (!sess.paused) elapsed += now - last;
       last = now;
@@ -561,10 +572,10 @@ async function runPrescribedReps(ex) {
   // runs out of segments.
   const finished = new Promise(resolve => {
     const watchdog = setInterval(() => {
-      if (sess.abort || sess.skipExercise) {
+      if (sess.abort || sess.skipExercise || sess.backTo != null) {
         clearInterval(watchdog);
         const r = sess.byRepsResolver;
-        if (r) { sess.byRepsResolver = null; r(sess.abort ? "abort" : "skip"); }
+        if (r) { sess.byRepsResolver = null; r(sess.abort ? "abort" : sess.backTo != null ? "back" : "skip"); }
       }
     }, 200);
     sess.byRepsResolver = (result) => {
@@ -582,7 +593,7 @@ async function runPrescribedReps(ex) {
       if (stopped) return;
       if (i > 0) {
         const br = await segmentBreak(seg);
-        if (br === "abort" || br === "skip" || stopped) return;
+        if (br === "abort" || br === "skip" || br === "back" || stopped) return;
       }
       sess.segmentLabel = seg.label;
       sess.sideLabel = seg.label;
@@ -669,20 +680,6 @@ function stopElapsed() {
 }
 
 /* ---- helpers ---- */
-function nextExercise(circuits, ci, r, ei) {
-  const circuit = circuits[ci];
-  for (let j = ei + 1; j < circuit.exercises.length; j++) {
-    if (!(circuit.exercises[j].rounds && r > circuit.exercises[j].rounds)) return circuit.exercises[j];
-  }
-  if (r + 1 <= circuit.rounds) {
-    for (let j = 0; j < circuit.exercises.length; j++) {
-      if (!(circuit.exercises[j].rounds && (r + 1) > circuit.exercises[j].rounds)) return circuit.exercises[j];
-    }
-  }
-  if (ci + 1 < circuits.length) return circuits[ci + 1].exercises[0];
-  return null;
-}
-
 function setPhase(phase) {
   sess.phase = phase;
   // A pending "Skip this exercise?" ask belongs to the phase it was raised in.
@@ -692,8 +689,10 @@ function setPhase(phase) {
   notify("phase");
 }
 
-function setUpNext(circuits, ci, r, ei) {
-  const nx = nextExercise(circuits, ci, r, ei);
+/* What comes after the step she is on — read off the step list, which is
+   the one authority on the order (see buildSteps). */
+function setUpNext(nextStep) {
+  const nx = nextStep ? nextStep.ex : null;
   sess.upNextName = nx ? nx.name : "";
   sess.upNextDose = nx ? (nx.dose || "") : "";
 }
@@ -904,7 +903,7 @@ function isCareSession(s = sess) { return !!(s.recovery || s.spa); }
    (see isCareSession above). Both guards used to live only in recordBlockDone;
    they are shared now that rounds are banked from inside the round loop too. */
 function ownsDayProgress() {
-  return sess.mode !== "tryit" && !isCareSession();
+  return !sess.explore && !isCareSession();
 }
 
 /* A workout's identity. Random rather than derived from the date, because two
@@ -978,6 +977,23 @@ function bankMove(row) {
   list.push(row.name);
   prog.bankedCredit = Number(prog.bankedCredit) + 1;
   prog.light = sess.light;
+  saveDayProgress(sess.dayKey, prog);
+}
+
+/* The mirror of bankMove, for "back a move". A row the ledger no longer holds
+   must not stay banked on disk, or the resume would hand her a move she then
+   chose to redo — and, if she skips it the second time, never ask for it again.
+   Only a banked name comes off, and the credit that went on with it. */
+function unbankMove(row) {
+  if (!ownsDayProgress()) return;
+  if (!row || row.status !== "done") return;
+  const block = row.block;
+  if (!block || block === "prep") return;
+  const prog = readDayProgress();
+  const list = prog.moves[block];
+  if (!list || !list.includes(row.name)) return;
+  prog.moves[block] = list.filter(n => n !== row.name);
+  prog.bankedCredit = Math.max(0, Number(prog.bankedCredit) - 1);
   saveDayProgress(sess.dayKey, prog);
 }
 
@@ -1109,18 +1125,125 @@ function microLoopPrompt() {
   });
 }
 
+/* ---- the step list ---------------------------------------------------------
+   The workout as ONE ORDERED LIST of exercise-rounds, in exactly the order the
+   old ci → r → ei loops walked it and with the same `ex.rounds` cap. The runner
+   walks this list by index, which is what makes "back a move" a plain
+   decrement, and it is what lets the ledger be read positionally: every step
+   that is reached records exactly one row, so `sess.ledger[i]` is `steps[i]`
+   and rewinding is a truncation. */
+export function buildSteps(circuits) {
+  const steps = [];
+  (circuits || []).forEach((circuit, ci) => {
+    for (let r = 1; r <= circuit.rounds; r++) {
+      circuit.exercises.forEach((ex, ei) => {
+        if (ex.rounds && r > ex.rounds) return;
+        steps.push({ s: steps.length, ci, r, ei, ex, circuit, absRound: roundNumber(circuit, r) });
+      });
+    }
+  });
+  return steps;
+}
+
+/* WHAT A DAY STILL OWES, as circuits — the one answer the runner and the Today
+   card both have to give. Until this existed the card counted five fixed blocks
+   and offered "Finish remaining moves" for blocks a Red day never asked for,
+   and the runner, asked to start that, assembled nothing and went quiet.
+
+   Resolves the light exactly as a start does: a spa day is recovery, a locked
+   light on the day's progress record can only ever LOWER the one asked for
+   (see startSession), and a care session reads no progress at all. */
+export function planResume(dayKey, light = "green") {
+  const day = DAYS[dayKey] || {};
+  const resolvedLight = day.spa ? "recovery" : light;
+  const care = !!day.spa || resolvedLight === "recovery";
+  const prog = care ? null : loadDayProgress(dayKey);
+  const lockedLight = prog && prog.lockedLight;
+  const finalLight = lockedLight ? lowerLight(lockedLight, resolvedLight) : resolvedLight;
+  const skipBlocks = (prog && prog.done) || [];
+  const bankedRounds = (prog && Number(prog.mainRoundsCompleted)) || 0;
+  const mainOwed = care ? 0 : Math.max(0, roundsForLight(finalLight) - bankedRounds);
+  const bankedMoves = (prog && prog.moves) || {};
+  const circuits = care
+    ? assembleCircuits(dayKey, finalLight, { skip: [] })
+    : assembleCircuits(dayKey, finalLight, {
+        skip: skipBlocks.filter(b => !(b === "main" && mainOwed > 0)),
+        mainRounds: mainOwed,
+        skipMoves: bankedMoves,
+        mainPartialRound: bankedMoves.main || [],
+        // Rounds already on disk, so this sitting's rows are numbered as rounds
+        // OF THE DAY and cannot collide with the earlier sitting's.
+        roundOffset: bankedRounds
+      });
+  return { circuits, prog, light: finalLight, care, mainOwed, bankedRounds, bankedMoves };
+}
+
+/* ---- back a move -----------------------------------------------------------
+   Where "◀ Back" would take her from the phase she is in. During a move it is
+   the move before; during the breather after one, it is that move again. There
+   is no target during the lead-in or a prompt. */
+function backTarget() {
+  if (!sess.running) return null;
+  if (sess.explore) return sess.stepIdx > 0 ? sess.stepIdx - 1 : null;
+  const ph = sess.phase;
+  if (ph === "work" || ph === "reps" || ph === "sideswitch") return sess.stepIdx - 1;
+  if (ph === "rest" || ph === "roundRest" || ph === "sectionRest" || ph === "formcheck") return sess.stepIdx;
+  return null;
+}
+
+/* Back is offered only where it can be honoured IN MEMORY. A committed main
+   round has been written to the day's progress record, and a finished block
+   has retired its move list from that record; undoing either means rewriting
+   what a resume reads, which is the kind of bookkeeping this app has been
+   burned by before. So a round that counted, or a block that closed, is behind
+   her for good — and the button says so by not being there. */
+export function canGoBack() {
+  const t = backTarget();
+  if (t == null || t < 0) return false;
+  if (sess.explore) return true;
+  const st = sess.steps && sess.steps[t];
+  if (!st) return false;
+  if (st.ci !== sess.ci) return false;
+  if (sess.roundsCounted[st.ci + ":" + st.absRound]) return false;
+  return true;
+}
+
+/* Undo everything from step `target` on, so the loop can walk it again.
+   Every reached step wrote exactly one ledger row, in order, so the rows to
+   drop are the tail. Skips are tagged with the step they happened on. */
+function rewindTo(target) {
+  const dropped = sess.ledger.slice(target);
+  sess.ledger.length = Math.min(sess.ledger.length, target);
+  dropped.forEach(unbankMove);
+  sess.exDone = sess.ledger.length;
+  sess.skipped = (sess.skipped || []).filter(e => !(Number.isFinite(e.step) && e.step >= target));
+  // Replay the per-key status from the rows that remain.
+  sess.exStatus = {};
+  sess.ledger.forEach(row => {
+    const c = sess.circuits[row.ci] || {};
+    const key = row.ci + "-" + row.ei;
+    const r = row.round - (Number.isFinite(Number(c.roundBase)) ? Number(c.roundBase) : 1) + 1;
+    sess.exStatus[key] = row.status === "skipped" ? "skipped"
+      : r === c.rounds ? row.status : sess.exStatus[key];
+  });
+  sess.backTo = null;
+  sess.skipExercise = false; sess.justSkipped = false; sess.forceDone = false;
+  sess.confirmSkip = false; sess.sideLabel = "";
+  return target;
+}
+const wentBack = () => sess.backTo != null;
+
 /* ============================================================
    MAIN RUNNER
    ============================================================ */
 export async function startSession({ dayKey, light = "green", mode = null, suggestedLight = null, readiness = null }) {
   if (sess.running) return;
-  // Try-It never reaches the engine any more — it is a browse screen with no
-  // timer, no rounds and no record (see js/vm/tryit.js). Refuse it here so a
-  // stale caller can't quietly start a real, recorded workout in "test" mode.
-  if (mode === "tryit") return;
-  ensureAudio();
   const day = DAYS[dayKey];
   if (!day) return;
+  // Explore: the same screen, nothing counting down, nothing saved. Its own
+  // small runner, so not one branch of the real one has to know about it.
+  if (mode === "explore") return runExplore(dayKey);
+  ensureAudio();
 
   // Recovery is an explicit MODE, not a light with zero rounds — the whole
   // point of the check is that a sore day gets recovery rather than a shortened
@@ -1149,15 +1272,16 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
      Care never reads or locks anything: a recovery pass is not the training
      day's work, which is the same reason it never touches its progress record.
      Only a locked light already on disk can hold: a first sitting has nothing
-     to lock, so nothing about a single-sitting day moves. */
-  const careRun = !!day.spa || isRecovery;
-  const dayProg = careRun ? null : loadDayProgress(dayKey);
-  const lockedLight = dayProg && dayProg.lockedLight;
-  const finalLight = lockedLight ? lowerLight(lockedLight, resolvedLight) : resolvedLight;
+     to lock, so nothing about a single-sitting day moves.
+
+     All of that — and the same-day resume that skips what is already banked —
+     is planResume's, so the Today card can ask the identical question. */
+  const plan = planResume(dayKey, resolvedLight);
+  const prog = plan.prog;
   Object.assign(sess, blankSession(), {
     running: true, dayKey, mode: sessionMode,
     practice: false,
-    light: finalLight,
+    light: plan.light,
     // What the readiness check produced, before any grown-up moved it. Kept so
     // readiness analytics can read the body's answer and executed-load
     // analytics can read what was actually trained.
@@ -1179,20 +1303,11 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
   // What actually ran, back onto the check that suggested it.
   stampReadinessOutcome(resolvedLight, resolvedSuggestion !== resolvedLight);
 
-  // Same-day resume: blocks already completed today are skipped. A care session
-  // does not even READ the training day's progress — see isCareSession. Read
-  // once, above, because the locked light has to be known before the plan is.
-  const prog = dayProg;
-  const skipBlocks = (prog && prog.done) || [];
-  /* Main resumes by ROUNDS, never by name. A finished-block list cannot say that
-     one round of a Red day is banked while a Green day still wants two more, so
-     a raised light dropped Main outright and ran a session with no main set. */
-  const bankedRounds = (prog && Number(prog.mainRoundsCompleted)) || 0;
-  const mainOwed = Math.max(0, roundsForLight(sess.light) - bankedRounds);
+  const bankedRounds = plan.bankedRounds;
+  const mainOwed = plan.mainOwed;
   /* Moves finished earlier today, and the credit they were worth. Both come off
      the day's record rather than being recounted from the session log, because
      the record is what the banking wrote and it is per-day by construction. */
-  const bankedMoves = (prog && prog.moves) || {};
   sess.bankedCredit = isCareSession() ? 0 : (Number(prog && prog.bankedCredit) || 0);
   /* A resume continues the SAME workout; anything else starts a new one. Care
      never joins the training day's workout — it is not that day's work, which
@@ -1200,17 +1315,11 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
   sess.workoutInstanceId = (!isCareSession() && prog && prog.workoutInstanceId)
     ? prog.workoutInstanceId
     : newWorkoutInstanceId();
-  sess.circuits = isCareSession()
-    ? assembleCircuits(dayKey, sess.light, { skip: [] })
-    : assembleCircuits(dayKey, sess.light, {
-        skip: skipBlocks.filter(b => !(b === "main" && mainOwed > 0)),
-        mainRounds: mainOwed,
-        skipMoves: bankedMoves,
-        mainPartialRound: bankedMoves.main || [],
-        // Rounds already on disk, so this sitting's rows are numbered as rounds
-        // OF THE DAY and cannot collide with the earlier sitting's.
-        roundOffset: bankedRounds
-      });
+  sess.circuits = plan.circuits;
+  /* NOTHING LEFT TO RUN. This return happens BEFORE THE FIRST AWAIT, and
+     js/main.js relies on that: it reads `sess.running` straight after calling
+     this and steps back to Today rather than leaving a dead session screen up.
+     Keep it synchronous. */
   if (!sess.circuits.length) { sess.running = false; return; }
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
   /* THE ASK IS THE DAY'S, NOT THIS SITTING'S.
@@ -1280,181 +1389,213 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
 
   let preAnnounced = false;
 
-  for (let ci = 0; ci < circuits.length; ci++) {
-    const circuit = circuits[ci];
+  /* The workout, as one list. Round and block boundaries are where the NEXT
+     step changes round or circuit — the same moments the nested loops closed
+     their braces — so every hook fires exactly where it used to. */
+  const steps = buildSteps(circuits);
+  sess.steps = steps;
+  sess.totalSteps = steps.length;
 
-    for (let r = 1; r <= circuit.rounds; r++) {
-      for (let ei = 0; ei < circuit.exercises.length; ei++) {
-        const ex = circuit.exercises[ei];
-        if (ex.rounds && r > ex.rounds) continue;
-        sess.skipExercise = false;
-        sess.currentEx = ex;
-        // The round of the DAY, not of this circuit — a resume's remainder round
-        // is round two, and both the ledger and the screen have to say so.
-        const absRound = roundNumber(circuit, r);
-        sess.ci = ci; sess.ei = ei; sess.round = absRound;
-        resetExerciseClock();
-        setUpNext(circuits, ci, r, ei);
+  for (let s = 0; s < steps.length; s++) {
+    const st = steps[s];
+    const { ci, r, ei, ex, circuit, absRound } = st;
+    const next = steps[s + 1] || null;
+    const isLastOfRound = !next || next.ci !== ci || next.r !== r;
+    const isLastOfBlock = !next || next.ci !== ci;
 
-        // ---------- WORK ----------
-        const work = ex.byReps ? 0 : exWork(ex);
-        playCue("work");
-        if (ex.byReps) {
-          setPhase("reps");
-          if (!preAnnounced) await speakAndWait(ex.name + "." + (ex.reset ? " " + ex.reset : "") + " Go.");
-          preAnnounced = false;
-          const result = await runPrescribedReps(ex);
-          if (result === "abort") return finalize(false);
-        } else {
-          sess.timerSecs = work; sess.timerMax = work;
-          setPhase("work");
-          if (!preAnnounced) await speakAndWait(ex.name + "." + (ex.reset ? " " + ex.reset : "") + " Three, two, one, go.");
-          preAnnounced = false;
+    sess.stepIdx = s;
+    sess.skipExercise = false;
+    sess.currentEx = ex;
+    // The round of the DAY, not of this circuit — a resume's remainder round
+    // is round two, and both the ledger and the screen have to say so.
+    sess.ci = ci; sess.ei = ei; sess.round = absRound;
+    resetExerciseClock();
+    setUpNext(next);
 
-          if (ex.eachSide) {
-            const half = Math.floor(work / 2);
-            sess.sideLabel = `${half}s first side`;
-            const r3 = await countdown(half);
-            if (r3 === "abort") return finalize(false);
-            if (r3 !== "skip") {
-              setPhase("sideswitch");
-              await speakAndWait("Nice. Switch sides — five to reset.");
-              const r4 = await countdown(SIDE_SWITCH_BUFFER);
-              if (r4 === "abort") return finalize(false);
-              if (r4 !== "skip") {
-                sess.sideLabel = `${half}s second side`;
-                setPhase("work");
-                await speakAndWait(ex.name + " second side. Three, two, one, go.");
-                const r5 = await countdown(half);
-                if (r5 === "abort") return finalize(false);
-              }
-            }
-            sess.sideLabel = "";
-          } else {
-            const r6 = await countdown(work);
-            if (r6 === "abort") return finalize(false);
+    /* "◀ Back" can land during any await below — a countdown, a rep, or a
+       spoken line that cannot itself return "back". One check, after each. */
+    const back = () => { s = rewindTo(sess.backTo) - 1; preAnnounced = false; };
+
+    // ---------- WORK ----------
+    const work = ex.byReps ? 0 : exWork(ex);
+    playCue("work");
+    if (ex.byReps) {
+      setPhase("reps");
+      if (!preAnnounced) await speakAndWait(ex.name + "." + (ex.reset ? " " + ex.reset : "") + " Go.");
+      preAnnounced = false;
+      if (sess.abort) return finalize(false);
+      if (wentBack()) { back(); continue; }
+      const result = await runPrescribedReps(ex);
+      if (result === "abort") return finalize(false);
+      if (result === "back" || wentBack()) { back(); continue; }
+    } else {
+      sess.timerSecs = work; sess.timerMax = work;
+      setPhase("work");
+      if (!preAnnounced) await speakAndWait(ex.name + "." + (ex.reset ? " " + ex.reset : "") + " Three, two, one, go.");
+      preAnnounced = false;
+      if (sess.abort) return finalize(false);
+      if (wentBack()) { back(); continue; }
+
+      if (ex.eachSide) {
+        const half = Math.floor(work / 2);
+        sess.sideLabel = `${half}s first side`;
+        const r3 = await countdown(half);
+        if (r3 === "abort") return finalize(false);
+        if (r3 === "back") { back(); continue; }
+        if (r3 !== "skip") {
+          setPhase("sideswitch");
+          await speakAndWait("Nice. Switch sides — five to reset.");
+          if (sess.abort) return finalize(false);
+          if (wentBack()) { back(); continue; }
+          const r4 = await countdown(SIDE_SWITCH_BUFFER);
+          if (r4 === "abort") return finalize(false);
+          if (r4 === "back") { back(); continue; }
+          if (r4 !== "skip") {
+            sess.sideLabel = `${half}s second side`;
+            setPhase("work");
+            await speakAndWait(ex.name + " second side. Three, two, one, go.");
+            if (sess.abort) return finalize(false);
+            if (wentBack()) { back(); continue; }
+            const r5 = await countdown(half);
+            if (r5 === "abort") return finalize(false);
+            if (r5 === "back") { back(); continue; }
           }
         }
-
-        const key = ci + "-" + ei;
-        // Clear the skip flag BEFORE the rest phase — leaving it set makes the
-        // rest countdown resolve "skip" instantly, so a skipped exercise used
-        // to also swallow its rest (and the justSkipped minimum below).
-        const wasSkipped = sess.skipExercise;
-        sess.skipExercise = false;
-        sess.exDone += 1;
-
-        // ---------- LEDGER ----------
-        // What ACTUALLY happened, one row per exercise per round. The old code
-        // wrote perExercise only when r === 1, so a move skipped in round two
-        // or three left no trace at all, and it inferred "done" from reaching
-        // the end of the loop — so tapping Done instantly on everything still
-        // produced a fully completed session.
-        const row = recordExercise(ex, circuit, ci, ei, absRound, wasSkipped);
-        // Banked NOW, not when the block ends — an interrupted session must keep
-        // every move it actually finished. See bankMove.
-        bankMove(row);
-        // And the ROUND is committed now too, for the same reason one move down:
-        // everything between here and the next round — the form check below, the
-        // round-rest speech, the rest itself — can abort, and each abort used to
-        // discard a round she had already finished. See commitRoundIfDone.
-        if (circuit.block === "main") commitRoundIfDone(ci, absRound);
-        sess.exStatus[key] = row.status === "skipped" ? "skipped"
-          : r === circuit.rounds ? row.status : sess.exStatus[key];
-
-        // Self-check only the moves this run is watching (see pickSpotChecks),
-        // and only the first time each one comes round — main runs 2–3 rounds.
-        // A pending check is never overwritten by the next move: it is awaited
-        // here and resolved before the loop can reach another one.
-        if ((circuit.block === "main" || circuit.block === "prep") && row.status === "done"
-            && sess.spotChecks.includes(ex.name) && !sess.spotAsked[ex.name]
-            && !sess.pendingCleanCheck) {
-          sess.spotAsked[ex.name] = true;
-          const fc = await formCheckPrompt(ex.name);
-          if (fc === "abort") return finalize(false);
-        }
-
-        // ---------- REST ----------
-        const isFinalEx =
-          ci === circuits.length - 1 &&
-          r === circuit.rounds &&
-          ei === circuit.exercises.length - 1;
-
-        if (!isFinalEx) {
-          const upcomingEx = nextExercise(circuits, ci, r, ei);
-          const isLastOfRound = ei === circuit.exercises.length - 1;
-          const isLastCircuit = ci === circuits.length - 1;
-          const isRoundBreak = isLastOfRound && r < circuit.rounds;
-          const isBlockBreak = isLastOfRound && r === circuit.rounds && !isLastCircuit;
-
-          if (isRoundBreak) {
-            if (circuit.block === "main" && r === 1 && !sess.intentWord && !sess.spa && !sess.recovery) {
-              const iw = await intentWordPrompt();
-              if (iw === "abort") return finalize(false);
-            }
-            playCue("rest");
-            setPhase("roundRest");
-            const roundProgress = `Round ${r} done! You've got ${circuit.rounds - r} more to crush!`;
-            await speakAndWait(roundProgress);
-            if (voiceOn()) speakIfIdle("Did that feel different from the first round? Just ask yourself.");
-            const leadTime = upcomingEx && HARD_EXERCISES.has(upcomingEx.name) ? 8 : 5;
-            const result = await countdown(configuredRoundRest(), {
-              onTick: (rem) => {
-                if (rem === leadTime && upcomingEx) {
-                  speakIfIdle("Get ready for " + upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : ""));
-                }
-              }
-            });
-            if (result === "abort") return finalize(false);
-            if (result !== "skip" && voiceOn()) await speakAndWait(nextEncouragement());
-          } else if (isBlockBreak) {
-            playCue("rest");
-            setPhase("sectionRest");
-            await speakAndWait(`Block done! Next up: ${circuits[ci + 1].name}.`);
-            const result = await countdown(configuredSectionRest(), {
-              onTick: (rem) => {
-                if (rem === 4 && upcomingEx) {
-                  speakIfIdle("Get ready for " + upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : ""));
-                }
-              }
-            });
-            if (result === "abort") return finalize(false);
-          } else {
-            let restDuration = configuredExerciseRest();
-            if (sess.justSkipped) restDuration = Math.max(restDuration, 4);
-            sess.justSkipped = false;
-            playCue("rest");
-            sess.restCue = upcomingEx && upcomingEx.reset ? `Next: ${upcomingEx.reset}` : "Breathe and reset.";
-            setPhase("rest");
-            const nextName = upcomingEx ? upcomingEx.name : "";
-            if (voiceOn()) await speakAndWait(nextName ? `Rest. Next: ${nextName}.` : "Rest.");
-            let said = {};
-            const result = await countdown(restDuration, {
-              onTick: (rem) => {
-                if (rem >= 1 && rem <= 3 && !said[rem]) { said[rem] = true; speak(String(rem)); }
-              }
-            });
-            if (result === "abort") return finalize(false);
-            if (result !== "skip") { speak("Go"); preAnnounced = true; }
-          }
-        }
-      }
-      // "Rounds" means MAIN rounds trained. Every one-round block used to add
-      // to this same counter, so the finish screen showed a green day as 8.
-      //
-      // The round has normally been committed already, as its last row landed.
-      // This is the safety net for the ragged shapes: a move capped by
-      // `ex.rounds` means the last exercise of a round is not always the last
-      // INDEX of the circuit, so "its last row" is not a position we can trust.
-      // commitRoundIfDone counts a round once however often it is asked.
-      if (circuit.block === "main") {
-        const abs = roundNumber(circuit, r);
-        commitRoundIfDone(ci, abs);
-        logRoundShort(ci, abs);
+        sess.sideLabel = "";
+      } else {
+        const r6 = await countdown(work);
+        if (r6 === "abort") return finalize(false);
+        if (r6 === "back") { back(); continue; }
       }
     }
-    if (blockHadWork(ci)) sess.blocksCompleted += 1;
-    recordBlockDone(circuit.block, ci);
+
+    const key = ci + "-" + ei;
+    // Clear the skip flag BEFORE the rest phase — leaving it set makes the
+    // rest countdown resolve "skip" instantly, so a skipped exercise used
+    // to also swallow its rest (and the justSkipped minimum below).
+    const wasSkipped = sess.skipExercise;
+    sess.skipExercise = false;
+    sess.exDone += 1;
+
+    // ---------- LEDGER ----------
+    // What ACTUALLY happened, one row per exercise per round. The old code
+    // wrote perExercise only when r === 1, so a move skipped in round two
+    // or three left no trace at all, and it inferred "done" from reaching
+    // the end of the loop — so tapping Done instantly on everything still
+    // produced a fully completed session.
+    const row = recordExercise(ex, circuit, ci, ei, absRound, wasSkipped);
+    // Banked NOW, not when the block ends — an interrupted session must keep
+    // every move it actually finished. See bankMove.
+    bankMove(row);
+    // And the ROUND is committed now too, for the same reason one move down:
+    // everything between here and the next round — the form check below, the
+    // round-rest speech, the rest itself — can abort, and each abort used to
+    // discard a round she had already finished. See commitRoundIfDone.
+    if (circuit.block === "main") commitRoundIfDone(ci, absRound);
+    sess.exStatus[key] = row.status === "skipped" ? "skipped"
+      : r === circuit.rounds ? row.status : sess.exStatus[key];
+
+    // Self-check only the moves this run is watching (see pickSpotChecks),
+    // and only the first time each one comes round — main runs 2–3 rounds.
+    // A pending check is never overwritten by the next move: it is awaited
+    // here and resolved before the loop can reach another one.
+    if ((circuit.block === "main" || circuit.block === "prep") && row.status === "done"
+        && sess.spotChecks.includes(ex.name) && !sess.spotAsked[ex.name]
+        && !sess.pendingCleanCheck) {
+      sess.spotAsked[ex.name] = true;
+      const fc = await formCheckPrompt(ex.name);
+      if (fc === "abort") return finalize(false);
+      if (wentBack()) { back(); continue; }
+    }
+
+    // ---------- REST ----------
+    const isFinalEx = !next;
+
+    if (!isFinalEx) {
+      const upcomingEx = next.ex;
+      const isLastCircuit = ci === circuits.length - 1;
+      const isRoundBreak = isLastOfRound && r < circuit.rounds;
+      const isBlockBreak = isLastOfRound && r === circuit.rounds && !isLastCircuit;
+
+      if (isRoundBreak) {
+        if (circuit.block === "main" && r === 1 && !sess.intentWord && !sess.spa && !sess.recovery) {
+          const iw = await intentWordPrompt();
+          if (iw === "abort") return finalize(false);
+        }
+        playCue("rest");
+        setPhase("roundRest");
+        const roundProgress = `Round ${r} done! You've got ${circuit.rounds - r} more to crush!`;
+        await speakAndWait(roundProgress);
+        if (sess.abort) return finalize(false);
+        if (wentBack()) { back(); continue; }
+        if (voiceOn()) speakIfIdle("Did that feel different from the first round? Just ask yourself.");
+        const leadTime = upcomingEx && HARD_EXERCISES.has(upcomingEx.name) ? 8 : 5;
+        const result = await countdown(configuredRoundRest(), {
+          onTick: (rem) => {
+            if (rem === leadTime && upcomingEx) {
+              speakIfIdle("Get ready for " + upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : ""));
+            }
+          }
+        });
+        if (result === "abort") return finalize(false);
+        if (result === "back") { back(); continue; }
+        if (result !== "skip" && voiceOn()) await speakAndWait(nextEncouragement());
+        if (sess.abort) return finalize(false);
+        if (wentBack()) { back(); continue; }
+      } else if (isBlockBreak) {
+        playCue("rest");
+        setPhase("sectionRest");
+        await speakAndWait(`Block done! Next up: ${circuits[ci + 1].name}.`);
+        if (sess.abort) return finalize(false);
+        if (wentBack()) { back(); continue; }
+        const result = await countdown(configuredSectionRest(), {
+          onTick: (rem) => {
+            if (rem === 4 && upcomingEx) {
+              speakIfIdle("Get ready for " + upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : ""));
+            }
+          }
+        });
+        if (result === "abort") return finalize(false);
+        if (result === "back") { back(); continue; }
+      } else {
+        let restDuration = configuredExerciseRest();
+        if (sess.justSkipped) restDuration = Math.max(restDuration, 4);
+        sess.justSkipped = false;
+        playCue("rest");
+        sess.restCue = upcomingEx && upcomingEx.reset ? `Next: ${upcomingEx.reset}` : "Breathe and reset.";
+        setPhase("rest");
+        const nextName = upcomingEx ? upcomingEx.name : "";
+        if (voiceOn()) await speakAndWait(nextName ? `Rest. Next: ${nextName}.` : "Rest.");
+        if (sess.abort) return finalize(false);
+        if (wentBack()) { back(); continue; }
+        let said = {};
+        const result = await countdown(restDuration, {
+          onTick: (rem) => {
+            if (rem >= 1 && rem <= 3 && !said[rem]) { said[rem] = true; speak(String(rem)); }
+          }
+        });
+        if (result === "abort") return finalize(false);
+        if (result === "back") { back(); continue; }
+        if (result !== "skip") { speak("Go"); preAnnounced = true; }
+      }
+    }
+
+    // "Rounds" means MAIN rounds trained. Every one-round block used to add
+    // to this same counter, so the finish screen showed a green day as 8.
+    //
+    // The round has normally been committed already, as its last row landed.
+    // This is the safety net for the ragged shapes: a move capped by
+    // `ex.rounds` means the last exercise of a round is not always the last
+    // INDEX of the circuit, so "its last row" is not a position we can trust.
+    // commitRoundIfDone counts a round once however often it is asked.
+    if (isLastOfRound && circuit.block === "main") {
+      commitRoundIfDone(ci, absRound);
+      logRoundShort(ci, absRound);
+    }
+    if (isLastOfBlock) {
+      if (blockHadWork(ci)) sess.blocksCompleted += 1;
+      recordBlockDone(circuit.block, ci);
+    }
   }
 
   // Swim-skill extras: micro-loop Q&A + breath rehearsal. These are TRAINING
@@ -1474,6 +1615,79 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
   // A CARE session is not the day — finishing a Recovery pass must leave a
   // half-trained Monday exactly as it found it.
   if (!isCareSession()) clearProgressIfReplaced();
+}
+
+/* ============================================================
+   EXPLORE — the same screen, nothing counting down, nothing saved.
+
+   "Let me look at the moves" is not a workout, and it used to be handed a
+   whole different screen: a list, with a popup that opened off the bottom of
+   the page. The ask is the timer she already knows — photo, ring, the list
+   down the side, Next / Back / Skip — with the clock simply not running. So
+   this walks the day's moves once each (prep included) and waits for a tap on
+   every one of them. No body check, no rest, no ledger, no XP, no day
+   progress: the only things that move are the screen and her.
+   ============================================================ */
+function holdUntilTap() {
+  return new Promise(resolve => {
+    sess.holdResolver = (r) => { sess.holdResolver = null; resolve(r); };
+  });
+}
+
+async function runExplore(dayKey) {
+  const day = DAYS[dayKey] || {};
+  const light = day.spa ? "recovery" : "green";
+  // Every move once. The valgus gate still applies: a locked gate means
+  // Drop-and-Stick is the jump she is allowed to see.
+  const circuits = assembleCircuits(dayKey, light, { mainRounds: 1 })
+    .map(c => ({ ...c, rounds: 1, roundBase: 1 }));
+  if (!circuits.length) { sess.running = false; return; }
+  Object.assign(sess, blankSession(), {
+    running: true, explore: true, mode: "explore", dayKey, light,
+    spa: !!day.spa, recovery: light === "recovery", circuits,
+    expectedByRound: {}
+  });
+  const steps = buildSteps(circuits);
+  sess.steps = steps;
+  sess.totalSteps = steps.length;
+  sess.plannedSecs = estimateSessionSecs(circuits);
+
+  for (let s = 0; s < steps.length; s++) {
+    const st = steps[s];
+    const { ci, ei, ex } = st;
+    sess.stepIdx = s;
+    sess.currentEx = ex;
+    sess.ci = ci; sess.ei = ei; sess.round = 1;
+    setUpNext(steps[s + 1] || null);
+    sess.sideLabel = ex.eachSide ? "each side" : "";
+    if (ex.byReps) {
+      const p = exPrescription(ex);
+      sess.repsTarget = p.totalReps; sess.repsCounted = 0; sess.repNow = 0;
+      sess.timerSecs = 0; sess.timerMax = 0;
+      setPhase("reps");
+    } else {
+      const work = exWork(ex);
+      sess.timerSecs = work; sess.timerMax = work;
+      setPhase("work");
+    }
+    const r = await holdUntilTap();
+    if (r === "abort") {
+      // No setPhase here: the caller blanks `sess` on the same tick, and this
+      // continuation lands a microtask later.
+      sess.running = false; sess.abort = false;
+      return;
+    }
+    const key = ci + "-" + ei;
+    if (r === "back") {
+      if (s > 0) { delete sess.exStatus[(steps[s - 1].ci) + "-" + steps[s - 1].ei]; sess.exDone = s - 1; s -= 2; }
+      else s -= 1;
+      continue;
+    }
+    sess.exStatus[key] = r === "skip" ? "skipped" : "done";
+    sess.exDone = s + 1;
+  }
+  sess.running = false;
+  setPhase("done");
 }
 
 /* THE RECORD IS WRITTEN BEFORE THE RESUME IT REPLACES IS THROWN AWAY.
@@ -1792,7 +2006,10 @@ function pauseReasons() {
 }
 
 export function pauseSession(reason = PAUSE_USER) {
-  if (!sess.running) return;
+  // Nothing is counting in explore, so there is nothing to stop. Reading the
+  // instructions there must not put a "Resume my workout" button on a screen
+  // with no workout behind it.
+  if (!sess.running || sess.explore) return;
   syncClock();                       // close the span at the moment of the tap
   const reasons = pauseReasons();
   // A pause set directly on `sess` (or carried over from before this ran) is
@@ -1853,6 +2070,11 @@ export function advance() {
   // Tap the ring / Done: finishes a reps exercise early, ends a timed exercise
   // early (counts as done, not skipped), skips the current rest, or dismisses
   // an in-session prompt.
+  if (sess.explore) { if (sess.holdResolver) sess.holdResolver("done"); return; }
+  // The clean-check is its own phase, and Done there used to fall through to
+  // nothing: the button sat on screen and did nothing for up to thirty
+  // seconds. Done during the question means "move on" — no verdict recorded.
+  if (sess.phase === "formcheck") { skipFormCheck(); return; }
   if (sess.phase === "reps" && sess.byRepsResolver) { sess.byRepsResolver("done"); return; }
   if (sess.phase === "intent" && sess.intentResolver) { sess.intentResolver(null); return; }
   if (sess.phase === "microloop" && sess.microResolver) { sess.microResolver(null); return; }
@@ -1864,17 +2086,36 @@ export function advance() {
 }
 
 export function skipCurrentExercise() {
+  if (sess.explore) { if (sess.holdResolver) sess.holdResolver("skip"); return; }
   // During rests and prompts no exercise is underway — Skip there means
   // "skip the wait", not "log the exercise that just finished as skipped".
   if (!["work", "reps", "sideswitch"].includes(sess.phase)) { advance(); return; }
   if (sess.currentEx) {
-    sess.skipped.push({ name: sess.currentEx.name, round: `R${sess.round}`, at: Date.now() });
+    // Tagged with the step, so "back a move" can take the skip off the list
+    // when she goes back and does it after all.
+    sess.skipped.push({ name: sess.currentEx.name, round: `R${sess.round}`, at: Date.now(), step: sess.stepIdx });
     logEvent("skip", { ex: sess.currentEx.name, block: sess.currentEx.block || null });
   }
   sess.skipExercise = true;
   sess.justSkipped = true;
   if (sess.byRepsResolver) sess.byRepsResolver("skip");
   interruptSpeech("Okay, skipping — you've got the next one.");
+}
+
+/* "◀ Back a move". During a move: the move before it. During the breather
+   after one: that move again. The runner sees `backTo` at its next await (a
+   countdown, a rep, or the end of a spoken line) and rewinds — see rewindTo.
+   canGoBack() says where it is offered; this refuses anywhere else, so a
+   stale button can never rewind across a committed round. */
+export function goBackExercise() {
+  if (sess.explore) { if (sess.holdResolver) sess.holdResolver("back"); return; }
+  if (!canGoBack()) return;
+  sess.backTo = backTarget();
+  sess.confirmSkip = false;
+  cancelSpeech();
+  if (sess.byRepsResolver) sess.byRepsResolver("back");
+  if (sess.formResolver) sess.formResolver(null);
+  notify("phase");
 }
 
 export function openStopOverlay() {
@@ -1895,6 +2136,12 @@ export function endFromStop() {
 }
 export function endEarly() {
   sess.confirmEnd = false;
+  if (sess.explore) {
+    // Nothing was recorded, so nothing is "stopped" — no safety line, no record.
+    sess.abort = true;
+    if (sess.holdResolver) sess.holdResolver("abort");
+    return;
+  }
   sess.abort = true;
   if (sess.byRepsResolver) sess.byRepsResolver("abort");
   if (sess.intentResolver) sess.intentResolver(null);

@@ -198,9 +198,10 @@ export const DEFAULT_SETTINGS = {
    session after it; then it expired after two hours.
 
    None of that is needed to read an instruction. Every launchable day now has
-   its own "Explore the moves" button straight to the list, GO always means GO,
-   and there is no state to leave switched on. The settings keys are gone with
-   it; an old saved value simply goes unread.  */
+   its own "Explore the moves" button, which opens the ordinary workout screen
+   with nothing counting down and nothing saved (runExplore in js/engine.js);
+   GO always means GO, and there is no state to leave switched on. The settings
+   keys are gone with it; an old saved value simply goes unread.  */
 
 export let settings = loadSettings();
 

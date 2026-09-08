@@ -8,6 +8,7 @@
 
 import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS, migratePrizeAmnesty } from "./store.js";
 import { edmontonDayKey, escapeHtml } from "./util.js";
+import { DAYS } from "./data.js";
 import { restoreFromCloud, publishJourney, publishReadiness } from "./sync.js";
 import { downloadBackup, restoreBackupFile } from "./backup.js";
 import { buildTodayVM, journeyPathScrollIntoView } from "./vm/today.js";
@@ -17,8 +18,6 @@ import { newReadinessFlow, answerQuestion, setZoneSev, resetBodyCheck, confirmGr
 import { readinessScreen } from "./screens/readiness.js";
 import * as engine from "./engine.js";
 import { buildSessionVM, sessionQuizFor } from "./vm/session.js";
-import { buildTryItVM, tryItMoves } from "./vm/tryit.js";
-import { tryItScreen } from "./screens/tryit.js";
 import { sessionScreen, updateSessionTick } from "./screens/session.js";
 import { buildQuizDeck, answerQuizDeck, finishQuizDeck, quizDeckHtml, newPrizeDraw, claimPrize, prizeDrawHtml } from "./screens/overlays.js";
 import { buildProgressVM, toggleRedeem } from "./vm/progress.js";
@@ -50,7 +49,7 @@ export const state = {
   formCheckMonth: null,         // 'YYYY-MM' — Form Check month being reviewed (null = current)
   expanded: {},                 // day-card block expansion
   selectedDay: null,            // monday..sunday
-  tryIt: null,                  // dayKey while the Try-It browse screen is open
+  startNote: "",                // one-line reason a GO could not start, shown on the day card
   inSession: false,
   readiness: null,              // active readiness-check flow state (null = not in flow)
   pendingSession: null,         // { light, dayKey } — readiness → session handoff
@@ -174,8 +173,7 @@ function overlaysHtml() {
 
 export function render() {
   state.isWide = computeIsWide();
-  if (state.tryIt) { root.innerHTML = page(tryItScreen(buildTryItVM(state))); }
-  else if (state.readiness) { renderReadiness(); }
+  if (state.readiness) { renderReadiness(); }
   else if (state.inSession) { renderSession(); }
   else if (state.nav === "progress") {
     const railVm = buildTodayVM(state);
@@ -316,7 +314,7 @@ Object.assign(RAW, {
     const id = addProfile(name);
     if (id && switchProfile(id)) location.reload();
   },
-  selectDay(arg) { state.selectedDay = arg; state.expanded = {}; render(); },
+  selectDay(arg) { state.selectedDay = arg; state.expanded = {}; state.startNote = ""; render(); },
   toggleBlock(arg) { state.expanded[arg] = !state.expanded[arg]; render(); },
   /* Every one of these lives in the Grown-up Zone and changes how her sessions
      run or what gets recorded. All of them were reachable by anyone holding the
@@ -338,27 +336,27 @@ Object.assign(RAW, {
     const dayKey = arg || state.selectedDay || edmontonDayKey();
     // GO always means GO. Looking at the moves has its own button, so nothing
     // can re-point this one at the move list behind her.
+    state.startNote = "";
     state.readiness = newReadinessFlow(dayKey);
     render();
   },
-  goTryIt(arg) {
-    state.tryIt = arg || state.selectedDay || edmontonDayKey();
+  /* EXPLORE — the workout screen with nothing counting down and nothing
+     saved. Straight in, no Body Check: there is no load to check a body
+     against. See runExplore in js/engine.js. */
+  goExplore(arg) {
+    const dayKey = arg || state.selectedDay || edmontonDayKey();
+    state.startNote = "";
+    state.readiness = null;
+    state.selectedDay = dayKey;   // Done looking lands back on this day
     state.detailOverlay = false; state.detailEx = null;
-    render();
+    launchSession({ dayKey, mode: "explore" });
   },
-  exitTryIt() {
-    // Closing the list is the whole of leaving: there is no mode to stand down.
-    state.tryIt = null;
-    state.detailOverlay = false; state.detailEx = null;
-    render();
+  /* "✕ Done looking" — nothing to confirm and nothing to save. */
+  exitExplore() {
+    engine.endEarly();
+    leaveSession({ keepDay: true });
   },
-  tryItDetail(arg) {
-    const moves = tryItMoves(state.tryIt);
-    const ex = moves[Number(arg)];
-    if (!ex) return;
-    state.detailEx = ex; state.detailOverlay = true;
-    render();
-  },
+  goBack() { engine.goBackExercise(); },
   startQuizDeck() {
     state.quizDeck = buildQuizDeck(8);
     render();
@@ -514,6 +512,7 @@ Object.assign(RAW, {
     state.detailOverlay = true;
     // Named reason, not a borrowed user pause: reading a move must not be
     // announced out loud, and must not count as her stopping for a breather.
+    // (In explore the engine ignores this — nothing there is counting.)
     engine.pauseSession("instructions");
     render();
   },
@@ -789,27 +788,53 @@ Object.assign(RAW, {
   },
 
   exitSession() {
-    engine.exitSession();
-    // The engine disarms try-it when a run finalizes; mirror that into the view
-    // state so the button and badges are right the moment we leave the session.
-    state.inSession = false;
-    state.pendingSession = null;
-    state.detailOverlay = false;
-    state.nav = "today";
-    state.selectedDay = edmontonDayKey();
-    // The unlock does not follow her back out of the Grown-up Zone.
-    lockGate();
-    state.gateAsk = null; state.prizeReviewOpen = false;
-    render();
+    // An explore walk-through ends on the day she was looking at; a real
+    // session always lands back on today.
+    leaveSession({ keepDay: !!engine.sess.explore });
   }
 });
 
-function startPendingSession(pending) {
-  state.readiness = null;
+/* Back to Today from any session screen, with the engine reset first. */
+function leaveSession({ keepDay = false } = {}) {
+  engine.exitSession();
+  state.inSession = false;
+  state.pendingSession = null;
+  state.detailOverlay = false; state.detailEx = null;
+  state.nav = "today";
+  if (!keepDay) state.selectedDay = edmontonDayKey();
+  // The unlock does not follow her back out of the Grown-up Zone.
+  lockGate();
+  state.gateAsk = null; state.prizeReviewOpen = false;
+  render();
+}
+
+/* THE ONE DOOR INTO A SESSION SCREEN, real or explore.
+
+   The engine can refuse to start — a day whose every block is already banked
+   under its light assembles nothing — and it says so by leaving `sess.running`
+   false BEFORE its first await (see startSession). This used to be ignored:
+   the screen had already been switched to the session, and she was left on a
+   dead "Ready?" with a clock at zero and buttons wired to a runner that did not
+   exist. A reload was the only way out. Now a refusal steps straight back to
+   Today and says why. */
+function launchSession(pending) {
   state.pendingSession = pending;
   state.inSession = true;
   render();
   engine.startSession(pending);
+  if (engine.sess.running) return;
+  state.inSession = false;
+  state.pendingSession = null;
+  const day = DAYS[pending.dayKey];
+  state.startNote = pending.mode === "explore"
+    ? "There are no moves to look at for that day."
+    : "Every block of " + ((day && day.title) || "that day") + " is already done for today's light — nothing left to finish. Tap Explore to look at the moves.";
+  render();
+}
+
+function startPendingSession(pending) {
+  state.readiness = null;
+  launchSession(pending);
 }
 
 root.addEventListener("click", e => {
