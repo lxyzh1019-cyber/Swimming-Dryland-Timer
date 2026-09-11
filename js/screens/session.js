@@ -120,8 +120,10 @@ function stopOverlay() {
     <div style="font-size:18px;font-weight:700;color:var(--ink);line-height:1.5;max-width:480px;">If something hurts — sharp pain, pinching, or numbness — <b>tell a grown-up right now</b>. Your body matters more than any streak.</div>
     <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;justify-content:center;">
       <button type="button" data-action="resumeFromStop" style="min-height:56px;border:none;border-radius:var(--radius-pill);padding:0 26px;background:var(--mint);color:#fff;font-weight:900;font-size:16px;cursor:pointer;font-family:inherit;box-shadow:0 4px 0 var(--mint-deep);">I'm okay — keep going</button>
-      <button type="button" data-action="endFromStop" style="min-height:56px;border:2px solid var(--stop);border-radius:var(--radius-pill);padding:0 26px;background:var(--surface);color:var(--stop-ink);font-weight:900;font-size:16px;cursor:pointer;font-family:inherit;">End session</button>
+      <button type="button" data-action="endFromStopNoPain" style="min-height:56px;border:2px solid var(--hairline);border-radius:var(--radius-pill);padding:0 26px;background:var(--surface);color:var(--ink);font-weight:900;font-size:16px;cursor:pointer;font-family:inherit;">I need to stop — nothing hurts</button>
+      <button type="button" data-action="endFromStop" style="min-height:56px;border:2px solid var(--stop);border-radius:var(--radius-pill);padding:0 26px;background:var(--surface);color:var(--stop-ink);font-weight:900;font-size:16px;cursor:pointer;font-family:inherit;">Stop — something hurts</button>
     </div>
+    <div style="font-size:14px;font-weight:700;color:var(--ink-soft);line-height:1.5;max-width:480px;">Stopping because something hurts is always right, and nothing from today is counted — it's a rest, not a workout. Stopping for another reason keeps everything you've done so far.</div>
   </div>`;
 }
 

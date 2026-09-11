@@ -25,10 +25,12 @@ export function newReadinessFlow(dayKey, practice) {
 
 /* Caution, in order. A light is never quietly downgraded by a second opinion:
    where the two signals disagree, the session runs the smaller day. */
-export const LIGHT_ORDER = ["green", "yellow", "red", "recovery"];
+// Caution order, most-to-least permissive. NOT the engine's LIGHT_ORDER (which
+// runs the other way for lowerLight) — named apart so nobody imports the wrong one.
+const CAUTION_ORDER = ["green", "yellow", "red", "recovery"];
 
 export function moreCautious(a, b) {
-  const ia = LIGHT_ORDER.indexOf(a), ib = LIGHT_ORDER.indexOf(b);
+  const ia = CAUTION_ORDER.indexOf(a), ib = CAUTION_ORDER.indexOf(b);
   if (ia < 0) return ib < 0 ? "green" : b;
   if (ib < 0) return a;
   return ia >= ib ? a : b;
@@ -56,7 +58,10 @@ export function confirmGrownup(r) { r.grownupOk = !r.grownupOk; }
    rule can be stated and tested without building a whole flow. */
 export function mayStartFromReadiness(r) {
   if (!r) return false;
-  const severity = Number(r.severity) || 0;
+  // The worst thing she reported THIS check, not only what is marked now: a
+  // "retry" clears the marks, and clearing a severity-3 mark must not clear
+  // the grown-up it called for. (maxSeverity is kept by resetBodyCheck.)
+  const severity = Math.max(Number(r.severity) || 0, Number(r.maxSeverity) || 0);
   const confirmed = r.grownupOk !== undefined ? !!r.grownupOk : !!r.grownupConfirmed;
   if (severity >= 3 && BODY_RESULTS[3] && BODY_RESULTS[3].needsGrownup) return confirmed;
   return true;
@@ -144,6 +149,8 @@ export function setZoneSev(r, num, level) {
   r.zoneSev = zs;
   r.pendingZone = null;
   r.severity = worst || null;
+  r.maxSeverity = Math.max(Number(r.maxSeverity) || 0, worst || 0);
+  r.bodyStepVisited = true;
   r.bodyLight = worst ? map[worst] : "green";
   /* Both signals, and we run the smaller day. The body map used to simply
      OVERWRITE the light, so a Recovery-grade set of readiness answers came out
@@ -162,8 +169,10 @@ export function resetBodyCheck(r) {
   // "Rest 1–2 min, then re-check": clear the MARKS so she can redo the body
   // check. Her readiness answers are not marks and are not cleared — re-checking
   // a sore shoulder must not quietly discard a Red night's sleep.
+  // The high-water mark survives on purpose: see mayStartFromReadiness.
+  r.maxSeverity = Math.max(Number(r.maxSeverity) || 0, Number(r.severity) || 0);
   r.severity = null; r.zoneSev = {}; r.resultSource = "readiness";
-  r.bodyLight = null;
+  r.bodyLight = null; r.bodyStepVisited = true;
   r.light = r.readinessLight || "green";
   r.suggestedLight = r.light; r.overridden = false; r.grownupOk = false;
 }
@@ -299,7 +308,10 @@ export function buildReadinessVM(r, isWide) {
     : "";
 
   const showInlineReadinessResult = step === "questions" && r.readinessDone && !isBodyResultPath;
-  const showInlineBodyResult = step === "bodyArea" && r.severity != null && selectedNums.length > 0;
+  // With every mark removed there is still an answer — the quick check's —
+  // and it is shown, rather than the card vanishing and leaving only the back
+  // arrow.
+  const showInlineBodyResult = step === "bodyArea" && ((r.severity != null && selectedNums.length > 0) || (selectedNums.length === 0 && !!r.readinessLight && !!r.bodyStepVisited));
 
   const bodyBranch = step === "bodyArea" || r.resultSource === "bodycheck";
   const STEPS = bodyBranch

@@ -462,6 +462,7 @@ Object.assign(RAW, {
   stopNow() { engine.openStopOverlay(); },
   resumeFromStop() { engine.resumeFromStop(); },
   endFromStop() { engine.endFromStop(); },
+  endFromStopNoPain() { engine.endFromStopNoPain(); },
   askEnd() { engine.sess.confirmEnd = true; render(); },
   cancelEnd() { engine.sess.confirmEnd = false; render(); },
   confirmEndEarly() { engine.endEarly(); },

@@ -9,7 +9,7 @@
    ============================================================ */
 
 import { deriveSessionOutcome, mainRoundsFromLedger, mainRoundReport, OUTCOME_VERSION } from "./outcome.js";
-import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA,
+import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, MICRO_LOOP, MANTRA,
          exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
          needsSetup, SETUP_SECONDS,
          VALGUS_FLOOR, VALGUS_PROGRESSIONS } from "./data.js";
@@ -44,7 +44,19 @@ function blankSession() {
   return {
     running: false, paused: false, pauseReasons: [], pauseCount: 0,
     abort: false, skipExercise: false, forceDone: false, forceDoneAt: 0,
+    /* A Done tap belongs to the PHASE it was tapped in. `phaseSeq` counts phase
+       changes and `forceDoneSeq` is stamped from it, so a countdown honours a
+       flag minted in its own phase and drops one from the phase before — the
+       1200 ms self-clearing timer this replaces let a second tap land on the
+       rest that followed the move. */
+    phaseSeq: 0, forceDoneSeq: -1,
     byRepsResolver: null, intentResolver: null, microResolver: null,
+    // Resolves the spoken lead-in early: "I know this one — go."
+    announceResolver: null,
+    // What the workout's light was before the day's lock lowered it, and
+    // whether the lock did. Both go on the record; see finalize.
+    lightLowered: false, wasOverridden: false, confirmSkip: false, quizCapped: false,
+    dayIso: null,
     currentEx: null, skipped: [], perExercise: [], justSkipped: false,
     phase: "greeting",           // greeting|getready|work|reps|sideswitch|rest|roundRest|sectionRest|intent|microloop|breath|done
     circuits: [], ci: 0, ei: 0, round: 1, exDone: 0,
@@ -82,7 +94,7 @@ function blankSession() {
        two. Minted when a plan starts, carried on the day's progress record, and
        written onto every session row and event the workout produces. */
     workoutInstanceId: null,
-    savedEntry: null, savedOutcome: null, saveFailed: false,
+    savedOutcome: null,
     blocksCompleted: 0, expectedByRound: {},
     repsCounted: 0, repsTarget: 0, repNow: 0, segmentsDone: 0, segmentsPlanned: 0,
     sideLabel: "", segmentLabel: "",
@@ -111,8 +123,32 @@ function blankSession() {
     dayKey: null, light: "green", practice: false, spa: false, recovery: false,
     endedEarly: false, xpEarned: 0, leveledUp: false,
     mood: null, wentWell: null, nextTime: null, quizPick: null, quizXp: 0,
-    savedEntry: false, saveFailed: false, savedKey: null, fsId: null
+    savedEntry: null, saveFailed: false, savedKey: null, fsId: null,
+    suggestedLight: null, readinessDetail: null
   };
+}
+
+/* THE DOSE, SAID OUT LOUD. "Band Row. 8 to 10 reps each side." — the move's
+   name alone left her looking at the screen to learn how many, which is the
+   one thing the voice exists to spare her. One rule for reps and for time, so
+   the announcement, the rest cue and the second-side line all say it the same
+   way. Exported for the tests and the VM. */
+export function spokenDose(ex) {
+  if (!ex) return "";
+  if (ex.byReps && ex.prescription) {
+    const p = ex.prescription;
+    const n = p.repsHigh ? `${p.reps} to ${p.repsHigh}` : String(p.reps);
+    const unit = p.unit === "reps" ? (p.reps === 1 && !p.repsHigh ? "rep" : "reps") : p.unit;
+    let s = `${n} ${unit}`;
+    if (p.sides > 1) s += " each side";
+    if (p.dirs > 1) s += " each direction";
+    if (p.sets > 1) s = `${p.sets} sets of ${s}`;
+    return s;
+  }
+  const w = exWork(ex);
+  if (!(w > 0)) return "";
+  if (ex.eachSide) return `${Math.floor(w / 2)} seconds each side`;
+  return `${w} seconds`;
 }
 
 let notify = () => {};
@@ -413,8 +449,10 @@ function countdown(seconds, opts = {}) {
     const id = setInterval(() => {
       if (sess.abort)        { clearInterval(id); resolve("abort"); return; }
       if (sess.backTo != null) { clearInterval(id); resolve("back"); return; }
-      // Honor a Done-tap only if it landed AFTER this countdown began — a stale
-      // flag from the previous phase must not skip a freshly-started one.
+      // Honor a Done-tap only if it was tapped IN THIS PHASE and after this
+      // countdown began — a flag from the phase before must not skip a
+      // freshly-started one, however recently it was tapped.
+      if (sess.forceDone && sess.forceDoneSeq !== sess.phaseSeq) sess.forceDone = false;
       if (sess.forceDone && sess.forceDoneAt >= started) { sess.forceDone = false; clearInterval(id); endBeep(); resolve("done"); return; }
       if (sess.forceDone && sess.forceDoneAt < started) sess.forceDone = false;   // drop the stale flag
       if (sess.skipExercise) { clearInterval(id); resolve("skip");  return; }
@@ -441,6 +479,7 @@ function sleep(ms) {
     const id = setInterval(() => {
       if (sess.abort)        { clearInterval(id); resolve("abort"); return; }
       if (sess.backTo != null) { clearInterval(id); resolve("back"); return; }
+      if (sess.forceDone && sess.forceDoneSeq !== sess.phaseSeq) sess.forceDone = false;
       if (sess.forceDone && sess.forceDoneAt >= started) { sess.forceDone = false; clearInterval(id); resolve("done"); return; }
       if (sess.forceDone && sess.forceDoneAt < started) sess.forceDone = false;
       if (sess.skipExercise) { clearInterval(id); resolve("skip");  return; }
@@ -694,6 +733,7 @@ function stopElapsed() {
 /* ---- helpers ---- */
 function setPhase(phase) {
   sess.phase = phase;
+  sess.phaseSeq = (sess.phaseSeq || 0) + 1;
   // A pending "Skip this exercise?" ask belongs to the phase it was raised in.
   // Left standing, a countdown that expires mid-ask would point the confirm at
   // whatever came next — so every transition clears it.
@@ -1246,6 +1286,26 @@ function rewindTo(target) {
 }
 const wentBack = () => sess.backTo != null;
 
+/* THE LEAD-IN IS ITS OWN PHASE, AND THE CLOCK WAITS FOR IT.
+
+   The work phase used to be set BEFORE the coach spoke the move's name, so the
+   three or four seconds of "Band Row. Three, two, one, go" were charged to the
+   move as work (an instant Done then read as a partial, never a skip), the ring
+   was already counting while she was still being told what to do, and a Done
+   tap during the announcement was thrown away as stale by the countdown that
+   started afterwards. The announcement is a phase of its own now: nothing is
+   charged, the ring reads READY, and a tap during it means "I know this one —
+   go", which cuts the speech and starts the clock. */
+async function announce(text) {
+  setPhase("announce");
+  if (!voiceOn()) return;
+  let early = false;
+  const tap = new Promise(res => { sess.announceResolver = () => { early = true; res(); }; });
+  await Promise.race([speakAndWait(text), tap]);
+  sess.announceResolver = null;
+  if (early) cancelSpeech();
+}
+
 /* ============================================================
    MAIN RUNNER
    ============================================================ */
@@ -1313,8 +1373,12 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
       resultSource: readiness.resultSource || null
     } : null
   });
-  // What actually ran, back onto the check that suggested it.
-  stampReadinessOutcome(resolvedLight, resolvedSuggestion !== resolvedLight);
+  /* What actually ran, back onto the check that suggested it. `plan.light` is
+     the light after the day's lock — the one that RAN. A lock lowering the day
+     is not a grown-up's override, and the record says which it was. */
+  sess.wasOverridden = resolvedSuggestion !== resolvedLight;
+  sess.lightLowered = plan.light !== resolvedLight;
+  stampReadinessOutcome(plan.light, sess.wasOverridden);
 
   const bankedRounds = plan.bankedRounds;
   const mainOwed = plan.mainOwed;
@@ -1441,22 +1505,23 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     // ---------- WORK ----------
     const work = ex.byReps ? 0 : exWork(ex);
     playCue("work");
+    const dose = spokenDose(ex);
     if (ex.byReps) {
-      setPhase("reps");
-      if (!preAnnounced) await speakAndWait(ex.name + "." + (ex.reset ? " " + ex.reset : "") + " Go.");
+      if (!preAnnounced) await announce(ex.name + "." + (dose ? " " + dose + "." : "") + (ex.reset ? " " + ex.reset : "") + " Go.");
       preAnnounced = false;
       if (sess.abort) return finalize(false);
       if (wentBack()) { back(); continue; }
+      setPhase("reps");
       const result = await runPrescribedReps(ex);
       if (result === "abort") return finalize(false);
       if (result === "back" || wentBack()) { back(); continue; }
     } else {
       sess.timerSecs = work; sess.timerMax = work;
-      setPhase("work");
-      if (!preAnnounced) await speakAndWait(ex.name + "." + (ex.reset ? " " + ex.reset : "") + " Three, two, one, go.");
+      if (!preAnnounced) await announce(ex.name + "." + (dose ? " " + dose + "." : "") + (ex.reset ? " " + ex.reset : "") + " Three, two, one, go.");
       preAnnounced = false;
       if (sess.abort) return finalize(false);
       if (wentBack()) { back(); continue; }
+      setPhase("work");
 
       if (ex.eachSide) {
         const half = Math.floor(work / 2);
@@ -1468,16 +1533,17 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
           setPhase("sideswitch");
           await speakAndWait("Nice. Switch sides — five to reset.");
           if (sess.abort) return finalize(false);
+          if (sess.abort) return finalize(false);
           if (wentBack()) { back(); continue; }
           const r4 = await countdown(SIDE_SWITCH_BUFFER);
           if (r4 === "abort") return finalize(false);
           if (r4 === "back") { back(); continue; }
           if (r4 !== "skip") {
             sess.sideLabel = `${half}s second side`;
-            setPhase("work");
-            await speakAndWait(ex.name + " second side. Three, two, one, go.");
+            await announce(ex.name + " second side, " + half + " seconds. Three, two, one, go.");
             if (sess.abort) return finalize(false);
             if (wentBack()) { back(); continue; }
+            setPhase("work");
             const r5 = await countdown(half);
             if (r5 === "abort") return finalize(false);
             if (r5 === "back") { back(); continue; }
@@ -1591,8 +1657,10 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
           : upcomingEx && upcomingEx.reset ? `Next: ${upcomingEx.reset}` : "Breathe and reset.";
         setPhase("rest");
         const nextName = upcomingEx ? upcomingEx.name : "";
+        const nextDose = upcomingEx ? spokenDose(upcomingEx) : "";
+        const nextLine = nextName + (nextDose ? ", " + nextDose : "");
         if (voiceOn()) await speakAndWait(nextName
-          ? (setup ? `Rest. Next: ${nextName} — get it set up.` : `Rest. Next: ${nextName}.`)
+          ? (setup ? `Rest. Next: ${nextLine} — get it set up.` : `Rest. Next: ${nextLine}.`)
           : "Rest.");
         if (sess.abort) return finalize(false);
         if (wentBack()) { back(); continue; }
@@ -1822,7 +1890,8 @@ export function finalize(completed) {
     sessionType: sess.recovery && !sess.spa ? "recovery" : sess.spa ? "spa" : "main",
     lightResult: sess.light,
     suggestedLight: sess.suggestedLight || sess.light,
-    wasOverridden: (sess.suggestedLight || sess.light) !== sess.light,   // a grown-up moved it
+    wasOverridden: !!sess.wasOverridden,   // a grown-up moved it (a lock lowering it is lightLowered)
+    lightLowered: !!sess.lightLowered,
     ...(sess.readinessDetail || {}),   // zones + answers, abnormal checks only
     // What was actually trained, and what the day asked for — two different
     // numbers. Storing only the planned one is what paid 150% for one day.
@@ -2104,13 +2173,15 @@ export function advance() {
   // nothing: the button sat on screen and did nothing for up to thirty
   // seconds. Done during the question means "move on" — no verdict recorded.
   if (sess.phase === "formcheck") { skipFormCheck(); return; }
+  // "I know this one — go": cut the lead-in and start the clock now.
+  if (sess.phase === "announce") { if (sess.announceResolver) sess.announceResolver(); return; }
   if (sess.phase === "reps" && sess.byRepsResolver) { sess.byRepsResolver("done"); return; }
   if (sess.phase === "intent" && sess.intentResolver) { sess.intentResolver(null); return; }
   if (sess.phase === "microloop" && sess.microResolver) { sess.microResolver(null); return; }
   if (["work", "rest", "roundRest", "sectionRest", "sideswitch", "getready", "greeting", "breath"].includes(sess.phase)) {
-    sess.forceDone = true;   // running countdown/sleep resolves as "done" within 1s
+    sess.forceDone = true;   // the running countdown/sleep resolves as "done" on its next tick
     sess.forceDoneAt = Date.now();
-    setTimeout(() => { sess.forceDone = false; }, 1200);
+    sess.forceDoneSeq = sess.phaseSeq;   // and only that one — see countdown
   }
 }
 
@@ -2148,6 +2219,7 @@ export function goBackExercise() {
 }
 
 export function openStopOverlay() {
+  if (!sess.running || sess.explore) return;   // nothing is running in explore
   sess.stopOverlay = true;
   cancelSpeech();
   pauseSession("stop");
@@ -2161,6 +2233,16 @@ export function resumeFromStop() {
 export function endFromStop() {
   sess.stopOverlay = false;
   sess.painFlag = true;
+  endEarly();
+}
+/* The red button also gets tapped for a bathroom, a phone call, a sibling —
+   and it used to cost her every XP of the session, because STOP meant pain
+   and nothing else. This is the other exit from the same overlay: the session
+   ends, and what she did is paid for, exactly like the grey End button. */
+export function endFromStopNoPain() {
+  sess.stopOverlay = false;
+  resumeSession("stop");
+  sess.painFlag = false;
   endEarly();
 }
 export function endEarly() {
@@ -2262,5 +2344,8 @@ export function exitSession() {
   stopElapsed();
   cancelSpeech();
   _pendingCloudPatch = null;
+  // Object.assign cannot DELETE: a key added during a run (a stray flag, a
+  // readiness detail) used to survive into the next one. Clear, then reset.
+  Object.keys(sess).forEach(k => { delete sess[k]; });
   Object.assign(sess, blankSession());
 }

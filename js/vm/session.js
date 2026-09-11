@@ -212,23 +212,30 @@ export function buildSessionVM(state) {
   // A move is only skippable while it is underway. Elsewhere Done already says
   // "skip rest", and a "Skip this exercise? It won't count." over a breather
   // was a question about a move that had already been recorded.
-  const canSkipExercise = phase === "work" || phase === "reps" || phase === "sideswitch";
+  const canSkipExercise = phase === "work" || phase === "reps" || phase === "sideswitch" || phase === "announce";
   const isBigRest = phase === "roundRest" || phase === "sectionRest";
   const timerIsReps = phase === "reps";
   const timerIsTime = !timerIsReps && !isPrompt;
 
   const bzMap = { warmup: "warmup", coordination: "work", main: "work", prep: "work", finisher: "rest", swimskill: "rest", recovery: "rest" };
-  const pzMap = { work: bzMap[circuit.block] || "work", rest: "rest", roundRest: "evening", sectionRest: "evening", sideswitch: "rest", getready: "warmup", greeting: "warmup", breath: "rest" };
+  const pzMap = { work: bzMap[circuit.block] || "work", rest: "rest", roundRest: "evening", sectionRest: "evening", sideswitch: "rest", getready: "warmup", greeting: "warmup", announce: "warmup", breath: "rest" };
   const timerZoneType = pzMap[phase] || "work";
   const timerZone = ({ work: "WORK", rest: "REST", roundRest: "ROUND REST", sectionRest: "SECTION REST",
-    sideswitch: "SWITCH", getready: "READY", greeting: "READY", breath: "BREATHE" })[phase] || "WORK";
+    sideswitch: "SWITCH", getready: "READY", greeting: "READY", announce: "READY", breath: "BREATHE" })[phase] || "WORK";
   const timerUrgent = sess.urgent && phase !== "roundRest" && phase !== "sectionRest";
 
   const bvMap = { warmup: "sun", coordination: "sun", main: "aqua", prep: "grape", finisher: "mint", swimskill: "sea", recovery: "grape" };
   const blockBadgeVariant = bvMap[circuit.block] || "aqua";
   const blockLabel = ({ warmup: "Warm-Up 🔥", coordination: "Coordination ⚡", main: "Main Circuit 💪",
     prep: "Prep Pair 🎯", finisher: "Finisher 🏁", swimskill: "Swim-Skill 🏊", recovery: "Recovery ❄️" })[circuit.block] || circuit.name || "";
-  const roundLabelText = circuit.block === "main" && circuit.rounds > 1 ? ("Round " + sess.round + " of " + circuit.rounds) : "";
+  /* THE DAY'S ROUNDS, on the live screen too. `circuit.rounds` is what THIS
+     sitting still owes, so a green day resumed after one banked round ran a
+     two-round circuit under "Round 3 of 2". The day's own ask is what the
+     finish screen and the XP already judge by. */
+  const dayRounds = circuit.block === "main"
+    ? Math.max(Number(sess.dayRoundsPlanned) || 0, (Number(sess.bankedRounds) || 0) + (circuit.rounds || 1))
+    : (circuit.rounds || 1);
+  const roundLabelText = circuit.block === "main" && dayRounds > 1 ? ("Round " + sess.round + " of " + dayRounds) : "";
 
   const stageTitle =
     phase === "greeting" ? "Ready?" :
@@ -254,8 +261,8 @@ export function buildSessionVM(state) {
   const secNames = { warmup: "Warm-Up", coordination: "Coordination", main: "Main", prep: "Prep", finisher: "Finisher", swimskill: "Swim-Skill", recovery: "Recovery" };
   const progressLabel = (secNames[circuit.block] || "") + " · " + Math.min(sess.ei + 1, circuit.exercises.length) + " of " + circuit.exercises.length;
   const sessionTimePct = Math.min(100, Math.round(sess.elapsed / Math.max(1, sess.plannedSecs) * 100));
-  const roundLine = (circuit.rounds || 1) > 1 ? ((circuit.name || "") + " · Round " + sess.round + " of " + circuit.rounds) : "";
-  const roundDots = (circuit.rounds || 1) > 1 ? Array.from({ length: circuit.rounds }, (_, i) => ({
+  const roundLine = dayRounds > 1 ? ((circuit.name || "") + " · Round " + sess.round + " of " + dayRounds) : "";
+  const roundDots = dayRounds > 1 ? Array.from({ length: dayRounds }, (_, i) => ({
     style: "width:10px;height:10px;border-radius:50%;flex-shrink:0;" + (i < sess.round - 1 ? "background:var(--mint);" : (i === sess.round - 1 ? "background:var(--aqua);" : "background:var(--surface-2);border:1.5px solid var(--hairline);box-sizing:border-box;"))
   })) : [];
 
@@ -407,7 +414,7 @@ export function buildSessionVM(state) {
       ? "Were your " + sess.cleanCheckMove + " reps clean?"
       : "Were your reps clean?",
     wobblyBanner: !!sess.lastWobbly && !isResting && !isPrompt,
-    doneLabel: explore ? "Next move ▶" : isResting ? "⏭ Skip Rest" : isFormCheck ? "Move on →" : "✓ Done — Next",
+    doneLabel: explore ? "Next move ▶" : isResting ? "⏭ Skip Rest" : isFormCheck ? "Move on →" : phase === "announce" ? "▶ Start now" : "✓ Done — Next",
 
     // prompts
     intentWords: INTENT_WORDS, microQ: MICRO_LOOP.q, microOpts: ["the hips", "the arms", "the knees"],
