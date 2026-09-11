@@ -66,7 +66,7 @@ export const UNGATED_ACTIONS = [
   "setGuTab", "setGsScope", "formCheckMonth", "dismissStorageError",
   // her own session, start to finish
   "goSession", "goExplore", "exitExplore", "goBack",
-  "advance", "pauseTimer", "skipEx", "stopNow", "resumeFromStop", "endFromStop",
+  "advance", "pauseTimer", "skipEx", "stopNow", "resumeFromStop", "endFromStop", "endFromStopNoPain",
   "askEnd", "cancelEnd", "confirmEndEarly",
   "askSkip", "cancelSkip", "confirmSkipEx", "pickIntent", "answerMicro",
   "pickClean", "pickWobbly", "skipFormCheck", "pickMood", "reflectWell",
@@ -91,9 +91,12 @@ export const GATE_REASON = {
   renameAthlete:  "change the athlete's name",
   restoreBackup:  "write a backup over her live history",
   forgetPasskey:  "remove the grown-up passkey from this device",
-  severity3:      "clear a pain report that changed how she moves",
-  lightOverride:  "override the light her body check produced",
-  safetySettings: "change the safety settings",
+  // Keyed by ACTION NAME — that is what gateHtml looks up. Three of these
+  // were named after the decision instead, and so were never found: the two
+  // safety prompts fell back to "…to continue".
+  rGrownupOk:     "clear a pain report that changed how she moves",
+  rPickLight:     "override the light her body check produced",
+  toggleSafetyVoice: "change the safety settings",
   reviewPrizes:   "review the prizes marked used",
   restorePrize:   "restore a prize the app marked used",
   confirmRestore: "write a backup over her live history",
