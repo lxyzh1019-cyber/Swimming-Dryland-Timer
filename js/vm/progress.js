@@ -16,10 +16,10 @@ const LIGHT_CHIP = {
   YELLOW: "var(--sun-wash);color:var(--sun-ink)",
   RED: "color-mix(in srgb, var(--stop) 12%, #fff);color:var(--stop)",
   RECOVERY: "color-mix(in srgb, var(--grape) 14%, #fff);color:var(--grape)",
-  MINI: "var(--aqua-wash);color:var(--aqua-ink)",
-  "ENDED EARLY": "color-mix(in srgb, var(--coral) 14%, #fff);color:var(--coral)",
-  "NOTHING LOGGED": "var(--surface-2);color:var(--ink-faint)",
-  "SAFETY STOP": "color-mix(in srgb, var(--stop) 12%, #fff);color:var(--stop)"
+  "SHORT DAY": "var(--aqua-wash);color:var(--aqua-ink)",
+  "STOPPED EARLY": "color-mix(in srgb, var(--coral) 14%, #fff);color:var(--coral)",
+  "NOT COUNTED": "var(--surface-2);color:var(--ink-faint)",
+  "STOPPED FOR PAIN": "color-mix(in srgb, var(--stop) 12%, #fff);color:var(--stop)"
 };
 const MOOD_EMOJI = { great: "😀", okay: "🙂", tired: "😴" };
 const MOOD_LABEL = { great: "Great", okay: "Okay", tired: "Tired" };
@@ -33,12 +33,13 @@ export function logEntryView(s) {
   // can never disagree with the streak, the week strip or the XP it paid.
   const oc = outcomeOf(s);
   const noWork = oc.state === "none";
-  const lightLabel = oc.state === "safety-stop" ? "SAFETY STOP"
+  // Her words, not the outcome authority's: this is the kid's own log.
+  const lightLabel = oc.state === "safety-stop" ? "STOPPED FOR PAIN"
     : oc.state === "recovery" ? "RECOVERY"
-    : noWork ? "NOTHING LOGGED"
-    : s.practice || s.sessionType === "try-it" ? "TRY-IT"
-    : oc.state === "partial" ? "ENDED EARLY"
-    : (s.mini || s.sessionType === "mini") ? "MINI"
+    : noWork ? "NOT COUNTED"
+    : s.practice || s.sessionType === "try-it" ? "NOT COUNTED"
+    : oc.state === "partial" ? "STOPPED EARLY"
+    : (s.mini || s.sessionType === "mini") ? "SHORT DAY"
     : (s.lightResult || s.light || "green").toUpperCase();
   const skips = (s.perExercise || []).filter(p => p.skipped).map(p => p.name);
   const note = [
@@ -179,11 +180,11 @@ export function buildProgressVM(state) {
   const allLog = sessions.filter(s => !s.practice).slice().reverse().map(logEntryView);
   const logScope = state.logScope || "week";
   const logItems = logScope === "week" ? allLog.slice(0, 4) : allLog;
-  const logScopeTab = (v) => "min-height:32px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:12px;padding:0 14px;font-family:inherit;"
+  const logScopeTab = (v) => "min-height:44px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:13px;padding:0 16px;font-family:inherit;"
     + (logScope === v ? "background:var(--aqua);color:#fff;" : "background:transparent;color:var(--ink-soft);");
   const logScopeTabs = [
-    { label: "Recent", key: "week", style: logScopeTab("week") },
-    { label: "All", key: "month", style: logScopeTab("month") }
+    { label: "Recent", key: "week", active: logScope === "week", style: logScopeTab("week") },
+    { label: "All", key: "month", active: logScope === "month", style: logScopeTab("month") }
   ];
 
   // Prize wallet
@@ -196,10 +197,10 @@ export function buildProgressVM(state) {
       ...pz, canUndo, spent,
       cardStyle: "display:flex;align-items:center;gap:10px;background:" + (pz.redeemed ? "var(--surface-2)" : "var(--surface)") + ";border:2px" + (pz.redeemed ? " dashed var(--hairline)" : " solid var(--sun)") + ";border-radius:16px;padding:10px 12px;" + (pz.redeemed ? "opacity:0.65;" : ""),
       redeemLabel: canUndo ? "✓ Used · undo" : pz.redeemed ? "✓ Used" : "Redeem",
-      redeemBtnStyle: "flex-shrink:0;min-height:32px;border-radius:var(--radius-pill);border:none;cursor:" + (spent ? "default" : "pointer") + ";font-weight:900;font-size:12px;padding:0 12px;font-family:inherit;"
+      redeemBtnStyle: "flex-shrink:0;min-height:44px;border-radius:var(--radius-pill);border:none;cursor:" + (spent ? "default" : "pointer") + ";font-weight:900;font-size:13px;padding:0 14px;font-family:inherit;"
         + (canUndo ? "background:var(--surface);color:var(--ink-soft);border:1.5px solid var(--hairline);"
           : pz.redeemed ? "background:transparent;color:var(--ink-faint);"
-          : "background:var(--sun);color:var(--sun-ink);")
+          : "background:var(--sun);color:var(--ink);")
     };
   });
 
@@ -266,8 +267,8 @@ export function buildProgressVM(state) {
   const per = (n, d, unit) => d > 0 ? (Math.round((n / d) * 10) / 10) + " " + unit : "—";
   const periodStats = {
     periodKey,
-    tabs: PROGRESS_PERIODS.map(p => ({ ...p, style:
-      "min-height:36px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:12px;padding:0 15px;font-family:inherit;"
+    tabs: PROGRESS_PERIODS.map(p => ({ ...p, active: p.key === periodKey, style:
+      "min-height:44px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:13px;padding:0 16px;font-family:inherit;"
       + (p.key === periodKey ? "background:var(--aqua);color:#fff;" : "background:transparent;color:var(--ink-soft);") })),
     rangeLabel: pSessions.length
       ? new Date(range.from + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Edmonton" })
@@ -276,21 +277,21 @@ export function buildProgressVM(state) {
     hasData: pCount > 0,
     rows: [
       { label: "Sessions finished", total: String(pDone.length), avg: per(pDone.length, weeks, "/ week") },
-      { label: "Completion status", total: pDone.length + " of " + pCount,
+      { label: "Finished the whole thing", total: pDone.length + " of " + pCount,
         avg: pCount ? Math.round((pDone.length / pCount) * 100) + "%" : "—" },
       { label: "Time", total: pMins >= 60 ? Math.floor(pMins / 60) + "h " + (pMins % 60) + "m" : pMins + "m",
         avg: per(pMins, pCount, "min / session") },
       { label: "Main rounds", total: pRounds + " of " + pPlannedRounds + (pPartial ? "  (" + pPartial + " partial)" : ""),
         avg: per(pRounds, pCount, "/ session") },
       { label: "XP earned", total: fmtXp(pXp), avg: per(pXp, pCount, "/ session") },
-      { label: "Levels upgraded", total: "+" + pLevels,
+      { label: "Levels gained", total: "+" + pLevels,
         avg: pLevels ? "one every " + per(pCount, pLevels, "sessions") : "—" },
       { label: "Clean form", total: pForm.asked ? pForm.clean + " of " + pForm.asked : "—",
         avg: pForm.asked ? Math.round((pForm.clean / pForm.asked) * 100) + "%" : "—" },
       { label: "How I felt", total: "😀" + pMoods.great + "  🙂" + pMoods.okay + "  😴" + pMoods.tired
         + (pMoodUnanswered ? "  · " + pMoodUnanswered + " not answered" : ""),
         avg: topMood && topMood[1] ? "mostly " + MOOD_EMOJI[topMood[0]] : "—" },
-      { label: "Tough days finished", total: String(pToughDone),
+      { label: "Hard days done anyway", total: String(pToughDone),
         avg: pCount ? Math.round((pToughDone / pCount) * 100) + "% of sessions" : "—" }
     ],
     // One bar per day: a good run and a dead patch are both obvious at a glance.

@@ -89,7 +89,7 @@ same(pv.sessionsLabel, "1 session", "and its label says the same thing the numbe
 const rowOf = label => pv.periodStats.rows.find(r => r.label === label);
 same(rowOf("XP earned").total, "360", "Progress reports the settled XP, not the sum of the stamps");
 same(rowOf("Main rounds").total, "3 of 3", "and all three main rounds");
-same(rowOf("Completion status").total, "1 of 1", "and one workout, finished");
+same(rowOf("Finished the whole thing").total, "1 of 1", "and one workout, finished");
 /* Derived from the two fragments, not written down as a constant: the point is
    that the minutes ADD, and pinning the sum meant any change to rest lengths
    (setup time for band and pull-up moves, say) failed this as if the additivity

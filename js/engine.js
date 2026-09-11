@@ -16,7 +16,7 @@ import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SID
 import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent,
          loadDayProgress, saveDayProgress, clearDayProgress, gateLocked, creditValgusWeek, addSkipRecord,
          addXp, pendingDrawCount, claimSessionXp, athleteId, noteSessionXpAwarded, patchSession, sessionKey,
-         XP_VERSION, flaggedMoves, isAbnormalCheck, stampReadinessOutcome } from "./store.js";
+         XP_VERSION, flaggedMoves, isAbnormalCheck, stampReadinessOutcome, levelFromXp } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn, speakSafety } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
 import { recoveryDoseSecs, refTime, edmontonISO } from "./util.js";
@@ -2008,7 +2008,10 @@ export function finalize(completed) {
     patchSession(sess.savedKey, { xpEarned: sess.xpEarned });
   }
   if (sess.xpEarned > 0) {
-    const { leveledUp } = addXp(sess.xpEarned);
+    const { leveledUp, journey: paidJourney } = addXp(sess.xpEarned);
+    // Said on the finish screen whether or not a prize draw is pending — a
+    // level gained with no draw owed used to be announced nowhere.
+    if (leveledUp && paidJourney) sess.levelReached = levelFromXp(paidJourney.xp || 0).level;
     // Only celebrate a level-up that actually owes a prize, so the button can
     // never be a dead tap (openPrizeDraw refuses when nothing is pending).
     sess.leveledUp = leveledUp && pendingDrawCount() > 0;

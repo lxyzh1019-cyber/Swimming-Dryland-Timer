@@ -96,6 +96,7 @@ export const GATE_REASON = {
   // safety prompts fell back to "…to continue".
   rGrownupOk:     "clear a pain report that changed how she moves",
   rPickLight:     "override the light her body check produced",
+  openLightOverride: "override the light her body check produced",
   toggleSafetyVoice: "change the safety settings",
   reviewPrizes:   "review the prizes marked used",
   restorePrize:   "restore a prize the app marked used",

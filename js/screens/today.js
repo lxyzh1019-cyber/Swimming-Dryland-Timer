@@ -112,7 +112,7 @@ function journeyRail(j, headerOffset) {
 function journeyMapWide(vm) {
   const j = vm.journey;
   return `
-  <div id="journey-map-card" data-action="nav" data-arg="progress" style="flex:1;min-height:420px;position:relative;border-radius:26px;overflow:hidden;cursor:pointer;box-shadow:var(--shadow-lift);background:#1B7FAD;transition:transform 0.2s var(--ease-out,ease),box-shadow 0.2s var(--ease-out,ease);">
+  <div id="journey-map-card" data-action="nav" data-arg="progress" role="button" tabindex="0" aria-label="Your ocean journey — open Progress" style="flex:1;min-height:420px;position:relative;border-radius:26px;overflow:hidden;cursor:pointer;box-shadow:var(--shadow-lift);background:#1B7FAD;transition:transform 0.2s var(--ease-out,ease),box-shadow 0.2s var(--ease-out,ease);">
     ${journeySvgBg("W")}
     <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,62,99,0.55) 0%,rgba(10,62,99,0.15) 32%,transparent 55%);pointer-events:none;"></div>
     <div style="position:relative;z-index:2;padding:18px 22px 10px;color:#fff;">
@@ -129,7 +129,7 @@ function journeyMapWide(vm) {
 function journeyMapNarrow(vm) {
   const j = vm.journey;
   return `
-  <div id="journey-map-card" data-action="nav" data-arg="progress" style="height:420px;flex-shrink:0;position:relative;border-radius:24px;overflow:hidden;cursor:pointer;box-shadow:var(--shadow-lift);background:#1B7FAD;">
+  <div id="journey-map-card" data-action="nav" data-arg="progress" role="button" tabindex="0" aria-label="Your ocean journey — open Progress" style="height:420px;flex-shrink:0;position:relative;border-radius:24px;overflow:hidden;cursor:pointer;box-shadow:var(--shadow-lift);background:#1B7FAD;">
     ${journeySvgBg("N")}
     <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,62,99,0.55) 0%,rgba(10,62,99,0.15) 32%,transparent 55%);pointer-events:none;"></div>
     <div style="position:relative;z-index:2;padding:16px 18px 8px;color:#fff;">
@@ -192,7 +192,7 @@ function dayPane(vm, wide) {
           <span style="font-size:15px;flex-shrink:0;">🧘</span>
           <span style="font-size:14px;font-weight:700;">${r.text}</span>
         </div>`).join("")}
-      <div style="font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.8;">No XP needed — recovery is part of the plan.</div>
+      <div style="font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.8;">${dv.recoveryDone ? "✅ Done today — that was care. It holds your streak right where it is." : "No XP needed — recovery is part of the plan."}</div>
     </div>` : "";
 
   const blocksList = dv.showBlocksList ? `
@@ -255,7 +255,6 @@ function dayPane(vm, wide) {
           <span style="font-size:15px;line-height:1;">${vm.weather.icon}</span>
           <span style="font-size:13px;font-weight:900;">${wide ? vm.weather.caption + " " : ""}${vm.weather.temp}°</span>
         </div>
-        ${dv.showSettings ? `<button type="button" data-action="toggleCoachVoice" aria-label="Toggle coach voice" style="${vm.coachIconBtnStyle}">🎧</button>` : ""}
       </div>
     </div>
     <div style="font-family:var(--font-display);font-weight:600;font-size:${titleSize}px;line-height:1.${wide ? "05" : "1"};margin:12px 0 12px;">${dv.title}</div>
@@ -283,7 +282,7 @@ export function todayWide(vm) {
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:18px;">
         <div>
           <div style="display:flex;align-items:center;gap:10px;">
-            <div style="font-family:var(--font-display);font-weight:600;font-size:42px;line-height:1;color:var(--ink);white-space:nowrap;">Hi, ${name}!</div>
+            <h1 style="margin:0;font-family:var(--font-display);font-weight:600;font-size:42px;line-height:1;color:var(--ink);white-space:nowrap;">Hi, ${name}!</h1>
             <span style="font-size:30px;">🌊</span>
           </div>
           <div style="font-family:var(--font-hand);font-weight:700;font-size:24px;line-height:1.1;color:var(--aqua-ink);margin-top:5px;">Ready to make a splash?</div>
@@ -324,7 +323,7 @@ export function todayNarrow(vm) {
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 4px 0;">
       <div style="min-width:0;">
         <div style="display:flex;align-items:center;gap:8px;">
-          <div style="font-family:var(--font-display);font-weight:600;font-size:32px;line-height:1;color:var(--ink);white-space:nowrap;">Hi, ${name}!</div>
+          <h1 style="margin:0;font-family:var(--font-display);font-weight:600;font-size:32px;line-height:1;color:var(--ink);white-space:nowrap;">Hi, ${name}!</h1>
           <span style="font-size:24px;">🌊</span>
         </div>
         <div style="font-family:var(--font-hand);font-weight:700;font-size:20px;line-height:1.1;color:var(--aqua-ink);margin-top:4px;">Ready to make a splash?</div>

@@ -2,33 +2,38 @@
    Splash — Color tokens
    Bright, friendly ocean palette for 10-year-old swimmers.
    Base values (the crayon box) + semantic aliases (how we use them).
+
+   Every saturated FILL here carries white text at 4.5:1 or better, and
+   ink-faint clears 4.5:1 on white — test/contrast.mjs checks the pairs. The
+   one exception is sun, which no text colour but navy can sit on, so sun
+   fills take --ink text (see --text-on-sun).
    ============================================================ */
 
 :root {
   /* ---- Ink / text (deep ocean navy, never pure black) ---- */
   --ink:        #143B4A;   /* primary text */
   --ink-soft:   #4A6B78;   /* secondary text, captions */
-  --ink-faint:  #8AA6B0;   /* hints, disabled text, dividers */
+  --ink-faint:  #5A7783;   /* hints, disabled text, dividers — 4.5:1 on white */
 
   /* ---- Aqua — the pool. Primary brand color (brighter ocean cyan) ---- */
   --aqua-wash:  #DFF7FE;   /* tinted surfaces, fills */
   --aqua-light: #6FE3F5;
-  --aqua:       #06B6D4;   /* primary — vivid ocean cyan */
-  --aqua-deep:  #0593AE;   /* primary pressed / 3D edge */
+  --aqua:       #077E96;   /* primary — ocean cyan, carries white text (4.7:1) */
+  --aqua-deep:  #06667A;   /* primary pressed / 3D edge */
   --aqua-ink:   #065F73;   /* text on light aqua */
 
   /* ---- Deep sea — richer ocean blue for depth & accents ---- */
   --sea-wash:   #D6EDFB;
   --sea-light:  #7CC4F2;
-  --sea:        #2393E0;   /* deep-water blue */
-  --sea-deep:   #1570C0;
+  --sea:        #1570C0;   /* deep-water blue, carries white text (5.1:1) */
+  --sea-deep:   #0F5A9E;
   --sea-ink:    #0C4A86;
 
   /* ---- Coral — energy, the "GO / action" warm ---- */
   --coral-wash: #FFEDE6;
   --coral-light:#FFB59E;
-  --coral:      #FF7A59;
-  --coral-deep: #E5532F;   /* pressed / 3D edge */
+  --coral:      #CF421B;   /* carries white text (4.7:1) */
+  --coral-deep: #B0361A;   /* pressed / 3D edge */
   --coral-ink:  #A8330F;
 
   /* ---- Sunshine — rewards, stars, highlights ---- */
@@ -41,29 +46,29 @@
   /* ---- Mint — success, "clean rep", green light ---- */
   --mint-wash:  #DFF7EC;
   --mint-light: #A6ECCC;
-  --mint:       #2FC78C;
-  --mint-deep:  #18A372;   /* pressed / 3D edge */
+  --mint:       #0F7F55;   /* carries white text (5.0:1) */
+  --mint-deep:  #0C6B48;   /* pressed / 3D edge */
   --mint-ink:   #0B6A47;
 
   /* ---- Grape — learning, quizzes, evening sessions ---- */
   --grape-wash: #ECE6FD;
   --grape-light:#C9BCF5;
-  --grape:      #8B7CE8;
-  --grape-deep: #6A57D4;   /* pressed / 3D edge */
+  --grape:      #6A57D4;   /* carries white text (5.4:1) */
+  --grape-deep: #5644B8;   /* pressed / 3D edge */
   --grape-ink:  #46329C;
 
   /* ---- Bubblegum — playful pink accents, side-switches ---- */
   --gum-wash:   #FFE7F0;
   --gum-light:  #FFB9D2;
-  --gum:        #FF82AE;
-  --gum-deep:   #ED5A8C;
+  --gum:        #CF3A70;   /* carries white text (4.7:1) */
+  --gum-deep:   #B02D5E;
   --gum-ink:    #B02560;
 
   /* ---- Stop — red flags, "stop and tell a grown-up" ---- */
   --stop-wash:  #FFE2E0;
   --stop-light: #FFA9A5;
-  --stop:       #F0544F;
-  --stop-deep:  #D1322C;
+  --stop:       #D1322C;   /* carries white text (5.0:1) */
+  --stop-deep:  #B02622;
   --stop-ink:   #8E1B17;
 
   /* ---- Surfaces (brighter ocean) ---- */
@@ -84,7 +89,7 @@
   --text-faint:     var(--ink-faint);
   --text-on-aqua:   #FFFFFF;
   --text-on-coral:  #FFFFFF;
-  --text-on-sun:    var(--sun-ink);
+  --text-on-sun:    var(--ink);      /* sun is too light for white or for sun-ink; navy reads 7.4:1 */
   --text-on-mint:   #FFFFFF;
   --text-on-grape:  #FFFFFF;
 
@@ -107,7 +112,7 @@
   /* Reward / star (sunshine) */
   --reward-bg:      var(--sun);
   --reward-edge:    var(--sun-deep);
-  --reward-text:    var(--sun-ink);
+  --reward-text:    var(--ink);
 
   /* Readiness traffic lights */
   --light-go:       var(--mint);     /* green  — feel great */

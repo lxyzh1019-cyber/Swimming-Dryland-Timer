@@ -16,7 +16,7 @@ function timerRing(vm, size) {
   const color = vm.timerUrgent ? "var(--stop)" : (RING_ZONE_COLOR[vm.timerZoneType] || "var(--aqua)");
   const offset = c * (1 - Math.max(0, Math.min(1, vm.timerProgress)));
   return `
-  <div data-action="advance" title="Tap the ring when you're done" style="flex:0 1 ${size}px;max-width:${size}px;min-width:${size >= 300 ? 200 : 140}px;aspect-ratio:1;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;${vm.timerUrgent ? "animation:splash-pulse-ring 1s ease-in-out infinite;" : ""}">
+  <button type="button" data-action="advance" aria-label="${vm.timerZone} ${vm.timerDisplay} — tap when you're done" title="Tap the ring when you're done" style="border:none;background:none;padding:0;font-family:inherit;flex:0 1 ${size}px;max-width:${size}px;min-width:${size >= 300 ? 200 : 140}px;aspect-ratio:1;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;${vm.timerUrgent ? "animation:splash-pulse-ring 1s ease-in-out infinite;" : ""}">
     <svg width="100%" height="100%" viewBox="0 0 ${size} ${size}" preserveAspectRatio="xMidYMid meet" style="transform:rotate(-90deg);position:absolute;inset:0;">
       <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="var(--surface)" stroke="var(--surface-2)" stroke-width="${stroke}"></circle>
       <circle id="s-ring-arc" cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
@@ -27,18 +27,18 @@ function timerRing(vm, size) {
       <span id="s-timer-text" style="font-family:var(--font-display);font-weight:600;font-size:${size >= 300 ? "clamp(44px, 6.5vw, 76px)" : "46px"};line-height:1;color:${vm.timerUrgent ? "var(--stop)" : "var(--ink)"};">${vm.timerDisplay}</span>
       ${vm.timerIsPaused ? `<span style="font-size:12px;font-weight:900;color:var(--sun-ink);">PAUSED</span>` : ""}
     </div>
-  </div>`;
+  </button>`;
 }
 
 function repRing(vm, size) {
   const border = size >= 300 ? 10 : 8;
   return `
-  <div data-action="advance" title="Tap the ring when you're done" style="cursor:pointer;flex:0 1 ${size}px;max-width:${size}px;min-width:${size >= 300 ? 220 : 160}px;aspect-ratio:1;border-radius:50%;background:var(--grape-wash);border:${border}px solid var(--grape);display:flex;flex-direction:column;align-items:center;justify-content:center;box-sizing:border-box;padding:${size >= 300 ? 26 : 14}px;">
+  <button type="button" data-action="advance" aria-label="Reps: ${vm.curExDose} — tap when you're done" title="Tap the ring when you're done" style="font-family:inherit;cursor:pointer;flex:0 1 ${size}px;max-width:${size}px;min-width:${size >= 300 ? 220 : 160}px;aspect-ratio:1;border-radius:50%;background:var(--grape-wash);border:${border}px solid var(--grape);display:flex;flex-direction:column;align-items:center;justify-content:center;box-sizing:border-box;padding:${size >= 300 ? 26 : 14}px;">
     <div style="font-weight:900;font-size:${size >= 300 ? 15 : 11}px;letter-spacing:0.1em;color:var(--grape-deep);">${size >= 300 ? "DO YOUR REPS" : "REPS"}</div>
     <div style="font-family:var(--font-display);font-size:${size >= 300 ? 50 : 32}px;font-weight:600;color:var(--grape);text-align:center;line-height:1.05;margin:${size >= 300 ? 8 : 4}px 0;">${vm.curExDose}</div>
     ${vm.showClock ? `<div style="font-weight:900;font-size:${size >= 300 ? 20 : 14}px;color:${vm.paceColor};">⏱ <span id="s-timer-text">${vm.exActualDisplay}</span>${size >= 300 ? ` <span style="font-weight:700;opacity:0.65;">/ ${vm.exPlannedDisplay}</span>` : ""}</div>` : ""}
     <div style="font-size:12px;font-weight:800;color:var(--grape-deep);opacity:0.8;margin-top:6px;">${vm.explore ? "No clock here — tap Next when you've had a look" : "Tap the ring when you're done"}</div>
-  </div>`;
+  </button>`;
 }
 
 /* In-session prompt card (intent word / micro-loop) rendered in the ring's spot. */
@@ -114,7 +114,7 @@ function photoSlot(photoUrl, w, h, radius) {
 
 function stopOverlay() {
   return `
-  <div style="position:absolute;inset:0;z-index:20;background:var(--stop-wash);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px;text-align:center;">
+  <div role="dialog" aria-modal="true" aria-label="Stopped" style="position:absolute;inset:0;z-index:20;background:var(--stop-wash);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px;text-align:center;">
     <img src="assets/poses/breath.png" alt="" style="height:180px;object-fit:contain;">
     <div style="font-family:var(--font-display);font-weight:600;font-size:34px;color:var(--stop-ink);">Stopped. Good call.</div>
     <div style="font-size:18px;font-weight:700;color:var(--ink);line-height:1.5;max-width:480px;">If something hurts — sharp pain, pinching, or numbness — <b>tell a grown-up right now</b>. Your body matters more than any streak.</div>
@@ -130,14 +130,14 @@ function stopOverlay() {
 export function detailOverlayHtml(vm) {
   return `
   <div data-action="closeDetail" style="position:fixed;inset:0;z-index:100;background:rgba(20,59,74,0.55);display:flex;align-items:center;justify-content:center;padding:30px;box-sizing:border-box;">
-    <div data-stop-propagation="1" style="background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-pop);max-width:680px;width:100%;max-height:100%;overflow-y:auto;box-sizing:border-box;">
+    <div data-stop-propagation="1" role="dialog" aria-modal="true" aria-label="${vm.detailName}" style="background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-pop);max-width:680px;width:100%;max-height:100%;overflow-y:auto;box-sizing:border-box;">
       <div style="position:relative;">
-        <div style="width:100%;height:330px;position:relative;overflow:hidden;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+        <div style="width:100%;height:min(330px, 40dvh);position:relative;overflow:hidden;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
           <span style="font-size:60px;" aria-hidden="true">🏊</span>
           <span style="font-size:13px;font-weight:800;color:var(--aqua-ink);opacity:0.75;">Demo photo coming soon</span>
           <img src="${vm.detailPhotoUrl}" alt="" data-fallback="${vm.detailPhotoFallbackUrl || ""}" onerror="if(this.dataset.fallback&&this.src.indexOf(this.dataset.fallback)<0){this.src=this.dataset.fallback;}else{this.style.display='none';}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
         </div>
-        <button type="button" data-action="closeDetail" style="position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;border:none;background:rgba(20,59,74,0.55);color:#fff;font-size:16px;font-weight:900;cursor:pointer;" aria-label="Close">✕</button>
+        <button type="button" data-action="closeDetail" style="position:absolute;top:12px;right:12px;width:44px;height:44px;border-radius:50%;border:none;background:rgba(20,59,74,0.65);color:#fff;font-size:18px;font-weight:900;cursor:pointer;" aria-label="Close">✕</button>
       </div>
       <div style="padding:22px 26px 26px;display:flex;flex-direction:column;gap:14px;">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">
@@ -152,7 +152,7 @@ export function detailOverlayHtml(vm) {
         </div>` : ""}
         ${vm.detailWatchFor ? `
         <div style="background:var(--sun-wash);border-radius:var(--radius-md);padding:12px 14px;">
-          <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sun-ink);margin-bottom:4px;">👀 Watch for</div>
+          <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sun-ink);margin-bottom:4px;">👀 Watch out for</div>
           <div style="font-size:15px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.detailWatchFor}</div>
           ${vm.detailFix ? `<div style="font-size:14px;color:var(--ink-soft);line-height:1.4;margin-top:5px;">🔧 ${vm.detailFix}</div>` : ""}
         </div>` : ""}
@@ -266,7 +266,8 @@ function completeScreen(vm) {
     <div style="font-size:14px;font-weight:700;color:var(--ink-soft);max-width:480px;line-height:1.5;">
       ${vm.roundShortNotes.map(n => `<div>${n}</div>`).join("")}
     </div>` : ""}
-    ${vm.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="display:flex;align-items:center;gap:10px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:14px 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
+    ${vm.levelReached && !vm.leveledUp ? `<div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--sun-ink);">⬆️ Level ${vm.levelReached}!</div>` : ""}
+    ${vm.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="display:flex;align-items:center;gap:10px;background:var(--sun);color:var(--ink);border:none;border-radius:var(--radius-pill);padding:14px 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
     ${vm.saveFailed ? `
     <div style="display:flex;flex-direction:column;gap:10px;background:var(--stop-wash, var(--surface));border:2px solid var(--stop);border-radius:20px;padding:18px 22px;max-width:600px;width:100%;box-sizing:border-box;text-align:left;">
       <div style="font-family:var(--font-display);font-weight:600;font-size:19px;color:var(--stop-ink);">This one didn't save 😕</div>
@@ -327,18 +328,36 @@ function completeScreen(vm) {
       </div>` : ""}
       <button type="button" data-action="startQuizDeck" style="align-self:flex-start;display:flex;align-items:center;gap:8px;background:var(--aqua-wash);border:2px solid var(--aqua-light);border-radius:var(--radius-pill);padding:9px 16px;cursor:pointer;font-weight:900;font-size:14px;color:var(--aqua-ink);font-family:inherit;">🧠 Try the full Quiz Deck (8 moves)</button>
     </div>` : ""}
-    <button type="button" data-action="exitSession" style="margin-top:14px;display:flex;align-items:center;gap:10px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:16px 32px;font-family:var(--font-display);font-weight:600;font-size:20px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);flex-shrink:0;">🏠 ${vm.explore ? "Done looking" : "Back to Today"}</button>
+    <button type="button" data-action="exitSession" style="margin-top:14px;display:flex;align-items:center;gap:10px;background:var(--sun);color:var(--ink);border:none;border-radius:var(--radius-pill);padding:16px 32px;font-family:var(--font-display);font-weight:600;font-size:20px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);flex-shrink:0;">🏠 ${vm.explore ? "Done exploring" : "Back to Today"}</button>
   </div>`;
 }
 
-function centerStack(vm, wide) {
+/* The one cue, under the move's name — where her eyes already are. It used
+   to sit in a "Tips & Safety" card on the far side of the screen, beside the
+   watch-outs and the swim transfer, and none of it was read mid-set. */
+function cueLine(vm, wide) {
+  if (!vm.curExCue || !vm.notResting) return "";
+  return `<div style="font-family:var(--font-hand);font-size:${wide ? 22 : 19}px;font-weight:700;color:var(--aqua-ink);line-height:1.25;max-width:520px;">“${vm.curExCue}”</div>`;
+}
+
+/* The pain rule, one line, always there. */
+export function safetyStrip(wide) {
+  return `<div style="display:flex;align-items:center;gap:8px;background:var(--stop-wash);border:2px solid var(--stop);border-radius:var(--radius-md);padding:${wide ? "9px 12px" : "8px 12px"};box-sizing:border-box;flex-shrink:0;">
+    <span style="font-size:16px;flex-shrink:0;" aria-hidden="true">🔴</span>
+    <span style="font-size:13px;font-weight:800;color:var(--stop-ink);line-height:1.3;">Sharp pain, pinching or numbness → STOP and tell a grown-up.</span>
+  </div>`;
+}
+
+const showPhoto = vm => vm.notResting && (!vm.isPrompt || vm.isFormCheck);
+
+function centerStack(vm, wide, { photo = true } = {}) {
   const ringSize = wide ? 320 : 200;
   const ring = vm.isPrompt ? promptCard(vm, ringSize)
     : vm.timerIsReps ? repRing(vm, ringSize)
     : timerRing(vm, ringSize);
   return `
   <div style="display:flex;gap:${wide ? 24 : 16}px;align-items:center;justify-content:center;width:100%;min-width:0;flex-shrink:0;flex-wrap:${wide ? "nowrap" : "wrap"};">
-    ${vm.notResting && (!vm.isPrompt || vm.isFormCheck) ? photoSlot(vm.curExPhotoUrl, wide ? 360 : 210, wide ? 480 : 280, wide ? 20 : 16) : ""}
+    ${photo && showPhoto(vm) ? photoSlot(vm.curExPhotoUrl, wide ? 360 : 210, wide ? 480 : 280, wide ? 20 : 16) : ""}
     ${ring}
   </div>
 
@@ -355,8 +374,10 @@ function centerStack(vm, wide) {
     <div style="display:flex;align-items:center;gap:8px;">
       <div style="font-family:var(--font-display);font-size:${wide ? 22 : 19}px;font-weight:600;color:var(--ink);line-height:1.15;">${vm.stageTitle}</div>
     </div>`}
+    ${vm.notResting ? `<div style="font-size:${wide ? 15 : 14}px;font-weight:800;color:var(--ink-soft);line-height:1.2;">${vm.curExDose}</div>` : ""}
+    ${cueLine(vm, wide)}
+    ${vm.wobblyBanner ? `<div style="font-family:var(--font-hand);font-size:17px;font-weight:700;color:var(--sun-ink);line-height:1.2;">Fewer, slower — quality first. You've got this 💛</div>` : ""}
     ${vm.overNudge ? `<div style="font-family:var(--font-hand);font-size:17px;font-weight:700;color:var(--sun-ink);line-height:1.2;">Past the planned time — that's okay. Finish clean, then rest 💛</div>` : ""}
-    ${vm.notResting ? `<div style="font-family:var(--font-hand);font-size:${wide ? 16 : 14}px;color:var(--aqua-ink);font-style:italic;line-height:1.2;">${vm.curExDose}</div>` : ""}
     ${vm.upNextName ? `
     <div style="font-size:15px;color:var(--ink-soft);line-height:1.3;">
       <span style="font-weight:900;color:var(--aqua-ink);text-transform:uppercase;letter-spacing:0.04em;">Up next · </span>${vm.upNextName} <span style="font-family:var(--font-hand);">${vm.upNextDose}</span>
@@ -380,7 +401,7 @@ function centerStack(vm, wide) {
   <div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:2px solid var(--mint);border-radius:var(--radius-lg);padding:10px 16px;width:100%;max-width:480px;flex-shrink:0;box-sizing:border-box;box-shadow:var(--shadow-soft);">
     <span style="flex:1;font-weight:900;font-size:15px;color:var(--ink);">${vm.cleanCheckQuestion}</span>
     <button type="button" data-action="pickClean" style="min-height:46px;border:none;border-radius:var(--radius-pill);padding:0 18px;background:var(--mint);color:#fff;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--mint-deep);">✓ Clean</button>
-    <button type="button" data-action="pickWobbly" style="min-height:46px;border:none;border-radius:var(--radius-pill);padding:0 18px;background:var(--sun);color:var(--sun-ink);font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--sun-deep);">😅 Wobbly</button>
+    <button type="button" data-action="pickWobbly" style="min-height:46px;border:none;border-radius:var(--radius-pill);padding:0 18px;background:var(--sun);color:var(--ink);font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--sun-deep);">😅 Wobbly</button>
     <button type="button" data-action="skipFormCheck" style="min-height:46px;border:none;border-radius:var(--radius-pill);padding:0 14px;background:transparent;color:var(--ink-soft);font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;">Skip</button>
   </div>` : ""}
 
@@ -410,7 +431,7 @@ function controls(vm, wide) {
   <div style="display:flex;gap:${wide ? 14 : 8}px;">
     ${backBtn}
     ${rowBtn("skipEx", "⏭ Skip", "border:2px solid var(--hairline);background:var(--surface);color:var(--ink-soft);")}
-    ${rowBtn("exitExplore", "✕ Done looking", "border:2px solid var(--sun-deep);background:var(--sun-wash);color:var(--sun-ink);")}
+    ${rowBtn("exitExplore", "✕ Done exploring", "border:2px solid var(--sun-deep);background:var(--sun-wash);color:var(--sun-ink);")}
   </div>`;
   }
 
@@ -445,51 +466,29 @@ function controls(vm, wide) {
     <span style="${wide ? "flex:1;" : ""}font-weight:800;font-size:${wide ? 15 : 14}px;color:var(--ink);">End early? Your progress is saved.</span>
     <div style="display:flex;gap:8px;">
       <button type="button" data-action="cancelEnd" style="${wide ? "" : "flex:1;"}min-height:44px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;padding:0 16px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">Keep going</button>
-      <button type="button" data-action="confirmEndEarly" style="${wide ? "" : "flex:1;"}min-height:44px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;padding:0 16px;background:var(--sun);color:var(--sun-ink);box-shadow:0 3px 0 var(--sun-deep);font-family:inherit;">End session</button>
+      <button type="button" data-action="confirmEndEarly" style="${wide ? "" : "flex:1;"}min-height:44px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;padding:0 16px;background:var(--sun);color:var(--ink);box-shadow:0 3px 0 var(--sun-deep);font-family:inherit;">End session</button>
     </div>
   </div>`}`;
 }
 
+/* The list is a map of the workout, not a control panel: block headers stay
+   put while the block scrolls, every row is one line (long names truncate,
+   the full name is in the title), and the ⓘ lives on the move that is
+   running rather than on forty rows at 20px. The current row is tagged so
+   the screen can keep it in view. */
 function exList(vm, wide) {
   return vm.sessionExList.map(sitem => sitem.isHeader ? `
-    <div style="display:flex;align-items:center;gap:8px;padding:${wide ? "12px 0 4px" : "10px 0 4px"};">
-      <span style="width:${wide ? 10 : 9}px;height:${wide ? 10 : 9}px;border-radius:50%;background:${sitem.color};flex-shrink:0;"></span>
+    <div style="position:sticky;top:0;z-index:1;background:var(--surface);display:flex;align-items:center;gap:8px;padding:${wide ? "10px 0 4px" : "8px 0 4px"};">
+      <span style="width:9px;height:9px;border-radius:50%;background:${sitem.color};flex-shrink:0;"></span>
       <span style="font-weight:900;font-size:11px;letter-spacing:0.05em;text-transform:uppercase;color:${sitem.color};">${sitem.name}</span>
     </div>` : `
-    <div style="${sitem.cardStyle}">
+    <div${sitem.isCurrent ? ' data-ex-current="1" aria-current="step"' : ""} title="${sitem.name}" style="${sitem.cardStyle}min-height:${wide ? 38 : 34}px;">
       <span style="${sitem.numStyle}">${sitem.num}</span>
-      <span style="${sitem.nameStyle}font-size:${wide ? 16 : 14}px;">${sitem.name}</span>
-      <button type="button" data-action="openDetailAt" data-arg="${sitem.ci}|${sitem.ei}" title="See detail photo &amp; video" style="flex-shrink:0;width:${wide ? 22 : 20}px;height:${wide ? 22 : 20}px;border-radius:50%;border:none;background:var(--surface-2);color:var(--ink-soft);font-size:${wide ? 13 : 12}px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">ⓘ</button>
-      <span style="font-size:${wide ? 16 : 14}px;flex-shrink:0;width:${wide ? 18 : 16}px;text-align:center;color:${sitem.secColor};">${sitem.statusIcon}</span>
+      <span style="${sitem.nameStyle}font-size:${wide ? 15 : 14}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sitem.name}</span>
+      <span aria-label="${sitem.statusLabel}" style="font-size:${wide ? 15 : 14}px;flex-shrink:0;width:18px;text-align:center;color:${sitem.secColor};">${sitem.statusIcon}</span>
     </div>`).join("");
 }
 
-function tipsSafety(vm) {
-  return `
-  <div style="flex-shrink:0;background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-lg);box-shadow:var(--shadow-soft);box-sizing:border-box;padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
-    <div style="font-weight:900;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);">Tips &amp; Safety</div>
-    ${vm.curExCue ? `
-    <div style="background:var(--aqua-wash);border-radius:var(--radius-md);padding:12px 14px;box-sizing:border-box;display:flex;align-items:center;gap:12px;">
-      <img src="assets/poses/keepgoing.png" alt="" style="width:68px;height:52px;object-fit:contain;flex-shrink:0;">
-      <div style="min-width:0;">
-        <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--aqua-ink);margin-bottom:6px;">Coach tip</div>
-        <div style="font-size:16px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.curExCue}</div>
-      </div>
-    </div>` : ""}
-    ${vm.wobblyBanner ? `<div style="background:var(--sun-wash);border-radius:var(--radius-md);padding:10px 14px;font-family:var(--font-hand);font-size:18px;font-weight:700;color:var(--sun-ink);line-height:1.3;">Fewer, slower — quality first. You've got this 💛</div>` : ""}
-    ${vm.curExWatchFor && vm.notResting ? `
-    <div style="background:var(--sun-wash);border-radius:var(--radius-md);padding:12px 14px;box-sizing:border-box;">
-      <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sun-ink);margin-bottom:4px;">👀 Watch for</div>
-      <div style="font-size:15px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.curExWatchFor}</div>
-      ${vm.curExFix ? `<div style="font-size:14px;color:var(--ink-soft);line-height:1.4;margin-top:5px;">🔧 ${vm.curExFix}</div>` : ""}
-    </div>` : ""}
-    ${vm.curExSwim && vm.notResting ? `<div style="background:var(--sea-wash);border-radius:var(--radius-md);padding:10px 14px;font-size:14px;font-weight:700;color:var(--sea-ink);">🏊 Builds: ${vm.curExSwim}</div>` : ""}
-    <div style="background:var(--stop-wash);border:2px solid var(--stop);border-radius:var(--radius-md);padding:11px 14px;box-sizing:border-box;display:flex;align-items:center;gap:8px;">
-      <span style="font-size:18px;flex-shrink:0;">🔴</span>
-      <span style="font-size:15px;font-weight:700;color:var(--stop-ink);line-height:1.3;">Sharp pain, pinching, or numbness → STOP and tell a grown-up.</span>
-    </div>
-  </div>`;
-}
 
 export function sessionScreen(vm) {
   const overlays = `
@@ -540,12 +539,12 @@ export function sessionScreen(vm) {
           </div>` : ""}
         </div>` : ""}
 
-        <div style="flex:1;min-height:0;display:flex;flex-direction:column;background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-lg);box-shadow:var(--shadow-soft);box-sizing:border-box;padding:14px 16px;">
-          <div style="font-weight:900;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;flex-shrink:0;">Today's exercises</div>
-          <div style="flex:1;min-height:0;overflow-y:auto;">${exList(vm, true)}</div>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-lg);box-shadow:var(--shadow-soft);box-sizing:border-box;padding:12px 14px;">
+          <div style="font-weight:900;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;flex-shrink:0;">Today's exercises</div>
+          <div data-ex-list="1" style="flex:1;min-height:0;overflow-y:auto;position:relative;">${exList(vm, true)}</div>
         </div>
 
-        ${tipsSafety(vm)}
+        ${safetyStrip(true)}
       </div>
 
       <div style="width:68%;min-width:0;display:flex;flex-direction:column;min-height:0;box-sizing:border-box;overflow:hidden;">
@@ -577,18 +576,19 @@ export function sessionScreen(vm) {
       </div>
 
       <div style="padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px;flex-shrink:0;">
-        ${centerStack(vm, false)}
+        ${centerStack(vm, false, { photo: false })}
       </div>
 
-      <div style="flex-shrink:0;padding:0 16px 14px;display:flex;flex-direction:column;gap:16px;">
+      <div style="flex-shrink:0;padding:0 16px 14px;display:flex;flex-direction:column;gap:14px;">
         ${controls(vm, false)}
+        ${safetyStrip(false)}
       </div>
 
       <div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:10px;">
-        ${tipsSafety(vm)}
+        ${showPhoto(vm) ? `<div style="display:flex;justify-content:center;">${photoSlot(vm.curExPhotoUrl, 240, 320, 16)}</div>` : ""}
         <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-lg);padding:12px 14px;">
-          <div style="font-weight:900;font-size:11px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;">Today's exercises</div>
-          ${exList(vm, false)}
+          <div style="font-weight:900;font-size:11px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;">Today's exercises</div>
+          <div data-ex-list="1" style="position:relative;">${exList(vm, false)}</div>
         </div>
       </div>
     </div>

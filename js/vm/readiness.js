@@ -133,7 +133,7 @@ export function yesterdayZoneLine(now = Date.now()) {
   const sev = prev.zoneSev || {};
   const nums = Object.keys(sev).map(Number).filter(n => Number.isFinite(sev[n]));
   if (!nums.length) return "Yesterday: no sore spots.";
-  const SEV_WORD = { 2: "tired", 3: "not right", 4: "pain" };
+  const SEV_WORD = { 2: "tired", 3: "not right", 4: "hurts" };
   const named = nums.map(n => {
     const z = BODY_ZONES.find(b => b.n === n);
     return (z ? z.label : "Zone " + n) + " — " + (SEV_WORD[sev[n]] || "marked");
@@ -215,7 +215,7 @@ export function buildReadinessVM(r, isWide) {
   const zoneSev = r.zoneSev || {};
   const selectedNums = Object.keys(zoneSev).map(Number);
   const SEV_COLOR = { 2: "var(--sun)", 3: "var(--coral)", 4: "var(--stop)" };
-  const SEV_SHORT = { 2: "Tired", 3: "Not right", 4: "Pain" };
+  const SEV_SHORT = { 2: "Tired", 3: "Not right", 4: "Hurts" };
   const zoneHighlight = {}, zoneBadge = {}, zoneBadgeBg = {};
   BODY_ZONES.forEach(z => {
     const key = "n" + z.n;
@@ -259,8 +259,14 @@ export function buildReadinessVM(r, isWide) {
     { key: "red", emoji: "🔴", label: "Red" },
     { key: "recovery", emoji: "🟣", label: "Recovery" }
   ];
+  // The override row is a grown-up's control. It is drawn only once a
+  // grown-up has unlocked it (openLightOverride); until then the kid sees the
+  // suggested light as a plain chip and one link that asks for the grown-up.
+  const showLightOverride = !!r.overrideOpen;
+  const suggestedChip = { emoji: (LIGHT_OPTS.find(o => o.key === lightKey) || {}).emoji || "", label: LIGHT_NAME[lightKey] || lightKey };
   const lightOptions = LIGHT_OPTS.map(o => ({
     ...o,
+    selected: o.key === lightKey,
     style: "display:flex;align-items:center;gap:6px;border-radius:var(--radius-pill);padding:8px 14px;cursor:pointer;border:2px solid;background:var(--surface);"
       + (o.key === lightKey ? "border-color:" + L.color + ";background:" + L.color + ";color:#fff;" : "border-color:var(--hairline);color:var(--ink-soft);")
   }));
@@ -289,7 +295,7 @@ export function buildReadinessVM(r, isWide) {
   const bodyLight = r.bodyLight || null;
   const readinessLight = r.readinessLight || null;
   const combinedLine = bodyLight && readinessLight && bodyLight !== readinessLight
-    ? "Body Check said " + lightWord(bodyLight) + ". Quick check said "
+    ? "The body map said " + lightWord(bodyLight) + ". Your answers said "
       + lightWord(readinessLight) + ". Today runs the smaller one."
     : "";
   const resultDesc = showBodyResult ? BR.desc : light.desc;
@@ -303,8 +309,8 @@ export function buildReadinessVM(r, isWide) {
   /* Two decisions were made, so the card says both. Hiding the suggestion would
      make the grown-up's choice look like the body's own answer. */
   const suggestionLine = wasOverridden
-    ? (isBodyResultPath ? "Body Check" : "Quick check") + " suggested " + lightWord(suggested)
-      + ". Grown-up selected " + lightWord(lightKey) + "."
+    ? (isBodyResultPath ? "The body map" : "Your answers") + " suggested " + lightWord(suggested)
+      + ". A grown-up chose " + lightWord(lightKey) + "."
     : "";
 
   const showInlineReadinessResult = step === "questions" && r.readinessDone && !isBodyResultPath;
@@ -315,8 +321,8 @@ export function buildReadinessVM(r, isWide) {
 
   const bodyBranch = step === "bodyArea" || r.resultSource === "bodycheck";
   const STEPS = bodyBranch
-    ? [{ label: "Quick check-in" }, { label: "Body check" }, { label: "Your light" }]
-    : [{ label: "Quick check-in" }, { label: "Your light" }];
+    ? [{ label: "Questions" }, { label: "Body map" }, { label: "Your light" }]
+    : [{ label: "Questions" }, { label: "Your light" }];
   let currentStepNum = 1;
   if (step === "questions" && showInlineReadinessResult) currentStepNum = STEPS.length;
   else if (step === "bodyArea") currentStepNum = showInlineBodyResult ? 3 : 2;
@@ -362,7 +368,13 @@ export function buildReadinessVM(r, isWide) {
        Keying it to the body-result path meant a readiness score strict enough to
        drive the light past Red took the grown-up confirmation away with it —
        exactly backwards, since that is a day with pain AND a flat body. */
-    needsGrownupConfirm: (r.severity || 0) >= 3 && !!BODY_RESULTS[3].needsGrownup,
+    // Keyed off the WORST she reported this check (see mayStartFromReadiness),
+    // so withdrawing the mark cannot hide the checkbox while the button stays
+    // disabled for the very reason the checkbox explains.
+    needsGrownupConfirm: Math.max(r.severity || 0, r.maxSeverity || 0) >= 3 && !!BODY_RESULTS[3].needsGrownup,
+    grownupConfirmWhy: (r.severity || 0) < 3 && (r.maxSeverity || 0) >= 3
+      ? "Earlier in this check you marked something as “Not right”, so a grown-up still needs to say it's OK to train."
+      : "",
     // The same answer the handler enforces — see mayStartFromReadiness.
     mayStart: mayStartFromReadiness(r),
     grownupConfirmed: !!r.grownupOk,
@@ -379,6 +391,6 @@ export function buildReadinessVM(r, isWide) {
     pendingZoneLabel: pz ? pz.label : "",
     popupOptions,
     popupHasMark: !!(pz && zoneSev[pendingZone]),
-    light, lightOptions
+    light, lightOptions, showLightOverride, suggestedChip
   };
 }
