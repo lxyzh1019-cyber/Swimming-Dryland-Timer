@@ -557,7 +557,7 @@ const SWIMSKILL_A = () => [
   X({ name: "Side-Lying Breath Rehearsal", block: "swimskill", driver: "reps", repsDetail: "2×6/side", dose: "2×6/side",
       cue: "Exhale/hum face-down, rotate (one ear in water), quick sip, neutral.",
       swimTransfer: "Breath timing", searchableName: "side lying breathing drill swimming" }),
-  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "40s hold",
       cue: "Ribs down, long body, hum the breath.",
       swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
 ];
@@ -571,7 +571,7 @@ const SWIMSKILL_B = () => [
   X({ name: "Breaststroke Kick Shape", block: "swimskill", driver: "reps", repsDetail: "~20", dose: "~20 (kick only)",
       cue: "Heels to seat, sweep, snap together — kick only, no arms.",
       swimTransfer: "Breaststroke kick", searchableName: "breaststroke kick technique on land" }),
-  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "40s hold",
       cue: "Ribs down, long body, hum the breath.",
       swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
 ];
@@ -579,7 +579,7 @@ const SWIMSKILL_SAT = () => [
   X({ name: "Chair High-Elbow Catch", setup: true, block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
       cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm. [free/back/fly]",
       swimTransfer: "High-elbow catch", searchableName: "high elbow catch drill chair" }),
-  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "40s hold",
       cue: "Ribs down, long body, hum the breath.",
       swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
 ];
@@ -601,7 +601,6 @@ export const DAYS = {
     mantra: "I am STRONG. I am SMOOTH. I can SWIM THIS.",
     poolLoad: "pm",
     defaultLight: "green",
-    timeLo: 18, timeHi: 22,
     equipment: ["Jump rope", "Resistance band", "Pull-up bar", "Mat"],
     prSentinel: "Clean Pull-Ups — clean reps in Round 1",
     blocks: {
@@ -613,8 +612,8 @@ export const DAYS = {
         X({ name: "Leg Swings", block: "warmup", driver: "reps", repsDetail: "8/dir/leg", dose: "8/dir/leg", cue: "Relaxed, build range." })
       ],
       coordination: [
-        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
-        X({ name: "A-Skip", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Same pattern with rhythm." })
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "60s · about 10 m each way", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "A-Skip", block: "coordination", driver: "time", work: 60, dose: "60s · about 10 m each way", cue: "Same pattern with rhythm." })
       ],
       main: [
         X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
@@ -654,7 +653,6 @@ export const DAYS = {
     mantra: "I am SHARP. I am STRONG. I can SWIM THIS.",
     poolLoad: "double",
     defaultLight: "green",
-    timeLo: 18, timeHi: 18,
     equipment: ["Resistance band", "Dowel", "Mat"],
     prSentinel: "Hollow Tuck Flutter — seconds held flat",
     blocks: {
@@ -666,8 +664,8 @@ export const DAYS = {
         X({ name: "Short-Foot", block: "warmup", driver: "time", work: 20, dose: "20s", cue: "Spread toes, dome the arch." })
       ],
       coordination: [
-        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
-        X({ name: "Carioca", block: "coordination", driver: "time", work: 60, dose: "10m/side", cue: "Hip over hip — trunk-hip separation." })
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "60s · about 10 m each way", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "Carioca", block: "coordination", driver: "time", work: 60, dose: "60s · about 10 m each way, both sides", cue: "Hip over hip — trunk-hip separation." })
       ],
       main: [
         X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
@@ -716,7 +714,6 @@ export const DAYS = {
     mantra: "Practice makes perfect.",
     poolLoad: "pm",
     defaultLight: "green",
-    timeLo: 20, timeHi: 20,
     equipment: ["Jump rope", "Pull-up bar", "Mat"],
     prSentinel: "Drop-and-Stick — clean landings out of 5",
     blocks: {
@@ -728,9 +725,9 @@ export const DAYS = {
         X({ name: "Knee-to-Wall Ankle", block: "warmup", driver: "reps", repsDetail: "8/side", dose: "8/side", cue: "Heel flat, knee past toes." })
       ],
       coordination: [
-        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
-        X({ name: "A-Skip", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Same pattern with rhythm." }),
-        X({ name: "Carioca", block: "coordination", driver: "time", work: 60, dose: "10m/side", cue: "Hip over hip — trunk-hip separation." })
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "60s · about 10 m each way", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "A-Skip", block: "coordination", driver: "time", work: 60, dose: "60s · about 10 m each way", cue: "Same pattern with rhythm." }),
+        X({ name: "Carioca", block: "coordination", driver: "time", work: 60, dose: "60s · about 10 m each way, both sides", cue: "Hip over hip — trunk-hip separation." })
       ],
       main: [
         X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
@@ -775,7 +772,6 @@ export const DAYS = {
     mantra: "I am SHARP. I am FAST. I can SWIM THIS.",
     poolLoad: "pm",
     defaultLight: "green",
-    timeLo: 19, timeHi: 19,
     equipment: ["Resistance band", "Mat"],
     prSentinel: "Hollow Tuck Flutter — seconds held flat",
     blocks: {
@@ -788,7 +784,7 @@ export const DAYS = {
         X({ name: "Leg Swings", block: "warmup", driver: "reps", repsDetail: "8/dir/leg", dose: "8/dir/leg", cue: "Relaxed, build range." })
       ],
       coordination: [
-        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "60s · about 10 m each way", cue: "Knee up, toe up, foot down under hip." }),
         X({ name: "Butt Kicks", block: "coordination", driver: "time", work: 60, dose: "15s", cue: "Heels recover fast under the butt." }),
         X({ name: "Ankle Dribbles", block: "coordination", driver: "time", work: 60, dose: "15s", cue: "Low, fast, stiff ankle." })
       ],
@@ -839,7 +835,6 @@ export const DAYS = {
     mantra: "Sweat in training, no tears in competition.",
     poolLoad: "am",
     defaultLight: "green",
-    timeLo: 19, timeHi: 23,
     equipment: ["Jump rope", "Resistance band", "Dowel", "Mat"],
     prSentinel: "Hollow Tuck Flutter — seconds held flat",
     blocks: {
@@ -851,8 +846,8 @@ export const DAYS = {
         X({ name: "Short-Foot", block: "warmup", driver: "time", work: 20, dose: "20s", cue: "Spread toes, dome the arch." })
       ],
       coordination: [
-        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
-        X({ name: "C-Skip", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Paw the ground back under the hip." }),
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "60s · about 10 m each way", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "C-Skip", block: "coordination", driver: "time", work: 60, dose: "60s · about 10 m each way", cue: "Paw the ground back under the hip." }),
         X({ name: "Fast Leg", block: "coordination", driver: "time", work: 60, dose: "4/side", cue: "One sharp snap leg in a march." })
       ],
       main: [
@@ -902,7 +897,6 @@ export const DAYS = {
     mantra: "I am STRONG. I am FAST. I can SWIM THIS.",
     poolLoad: "none",
     defaultLight: "green",
-    timeLo: 23, timeHi: 28,
     equipment: ["Jump rope", "Pull-up bar", "Med ball / partner", "Mat"],
     prSentinel: "Drop-and-Stick — clean landings out of 5",
     blocks: {
@@ -915,12 +909,12 @@ export const DAYS = {
             prescription: { reps: 8, dirs: 4 } })
       ],
       coordination: [
-        X({ name: "C-Skip", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Paw the ground back under the hip." }),
+        X({ name: "C-Skip", block: "coordination", driver: "time", work: 60, dose: "60s · about 10 m each way", cue: "Paw the ground back under the hip." }),
         X({ name: "Fast Leg", block: "coordination", driver: "time", work: 60, dose: "4/side", cue: "One sharp snap leg in a march." }),
         X({ name: "Straight-Leg Bound", block: "coordination", driver: "time", work: 60, dose: "6 reps", cue: "Stiff-leg drive, active foot strike." }),
         X({ name: "Wall Drive", block: "coordination", driver: "time", work: 60, dose: "6/side", cue: "Lean on wall, drive knee, hold line." }),
         X({ name: "Falling Start → 3m", block: "coordination", driver: "time", work: 60, dose: "3 reps", cue: "Lean, fall, catch with 3 strides." }),
-        X({ name: "Lateral Shuffle", block: "coordination", driver: "time", work: 60, dose: "10m/side", cue: "Stay low, don't cross your feet." })
+        X({ name: "Lateral Shuffle", block: "coordination", driver: "time", work: 60, dose: "60s · about 10 m each way, both sides", cue: "Stay low, don't cross your feet." })
       ],
       main: [
         X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
@@ -974,7 +968,6 @@ export const DAYS = {
     mantra: "Rest IS training.",
     poolLoad: "none",
     defaultLight: "recovery",
-    timeLo: 10, timeHi: 12,
     spa: true,
     equipment: ["Foam roller", "Massage gun (parent-operated)", "Mat"],
     safety: "Roller slow (2–3 cm/sec), pause 20s on tender spots. NEVER roll the lower-back spine or neck. Massage gun is PARENT-OPERATED only, lowest speed, big muscles only — never on bones, joints, spine, neck, or growth plates.",
@@ -987,7 +980,7 @@ export const DAYS = {
       { name: "Wind-down — Crocodile / 90-90 breathing", dose: "2 min", why: "Closes the week down-regulated." }
     ],
     recoveryHolds: [
-      X({ name: "Light Streamline Hold", block: "swimskill", driver: "time", work: 20, dose: "2×20s", cue: "Easy, long, relaxed." }),
+      X({ name: "Light Streamline Hold", block: "swimskill", driver: "time", work: 20, dose: "20s hold", cue: "Easy, long, relaxed." }),
       X({ name: "Easy Single-Leg Balance", block: "swimskill", driver: "time", work: 40, eachSide: true, dose: "20s/side", cue: "Gentle, quiet foot." })
     ],
     blocks: { warmup: [], coordination: [], main: [], finisher: [], swimskill: [] },
@@ -998,7 +991,7 @@ export const DAYS = {
 export const STANDING_RULES = [
   "No-Debt / Stop: a missed day is never doubled. Quality over quantity.",
   "Jump rope: single / no-pool days only — never double-pool days.",
-  "Valgus gate: all jumps stay at Drop-and-Stick until 5/5 clean landings ×2 weeks.",
+  "Jump gate (knees caving in): every jump stays at Drop-and-Stick until two separate weeks each hold a Drop-and-Stick she did, self-checked clean, and a grown-up did not flag.",
   "Parent Echo: hum/count out loud on anti-extension holds. Can't hear it = the rep doesn't count.",
   "Coordination / sprint always FRESH — first after warm-up, never to fatigue."
 ];

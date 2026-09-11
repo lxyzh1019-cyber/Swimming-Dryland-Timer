@@ -62,15 +62,6 @@ export function edmontonWeekISODates() {
   return out;
 }
 
-export function mondayOfThisWeek() {
-  const now = new Date();
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  const dow = d.getDay(); // 0=Sun..6=Sat
-  const diff = dow === 0 ? -6 : 1 - dow; // Monday-based week
-  d.setDate(d.getDate() + diff);
-  return d;
-}
 
 /* Timer digits: "05" under a minute, "1:05" above. */
 export function fmt(s) {
@@ -142,9 +133,10 @@ export function refTime(ex) {
 
 /* Parse a recovery dose string ("60s/side", "2 min", "30–45s/muscle") to seconds. */
 export function recoveryDoseSecs(dose) {
-  const m = String(dose).match(/(\d+)\s*(?:–\s*\d+)?\s*(min|s)?/i);
-  let secs = m ? parseInt(m[1], 10) : 40;
-  if (m && /min/i.test(m[2] || "")) secs *= 60;
+  // "30–45s" is a range, and the clock used to take the low end every time.
+  const m = String(dose).match(/(\d+)\s*(?:[–-]\s*(\d+))?\s*(min|s)?/i);
+  let secs = m ? (m[2] ? Math.round((parseInt(m[1], 10) + parseInt(m[2], 10)) / 2) : parseInt(m[1], 10)) : 40;
+  if (m && /min/i.test(m[3] || "")) secs *= 60;
   const eachSide = /\/side/i.test(dose);
   return { secs: eachSide ? secs * 2 : secs, eachSide };
 }

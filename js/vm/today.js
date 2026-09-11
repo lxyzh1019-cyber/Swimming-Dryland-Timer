@@ -4,7 +4,7 @@
    history, swim_journey_v1 XP, and live Edmonton dates.
    ============================================================ */
 
-import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overloadWeek } from "../data.js";
+import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overloadWeek, OVERLOAD_PAUSED } from "../data.js";
 import { settings, loadSessions, loadJourney, levelFromXp, currentStreakOf, loadDayProgress, countsAsTrained, settledXpByDate, outcomeOf } from "../store.js";
 import { workoutInstances } from "../outcome.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
@@ -536,7 +536,9 @@ export function buildTodayVM(state) {
   const now = new Date();
   const dateLine = now.toLocaleDateString("en-US", { timeZone: "America/Edmonton", weekday: "long" })
     + " · " + now.toLocaleDateString("en-US", { timeZone: "America/Edmonton", month: "long", day: "numeric" })
-    + " · Week " + overloadWeek();
+    // The overload week only means something while the overload machinery
+    // runs; paused, it read "Week 7" forever.
+    + (OVERLOAD_PAUSED ? "" : " · Week " + overloadWeek());
 
   const weather = state.weather || { icon: "☀️", temp: "–", caption: "Pool day!" };
 

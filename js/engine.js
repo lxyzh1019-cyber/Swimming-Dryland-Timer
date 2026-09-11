@@ -14,7 +14,7 @@ import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SID
          needsSetup, SETUP_SECONDS,
          VALGUS_FLOOR, VALGUS_PROGRESSIONS } from "./data.js";
 import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent,
-         loadDayProgress, saveDayProgress, clearDayProgress, gateLocked, creditValgusWeek, addSkipRecord,
+         loadDayProgress, saveDayProgress, clearDayProgress, gateLocked, creditValgusWeek,
          addXp, pendingDrawCount, claimSessionXp, athleteId, noteSessionXpAwarded, patchSession, sessionKey,
          XP_VERSION, flaggedMoves, isAbnormalCheck, stampReadinessOutcome, levelFromXp } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn, speakSafety } from "./audio.js";
@@ -24,8 +24,11 @@ import { recoveryDoseSecs, refTime, edmontonISO } from "./util.js";
 // Moves that deserve a longer "get ready" lead-in before they start. Kept in
 // sync with the names that actually appear in the 2026.2 content (js/data.js);
 // stale entries were pruned so the lead-time branch fires when it should.
+// The moves that get a longer spoken lead-in before they start: the jump
+// progressions (present and future) and the bar work. Built from the content
+// so the list cannot drift from the plan again.
 const HARD_EXERCISES = new Set([
-  "Box Jump", "Box Jump-Down", "Bosu Squat", "Drop-and-Stick",
+  VALGUS_FLOOR, ...VALGUS_PROGRESSIONS,
   "Clean Pull-Ups", "Scap Pull-Up + Dead Hang"
 ]);
 
@@ -1983,14 +1986,6 @@ export function finalize(completed) {
   // the WEEK rather than a bare count, so two sessions on one afternoon can't
   // unlock a gate that is supposed to take two weeks.
   if (completed) creditValgusWeek(entry);
-  if (sess.skipped.length) {
-    addSkipRecord({
-      createdAt: Date.now(),
-      sessionDate: new Date().toISOString(),
-      sessionType: sess.spa ? "spa" : "main",
-      skippedItems: sess.skipped
-    });
-  }
 
   // XP is paid for rounds actually trained, capped so one training day can
   // never pay more than the day's own plan however many partial-and-resume

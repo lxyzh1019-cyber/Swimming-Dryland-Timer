@@ -554,7 +554,7 @@ Object.assign(RAW, {
     const i = Number(arg);
     const first = engine.sess.quizPick == null;
     engine.setQuizPick(i);
-    // Priced off the same ledger as the Quiz Deck: a question pays +10 the
+    // Priced off the same ledger as the Quiz Deck: a question pays +5 the
     // first time it's attempted and +25 the first time it's answered right,
     // and never again. The Coach's Quiz question rotates but the bank is only
     // six deep, so without the ledger this paid 25 XP a session forever for
