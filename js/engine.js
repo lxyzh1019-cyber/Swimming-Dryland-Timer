@@ -19,7 +19,7 @@ import { settings, configuredExerciseRest, configuredRoundRest, configuredSectio
          XP_VERSION, flaggedMoves, isAbnormalCheck, stampReadinessOutcome } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn, speakSafety } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
-import { recoveryDoseSecs, refTime } from "./util.js";
+import { recoveryDoseSecs, refTime, edmontonISO } from "./util.js";
 
 // Moves that deserve a longer "get ready" lead-in before they start. Kept in
 // sync with the names that actually appear in the 2026.2 content (js/data.js);
@@ -937,6 +937,7 @@ function readDayProgress() {
   // Every write goes through here, so this is the one place the id has to be
   // stamped for a resume to be able to read it back.
   if (sess.workoutInstanceId) prog.workoutInstanceId = sess.workoutInstanceId;
+  if (sess.dayIso) prog.dayIso = sess.dayIso;
   /* And the light this workout is being trained under, so the resume cannot
      quietly run it under a bigger one. Written once and then only ever lowered:
      startSession has already resolved a later, worse check into sess.light, so
@@ -1327,6 +1328,12 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
   sess.workoutInstanceId = (!isCareSession() && prog && prog.workoutInstanceId)
     ? prog.workoutInstanceId
     : newWorkoutInstanceId();
+  /* The date the WORKOUT started on, for the XP day budget: a bout resumed
+     after midnight is the same day's work and shares that day's cap (see
+     dayXpKey in js/store.js). */
+  sess.dayIso = (!isCareSession() && prog && prog.workoutInstanceId === sess.workoutInstanceId && prog.dayIso)
+    ? prog.dayIso
+    : edmontonISO(new Date());
   sess.circuits = plan.circuits;
   /* NOTHING LEFT TO RUN. This return happens BEFORE THE FIRST AWAIT, and
      js/main.js relies on that: it reads `sess.running` straight after calling
@@ -1807,6 +1814,7 @@ export function finalize(completed) {
        before counting anything — see workoutInstances in js/outcome.js. */
     workoutInstanceId: sess.workoutInstanceId || null,
     isoDate: new Date().toISOString(),
+    dayIso: sess.dayIso || null,       // the day the workout STARTED — its XP budget
     durationSecs: elapsedSecs,
     session: "morning",
     planVersion: "2026.2",

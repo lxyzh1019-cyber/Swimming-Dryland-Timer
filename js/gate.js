@@ -77,7 +77,7 @@ export const UNGATED_ACTIONS = [
   "rGoBack", "rExit", "rResultCta", "rResultSecondary",
   // things she has earned
   "startQuizDeck", "answerQuizDeck", "nextQuizDeck", "exitQuizDeck",
-  "openPrizeDraw", "pickPrize", "claimPrize", "redeemPrize",
+  "openPrizeDraw", "pickPrize", "claimPrize", "closePrizeDraw", "redeemPrize",
   // the gate's own controls — these ARE the authorization, so gating them
   // would be circular. None of them mutates anything on its own.
   "cancelGate", "submitGate", "answerGate", "forgotPin", "unlockWithPasskey",

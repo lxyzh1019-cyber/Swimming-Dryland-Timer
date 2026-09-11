@@ -146,9 +146,16 @@ export function publishJourney(delaySecs = 2) {
 export async function publishReadiness() {
   if (settings.cloudMirror === false) return false;
   try {
+    const { fsSaveReadiness, fsGetReadiness } = await import("./firebase.js");
+    // READ, MERGE, THEN WRITE. The doc is one whole document per athlete, so a
+    // device that published before it had merged used to erase the other
+    // device's checks from the cloud copy.
+    for (const id of athleteAliases()) {
+      const doc = await fsGetReadiness(id);
+      if (doc && Array.isArray(doc.checks)) mergeReadinessLog(doc.checks);
+    }
     const rows = loadReadinessLog().filter(r => r && r.abnormal);
     if (!rows.length) return false;
-    const { fsSaveReadiness } = await import("./firebase.js");
     // Bounded so one document can never approach Firestore's size limit.
     return await fsSaveReadiness(athleteId(), rows.slice(-READINESS_MIRROR_CAP));
   } catch (e) {
@@ -165,7 +172,11 @@ export async function flushJourney() {
   if (_publishing) return false;
   _publishing = true;
   try {
-    const { fsSaveJourney } = await import("./firebase.js");
+    const { fsSaveJourney, fsGetJourney } = await import("./firebase.js");
+    // Merge what the other device has published since this one last looked,
+    // so the snapshot written below is a union and never a rollback of a prize
+    // or a mastered question that only the other device knew about.
+    for (const id of athleteAliases()) mergeCloudJourney(await fsGetJourney(id));
     return await fsSaveJourney(athleteId(), journeySnapshot());
   } catch (e) {
     console.warn("Journey publish skipped:", e);

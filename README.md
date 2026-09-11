@@ -89,7 +89,7 @@ A dependency-free smoke test covers the core logic (streak/XP math, readiness
 scoring + the pain-gate, quiz rotation, and that the view-models render):
 
 ```
-npm test        # runs node test/smoke.mjs — no install needed
+npm test        # runs the five suites under test/ — no install needed
 ```
 
 The `package.json` exists only for this script; the app itself still has no
