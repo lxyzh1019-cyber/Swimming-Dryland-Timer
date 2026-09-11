@@ -14,7 +14,7 @@ import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQU
          monthKeyOf, formVerdicts, latestFormVerdicts, loadReadinessLog,
          settledXpInRange } from "../store.js";
 import { workoutInstances } from "../outcome.js";
-import { edmontonWeekISODates, edmontonDayKey, edmontonISO, fmtHHMM, exercisePhotoUrl, DAY_MS } from "../util.js";
+import { edmontonWeekISODates, edmontonDayKey, edmontonISO, exercisePhotoUrl, DAY_MS } from "../util.js";
 import { sessionEffort, effortSummary, EFFORT_CAVEAT } from "../effort.js";
 
 const LIGHT_COLORS = { green: "var(--mint)", yellow: "var(--sun)", red: "var(--stop)", recovery: "var(--grape)" };
@@ -734,12 +734,15 @@ export function buildGrownupVM(state) {
   const seen = {};
   const libraryList = [];
   Object.values(DAYS).forEach(day => {
-    Object.values(day.blocks || {}).flat().concat(day.prepMenu || [], day.recovery || []).forEach(ex => {
+    Object.values(day.blocks || {}).flat().concat(day.prepMenu || [], day.recovery || [], day.recoveryHolds || []).forEach(ex => {
       if (!ex || !ex.name || seen[ex.name]) return; seen[ex.name] = true;
       libraryList.push({
         name: ex.name, dose: ex.dose || "", cue: ex.cue || "",
         parentWatch: ex.parentWatch || "", fix: ex.redFlag || "", swim: ex.swimTransfer || "",
+        // Demo first, then the Timer image — the library used to ask only for
+        // a Demo image, and with none on disk every card was blank.
         photoUrl: exercisePhotoUrl(ex.name, "Demo"),
+        photoFallbackUrl: exercisePhotoUrl(ex.name, "Timer"),
         videoUrl: videoSearchUrl(ex)
       });
     });

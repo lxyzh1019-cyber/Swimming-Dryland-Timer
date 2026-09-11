@@ -5,6 +5,6 @@
   "type": "module",
   "description": "Static, no-build ES-module app. package.json exists only for `npm test`.",
   "scripts": {
-    "test": "node test/smoke.mjs && node test/actions.mjs && node test/invariants.mjs && node test/integrity.mjs && node test/timing.mjs && node test/contrast.mjs && node test/ux.mjs && TZ=America/New_York node test/invariants.mjs"
+    "test": "node test/smoke.mjs && node test/actions.mjs && node test/invariants.mjs && node test/integrity.mjs && node test/timing.mjs && node test/contrast.mjs && node test/ux.mjs && node test/photos.mjs && TZ=America/New_York node test/invariants.mjs"
   }
 }

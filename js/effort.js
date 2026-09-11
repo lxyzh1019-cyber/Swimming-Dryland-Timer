@@ -46,7 +46,6 @@
    nothing in the app reads it to make one.
    ============================================================ */
 
-import { LIGHT_ROUNDS } from "./data.js";
 import { outcomeOf } from "./outcome.js";
 
 export const EFFORT_WEIGHTS = { form: 30, finish: 30, hardDay: 15, stuckWithIt: 15, clock: 10 };

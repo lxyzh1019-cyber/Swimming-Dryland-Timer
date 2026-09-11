@@ -4,31 +4,26 @@
    Local-first; Firestore mirroring happens in the engine.
    ============================================================ */
 
-import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
+import { DAY_MS, todayISODate, edmontonISO } from "./util.js";
 import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE } from "./data.js";
 import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION, roundPayCredit,
          streakDatesOf, freezeDatesOf } from "./outcome.js";
 
 /* ---- keys (unchanged from the old app unless noted) ---- */
 export const SETTINGS_KEY     = "swimTrainingSettingsV2";
-export const PROGRESS_KEY     = "swimTrainingProgressV2";
-export const SKIP_HISTORY_KEY = "swimTrainingSkipHistoryV2";
 export const ENGAGE_KEY       = "swimEngagementPickV2";
 export const LS_READINESS     = "swim_readiness";      // v2 schema (4-Q + body map)
 export const LS_READINESS_LOG = "swim_readiness_log_v1"; // every check, kept as history
 export const LS_DAYPROG       = "swim_day_progress";
-export const LS_LEARNING      = "swim_learning_records";
 export const LS_LADDER        = "swim_ladder_rungs";
 export const LS_QUIZ          = "swim_quiz_v1";
 export const LS_GATE          = "swim_gate_state";
 export const LS_SESSIONS      = "swim_sessions_v2";
 export const LS_TRACKER       = "swim_tracker_v2";
 export const LS_EVENTS        = "swim_events_v1";
-export const LS_PRLOG         = "swim_pr_log";
 export const LS_JOURNEY       = "swim_journey_v1";     // NEW: xp / level / prizes
 export const LS_FORMCHECK     = "swim_form_check_v1";  // NEW: parent-verified form
 
-const SKIP_RETENTION_MS  = 7 * 24 * 60 * 60 * 1000;
 const EVENT_RETENTION_MS = 120 * 24 * 60 * 60 * 1000; // 120 days
 const EVENT_CAP = 1500;
 
@@ -122,7 +117,9 @@ export function renameProfile(id, name) {
    session that was never recorded. Now a failed write frees the expendable
    analytics blobs, retries once, and — if it still fails — tells the app so a
    grown-up sees a banner instead of losing work invisibly. */
-const EXPENDABLE_KEYS = [LS_EVENTS, SKIP_HISTORY_KEY, LS_PRLOG];
+// Only the analytics event stream is expendable; the other two keys that
+// used to sit here were never read by anything.
+const EXPENDABLE_KEYS = [LS_EVENTS];
 let _storageErrorHandler = null;
 let _lastStorageError = null;
 export function onStorageError(fn) { _storageErrorHandler = fn; }
@@ -341,12 +338,6 @@ export function patchSession(key, patch) {
   return writeStorage(LS_SESSIONS, all);
 }
 
-export function thisWeekSessions() {
-  // Edmonton's Mon–Sun week, like every other calendar grouping in the app.
-  const weekIsoSet = new Set(Object.values(edmontonWeekISODates()));
-  return loadSessions().filter(s => weekIsoSet.has(edmontonISO(s.isoDate)));
-}
-
 /* Did this record earn the kid a day of training?
    Fully completed sessions always count. A session ENDED EARLY counts too, as
    long as real work happened (at least one non-skipped exercise) — the complete
@@ -384,11 +375,6 @@ export function streakFreezeDates(sessions) {
     .map(s => edmontonISO(s.isoDate)).filter(Boolean));
 }
 
-export function daysAgoCount(sessions, days) {
-  const cutoff = Date.now() - days * DAY_MS;
-  return sessions.filter(s => s.isoDate && new Date(s.isoDate).getTime() >= cutoff);
-}
-export function sumSecs(sessions) { return sessions.reduce((a, s) => a + (s.durationSecs || 0), 0); }
 
 /* Streak "freeze": a single rest/missed day between active days does NOT break
    the run (a gap of 1 or 2 calendar days both continue it). This stops the
@@ -485,26 +471,6 @@ export function currentStreak(sessions, freezeDays = null) {
 export function currentStreakOf(sessions) {
   const rows = sessions || loadSessions();
   return currentFromDays([...streakDatesOf(rows)].sort(), freezeDatesOf(rows));
-}
-export function longestStreakOf(sessions) {
-  const rows = sessions || loadSessions();
-  return longestFromDays([...streakDatesOf(rows)].sort(), freezeDatesOf(rows));
-}
-
-/* ---- skip history ---- */
-function pruneSkipHistory(items) {
-  const cutoff = Date.now() - SKIP_RETENTION_MS;
-  return (items || []).filter(item => item.createdAt >= cutoff);
-}
-export function loadSkipHistory() {
-  const cleaned = pruneSkipHistory(readStorage(SKIP_HISTORY_KEY, []));
-  writeStorage(SKIP_HISTORY_KEY, cleaned);
-  return cleaned;
-}
-export function addSkipRecord(record) {
-  const all = pruneSkipHistory(readStorage(SKIP_HISTORY_KEY, []));
-  all.push(record);
-  writeStorage(SKIP_HISTORY_KEY, all);
 }
 
 /* ---- analytics event stream ---- */
@@ -773,9 +739,7 @@ export function creditValgusWeek(entry) {
 export function loadLadderRungs() { return readStorage(LS_LADDER, {}); }
 export function saveLadderRungs(r) { writeStorage(LS_LADDER, r); }
 
-/* ---- learning records + quiz ---- */
-export function loadLearning() { return readStorage(LS_LEARNING, []); }
-export function saveLearning(l) { writeStorage(LS_LEARNING, l); }
+/* ---- quiz ---- */
 
 /* Quiz blob. `items` is the per-MOVE mastery record the grown-up analytics
    reads. `qLedger` is the per-QUESTION XP ledger added alongside it: a move
@@ -852,7 +816,7 @@ export function movePool() {
   const seen = {}, pool = [];
   Object.values(DAYS).forEach(day => {
     const blocks = day.blocks || {}; const rec = day.recovery || [];
-    [].concat(...Object.values(blocks), day.prepMenu || [], rec).forEach(ex => {
+    [].concat(...Object.values(blocks), day.prepMenu || [], rec, day.recoveryHolds || []).forEach(ex => {
       if (!ex || !ex.name || seen[ex.name]) return; seen[ex.name] = true;
       pool.push({ name: ex.name, cue: ex.cue || "", watch: ex.parentWatch || "", fix: ex.redFlag || "", block: ex.block || "" });
     });
@@ -940,13 +904,6 @@ export function quizBankStatus(quiz) {
            xpTotal: bank.length * (QXP_ATTEMPT + QXP_CORRECT) };
 }
 
-/* ---- PR log ---- */
-export function loadPrLog() { return readStorage(LS_PRLOG, []); }
-export function addPrLog(entry) {
-  const all = loadPrLog();
-  all.push(entry);
-  writeStorage(LS_PRLOG, all.slice(-60));
-}
 
 /* ---- 4-week tracker (PR board) ---- */
 export function loadTracker() {
@@ -2261,9 +2218,9 @@ export const BACKUP_SCHEMA = 1;
 
 /* Every key that belongs to an athlete. */
 export const PROFILE_KEYS = [
-  SETTINGS_KEY, PROGRESS_KEY, SKIP_HISTORY_KEY, ENGAGE_KEY, LS_READINESS, LS_READINESS_LOG, LS_DAYPROG,
-  LS_LEARNING, LS_LADDER, LS_QUIZ, LS_GATE, LS_SESSIONS, LS_TRACKER, LS_EVENTS,
-  LS_PRLOG, LS_JOURNEY, LS_FORMCHECK
+  SETTINGS_KEY, ENGAGE_KEY, LS_READINESS, LS_READINESS_LOG, LS_DAYPROG,
+  LS_LADDER, LS_QUIZ, LS_GATE, LS_SESSIONS, LS_TRACKER, LS_EVENTS,
+  LS_JOURNEY, LS_FORMCHECK
 ];
 
 /* True when nothing in the saved settings differs from the shipped defaults. */

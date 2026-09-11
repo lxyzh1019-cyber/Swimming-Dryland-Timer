@@ -215,3 +215,9 @@ Photo slots are intentionally empty until real photos land in
 (e.g. `Hollow Tuck Flutter - Timer Image.png`). A `/` in a name becomes `-`
 since it can't appear in a filename. Get the spelling exactly right — a
 typo means that photo silently falls back to the placeholder.
+
+`assets/exercises/EXPECTED_FILES.md` lists every filename the app will ask
+for and whether it is present; regenerate it with
+`node scripts/photo-manifest.mjs` after changing the plan (`npm test` checks
+it is current). The Move Library and the ⓘ card fall back to the Timer image
+when there is no Demo image.

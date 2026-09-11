@@ -552,8 +552,8 @@ function libraryTab(vm) {
         <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);box-shadow:var(--shadow-soft);overflow:hidden;display:flex;flex-direction:column;">
           <div style="width:100%;height:180px;position:relative;overflow:hidden;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
             <span style="font-size:44px;" aria-hidden="true">🏊</span>
-            <span style="font-size:12px;font-weight:800;color:var(--aqua-ink);opacity:0.75;">Demo photo coming soon</span>
-            <img src="${esc(lib.photoUrl)}" alt="" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+            <span style="font-size:12px;font-weight:800;color:var(--aqua-ink);opacity:0.75;">Photo coming soon</span>
+            <img src="${esc(lib.photoUrl)}" alt="" data-fallback="${esc(lib.photoFallbackUrl || "")}" onerror="if(this.dataset.fallback&&this.src.indexOf(this.dataset.fallback)<0){this.src=this.dataset.fallback;}else{this.style.display='none';}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
           </div>
           <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
             <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;">

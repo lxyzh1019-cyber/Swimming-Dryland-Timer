@@ -792,8 +792,8 @@ const playPerfect = () => {
 localStorage.removeItem(store.LS_QUIZ);
 localStorage.removeItem(store.LS_JOURNEY);
 const bank0 = store.quizBankStatus();
-const BANK = store.questionBank().length;      // 83 move questions + the unlocked ranks
-ok(BANK === 83 + store.rankPool().length * 2, "the bank is the moves plus the unlocked ocean chapters");
+const BANK = store.questionBank().length;      // 85 move questions (incl. the recovery holds) + the unlocked ranks
+ok(BANK === 85 + store.rankPool().length * 2, "the bank is the moves plus the unlocked ocean chapters");
 ok(bank0.total === BANK && bank0.mastered === 0, "nothing is mastered on a fresh device");
 ok(bank0.xpTotal === BANK * (store.QXP_ATTEMPT + store.QXP_CORRECT), "lifetime quiz XP budget is bank x question value");
 
