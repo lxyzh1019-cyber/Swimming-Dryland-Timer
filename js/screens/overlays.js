@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { PRIZE_POOL } from "../data.js";
-import { settings, loadQuiz, saveQuiz, logEvent, addXp, addPrize, pendingDrawCount,
+import { settings, loadQuiz, saveQuiz, logEvent, addXp, addPrize, pendingDrawCount, drawIsWaitingOnSync,
          movePool, rankPool, questionBank, quizPaidToday, quizBankStatus,
          quizQuestionKey, payQuizQuestion } from "../store.js";
 import { todayISODate, escapeHtml } from "../util.js";
@@ -249,7 +249,13 @@ export function claimPrize(pd) {
   // claim with no draw pending, and this keeps a double-tap from logging a
   // second "prize_won" the wallet never received.
   if (pendingDrawCount() < 1) return null;
+  /* THE DRAW WAITS FOR THE DAY TO SETTLE — and says so. addPrize refuses a
+     claim while the total is unsettled (see xpIsPending), and this used to log
+     the win, mark the draw claimed, and let the overlay close on "enjoy it!"
+     over a wallet that had not changed. The draw stays open with the reason. */
+  if (drawIsWaitingOnSync()) { pd.waiting = true; return { waiting: true }; }
   pd.claimed = true;
+  pd.waiting = false;
   const won = pd.cards[pd.picked];
   logEvent("prize_won", { label: won.label });
   return addPrize(won);
@@ -259,10 +265,12 @@ export function prizeDrawHtml(pd) {
   const hasPicked = pd.picked != null;
   return `
   <div style="position:fixed;inset:0;z-index:85;background:rgba(20,59,74,0.55);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;">
-    <div style="background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-pop);padding:26px;width:100%;max-width:540px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;">
+    <div style="position:relative;background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-pop);padding:26px;width:100%;max-width:540px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;">
       <div style="font-size:11px;font-weight:900;letter-spacing:0.08em;color:var(--sun-ink);background:var(--sun-wash);border-radius:var(--radius-pill);padding:6px 14px;">🎉 LEVEL UP REWARD</div>
       <div style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);line-height:1.1;">Pick a prize envelope!</div>
-      ${hasPicked ? `<div style="font-family:var(--font-hand);font-size:22px;font-weight:700;color:var(--aqua-ink);">You picked — enjoy it! 🌟</div>` : ""}
+      <button type="button" data-action="closePrizeDraw" aria-label="Close" style="position:absolute;top:12px;right:12px;width:44px;height:44px;border-radius:50%;border:none;background:var(--surface-2);color:var(--ink-soft);font-size:18px;font-weight:900;cursor:pointer;">✕</button>
+      ${hasPicked && !pd.waiting ? `<div style="font-family:var(--font-hand);font-size:22px;font-weight:700;color:var(--aqua-ink);">You picked — enjoy it! 🌟</div>` : ""}
+      ${pd.waiting ? `<div role="status" style="background:var(--sun-wash);border:2px solid var(--sun);border-radius:14px;padding:10px 14px;font-size:14px;font-weight:800;color:var(--sun-ink);line-height:1.45;max-width:420px;">Your prize is safe. The app is waiting to check in with your other device before it adds it — try again in a moment, or close this and pick it up from Progress later.</div>` : ""}
       <div style="display:flex;gap:12px;width:100%;justify-content:center;flex-wrap:wrap;">
         ${pd.cards.map((c, i) => {
           const revealed = pd.picked === i;
@@ -275,7 +283,7 @@ export function prizeDrawHtml(pd) {
           </button>`;
         }).join("")}
       </div>
-      ${hasPicked ? `<button type="button" data-action="claimPrize" style="min-height:56px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:0 34px;font-family:var(--font-display);font-weight:600;font-size:20px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">Add to my prizes ⭐</button>` : ""}
+      ${hasPicked ? `<button type="button" data-action="claimPrize" style="min-height:56px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:0 34px;font-family:var(--font-display);font-weight:600;font-size:20px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">${pd.waiting ? "Try again" : "Add to my prizes ⭐"}</button>` : ""}
     </div>
   </div>`;
 }

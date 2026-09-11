@@ -376,8 +376,11 @@ Object.assign(RAW, {
   pickPrize(arg) {
     if (state.prizeDraw && state.prizeDraw.picked == null) { state.prizeDraw.picked = Number(arg); render(); }
   },
+  closePrizeDraw() { state.prizeDraw = null; render(); },
   claimPrize() {
-    claimPrize(state.prizeDraw);
+    const r = claimPrize(state.prizeDraw);
+    // The draw is owed but cannot be settled yet: keep it open, say why.
+    if (r && r.waiting) { render(); return; }
     state.prizeDraw = null;
     publishJourney();   // a prize won here must not be invisible on her other device
     // One prize per level gained: once every pending draw is claimed, retire

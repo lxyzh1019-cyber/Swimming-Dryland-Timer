@@ -334,11 +334,12 @@ export function patchSession(key, patch) {
   const all = loadSessions();
   if (!all.length) return false;
   const found = key ? all.findIndex(s => sessionKey(s) === key) : -1;
-  const idx = found >= 0 ? found : all.length - 1;
-  all[idx] = { ...all[idx], ...patch };
+  // No fallback to "the last row": a patch whose record cannot be found lands
+  // nowhere rather than on whichever session happens to sit at the end.
+  if (found < 0) return false;
+  all[found] = { ...all[found], ...patch };
   return writeStorage(LS_SESSIONS, all);
 }
-export function patchLastSession(patch) { return patchSession(null, patch); }
 
 export function thisWeekSessions() {
   // Edmonton's Mon–Sun week, like every other calendar grouping in the app.
@@ -983,9 +984,10 @@ export function activeEngagement(date) {
 }
 export function setEngagementPick(systemKey) {
   const all = readStorage(ENGAGE_KEY, {});
-  const monday = new Date();
-  monday.setDate(monday.getDate() + 1);   // picking on Sunday applies to the coming week
-  all[weekKeyFor(monday)] = systemKey;
+  // The same key activeEngagement reads: weekKeyFor already sends a Sunday to
+  // the coming Monday. Adding a day first moved a SATURDAY pick to next week,
+  // so it was invisible until Sunday.
+  all[weekKeyFor(new Date())] = systemKey;
   writeStorage(ENGAGE_KEY, all);
 }
 
@@ -999,7 +1001,7 @@ export function setEngagementPick(systemKey) {
 export function loadJourney() {
   return readStorage(LS_JOURNEY, null);
 }
-export function saveJourney(j) { writeStorage(LS_JOURNEY, j); }
+export function saveJourney(j) { return writeStorage(LS_JOURNEY, j); }
 
 /* XP a stored record is worth. Prefers what was actually awarded at the time;
    falls back to the formula (halved for an ended-early session, matching
@@ -1211,8 +1213,15 @@ export function dayXpCap(entry) {
 
    No profile in the key: the journey doc is already stored per athlete
    (see nsKey), so two athletes on one device never share these rows. */
-function dayXpKey(entry) {
-  return edmontonISO(entry.isoDate || Date.now());
+export function dayXpKey(entry) {
+  /* A workout that crossed midnight keeps its progress for six hours (see
+     DAY_PROGRESS_GRACE_MS) but used to get a fresh budget at 00:00 — one bout,
+     two 360 XP caps. The record now carries the date the workout STARTED on
+     (`dayIso`, stamped by the engine from the day-progress record), and the
+     budget follows it. Rows written before the field existed fall back to the
+     date they were saved. */
+  if (entry && typeof entry.dayIso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(entry.dayIso)) return entry.dayIso;
+  return edmontonISO((entry && entry.isoDate) || Date.now());
 }
 
 /* A budget row is { spent, cap }. Rows written before the key changed were a
@@ -1269,7 +1278,7 @@ function pruneDayXp(map) {
    stamp is written a moment later — at full value against its own budget. */
 function loggedDayXp(key, entry) {
   const rows = loadSessions().filter(s =>
-    s && !s.practice && edmontonISO(s.isoDate) === key);
+    s && !s.practice && dayXpKey(s) === key);
   let spent = 0;
   let cap = dayXpCap(entry);
   rows.forEach(s => {
@@ -1641,8 +1650,13 @@ export function migratePrizeAmnesty(now = Date.now()) {
 
     // The relabel applies to every copy, spent or not — it is a correction to
     // what the prize SAYS, not to whether it has been used.
+    // ...but only to prizes EARNED before the amnesty. The pool still offers
+    // the original label, and a draw made after the correction is not the
+    // thing being corrected — rewriting it on the next launch produced two
+    // identically-named prizes in the wallet.
     const rule = AMNESTY_RELABEL.find(r => r.match.test(String(out.label || "")));
-    if (rule) { out.icon = rule.icon; out.label = rule.label; relabelled++; }
+    const earnedISO = typeof out.date === "string" ? out.date.slice(0, 10) : "";
+    if (rule && (!earnedISO || earnedISO <= edmontonISO(cutoff))) { out.icon = rule.icon; out.label = rule.label; relabelled++; }
 
     if (!out.redeemed) return out;
     /* A redemption with no date at all is precisely the legacy shape the audit
@@ -1892,7 +1906,7 @@ export function settledDayXp(sessions) {
   const byDate = new Map();
   (sessions || []).forEach(s => {
     if (!s || s.practice) return;
-    const date = edmontonISO(s.isoDate);
+    const date = dayXpKey(s);
     if (!date) return;
     if (!byDate.has(date)) byDate.set(date, []);
     byDate.get(date).push(s);
@@ -1955,6 +1969,13 @@ export function settledXpInRange(sessions, from, to) {
    Displaying it is the point: a kid who trained is told her work is counted,
    not that it is missing. */
 let _syncFailed = false;
+/* Whether the boot restore has ANSWERED yet this load. Before it has, a device
+   that has a working mirror on record is still waiting on it — `_syncFailed`
+   starting false every load used to read as "all clear" for the second or two
+   between first paint and the restore resolving, which was long enough to claim
+   a draw against an unsettled total. */
+let _syncResolved = false;
+export function resetSyncStateForTest() { _syncFailed = false; _syncResolved = false; }
 
 /* WHETHER THIS DEVICE HAS A WORKING MIRROR, remembered ACROSS LOADS.
 
@@ -1964,6 +1985,7 @@ let _syncFailed = false;
    now, which is already persisted and already synced. */
 export function noteSyncResult(ok) {
   _syncFailed = !ok;
+  _syncResolved = true;
   if (!ok) return;
   const j = loadJourney();
   if (!j) return;
@@ -2002,6 +2024,7 @@ export function xpIsPending(now = Date.now()) {
   if (!Number.isFinite(last)) return false;
   if (now - last > SYNC_EVIDENCE_MS) return false;
   if (!deviceIsOnline()) return true;
+  if (!_syncResolved) return true;      // the boot restore has not answered yet
   return _syncFailed;
 }
 
@@ -2078,8 +2101,19 @@ export function mergeCloudJourney(snap) {
   if (j.pendingDraws !== before) changed = true;
   saveJourney(j);
 
+  if (mergeQuizLearning(snap.qLedger, snap.quizItems)) changed = true;
+  return changed;
+}
+
+/* Learning moves UP only: a question mastered anywhere is mastered here, and
+   per-move tallies take the larger count. Shared by the cloud merge and the
+   backup restore so the two cannot drift. Returns true when anything changed. */
+export function mergeQuizLearning(qLedger, quizItems) {
+  if (qLedger != null && (typeof qLedger !== "object" || Array.isArray(qLedger))) return false;
+  if (quizItems != null && (typeof quizItems !== "object" || Array.isArray(quizItems))) return false;
   const q = loadQuiz();
-  Object.entries(snap.qLedger || {}).forEach(([k, rec]) => {
+  let changed = false;
+  Object.entries(qLedger || {}).forEach(([k, rec]) => {
     const cur = q.qLedger[k] || { attempted: false, mastered: false };
     const next = {
       attempted: !!(cur.attempted || (rec && rec.attempted)),
@@ -2088,16 +2122,40 @@ export function mergeCloudJourney(snap) {
     if (next.attempted !== cur.attempted || next.mastered !== cur.mastered) changed = true;
     q.qLedger[k] = next;
   });
-  Object.entries(snap.quizItems || {}).forEach(([move, rec]) => {
+  Object.entries(quizItems || {}).forEach(([move, rec]) => {
     const cur = q.items[move] || { right: 0, wrong: 0, seen: 0 };
-    q.items[move] = {
+    const next = {
       right: Math.max(cur.right || 0, (rec && rec.right) || 0),
       wrong: Math.max(cur.wrong || 0, (rec && rec.wrong) || 0),
       seen:  Math.max(cur.seen  || 0, (rec && rec.seen)  || 0)
     };
+    if (next.right !== (cur.right || 0) || next.wrong !== (cur.wrong || 0) || next.seen !== (cur.seen || 0)) changed = true;
+    q.items[move] = next;
   });
-  saveQuiz(q);
+  if (changed) saveQuiz(q);
   return changed;
+}
+
+/* Day budgets merge by date: the larger spend and the larger cap each win. */
+function mergeDayXp(a, b) {
+  const out = {};
+  [a, b].forEach(map => Object.keys(map || {}).forEach(k => {
+    const row = dayXpRow(map, k), cur = dayXpRow(out, k);
+    out[k] = { spent: Math.max(cur.spent, row.spent), cap: Math.max(cur.cap, row.cap) };
+  }));
+  return out;
+}
+
+/* Profiles from a backup are ADDED if this device does not know the id; nothing
+   already here is renamed or removed. Returns true when the list grew. */
+export function mergeProfileList(list) {
+  const known = new Set(_profiles.list.map(p => p.id));
+  const add = (list || []).filter(p => p && typeof p.id === "string" && p.id && !known.has(p.id) && typeof p.name === "string" && p.name.trim())
+    .map(p => ({ id: p.id, name: p.name.trim(), ...(Array.isArray(p.aliases) ? { aliases: p.aliases.slice(0, 20) } : {}) }));
+  if (!add.length) return false;
+  _profiles = { ..._profiles, list: [..._profiles.list, ...add] };
+  writeRaw(PROFILES_KEY, _profiles);
+  return true;
 }
 
 /* Keep the XP total consistent with the session log without double-counting
@@ -2107,7 +2165,13 @@ export function mergeCloudJourney(snap) {
    usual. First call just establishes the baseline and awards nothing.
    Returns the XP added. */
 export function reconcileJourneyWithSessions() {
-  const total = loadSessions().reduce((sum, s) => sum + sessionXp(s), 0);
+  /* THE SAME NUMBER THE REBUILD WRITES. This summed the raw per-row stamps,
+     while rebuildJourneyXp stores the day-capped (settled) total into the very
+     same `sessionXp` baseline. Any capped date — a resume, two devices offline
+     on one day — made raw exceed settled, so every boot found a "difference",
+     awarded it again, ratcheted maxLevelSeen and could open a real prize draw.
+     Settled on both sides, the difference is only ever new rows. */
+  const total = settledTrainingXp(loadSessions());
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
   if (!Number.isFinite(j.sessionXp)) {
     j.sessionXp = total;
@@ -2219,6 +2283,7 @@ export function exportProfileData() {
     app: BACKUP_APP, schema: BACKUP_SCHEMA,
     exportedAt: new Date().toISOString(),
     profile: { id: activeProfileId(), name: settings.athleteName || LEGACY_ATHLETE },
+    profiles: { list: profileList() },
     data
   };
 }
@@ -2278,6 +2343,9 @@ export function importProfileData(payload, opts = {}) {
     // backup taken before a prize was claimed would otherwise hand it back.
     const mergedJourney = {
       ...inc, ...local,
+      // The day budget merges by date, taking the larger spend and cap, so a
+      // restore neither forgets what the backup's device paid nor what this one did.
+      dayXpPaid: mergeDayXp(local.dayXpPaid, inc.dayXpPaid),
       xp: Math.max(local.xp || 0, inc.xp || 0),
       sessionXp: Math.max(
         Number.isFinite(local.sessionXp) ? local.sessionXp : 0,
@@ -2291,8 +2359,24 @@ export function importProfileData(payload, opts = {}) {
     saveJourney(mergedJourney);
   }
 
+  /* Learning and history MERGE rather than fill: a device with even a nearly
+     empty quiz blob used to win outright, and since XP is rebuilt from the quiz
+     ledger, the backup's quiz XP evaporated on the next boot. */
+  if (d[LS_QUIZ] && typeof d[LS_QUIZ] === "object") {
+    if (readStorage(LS_QUIZ, null) === null) { writeStorage(LS_QUIZ, d[LS_QUIZ]); result.filled.push(LS_QUIZ); }
+    else if (mergeQuizLearning(d[LS_QUIZ].qLedger, d[LS_QUIZ].items)) result.filled.push(LS_QUIZ);
+  }
+  if (Array.isArray(d[LS_READINESS_LOG])) {
+    if (mergeReadinessLog(d[LS_READINESS_LOG])) result.filled.push(LS_READINESS_LOG);
+  }
+  // The athlete registry rides on the payload (it is not per-athlete storage),
+  // so a second athlete's backup can be reconstituted on a clean device.
+  if (payload.profiles && Array.isArray(payload.profiles.list)) {
+    if (mergeProfileList(payload.profiles.list)) result.filled.push(PROFILES_KEY);
+  }
+
   PROFILE_KEYS.forEach(k => {
-    if (k === LS_SESSIONS || k === LS_JOURNEY || d[k] === undefined) return;
+    if (k === LS_SESSIONS || k === LS_JOURNEY || k === LS_QUIZ || k === LS_READINESS_LOG || d[k] === undefined) return;
     // Settings are the exception to "fill only what's missing": migrate() always
     // writes them, so they'd never look missing. Untouched defaults count as
     // empty — a fresh device gets her name, rest times and prize pool back, and
@@ -2340,7 +2424,7 @@ export function migrate() {
   migrateGateWeeks();
   migrateAthleteIdentity();
   if (loadJourney() == null) {
-    const xp = loadSessions().reduce((sum, s) => sum + sessionXp(s), 0);
+    const xp = settledTrainingXp(loadSessions());
     saveJourney({ xp, prizesWon: [], pendingDraws: 0, seededAt: Date.now() });
   }
   // Establish the session-XP baseline BEFORE any cloud restore runs, so a
