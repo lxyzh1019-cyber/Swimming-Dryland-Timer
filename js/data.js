@@ -1224,9 +1224,12 @@ export const BODY_ZONES = [
 
 export const SEVERITY_LEVELS = [
   { level: 1, emoji: "🙂", label: "OK",                   color: "var(--mint)",  desc: "Moved normally. Both sides feel similar." },
-  { level: 2, emoji: "😐", label: "Tired but controlled", color: "var(--sun)",   desc: "Tired or shaky, but still controlled. Better after 1–2 minutes rest." },
-  { level: 3, emoji: "😟", label: "Changed movement",     color: "var(--coral)", desc: "Limp, lean, twist, shake, or less range. Tell coach or parent." },
-  { level: 4, emoji: "🥺", label: "Pain / Stop",          color: "var(--stop)",  desc: "Pain, sharp pain, swelling, numbness, tingling, or affects normal activity. Stop now." }
+  // One word per level, the same one everywhere it is shown (picker, legend,
+  // yesterday line): "Changed movement" here and "Not right" in the legend
+  // were the same level with two names.
+  { level: 2, emoji: "😐", label: "Tired",        color: "var(--sun)",   desc: "Tired or shaky, but still moving normally. Better after 1–2 minutes rest." },
+  { level: 3, emoji: "😟", label: "Not right",    color: "var(--coral)", desc: "It changes how you move — a limp, a lean, a twist, a shake, or less range. Tell a coach or parent." },
+  { level: 4, emoji: "🥺", label: "Hurts — stop", color: "var(--stop)",  desc: "Pain, sharp pain, swelling, numbness or tingling. Stop now and tell a grown-up." }
 ];
 
 // Unified colored-circle icon set (🟢🟡🔴🟣) instead of the old mixed

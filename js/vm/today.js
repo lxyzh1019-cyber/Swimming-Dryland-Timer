@@ -73,11 +73,21 @@ export function weekStatuses() {
   const workouts = workoutInstances(trained);
   const doneKeys = new Set(workouts.filter(isWholeDay).map(w => w.dayKey).filter(Boolean));
   const partialKeys = new Set(workouts.filter(w => !isWholeDay(w)).map(w => w.dayKey).filter(Boolean));
+  /* A RECOVERY DAY IS ITS OWN THING. A finished recovery menu — Sunday's spa,
+     or a weekday the body check sent to care — is not training, so it never
+     ticked, and a weekday one read as "catch up" on a day that paid 90 XP and
+     held the streak. It gets its own cell. Only a full menu counts (the same
+     bar the streak freeze asks for); a menu abandoned after two moves stays
+     what it was. */
+  const recoveryKeys = new Set(sessions
+    .filter(s => { const o = outcomeOf(s); return o.state === "recovery" && o.streakFreeze; })
+    .map(s => s.dayKey).filter(Boolean));
   const todayIdx = WEEK_ORDER.indexOf(todayKey);
   const out = {};
   WEEK_ORDER.forEach((k, i) => {
     if (doneKeys.has(k)) out[k] = "done";
     else if (partialKeys.has(k)) out[k] = "partial";
+    else if (recoveryKeys.has(k)) out[k] = "recovery";
     else if (k === todayKey) out[k] = "today";
     else if (i < todayIdx) out[k] = DAYS[k].spa ? "rest" : "missed";
     else out[k] = DAYS[k].spa ? "rest" : "future";
@@ -86,11 +96,12 @@ export function weekStatuses() {
 }
 
 /* ---- Journey map (port of _buildJourney, real XP) ---- */
-let _scrolledOnce = false;
 export function journeyPathScrollIntoView(rootEl) {
   const el = rootEl.querySelector("[data-journey-rail]");
-  if (el && !_scrolledOnce) {
-    _scrolledOnce = true;
+  // Every render rebuilds the rail at scrollTop 0, so every render re-centres
+  // "YOU ARE HERE" — a once-per-load guard here left it parked at the top after
+  // the first tap on anything.
+  if (el) {
     requestAnimationFrame(() => {
       const cur = el.querySelector('[data-way="current"]');
       if (cur) el.scrollTop = Math.max(0, cur.offsetTop - el.clientHeight / 2 + cur.offsetHeight / 2);
@@ -228,12 +239,15 @@ export function buildJourney() {
 
 const STATUS = {
   done:     { bg: "var(--mint-wash)",  border: "transparent", icon: "✓", iconBg: "var(--mint)", iconColor: "#fff", label: "var(--ink-soft)" },
-  today:    { bg: "var(--sun-wash)",   border: "var(--sun)",  icon: "⭐", iconBg: "var(--sun)",  iconColor: "#fff", label: "var(--sun-ink)" },
+  today:    { bg: "var(--sun-wash)",   border: "var(--sun)",  icon: "⭐", iconBg: "var(--sun)",  iconColor: "var(--ink)", label: "var(--sun-ink)" },
   // Reframed from a red ✕ (shame) to a gentle amber "catch up" nudge — a wall of
   // red X's discourages a kid; a forward-looking prompt invites them back.
-  missed:   { bg: "var(--sun-wash)", border: "transparent", icon: "↺", iconBg: "var(--sun)", iconColor: "#fff", label: "var(--sun-ink)" },
-  // Trained, but ended early — a real ✓, visually softer than a full one.
-  partial:  { bg: "var(--mint-wash)", border: "transparent", icon: "✓", iconBg: "color-mix(in srgb, var(--mint) 55%, #fff)", iconColor: "#fff", label: "var(--ink-soft)" },
+  missed:   { bg: "var(--sun-wash)", border: "transparent", icon: "↺", iconBg: "var(--sun)", iconColor: "var(--ink)", label: "var(--sun-ink)" },
+  // Trained, but ended early — its own glyph, not a paler ✓ that only a
+  // colour-sure eye could tell from the full one.
+  partial:  { bg: "var(--mint-wash)", border: "transparent", icon: "½", iconBg: "var(--mint)", iconColor: "#fff", label: "var(--ink-soft)" },
+  // A finished recovery menu: care, not training, and not missed either.
+  recovery: { bg: "var(--aqua-wash)", border: "transparent", icon: "❄️", iconBg: "transparent", iconColor: "var(--aqua-ink)", label: "var(--aqua-ink)" },
   upcoming: { bg: "var(--aqua-wash)",  border: "transparent", icon: "📋", iconBg: "transparent", iconColor: "var(--aqua-ink)", label: "var(--aqua-ink)" }
 };
 
@@ -244,7 +258,8 @@ export function buildTodayVM(state) {
   const sessions = loadSessions();
   const selectedKey = state.selectedDay || todayKey;
 
-  const weekDoneCount = WEEK_ORDER.filter(k => statuses[k] === "done" || statuses[k] === "partial").length;
+  // A recovery day counts as a day she showed up for — so 7/7 is reachable.
+  const weekDoneCount = WEEK_ORDER.filter(k => ["done", "partial", "recovery"].includes(statuses[k])).length;
   const statChips = [
     /* The streak asks a stricter question than "did she train" — a day has to be
        a session, not a piece of one. Everything else here still counts any work.
@@ -313,13 +328,14 @@ export function buildTodayVM(state) {
     };
   });
 
-  const legendCircle = (bg) => "display:inline-flex;width:20px;height:20px;border-radius:50%;align-items:center;justify-content:center;font-size:11px;font-weight:900;background:" + bg + ";color:#fff;";
+  const legendCircle = (bg, ink = "#fff") => "display:inline-flex;width:20px;height:20px;border-radius:50%;align-items:center;justify-content:center;font-size:11px;font-weight:900;background:" + bg + ";color:" + ink + ";";
   const legend = [
     { icon: "✓", iconStyle: legendCircle("var(--mint)"), label: "Done" },
-    { icon: "⭐", iconStyle: legendCircle("var(--sun)") + "font-size:10px;", label: "Today" },
-    { icon: "✓", iconStyle: legendCircle("color-mix(in srgb, var(--mint) 55%, #fff)"), label: "Partly done" },
+    { icon: "½", iconStyle: legendCircle("var(--mint)"), label: "Partly done" },
+    { icon: "❄️", iconStyle: "font-size:13px;", label: "Recovery" },
+    { icon: "⭐", iconStyle: legendCircle("var(--sun)", "var(--ink)") + "font-size:10px;", label: "Today" },
     { icon: "📋", iconStyle: "font-size:14px;", label: "Upcoming" },
-    { icon: "↺", iconStyle: legendCircle("var(--sun)"), label: "Catch up" }
+    { icon: "↺", iconStyle: legendCircle("var(--sun)", "var(--ink)"), label: "Catch up" }
   ];
 
   // ---- Right-pane day view ----
@@ -331,6 +347,10 @@ export function buildTodayVM(state) {
   const isSpaDay = !!(fullDay && fullDay.spa);
   let status = statuses[selectedKey];
   if (status === "rest" || status === "future") status = isSpaDay ? "rest" : "future";
+  // A finished recovery menu shares the "done" card (or the rest card on a spa
+  // day) with its own words.
+  const recoveryDone = status === "recovery";
+  if (recoveryDone) status = isSpaDay ? "rest" : "done";
   // A partly-done day shares the "done" card, with copy that names what's left.
   const isPartial = status === "partial";
   if (isPartial) status = "done";
@@ -403,14 +423,16 @@ export function buildTodayVM(state) {
       ? Math.max(0, Math.round((0.75 - dayInstance.outcome.workRatio) * 100))
       : 0;
     dayView = {
-      badgeLabel: shortU + (isPartial ? " · PARTLY DONE ✓" : " · COMPLETED ✓"),
+      badgeLabel: shortU + (recoveryDone ? " · RECOVERY DONE ❄️" : isPartial ? " · PARTLY DONE ½" : " · COMPLETED ✓"),
       title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"),
       earnedXpLabel: isSpaDay || !earnedXp ? "" : "+" + earnedXp + " XP earned",
       showChips: true, isDone: true,
-      doneHeadline: isSpaDay ? "Nice reset — recovery complete!"
+      doneHeadline: recoveryDone ? "Recovery done — that was care ❄️"
+        : isSpaDay ? "Nice reset — recovery complete!"
         : isPartial ? "You showed up — that counts!"
         : (allDone ? "Nice work — you crushed this one!" : "You got through most of it!"),
-      doneSub: isSpaDay ? "No XP today — rest is part of the plan."
+      doneSub: recoveryDone ? "Your body asked for care today and got it. It holds your streak right where it is."
+        : isSpaDay ? "No XP today — rest is part of the plan."
         // Per-block records only survive the calendar day they were written, so
         // name what's left only when we actually still know.
         : isPartial ? ((streakEarned
@@ -426,11 +448,11 @@ export function buildTodayVM(state) {
              : (dayProg ? " Every block for today's light is done." : "")))
         : (allDone ? "Every block is checked off. Want extra reps?" : ("You skipped " + remainingLabel + " — finish up for XP.")),
       showCta: true,
-      ctaLabel: isSpaDay ? "Do it again" : (allDone ? "Look at the moves" : "Finish remaining moves"),
-      ctaIcon: isSpaDay ? "🧘" : (allDone ? "🧪" : "▶️"),
-      ctaVariant: (isSpaDay || allDone) ? "secondary" : "primary",
-      ctaSubtext: isSpaDay ? "Doesn't change progress" : (allDone ? "The workout screen, nothing counting down, nothing recorded" : ""),
-      ctaAction: (isSpaDay || allDone) ? "goExplore" : "goSession",
+      ctaLabel: isSpaDay ? "Do it again" : ((allDone || recoveryDone) ? "Explore the moves" : "Finish remaining moves"),
+      ctaIcon: isSpaDay ? "🧘" : ((allDone || recoveryDone) ? "🧪" : "▶️"),
+      ctaVariant: (isSpaDay || allDone || recoveryDone) ? "secondary" : "primary",
+      ctaSubtext: isSpaDay ? "Doesn't change progress" : ((allDone || recoveryDone) ? "The workout screen, nothing counting down, nothing recorded" : ""),
+      ctaAction: (isSpaDay || allDone || recoveryDone) ? "goExplore" : "goSession",
       showSettings: false
     };
   } else if (status === "missed") {
@@ -489,14 +511,15 @@ export function buildTodayVM(state) {
      move list until something disarmed it again. Arming a mode to read an
      instruction is a lot of machinery for "what does this one look like?", and
      while it was armed the real GO button was not where she left it. */
-  dayView.showExplore = canLaunch;
+  dayView.showExplore = canLaunch && dayView.ctaAction !== "goExplore";
+  dayView.recoveryDone = recoveryDone;
   if (dayView.isActive && !dayView.ctaSubtext) dayView.ctaSubtext = (dayView.movesLabel || "") + " · about " + (dayView.mins || "?") + " min · that’s the whole thing — no surprises.";
   dayView.showBlocksList = !!(dayView.isActive || dayView.isDone || dayView.isPreview || dayView.isMissed) && !isSpaDay;
   dayView.blocksHint = dayView.isDone ? "REVIEW WHAT YOU DID 👀" : dayView.isPreview ? "PEEK AT WHAT'S COMING 👀" : dayView.isMissed ? "READY WHEN YOU ARE — PEEK INSIDE 👀" : "TAP A BLOCK TO PEEK INSIDE 👀";
   dayView.showFocus = !!(dayView.isActive || dayView.isPreview) && !isSpaDay;
   dayView.ctaButtonStyle = dayView.ctaVariant === "secondary"
     ? "width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:rgba(255,255,255,0.16);color:#fff;border:2px solid rgba(255,255,255,0.55);border-radius:var(--radius-pill);padding:14px;font-family:var(--font-display);font-weight:600;font-size:18px;cursor:pointer;"
-    : "width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:18px;font-family:var(--font-display);font-weight:600;font-size:24px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);";
+    : "width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:var(--sun);color:var(--ink);border:none;border-radius:var(--radius-pill);padding:18px;font-family:var(--font-display);font-weight:600;font-size:24px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);";
 
   const coachIconBtnStyle = "width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;flex-shrink:0;font-size:15px;display:flex;align-items:center;justify-content:center;"
     + (settings.coachVoiceOn ? "background:#fff;color:var(--aqua-deep);" : "background:rgba(255,255,255,0.18);color:#fff;");
@@ -518,6 +541,7 @@ export function buildTodayVM(state) {
   const weather = state.weather || { icon: "☀️", temp: "–", caption: "Pool day!" };
 
   const railNav = (active) => ({
+    active,
     iconWrap: active ? "width:52px;height:52px;border-radius:18px;background:var(--aqua-wash);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px var(--aqua-light);" : "width:52px;height:52px;display:flex;align-items:center;justify-content:center;opacity:0.55;",
     labelColor: active ? "var(--aqua-ink)" : "var(--ink-soft)",
     tabIconWrap: "width:46px;height:30px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:19px;line-height:1;" + (active ? "background:var(--aqua-wash);box-shadow:inset 0 0 0 2px var(--aqua-light);" : ""),

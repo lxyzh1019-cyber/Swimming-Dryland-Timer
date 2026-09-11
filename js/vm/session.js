@@ -281,7 +281,9 @@ export function buildSessionVM(state) {
         numStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;"
           + (st === "done" ? "background:var(--mint);color:#fff;" : isCur ? "background:var(--aqua);color:#fff;" : "background:var(--surface-2);color:var(--ink-soft);"),
         nameStyle: "flex:1;min-width:0;font-weight:800;color:" + (st === "done" ? "var(--ink-faint);text-decoration:line-through;" : isCur ? "var(--ink);" : "var(--ink-soft);"),
+        isCurrent: isCur,
         statusIcon: st === "done" ? "✓" : st === "skipped" ? "⏭" : isCur ? "▶" : "",
+        statusLabel: st === "done" ? "done" : st === "skipped" ? "skipped" : isCur ? "now" : "to do",
         secColor: st === "done" ? "var(--mint)" : isCur ? "var(--aqua)" : "var(--ink-faint)"
       });
     });
@@ -348,7 +350,7 @@ export function buildSessionVM(state) {
        something when a clock is running: pause, stop, the session time, the
        end-early confirm. */
     explore,
-    exploreBanner: explore ? "🧪 EXPLORE — just looking. Tap Next to move on. Nothing counts down and nothing is recorded." : "",
+    exploreBanner: explore ? "🧪 EXPLORE — nothing counts down and nothing is recorded. Tap Next to move on." : "",
     showClock: !explore,
     showPause: !explore, showStop: !explore,
     // "◀ Back a move" — only where the engine can honour it (see canGoBack).
@@ -463,6 +465,7 @@ export function buildSessionVM(state) {
        short the whole time and simply never said. */
     roundShortNotes,
     xpEarned: sess.xpEarned, leveledUp: sess.leveledUp,
+    levelReached: sess.levelReached || 0,
     /* MOOD, REFLECTION AND THE QUIZ ONLY EXIST IF THERE IS A RECORD TO PUT
        THEM ON.
 

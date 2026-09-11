@@ -506,7 +506,7 @@ ok(rv.resultDesc === data.LIGHT_META.green.desc, "the description follows the fi
 ok(rv.resultCta.label === data.LIGHT_META.green.btnLabel, "and so does the button");
 ok(rv.resultCta.action === "continue", "which starts the session");
 ok(/suggested Yellow — 2 rounds/.test(rv.suggestionLine) &&
-   /selected Green — 3 rounds/.test(rv.suggestionLine),
+   /chose Green — 3 rounds/.test(rv.suggestionLine),
    "and both decisions are shown, so the override is never mistaken for the body's answer");
 
 /* Picking the suggested light back out of the list is not an override. */

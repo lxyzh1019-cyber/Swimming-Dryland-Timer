@@ -21,7 +21,7 @@ import { escapeHtml } from "../util.js";
 export function progressScreen(vm) {
   return `
     <div style="flex:1;min-width:0;padding:24px 26px;overflow-y:auto;box-sizing:border-box;">
-      <div style="font-family:var(--font-display);font-weight:600;font-size:32px;color:var(--ink);margin-bottom:18px;">Your Progress 🏅</div>
+      <h1 style="margin:0 0 18px;font-family:var(--font-display);font-weight:600;font-size:32px;color:var(--ink);">Your Progress 🏅</h1>
 
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;">
         <div style="flex:2;min-width:280px;background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);display:flex;align-items:center;gap:18px;">
@@ -67,7 +67,7 @@ export function progressScreen(vm) {
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
           <div style="font-weight:900;font-size:12px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">How it's going</div>
           <div style="display:flex;background:var(--surface-2);border-radius:var(--radius-pill);padding:3px;gap:3px;">
-            ${vm.periodStats.tabs.map(t => `<button type="button" data-action="progressScope" data-arg="${t.key}" style="${t.style}">${t.label}</button>`).join("")}
+            ${vm.periodStats.tabs.map(t => `<button type="button" data-action="progressScope" data-arg="${t.key}" aria-pressed="${t.active ? "true" : "false"}" style="${t.style}">${t.label}</button>`).join("")}
           </div>
         </div>
         <div style="font-size:12px;font-weight:700;color:var(--ink-faint);margin-bottom:12px;">${vm.periodStats.rangeLabel}</div>
@@ -104,7 +104,7 @@ export function progressScreen(vm) {
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
           <div style="font-weight:900;font-size:12px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">Training log</div>
           <div style="display:flex;background:var(--surface-2);border-radius:var(--radius-pill);padding:3px;gap:3px;">
-            ${vm.logScopeTabs.map(lt => `<button type="button" data-action="logScope" data-arg="${lt.key}" style="${lt.style}">${lt.label}</button>`).join("")}
+            ${vm.logScopeTabs.map(lt => `<button type="button" data-action="logScope" data-arg="${lt.key}" aria-pressed="${lt.active ? "true" : "false"}" style="${lt.style}">${lt.label}</button>`).join("")}
           </div>
         </div>
         <div class="rail-wrap">

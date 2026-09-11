@@ -137,6 +137,7 @@ function overviewTab(vm) {
   const a = vm.analytics;
   return `
   <div style="display:flex;flex-direction:column;gap:14px;">
+    ${vm.syncLine ? `<div role="status" style="font-size:13px;font-weight:800;color:var(--ink-soft);background:var(--surface-2);border-radius:12px;padding:9px 12px;line-height:1.45;">${esc(vm.syncLine)}</div>` : ""}
     ${flagsCard(a, vm.scopeLabel)}
     ${stopsCard(a, vm.scopeLabel)}
     <div style="background:var(--surface);border:2px solid var(--aqua-light);border-radius:var(--radius-xl);padding:16px 18px;box-shadow:var(--shadow-soft);">
@@ -188,9 +189,9 @@ function formCheckTab(vm) {
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
       <span style="font-family:var(--font-display);font-weight:600;font-size:20px;color:var(--ink);">Form check</span>
       <div style="display:flex;align-items:center;gap:8px;">
-        <button type="button" data-action="formCheckMonth" data-arg="${esc(f.prevMonth)}" style="min-height:38px;width:38px;border-radius:50%;border:2px solid var(--hairline);background:var(--surface);font-size:15px;font-weight:900;cursor:pointer;font-family:inherit;" aria-label="Previous month">◀</button>
+        <button type="button" data-action="formCheckMonth" data-arg="${esc(f.prevMonth)}" style="min-height:44px;width:44px;border-radius:50%;border:2px solid var(--hairline);background:var(--surface);font-size:15px;font-weight:900;cursor:pointer;font-family:inherit;" aria-label="Previous month">◀</button>
         <span style="font-weight:900;font-size:14px;color:var(--ink);min-width:120px;text-align:center;">${esc(f.monthLabel)}</span>
-        <button type="button" data-action="formCheckMonth" data-arg="${esc(f.nextMonth)}" ${f.atCurrentMonth ? "disabled" : ""} style="min-height:38px;width:38px;border-radius:50%;border:2px solid var(--hairline);background:var(--surface);font-size:15px;font-weight:900;cursor:${f.atCurrentMonth ? "default" : "pointer"};opacity:${f.atCurrentMonth ? "0.4" : "1"};font-family:inherit;" aria-label="Next month">▶</button>
+        <button type="button" data-action="formCheckMonth" data-arg="${esc(f.nextMonth)}" ${f.atCurrentMonth ? "disabled" : ""} style="min-height:44px;width:44px;border-radius:50%;border:2px solid var(--hairline);background:var(--surface);font-size:15px;font-weight:900;cursor:${f.atCurrentMonth ? "default" : "pointer"};opacity:${f.atCurrentMonth ? "0.4" : "1"};font-family:inherit;" aria-label="Next month">▶</button>
       </div>
     </div>
 
@@ -254,8 +255,9 @@ function analyticsTab(vm) {
         <span style="font-family:var(--font-display);font-weight:600;font-size:20px;color:var(--ink);">Coach analytics</span>
         <span style="font-size:12px;font-weight:900;letter-spacing:0.04em;background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);padding:5px 12px;text-transform:uppercase;">${esc(vm.scopeLabel)}</span>
       </div>
-      <button type="button" data-action="exportCsv" style="min-height:40px;border:2px solid var(--aqua);background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">⬇︎ Export CSV</button>
+      <button type="button" data-action="exportCsv" style="min-height:44px;border:2px solid var(--aqua);background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">⬇︎ Export CSV</button>
     </div>
+    ${vm.exportNote ? `<div role="status" style="font-size:13px;font-weight:800;color:var(--mint-ink);background:var(--mint-wash);border-radius:12px;padding:8px 12px;">${esc(vm.exportNote)}</div>` : ""}
     <div style="font-size:12px;font-weight:700;color:var(--ink-faint);margin-top:-6px;">${esc(a.periodCovered)}</div>
 
     ${card(`
@@ -340,7 +342,7 @@ function analyticsTab(vm) {
     ${card(`
       <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
         <div>
-          ${secTitle("Load ratio (ACWR)")}
+          ${secTitle("Load ratio — this week vs the last four (ACWR)")}
           <div style="display:flex;align-items:baseline;gap:10px;margin-top:8px;">
             <span style="font-family:var(--font-display);font-size:38px;font-weight:600;color:${a.acwr.color};line-height:1;">${a.acwr.value}</span>
             <span style="font-size:14px;font-weight:900;color:${a.acwr.color};">${esc(a.acwr.label)}</span>
@@ -599,7 +601,7 @@ function settingsTab(vm) {
         <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Coach voice 🎧</div>
         <button type="button" data-action="toggleCoachVoice" aria-label="Toggle coach voice" style="${vm.coachTrack}"><span style="${vm.coachKnob}"></span></button>
       </div>
-      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The coach will: announce the next exercise · remind you to breathe · warn about common mistakes · prompt a self-check.</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The coach announces each move and its reps or time, reminds her to breathe, warns about common mistakes and prompts a self-check.</div>
     </div>
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
@@ -647,7 +649,7 @@ function settingsTab(vm) {
             <div style="display:flex;align-items:center;gap:10px;background:var(--surface-2);border-radius:12px;padding:8px 12px;">
               <span style="font-size:18px;">${esc(p.icon)}</span>
               <span style="flex:1;font-size:14px;font-weight:700;color:var(--ink);">${escapeHtml(p.label)}</span>
-              <button type="button" data-action="removePrizePoolItem" data-arg="${i}" style="border:none;background:none;color:var(--ink-faint);font-weight:900;cursor:pointer;font-size:15px;" aria-label="Remove prize">✕</button>
+              <button type="button" data-action="removePrizePoolItem" data-arg="${i}" style="width:44px;height:44px;border-radius:50%;border:none;background:none;color:var(--ink-soft);font-weight:900;cursor:pointer;font-size:17px;font-family:inherit;" aria-label="Remove ${escapeHtml(p.label)} from the pool">✕</button>
             </div>`).join("")}
         </div>
       </div>
@@ -674,7 +676,7 @@ function settingsTab(vm) {
       </div>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <input type="text" placeholder="Add a prize… (e.g. 🎨 Craft afternoon)" data-input="newPrize" style="flex:1;padding:10px 13px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:14px;font-weight:700;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">
-        <button type="button" data-action="addPrizePoolItem" style="min-height:44px;border:none;background:var(--sun);color:var(--sun-ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">Add</button>
+        <button type="button" data-action="addPrizePoolItem" style="min-height:44px;border:none;background:var(--sun);color:var(--ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">Add</button>
       </div>
       ${!vm.isDefaultPool ? `<button type="button" data-action="resetPrizePool" style="margin-top:8px;border:none;background:none;color:var(--ink-soft);font-weight:800;font-size:13px;text-decoration:underline;cursor:pointer;font-family:inherit;">Reset to default pool</button>` : ""}
     </div>
@@ -702,11 +704,11 @@ function settingsTab(vm) {
 
 function coachingTab(vm) {
   const c = vm.coaching;
-  const rungBtn = (name, lvl, cur) => `<button type="button" data-action="setLadderRung" data-arg="${escapeHtml(name)}|${lvl}" style="width:36px;height:36px;border-radius:50%;border:2px solid ${lvl <= cur ? "var(--aqua)" : "var(--hairline)"};background:${lvl <= cur ? "var(--aqua)" : "var(--surface)"};color:${lvl <= cur ? "#fff" : "var(--ink-soft)"};font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;">${lvl}</button>`;
+  const rungBtn = (name, lvl, cur) => `<button type="button" data-action="setLadderRung" data-arg="${escapeHtml(name)}|${lvl}" aria-label="${escapeHtml(name)} — level ${lvl}" aria-pressed="${lvl === cur ? "true" : "false"}" style="width:44px;height:44px;border-radius:50%;border:2px solid ${lvl <= cur ? "var(--aqua)" : "var(--hairline)"};background:${lvl <= cur ? "var(--aqua)" : "var(--surface)"};color:${lvl <= cur ? "#fff" : "var(--ink-soft)"};font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;">${lvl}</button>`;
   return `
   <div style="display:flex;flex-direction:column;gap:14px;">
     ${card(`
-      ${secTitle("Valgus gate 🔒")}
+      ${secTitle("Jump gate 🔒 — knees caving in (valgus)")}
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;flex-wrap:wrap;">
         <div style="flex:1;min-width:220px;">
           <div style="font-size:15px;font-weight:900;color:${c.gate.unlocked ? "var(--mint-ink)" : "var(--sun-ink)"};">${c.gate.unlocked ? "🔓" : "🔒"} ${esc(c.gateLabel)}</div>
@@ -716,7 +718,7 @@ function coachingTab(vm) {
       </div>`)}
     ${card(`
       ${secTitle("Independence Ladder · Top 7")}
-      <div style="font-size:13px;color:var(--ink-faint);margin:4px 0 12px;line-height:1.3;">L1 guided → L5 fully independent. Tap the rung she's earned for each move.</div>
+      <div style="font-size:13px;color:var(--ink-faint);margin:4px 0 12px;line-height:1.3;">How much help she needs on each move: 1 = a grown-up guides every rep, 5 = she does it right on her own. Tap the rung she's earned.</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         ${c.ladderRows.map(r => `
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -739,7 +741,8 @@ function coachingTab(vm) {
           </div>`;
         }).join("")}
       </div>
-      <button type="button" data-action="saveTrackerWeek" style="margin-top:12px;min-height:44px;border:none;background:var(--aqua);color:#fff;border-radius:var(--radius-pill);font-weight:900;font-size:14px;padding:0 20px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--aqua-deep);">Save week ${esc(c.trackerWeek)}</button>`)}
+      <button type="button" data-action="saveTrackerWeek" style="margin-top:12px;min-height:44px;border:none;background:var(--aqua);color:#fff;border-radius:var(--radius-pill);font-weight:900;font-size:14px;padding:0 20px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--aqua-deep);">Save week ${esc(c.trackerWeek)}</button>
+      ${vm.trackerNote ? `<div role="status" style="margin-top:8px;font-size:13px;font-weight:800;color:var(--mint-ink);background:var(--mint-wash);border-radius:12px;padding:8px 12px;">${esc(vm.trackerNote)}</div>` : ""}`)}
     ${card(`
       ${secTitle("Engagement system · this week")}
       <div style="font-size:13px;color:var(--ink-faint);margin:4px 0 12px;line-height:1.3;">One shared game per week keeps a grown-up genuinely in it.</div>
@@ -775,16 +778,16 @@ export function grownupScreen(vm) {
   if (!vm.grownupUnlocked) return lockedZone();
   return `
     <div style="flex:1;min-width:0;padding:24px 26px;overflow-y:auto;box-sizing:border-box;">
-      <div style="font-family:var(--font-display);font-weight:600;font-size:32px;color:var(--ink);margin-bottom:18px;">Grown-up Zone 🧑</div>
+      <h1 style="margin:0 0 18px;font-family:var(--font-display);font-weight:600;font-size:32px;color:var(--ink);">Grown-up Zone 🧑</h1>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
         <div style="display:flex;background:var(--surface-2);border-radius:var(--radius-pill);padding:4px;gap:4px;overflow-x:auto;scrollbar-width:none;" data-tab-scroll="1">
-          ${vm.tabs.map(t => `<button type="button" data-action="setGuTab" data-arg="${esc(t.key)}" style="${t.style}">${esc(t.label)}</button>`).join("")}
+          ${vm.tabs.map(t => `<button type="button" data-action="setGuTab" data-arg="${esc(t.key)}" aria-pressed="${t.active ? "true" : "false"}" style="${t.style}">${esc(t.label)}</button>`).join("")}
         </div>
         ${(tab === "overview" || tab === "analytics") ? `
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
           <span style="font-size:11px;font-weight:900;letter-spacing:0.04em;color:var(--ink-faint);text-transform:uppercase;">Period</span>
           <div style="display:flex;background:var(--surface-2);border-radius:var(--radius-pill);padding:3px;gap:3px;min-width:210px;">
-            ${vm.scopeTabs.map(st => `<button type="button" data-action="setGsScope" data-arg="${esc(st.key)}" style="${st.style}">${esc(st.label)}</button>`).join("")}
+            ${vm.scopeTabs.map(st => `<button type="button" data-action="setGsScope" data-arg="${esc(st.key)}" aria-pressed="${st.active ? "true" : "false"}" style="${st.style}">${esc(st.label)}</button>`).join("")}
           </div>
         </div>` : ""}
       </div>

@@ -518,9 +518,9 @@ store.reconcileJourneyWithSessions();
 const p4w = pvm.buildProgressVM({ progressScope: "4w", logScope: "week" }).periodStats;
 const pRow = l => p4w.rows.find(r => r.label === l);
 ok(pRow("Sessions finished").total === "3", "the 4-week window excludes the 80-day-old session");
-ok(pRow("Completion status").total.includes(" of "), "completion status reads done-of-started");
-ok(pRow("Levels upgraded").total.startsWith("+"), "levels upgraded is reported for the window");
-ok(pRow("Tough days finished").total === "1", "a red-light day she finished counts as a tough day");
+ok(pRow("Finished the whole thing").total.includes(" of "), "completion status reads done-of-started");
+ok(pRow("Levels gained").total.startsWith("+"), "levels upgraded is reported for the window");
+ok(pRow("Hard days done anyway").total === "1", "a red-light day she finished counts as a tough day");
 ok(/progressScope/.test(pscreen.progressScreen(pvm.buildProgressVM({ progressScope: "month", logScope: "week" }))),
    "the period toggle renders on the Progress screen");
 localStorage.clear();
@@ -706,7 +706,7 @@ ok(flatAndSore.bodyLight === "yellow", "a tired shoulder is Yellow on the body m
 ok(flatAndSore.light === "recovery",
    "but the day runs Recovery — the body map no longer overrules a flatter body");
 const flatVM = rvm.buildReadinessVM(flatAndSore, true);
-ok(/Body Check said/.test(flatVM.combinedLine) && /Quick check said/.test(flatVM.combinedLine),
+ok(/The body map said/.test(flatVM.combinedLine) && /Your answers said/.test(flatVM.combinedLine),
    "and the card names both readings, so Recovery over a Yellow map is not a mystery");
 
 /* The other direction is unchanged: a sore body still outranks a good night. */
@@ -1613,7 +1613,7 @@ const oldMini = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOSt
   completedFully: true, ledger: [{ name: "x", block: "main", round: 1, status: "done" }] };
 ok(store.sessionRoundsPlanned(oldMini) === 1, "a historical mini still asks for one round");
 ok(store.xpForSession(oldMini) === 180, "and is still priced as a one-round day");
-ok(pvm.logEntryView(oldMini).lightLabel === "MINI", "the log still labels it MINI");
+ok(pvm.logEntryView(oldMini).lightLabel === "SHORT DAY", "the log still labels it as the short day it was");
 
 /* --- the Coach's Quiz pays once, not twice --------------------------------
    Reproduces the report exactly: 360 session + 30 quiz should read 390 after
@@ -1956,9 +1956,9 @@ store.saveSession(row({ isoDate: iso(4), durationSecs: 1200, completedFully: tru
 const pv0 = pvm.buildProgressVM({ progressScope: "4w", logScope: "month" });
 const zeroMin = pvm.logEntryView(store.loadSessions()[1]);
 ok(zeroMin.duration === "under a min", "a 20-second session reads as under a minute, not as 1 min");
-ok(zeroMin.lightLabel === "NOTHING LOGGED",
+ok(zeroMin.lightLabel === "NOT COUNTED",
    "and is labelled for what it was, not badged GREEN like a finished day");
-ok(pvm.logEntryView(store.loadSessions()[3]).lightLabel === "SAFETY STOP",
+ok(pvm.logEntryView(store.loadSessions()[3]).lightLabel === "STOPPED FOR PAIN",
    "a safety stop is named as one");
 ok(!pv0.logItems.some(l => /try-it/i.test(l.lightLabel || "")), "no try-it rows in her training log");
 ok(zeroMin.moodEmoji === "·" && /not answered/.test(zeroMin.moodLabel),
@@ -2091,7 +2091,7 @@ ok(store.countsAsTrained(shared) === true, "the store calls it trained");
 ok(store.isPartialSession(shared) === true, "and partial");
 ok(store.outcomeOf(shared).state === "partial", "the authority agrees");
 ok(store.xpForSession(shared) > 0, "and the XP it pays agrees that work happened");
-ok(pvm.logEntryView(shared).lightLabel === "ENDED EARLY", "the log reports the same partial session");
+ok(pvm.logEntryView(shared).lightLabel === "STOPPED EARLY", "the log reports the same partial session");
 
 /* --- regression: the one-full-day XP cap still holds over partial + resume --- */
 localStorage.clear(); store.migrate();
@@ -3639,7 +3639,7 @@ const splitDay = (suffix, rows, done) => ({
 store.saveSession(splitDay("1", 6, 1));
 store.saveSession(splitDay("2", 6, 2));
 const splitVm = pvm.buildProgressVM({ progressScope: "4w", logScope: "week" });
-const sessionsRow = splitVm.periodStats.rows.find(r => r.label === "Completion status");
+const sessionsRow = splitVm.periodStats.rows.find(r => r.label === "Finished the whole thing");
 ok(/ of 1$/.test(sessionsRow.total),
    "two sittings of one day count as one session on the board (" + sessionsRow.total + ")");
 ok(/^1 session$/.test(splitVm.sessionsLabel),

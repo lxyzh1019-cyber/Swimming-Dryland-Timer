@@ -27,7 +27,7 @@ import { grownupScreen } from "./screens/grownup.js";
 import { requireGrownup, answerPin, choosePin, allowPinChoice, clearPinChoice,
          pinRefusalReason, gateMode, lockGate, gateUnlocked, unlockByPasskey,
          hasGrownupPin, isFreshDevice, PIN_MIN_DIGITS, PIN_MAX_DIGITS,
-         GATE_REASON, setBootstrapState, bootstrapState, gateNeedsOfflineSetup } from "./gate.js";
+         GATE_REASON, setBootstrapState, bootstrapState, gateNeedsOfflineSetup, GATE_UNLOCK_MS } from "./gate.js";
 import { passkeySupported, hasPasskey, enrollPasskey, verifyPasskey, forgetPasskey } from "./passkey.js";
 import { loadSessions } from "./store.js";
 import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS, recordFormVerdict, repairPrizeWallet, redeemedPrizesForReview, restorePrize } from "./store.js";
@@ -61,6 +61,7 @@ export const state = {
   backupNote: "", backupNoteOk: false,   // result line under Backup & restore
   walletRepairNote: "",         // result line under the prize wallet repair
   pendingRestore: null,         // { file, from, to } — a backup from another athlete, awaiting confirmation
+  exportNote: "", trackerNote: "",   // confirmations under Export CSV and Save week
   storageError: null,           // { name } — set when a write is rejected (disk full)
   isWide: true
 };
@@ -104,10 +105,12 @@ engine.onSessionUpdate(kind => {
    believing it's being recorded. */
 function storageBannerHtml() {
   if (!state.storageError) return "";
-  return `<div role="alert" style="position:fixed;left:0;right:0;bottom:0;z-index:200;background:var(--stop-wash);border-top:3px solid var(--stop);padding:12px 16px;display:flex;align-items:center;gap:12px;justify-content:center;font-family:var(--font-ui);">
+  // At the TOP: at the bottom it sat over the bottom nav and took navigation
+  // away for as long as the error was up.
+  return `<div role="alert" style="position:fixed;left:0;right:0;top:0;z-index:200;background:var(--stop-wash);border-bottom:3px solid var(--stop);padding:calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;display:flex;align-items:center;gap:12px;justify-content:center;font-family:var(--font-ui);">
     <span style="font-size:20px;">⚠️</span>
     <span style="font-weight:800;font-size:14px;color:var(--stop-ink);line-height:1.4;max-width:640px;">This device's storage is full, so the last thing ${escapeHtml(state.storageError.name)} did wasn't saved. Free up space on the device (or clear other sites' data) — sessions won't be recorded until then.</span>
-    <button type="button" data-action="dismissStorageError" style="min-height:36px;border:none;background:var(--stop);color:#fff;border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 14px;cursor:pointer;font-family:inherit;">Dismiss</button>
+    <button type="button" data-action="dismissStorageError" style="min-height:44px;border:none;background:var(--stop);color:#fff;border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">Dismiss</button>
   </div>`;
 }
 
@@ -146,10 +149,12 @@ function gateHtml() {
         : passkeySupported()
           ? "No passkey is set up on this device, so there is nothing to confirm with. Set one up on a device that already has a grown-up unlocked, or restore a backup."
           : "This browser has no passkey support, so a forgotten PIN cannot be reset here. Restore a backup on another device instead."}</div>
-      ${hasPasskey() ? btn("unlockWithPasskey", state.gateBusy ? "Waiting for the device…" : "🔐 Confirm with this device", true) : ""}`;
+      ${hasPasskey() ? btn("unlockWithPasskey", state.gateBusy ? "Waiting for the device…" : "🔐 Confirm with this device", true)
+        : passkeySupported() ? `<div style="margin-top:4px;">${btn("enrollPasskey", "🔐 Set up a passkey on this device", true)}</div>
+      ${state.passkeyNote ? `<div style="margin-top:8px;font-size:13px;font-weight:800;line-height:1.45;color:${state.passkeyNoteOk ? "var(--mint-ink)" : "var(--stop-ink)"};">${escapeHtml(state.passkeyNote)}</div>` : ""}` : ""}`;
 
   return `<div style="position:fixed;inset:0;z-index:210;background:rgba(20,59,74,0.62);display:flex;align-items:center;justify-content:center;padding:24px;font-family:var(--font-ui);">
-    <div data-stop-propagation="1" style="background:var(--surface);border-radius:20px;padding:22px 24px;max-width:380px;width:100%;box-shadow:0 18px 40px rgba(20,59,74,0.3);">
+    <div data-stop-propagation="1" role="dialog" aria-modal="true" aria-label="Grown-up check" style="background:var(--surface);border-radius:20px;padding:22px 24px;max-width:380px;width:100%;box-shadow:0 18px 40px rgba(20,59,74,0.3);">
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--ink);margin-bottom:6px;">Grown-up check</div>
       <div style="font-size:13px;font-weight:800;color:var(--ink-soft);line-height:1.5;margin-bottom:14px;">A grown-up needs to be here to ${escapeHtml(reason)}.</div>
       ${body}
@@ -171,8 +176,66 @@ function overlaysHtml() {
   return html;
 }
 
+/* WHAT A RE-RENDER MUST NOT DESTROY.
+
+   Every render replaces the whole tree, and renders arrive from places that
+   have nothing to do with what the person is doing — the weather fetch, the
+   cloud restore, the redeem-undo timer, a passkey ceremony. Each one used to
+   wipe whatever was being typed into the PIN field, the athlete name, a new
+   prize or the PR board. The values (and the focus) are carried across. */
+function snapshotInputs() {
+  const out = { active: null, values: [] };
+  root.querySelectorAll("[data-input]").forEach(el => {
+    const key = el.dataset.input + "|" + (el.dataset.key || "");
+    if (el.type === "file") return;
+    out.values.push({ key, value: el.value });
+    if (el === document.activeElement) out.active = { key, start: el.selectionStart, end: el.selectionEnd };
+  });
+  return out;
+}
+function restoreInputs(snap) {
+  if (!snap || !snap.values.length) return;
+  const byKey = new Map(snap.values.map(v => [v.key, v.value]));
+  root.querySelectorAll("[data-input]").forEach(el => {
+    const key = el.dataset.input + "|" + (el.dataset.key || "");
+    if (el.type === "file" || !byKey.has(key)) return;
+    const v = byKey.get(key);
+    if (v !== "" && el.value !== v) el.value = v;
+    if (snap.active && snap.active.key === key) {
+      el.focus();
+      try { if (snap.active.start != null) el.setSelectionRange(snap.active.start, snap.active.end); } catch {}
+    }
+  });
+}
+
+/* Dialogs take focus when they open and give it back when they close, so a
+   keyboard or switch user is never left on an element the render destroyed. */
+let _dialogOpen = false, _opener = null, _lastAction = null;
+function manageDialogFocus() {
+  const dlg = root.querySelector('[role="dialog"]');
+  if (dlg && !_dialogOpen) {
+    _opener = _lastAction;
+    const first = dlg.querySelector("input:not([type=hidden]), button:not([disabled]), [tabindex]");
+    if (first && !dlg.contains(document.activeElement)) first.focus();
+  } else if (!dlg && _dialogOpen && _opener) {
+    const back = root.querySelector(`[data-action="${_opener}"]`);
+    if (back && typeof back.focus === "function") back.focus();
+  }
+  _dialogOpen = !!dlg;
+}
+
 export function render() {
+  const snap = snapshotInputs();
   state.isWide = computeIsWide();
+  renderInner();
+  restoreInputs(snap);
+  manageDialogFocus();
+  // The session's exercise list keeps the running move in view.
+  const cur = root.querySelector("[data-ex-current]");
+  if (cur && cur.scrollIntoView) { try { cur.scrollIntoView({ block: "nearest" }); } catch {} }
+}
+
+function renderInner() {
   if (state.readiness) { renderReadiness(); }
   else if (state.inSession) { renderSession(); }
   else if (state.nav === "progress") {
@@ -272,7 +335,12 @@ export const actions = new Proxy(RAW, {
 /* Close the challenge and re-run whatever she asked for, now that a grown-up is
    here. The re-run goes back through dispatch, so an unlock that somehow did not
    take cannot slip an action past. */
+let gateTimer = null;
 function finishUnlock() {
+  // The Zone's contents used to stay on screen past the five minutes until
+  // some unrelated tap happened to re-render. Repaint when the unlock lapses.
+  clearTimeout(gateTimer);
+  gateTimer = setTimeout(() => { if (!gateUnlocked()) render(); }, GATE_UNLOCK_MS + 500);
   const p = state.pendingAction;
   state.gateAsk = null;
   state.gateError = "";
@@ -416,6 +484,11 @@ Object.assign(RAW, {
   rPickLight(arg) {
     // Overriding the light the body check produced is an adult decision.
     state.readiness.light = arg; state.readiness.overridden = true; render();
+  },
+  // Gated by omission: the override row is drawn only once a grown-up has
+  // unlocked it, so the kid is not shown four buttons that all ask for a PIN.
+  openLightOverride() {
+    if (state.readiness) { state.readiness.overrideOpen = true; render(); }
   },
   rExit() { state.readiness = null; render(); },
   rResultCta(arg) {
@@ -572,7 +645,7 @@ Object.assign(RAW, {
   progressScope(arg) { state.progressScope = arg; render(); },
 
   /* ---- grown-up zone ---- */
-  setGuTab(arg) { state.grownupTab = arg; render(); },
+  setGuTab(arg) { state.grownupTab = arg; state.exportNote = ""; state.trackerNote = ""; render(); },
 
   /* ---- the grown-up gate --------------------------------------------------
      See js/gate.js for what the PIN and the passkey are each worth. There is no
@@ -722,7 +795,11 @@ Object.assign(RAW, {
     render();
   },
   // Both of these hand her entire training history to whoever asked for it.
-  exportCsv() { exportCsv(); },
+  exportCsv() {
+    exportCsv();
+    state.exportNote = "CSV downloaded — every session, one row per sitting.";
+    render();
+  },
   downloadBackup() {
     const p = downloadBackup();
     const n = (p.data[LS_SESSIONS] || []).length;
@@ -753,6 +830,7 @@ Object.assign(RAW, {
       else delete t[wk][inp.dataset.key];
     });
     saveTracker(t);
+    state.trackerNote = "Saved week " + getCurrentTrackerWeek() + ".";
     render();
   },
   pickEngagement(arg) { setEngagementPick(arg); render(); },
@@ -781,7 +859,9 @@ Object.assign(RAW, {
      actions now, so they are authorized by the same dispatch as everything
      else and cannot be reached any other way. */
   renameAthlete(arg) {
-    const name = String(arg == null ? "" : arg).trim() || "Jess";
+    // An emptied field is someone mid-edit, not a request to be called "Jess".
+    const name = String(arg == null ? "" : arg).trim();
+    if (!name) return;
     updateSettings({ athleteName: name });
     renameProfile(activeProfileId(), name);
   },
@@ -854,7 +934,38 @@ root.addEventListener("click", e => {
   if (!isLink) e.preventDefault();
   // By NAME, through the one guard. This listener used to look the function up
   // and call it with no check of its own.
+  _lastAction = el.dataset.action;
   dispatch(el.dataset.action, el.dataset.arg, el);
+});
+
+/* Keyboard: Escape closes the topmost overlay; Enter submits the field it is
+   in, or activates a non-button element that carries an action (the journey
+   card). There was no keydown handler at all — Enter in the PIN field did
+   nothing, and nothing ever closed a dialog. */
+root.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    const close = state.prizeDraw ? "closePrizeDraw"
+      : state.quizDeck ? "exitQuizDeck"
+      : state.gateAsk ? "cancelGate"
+      : state.detailOverlay ? "closeDetail"
+      : (state.readiness && state.readiness.pendingZone != null) ? "rClosePopup"
+      : null;
+    if (close) { e.preventDefault(); dispatch(close); }
+    return;
+  }
+  if (e.key !== "Enter") return;
+  const t = e.target;
+  if (t && t.matches && t.matches("input")) {
+    const submit = { gatePin: "submitGate", gateNewPin: "submitGate", newProfile: "addAthlete", newPrize: "addPrizePoolItem" }[t.dataset.input];
+    if (submit) { e.preventDefault(); dispatch(submit); }
+    return;
+  }
+  const el = t && t.closest && t.closest("[data-action]");
+  if (el && el.tagName !== "BUTTON" && el.tagName !== "A" && el.tagName !== "INPUT") {
+    e.preventDefault();
+    _lastAction = el.dataset.action;
+    dispatch(el.dataset.action, el.dataset.arg, el);
+  }
 });
 
 // Settings name edits flow straight back into the greeting. Saved on every

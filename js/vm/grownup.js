@@ -6,7 +6,7 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, BODY_ZONES, videoSearchUrl, fmtXp } from "../data.js";
-import { redeemedPrizesForReview } from "../store.js";
+import { redeemedPrizesForReview, lastSyncFailed } from "../store.js";
 import { gateUnlocked, GATE_REASON } from "../gate.js";
 import { passkeySupported, hasPasskey } from "../passkey.js";
 import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal, outcomeOf,
@@ -56,6 +56,24 @@ function scopeDays(scope, sessions) {
   if (!sessions.length) return 1;
   return Math.max(1, Math.round((Date.now() - new Date(sessions[0].isoDate).getTime()) / DAY_MS) + 1);
 }
+/* Days she was MEANT to train in the scope: the calendar days minus the spa
+   days. Sunday used to sit in the denominator, so adherence capped at 6/7 on a
+   perfect week and read 86% every Sunday. */
+function scheduledDays(scope, sessions) {
+  const days = scopeDays(scope, sessions);
+  if (scope === "week") {
+    const todayIdx = WEEK_ORDER.indexOf(edmontonDayKey());
+    return WEEK_ORDER.slice(0, todayIdx + 1).filter(k => !(DAYS[k] && DAYS[k].spa)).length;
+  }
+  const spaPerWeek = WEEK_ORDER.filter(k => DAYS[k] && DAYS[k].spa).length;
+  return Math.max(1, Math.round(days * (7 - spaPerWeek) / 7));
+}
+/* Local-time bucketing was the one date path here that bypassed Edmonton. */
+function shiftIso(iso, days) {
+  const d = new Date(iso + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 const alertRow = (tone) => "display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:12px;margin-top:8px;background:" + (tone === "stop" ? "color-mix(in srgb, var(--stop) 9%, #fff)" : "var(--sun-wash)") + ";";
 
@@ -77,9 +95,9 @@ export function buildGrownupVM(state) {
 
   /* ---- tabs / scope chrome ---- */
   const gu = state.grownupTab || "overview";
-  const tabStyle = (active) => "flex-shrink:0;padding:8px 14px;border:none;border-radius:var(--radius-pill);font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;"
+  const tabStyle = (active) => "flex-shrink:0;min-height:44px;padding:0 16px;border:none;border-radius:var(--radius-pill);font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;"
     + (active ? "background:var(--aqua);color:white;" : "background:transparent;color:var(--ink-soft);");
-  const scopeTabStyle = (v) => "flex:1;min-height:36px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:12px;letter-spacing:0.03em;padding:0 14px;font-family:inherit;"
+  const scopeTabStyle = (v) => "flex:1;min-height:44px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:12px;letter-spacing:0.03em;padding:0 14px;font-family:inherit;"
     + (scope === v ? "background:var(--aqua);color:#fff;box-shadow:0 2px 6px rgba(6,182,212,0.35);" : "background:transparent;color:var(--ink-soft);");
 
   /* ---- safety & flags ---- */
@@ -120,7 +138,7 @@ export function buildGrownupVM(state) {
   const trainingRows = workoutInstances(trainingFrags);
   const done = trainingRows.filter(w => w.outcome.state === "complete");
   const days = scopeDays(scope, all);
-  const scheduled = scope === "week" ? days : Math.round(days);   // plan trains daily (Sun = recovery)
+  const scheduled = scheduledDays(scope, all);   // training days only — Sunday is recovery
   const totalMins = trainingFrags.reduce((a, s) => a + mins(s), 0);
   // Adherence is "how many of the days she was meant to train did she train",
   // so it counts DAYS, not records. Counting records let two attempts at one
@@ -219,6 +237,13 @@ export function buildGrownupVM(state) {
       && !w.fragments.some(s => s.mini || s.sessionType === "mini")) ? "done" : "partial";
     if (byIso[k] !== "done") byIso[k] = st;
   });
+  // A finished recovery menu is its own cell, same as the week strip.
+  all.forEach(s => {
+    const o = outcomeOf(s);
+    if (o.state !== "recovery" || !o.streakFreeze) return;
+    const k = edmontonISO(s.isoDate);
+    if (!byIso[k]) byIso[k] = "recovery";
+  });
   let consistency;
   if (scope === "week") {
     const isoDates = edmontonWeekISODates();
@@ -269,15 +294,17 @@ export function buildGrownupVM(state) {
   const consistencyView = (() => {
     const legend = [
       { c: "var(--mint)", label: "Done" }, { c: "var(--sun)", label: "Partial" },
+      { c: "var(--aqua-wash)", label: "Recovery" },
       { c: "var(--grape-wash)", label: "Rest day" }, { c: "color-mix(in srgb, var(--coral) 14%, #fff)", label: "Missed" }];
     return {
       subtitle: consistency.subtitle, showDows: consistency.showDows, legend,
       gridStyle: "display:grid;grid-template-columns:repeat(" + consistency.cols + ",1fr);gap:5px;",
       cells: consistency.cells.map(cell => ({
-        d: cell.s === "rest" ? "🌙" : cell.label,
+        d: cell.s === "rest" ? "🌙" : cell.s === "recovery" ? "❄️" : cell.label,
         cellStyle: "height:" + (consistency.showDows ? "30px" : "46px") + ";border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:" + (consistency.showDows ? "11px" : "13px") + ";font-weight:900;"
           + (cell.s === "done" ? "background:var(--mint);color:#fff;"
-          : cell.s === "partial" ? "background:var(--sun);color:var(--sun-ink);"
+          : cell.s === "partial" ? "background:var(--sun);color:var(--ink);"
+          : cell.s === "recovery" ? "background:var(--aqua-wash);color:var(--aqua-ink);font-size:12px;"
           : cell.s === "rest" ? "background:var(--grape-wash);color:var(--grape-ink);font-size:12px;"
           : cell.s === "missed" ? "background:color-mix(in srgb, var(--coral) 14%, #fff);color:var(--coral);"
           : "background:var(--surface-2);color:var(--ink-faint);opacity:0.55;")
@@ -287,14 +314,16 @@ export function buildGrownupVM(state) {
 
   /* ---- load trend ---- */
   const minsBetween = (from, to) => all.filter(s => { const t = new Date(s.isoDate).getTime(); return t >= from && t < to; }).reduce((a, s) => a + mins(s), 0);
+  // One Edmonton date, the minutes trained on it — the same bucket every other
+  // calendar view uses, instead of device-local midnight.
+  const minsOnIso = (iso) => all.filter(s => edmontonISO(s.isoDate) === iso).reduce((a, s) => a + mins(s), 0);
   let loadBars, loadTitle, loadSubtitle, prevTotal;
   const now = Date.now();
   if (scope === "week") {
     const isoDates = edmontonWeekISODates();
     loadBars = WEEK_ORDER.map(k => {
       const iso = isoDates[k];
-      const t0 = new Date(iso + "T00:00:00").getTime();
-      return { k: DAY_SHORT[k], mins: minsBetween(t0, t0 + DAY_MS), prev: minsBetween(t0 - 7 * DAY_MS, t0 - 6 * DAY_MS) };
+      return { k: DAY_SHORT[k], mins: minsOnIso(iso), prev: minsOnIso(shiftIso(iso, -7)) };
     });
     loadTitle = "Load trend · daily"; loadSubtitle = "Minutes per day, this week vs last week (ghost bars).";
     prevTotal = loadBars.reduce((a, b) => a + (b.prev || 0), 0);
@@ -330,19 +359,24 @@ export function buildGrownupVM(state) {
   }));
 
   /* ---- ACWR (acute:chronic workload ratio) — kept from the old Coach Insights ---- */
-  const acute = minsBetween(now - 7 * DAY_MS, now + DAY_MS);
-  const chronicWeekly = minsBetween(now - 28 * DAY_MS, now + DAY_MS) / 4;
+  /* Same-length windows: 7 days against 28 days ÷ 4. An 8-day acute window
+     over a 29-day chronic one inflated every ratio by ~10% and pushed ordinary
+     weeks into "ramping fast". Training minutes only — a recovery menu or a
+     safety stop is not load. */
+  const loadMins = (from, to) => trainingFrags.filter(s => { const t = new Date(s.isoDate).getTime(); return t >= from && t < to; }).reduce((a, s) => a + mins(s), 0);
+  const acute = loadMins(now - 7 * DAY_MS, now);
+  const chronicWeekly = loadMins(now - 28 * DAY_MS, now) / 4;
   // A ratio over a near-empty chronic window reads as a scary spike — require
-  // ~2 weeks of history before showing a number.
+  // two weeks of history before showing a number.
   const oldestT = all.length ? new Date(all[0].isoDate).getTime() : now;
   const acwr = (chronicWeekly > 0 && now - oldestT >= 14 * DAY_MS) ? acute / chronicWeekly : null;
   const acwrView = acwr == null
-    ? { value: "—", label: "Needs ~4 weeks of history", color: "var(--ink-faint)", note: "The acute:chronic workload ratio compares this week's minutes to the 4-week average. It fills in as history builds." }
+    ? { value: "—", label: "Needs 2 weeks of history", color: "var(--ink-faint)", note: "Compares the last 7 days of training minutes to the average week over the last 28. It fills in once there are two weeks of sessions." }
     : {
       value: acwr.toFixed(2),
       label: acwr < 0.8 ? "Undertraining zone" : acwr <= 1.3 ? "Sweet spot (0.8–1.3)" : acwr <= 1.5 ? "Caution — ramping fast" : "High spike — back off",
       color: acwr >= 0.8 && acwr <= 1.3 ? "var(--mint-ink)" : acwr <= 1.5 ? "var(--sun-ink)" : "var(--stop)",
-      note: "This week: " + Math.round(acute) + " min vs " + Math.round(chronicWeekly) + " min/week 4-week average. 0.8–1.3 is the safe growth band."
+      note: "Last 7 days: " + Math.round(acute) + " min vs " + Math.round(chronicWeekly) + " min/week averaged over the last 28 days. 0.8–1.3 is the safe growth band."
     };
 
   /* ---- pace (planned vs actual, last 5 sessions in scope) ---- */
@@ -740,19 +774,29 @@ export function buildGrownupVM(state) {
   return {
     scopeLabel,
     guTab: gu,
-    tabs: [
-      { key: "overview", label: "Overview", style: tabStyle(gu === "overview") },
-      { key: "analytics", label: "Analytics", style: tabStyle(gu === "analytics") },
-      { key: "coaching", label: "Coaching", style: tabStyle(gu === "coaching") },
-      { key: "formcheck", label: "Form Check", style: tabStyle(gu === "formcheck") },
-      { key: "library", label: "Move Library", style: tabStyle(gu === "library") },
-      { key: "settings", label: "Settings", style: tabStyle(gu === "settings") }
-    ],
+    tabs: ["overview", "analytics", "coaching", "formcheck", "library", "settings"].map(key => ({
+      key, active: gu === key, style: tabStyle(gu === key),
+      label: { overview: "Overview", analytics: "Analytics", coaching: "Coaching", formcheck: "Form Check", library: "Move Library", settings: "Settings" }[key]
+    })),
     scopeTabs: [
-      { key: "week", label: "Week", style: scopeTabStyle("week") },
-      { key: "month", label: "Month", style: scopeTabStyle("month") },
-      { key: "all", label: "All-time", style: scopeTabStyle("all") }
+      { key: "week", label: "Week", active: scope === "week", style: scopeTabStyle("week") },
+      { key: "month", label: "Month", active: scope === "month", style: scopeTabStyle("month") },
+      { key: "all", label: "All-time", active: scope === "all", style: scopeTabStyle("all") }
     ],
+    /* Whether the cloud mirror is actually working — a parent's only way to
+       know the other device is seeing this one. Sync failures were logged to
+       the console and nowhere else. */
+    syncLine: (() => {
+      if (settings.cloudMirror === false) return "";
+      const last = Number((loadJourney() || {}).lastSyncAt);
+      const when = Number.isFinite(last)
+        ? new Date(last).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Edmonton" })
+        : null;
+      if (lastSyncFailed()) return "☁️ Cloud sync is not reaching the mirror" + (when ? " — last reached " + when + "." : " and never has from this device.") + " Sessions are safe on this device; the other device will not see them until it does.";
+      return when ? "☁️ Cloud sync OK — last checked in " + when + "." : "☁️ Cloud sync has not completed yet on this device.";
+    })(),
+    exportNote: state.exportNote || "",
+    trackerNote: state.trackerNote || "",
     guStatsGrid: "display:grid;grid-template-columns:" + (state.isWide ? "repeat(4,1fr)" : "1fr 1fr") + ";gap:12px;",
     grid2: "display:grid;grid-template-columns:" + (state.isWide ? "1fr 1fr" : "1fr") + ";gap:14px;",
     libGrid: "display:grid;grid-template-columns:" + (state.isWide ? "repeat(2,1fr)" : "1fr") + ";gap:14px;",

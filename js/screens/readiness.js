@@ -98,21 +98,27 @@ function resultCard(vm, { areaLabel = "" } = {}) {
       <span style="font-size:14px;flex-shrink:0;line-height:1.45;" aria-hidden="true">🧑</span>
       <span style="font-size:13px;font-weight:800;color:var(--ink-soft);line-height:1.45;">${vm.suggestionLine}</span>
     </div>` : ""}
+    ${vm.showLightOverride ? `
     <div style="background:var(--surface-2);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:18px;">
-      <div style="font-size:12px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Coach suggests this light — a grown-up can change it:</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <div style="font-size:12px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">🧑 Grown-up: pick the light for today</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;" role="group" aria-label="Today's light">
         ${vm.lightOptions.map(lo => `
-          <button type="button" data-action="rPickLight" data-arg="${lo.key}" style="${lo.style}">
+          <button type="button" data-action="rPickLight" data-arg="${lo.key}" aria-pressed="${lo.selected ? "true" : "false"}" style="${lo.style}">
             <span style="font-size:18px;line-height:1;">${lo.emoji}</span>
-            <span style="font-weight:800;font-size:13px;letter-spacing:0.02em;">${lo.label}</span>
+            <span style="font-weight:800;font-size:13px;letter-spacing:0.02em;">${lo.label}${lo.selected ? " ✓" : ""}</span>
           </button>`).join("")}
       </div>
-    </div>
+    </div>` : `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface-2);border-radius:var(--radius-lg);padding:10px 14px;margin-bottom:18px;">
+      <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">Today's light: <span style="color:var(--ink);">${vm.suggestedChip.emoji} ${vm.suggestedChip.label}</span></span>
+      <button type="button" data-action="openLightOverride" style="min-height:44px;border:none;background:none;padding:0 8px;color:var(--ink-soft);font-weight:800;font-size:13px;text-decoration:underline;cursor:pointer;font-family:inherit;">🧑 Grown-up: change it</button>
+    </div>`}
     ${vm.needsGrownupConfirm ? `
     <button type="button" data-action="rGrownupOk" style="width:100%;display:flex;align-items:center;gap:12px;background:${vm.grownupConfirmed ? "var(--mint-wash)" : "var(--surface-2)"};border:2px solid ${vm.grownupConfirmed ? "var(--mint)" : "var(--hairline)"};border-radius:var(--radius-lg);padding:14px 16px;cursor:pointer;text-align:left;margin-bottom:14px;min-height:56px;">
       <span style="font-size:24px;flex-shrink:0;">${vm.grownupConfirmed ? "☑️" : "⬜"}</span>
-      <span style="font-weight:800;font-size:15px;color:var(--ink);line-height:1.35;">A grown-up said it's OK to do a light day. <span style="color:var(--ink-soft);font-weight:700;">Tap after you've checked in.</span></span>
-    </button>` : ""}
+      <span style="font-weight:800;font-size:15px;color:var(--ink);line-height:1.35;">A grown-up said it's OK to train today. <span style="color:var(--ink-soft);font-weight:700;">Tap after you've checked in.</span></span>
+    </button>
+    ${vm.grownupConfirmWhy ? `<div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.45;margin:-6px 0 14px;">${vm.grownupConfirmWhy}</div>` : ""}` : ""}
     <button type="button" ${vm.mayStart ? `data-action="rResultCta" data-arg="${c.action}"` : "disabled"} style="width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:${c.color};color:${c.text};border:none;border-radius:var(--radius-pill);padding:18px;font-family:var(--font-display);font-weight:600;font-size:22px;${vm.mayStart ? "cursor:pointer;box-shadow:0 5px 0 " + c.deep + ";" : "opacity:0.45;cursor:default;"}">
       <span style="font-size:22px;">${c.icon}</span> ${c.label}
     </button>
@@ -212,7 +218,7 @@ export function readinessScreen(vm) {
 
       ${vm.showZonePopup ? `
         <div data-action="rClosePopup" style="position:fixed;inset:0;background:rgba(20,59,74,0.45);z-index:50;display:flex;align-items:center;justify-content:center;">
-          <div data-stop-propagation="1" style="background:var(--surface);border-radius:22px;padding:22px 24px;width:420px;max-width:90vw;box-sizing:border-box;box-shadow:var(--shadow-pop);display:flex;flex-direction:column;gap:10px;">
+          <div data-stop-propagation="1" role="dialog" aria-modal="true" aria-label="${vm.pendingZoneLabel} — how does it feel?" style="background:var(--surface);border-radius:22px;padding:22px 24px;width:420px;max-width:90vw;box-sizing:border-box;box-shadow:var(--shadow-pop);display:flex;flex-direction:column;gap:10px;">
             <div style="font-family:var(--font-display);font-weight:600;font-size:24px;color:var(--ink);">${vm.pendingZoneLabel} — how does it feel?</div>
             ${vm.popupOptions.map(po => `
               <button type="button" data-action="rSetZoneSev" data-arg="${vm.pendingZone}|${po.level}" style="display:flex;align-items:center;gap:12px;background:var(--bg);border:3px solid ${po.color};border-radius:var(--radius-lg);padding:12px 14px;cursor:pointer;text-align:left;min-height:60px;">
@@ -229,7 +235,7 @@ export function readinessScreen(vm) {
     </div>` : "";
 
   return `
-  <div style="display:flex;flex-direction:${vm.cardDir};background:var(--surface);border-radius:30px;box-shadow:0 18px 44px rgba(20,59,74,0.16);overflow:hidden;min-height:800px;">
+  <div style="display:flex;flex-direction:${vm.cardDir};background:var(--surface);border-radius:30px;box-shadow:0 18px 44px rgba(20,59,74,0.16);overflow:hidden;min-height:min(800px, calc(100dvh - 36px));">
     ${questionsStep}
     ${bodyStep}
   </div>`;
