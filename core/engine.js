@@ -249,8 +249,12 @@ export function assembleCircuits(dayKey, light, opts = {}) {
     // progression would have run whatever the grown-up had set. Locked means
     // every jump stays at Drop-and-Stick, exactly as the Grown-up Zone says.
     if (opts.gated !== false && gateLocked() && exs.some(ex => VALGUS_PROGRESSIONS.includes(ex.name))) {
+      // The floor is looked for in this block, then this day's main, then
+      // anywhere in the week: a jump day that never lists the floor itself
+      // used to lose every jump behind a locked gate instead of keeping one.
       const floor = exs.find(ex => ex.name === VALGUS_FLOOR)
-        || (day.blocks.main || []).find(ex => ex.name === VALGUS_FLOOR);
+        || (day.blocks.main || []).find(ex => ex.name === VALGUS_FLOOR)
+        || Object.values(DAYS).flatMap(d => Object.values(d.blocks || {}).flat()).find(ex => ex && ex.name === VALGUS_FLOOR);
       exs = exs.filter(ex => !VALGUS_PROGRESSIONS.includes(ex.name));
       if (floor && !exs.includes(floor)) exs.push(floor);
     }
