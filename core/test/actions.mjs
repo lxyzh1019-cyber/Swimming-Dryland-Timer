@@ -113,7 +113,7 @@ globalThis.document = {
   body: fakeEl(), documentElement: fakeEl()
 };
 
-const base = new URL("../js/", import.meta.url).href;
+const base = new URL("../", import.meta.url).href;
 const store  = await import(base + "store.js");
 const engine = await import(base + "engine.js");
 const gate    = await import(base + "gate.js");

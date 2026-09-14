@@ -1060,7 +1060,7 @@ export function needsSetup(ex) {
 
 export const MIN_REST = 3;
 /* Re-exported from util so the constant has exactly one definition. */
-export { SIDE_SWITCH_BUFFER } from "./util.js";
+export { SIDE_SWITCH_BUFFER } from "../core/util.js";
 export const ROUND_REST = 25;   // flat all weeks (settings can override)
 
 /* ============================================================

@@ -42,7 +42,7 @@ globalThis.document = {
 };
 Object.defineProperty(globalThis, "navigator", { value: {}, configurable: true, writable: true });
 
-const base = new URL("../js/", import.meta.url).href;
+const base = new URL("../", import.meta.url).href;
 export const util    = await import(base + "util.js");
 export const data    = await import(base + "data.js");
 export const store   = await import(base + "store.js");

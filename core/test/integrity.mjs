@@ -4,7 +4,7 @@
    Every case here is a defect the 2026-09 audit found in the code.
    ============================================================ */
 import { store, outcome, util } from "./harness.mjs";
-import { claimPrize } from "../js/screens/overlays.js";
+import { claimPrize } from "../screens/overlays.js";
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };

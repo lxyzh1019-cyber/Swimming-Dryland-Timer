@@ -134,7 +134,7 @@ globalThis.fireDocEvent = (type) => {
 
 import fs from "node:fs";
 
-const base = new URL("../js/", import.meta.url).href;
+const base = new URL("../core/", import.meta.url).href;
 const util   = await import(base + "util.js");
 const data   = await import(base + "data.js");
 const store  = await import(base + "store.js");
