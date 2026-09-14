@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { LADDER, RANK_LORE, RANK_TEASE, fmtXp } from "../data.js";
-import { COPY, LORE_TRANSFER_FIELD } from "../sport.js";
+import { COPY, EMOJI, LORE_TRANSFER_FIELD } from "../sport.js";
 import { levelFromXp, sessionRounds, plannedRoundsAcrossDays, settledXpByDate, settledXpInRange } from "../store.js";
 import { loadSessions, loadJourney, currentStreakOf, redeemPrize, countsAsTrained, prizeUndoOpen, outcomeOf } from "../store.js";
 import { workoutInstances } from "../outcome.js";
@@ -100,7 +100,7 @@ export function buildProgressVM(state) {
   const curRank = LADDER.find(r => r.name === j.rankName) || {};
 
   const level = {
-    levelNum: j.level, rankName: j.rankName, rankIcon: curRank.icon || "🌊",
+    levelNum: j.level, rankName: j.rankName, rankIcon: curRank.icon || EMOJI.world,
     nextRank: j.nextRankName, atSummit: j.atSummit,
     xp: fmtXp(journeyStore.xp || 0), xpToNext: j.xpToNextRank, levelPct: j.levelPct
   };
@@ -167,10 +167,10 @@ export function buildProgressVM(state) {
   const chip = (bg, ink) => "background:" + bg + ";color:" + ink + ";border-radius:var(--radius-pill);padding:8px 14px;font-weight:900;font-size:13px;";
   const milestones = [];
   if (streak > 1) milestones.push({ icon: "🔥", label: streak + "-day streak", style: chip("var(--coral-wash)", "var(--coral-ink)") });
-  if (j.level > 1 || trained.length) milestones.push({ icon: "🌊", label: "Reached " + j.rankName, style: chip("var(--sun-wash)", "var(--sun-ink)") });
+  if (j.level > 1 || trained.length) milestones.push({ icon: EMOJI.world, label: "Reached " + j.rankName, style: chip("var(--sun-wash)", "var(--sun-ink)") });
   // Workouts, not records: a day she came back to finish is one session.
   const trainedWorkouts = workoutInstances(trained).length;
-  if (trainedWorkouts) milestones.push({ icon: "🏊", label: trainedWorkouts + " session" + (trainedWorkouts === 1 ? "" : "s"), style: chip("var(--aqua-wash)", "var(--aqua-ink)") });
+  if (trainedWorkouts) milestones.push({ icon: EMOJI.sport, label: trainedWorkouts + " session" + (trainedWorkouts === 1 ? "" : "s"), style: chip("var(--aqua-wash)", "var(--aqua-ink)") });
   if ((journeyStore.xp || 0) > 0) milestones.push({ icon: "💯", label: fmtXp(journeyStore.xp) + " XP earned", style: chip("var(--mint-wash)", "var(--mint-ink)") });
   if (!milestones.length) milestones.push({ icon: "🌱", label: COPY.firstMilestone, style: chip("var(--aqua-wash)", "var(--aqua-ink)") });
 

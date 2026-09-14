@@ -65,6 +65,11 @@ export const IMAGES = {
   bodyBack:  "assets/swimmer-back.png"
 };
 
+/* The two emoji that stand for the sport and its world, wherever the core
+   needs a glyph rather than a picture: the sessions chip, the rank fallback,
+   the greeting, the photo placeholder. */
+export const EMOJI = { sport: "🏊", world: "🌊" };
+
 /* The lines of copy that say which sport this is. Everything else the core
    says is the same for every athlete. */
 export const COPY = {

@@ -322,7 +322,13 @@ export function buildSessionVM(state) {
     canGoBack: canGoBack(),
     canSkipExercise,
     isFormCheck,
-    formCheckTitle: "How did that feel?",
+    checkKind: sess.checkKind || "form",
+    formCheckTitle: sess.checkKind === "landing" ? "Landing check" : "How did that feel?",
+    checkCleanLabel: sess.checkKind === "landing" ? "🧊 Clean & frozen" : "✓ Clean",
+    checkWobblyLabel: sess.checkKind === "landing" ? "〰️ A bit wobbly" : "😅 Wobbly",
+    checkNote: sess.checkKind === "landing"
+      ? "2 wobbly in a row = we drop a round. Quality over quantity."
+      : "Answer below — or just move on.",
 
     sessionDayTitle: day.title || "",
     elapsedDisplay: fmtMMSS(sess.elapsed),
@@ -377,9 +383,11 @@ export function buildSessionVM(state) {
     // and she has to know which one she is answering for.
     showCleanCheck: phase === "formcheck" && !!sess.pendingCleanCheck,
     cleanCheckMove: sess.cleanCheckMove || "",
-    cleanCheckQuestion: sess.cleanCheckMove
-      ? "Were your " + sess.cleanCheckMove + " reps clean?"
-      : "Were your reps clean?",
+    cleanCheckQuestion: sess.checkKind === "landing"
+      ? (sess.cleanCheckMove ? sess.cleanCheckMove + " — " : "") + "how did those landings freeze?"
+      : sess.cleanCheckMove
+        ? "Were your " + sess.cleanCheckMove + " reps clean?"
+        : "Were your reps clean?",
     wobblyBanner: !!sess.lastWobbly && !isResting && !isPrompt,
     doneLabel: explore ? "Next move ▶" : isResting ? "⏭ Skip Rest" : isFormCheck ? "Move on →" : "✓ Done — Next",
 

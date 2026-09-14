@@ -6,7 +6,7 @@
 
 import { escapeHtml } from "../util.js";
 import { POSES } from "../data.js";
-import { COPY, IMAGES } from "../sport.js";
+import { COPY, IMAGES, EMOJI } from "../sport.js";
 
 /* ---- shared fragments (both layouts) ---- */
 
@@ -286,7 +286,7 @@ export function todayWide(vm) {
         <div>
           <div style="display:flex;align-items:center;gap:10px;">
             <div style="font-family:var(--font-display);font-weight:600;font-size:42px;line-height:1;color:var(--ink);white-space:nowrap;">Hi, ${name}!</div>
-            <span style="font-size:30px;">🌊</span>
+            <span style="font-size:30px;">${EMOJI.world}</span>
           </div>
           <div style="font-family:var(--font-hand);font-weight:700;font-size:24px;line-height:1.1;color:var(--aqua-ink);margin-top:5px;">${COPY.greeting}</div>
         </div>
@@ -327,7 +327,7 @@ export function todayNarrow(vm) {
       <div style="min-width:0;">
         <div style="display:flex;align-items:center;gap:8px;">
           <div style="font-family:var(--font-display);font-weight:600;font-size:32px;line-height:1;color:var(--ink);white-space:nowrap;">Hi, ${name}!</div>
-          <span style="font-size:24px;">🌊</span>
+          <span style="font-size:24px;">${EMOJI.world}</span>
         </div>
         <div style="font-family:var(--font-hand);font-weight:700;font-size:20px;line-height:1.1;color:var(--aqua-ink);margin-top:4px;">${COPY.greeting}</div>
       </div>

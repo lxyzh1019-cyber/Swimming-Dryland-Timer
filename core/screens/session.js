@@ -1,5 +1,5 @@
 import { POSES } from "../data.js";
-import { COPY, IMAGES } from "../sport.js";
+import { COPY, IMAGES, EMOJI } from "../sport.js";
 /* ============================================================
    SESSION screen — full-screen takeover, wide + narrow, plus a
    targeted per-second updater (updateSessionTick) so the screen
@@ -78,7 +78,7 @@ function promptCard(vm, size) {
     <div style="flex:0 1 ${size}px;max-width:${size}px;min-width:240px;min-height:${Math.round(size * 0.6)}px;border-radius:26px;background:var(--mint-wash);border:3px solid var(--mint);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:22px;box-sizing:border-box;">
       <img src="${POSES.think}" alt="" style="height:70px;object-fit:contain;">
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--mint-ink);text-align:center;">${vm.formCheckTitle}</div>
-      <div style="font-size:15px;font-weight:700;color:var(--ink);text-align:center;line-height:1.45;">${vm.cleanCheckQuestion}<br><span style="font-size:13px;color:var(--ink-soft);">Answer below — or just move on.</span></div>
+      <div style="font-size:15px;font-weight:700;color:var(--ink);text-align:center;line-height:1.45;">${vm.cleanCheckQuestion}<br><span style="font-size:13px;color:var(--ink-soft);">${vm.checkNote}</span></div>
     </div>`;
   }
   // breath rehearsal
@@ -108,7 +108,7 @@ function badge(variant, label) {
 function photoSlot(photoUrl, w, h, radius) {
   return `
   <div style="flex:1 1 ${w}px;max-width:${w}px;min-width:0;aspect-ratio:${w} / ${h};border-radius:${radius}px;overflow:hidden;position:relative;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
-    <span style="font-size:${Math.round(w / 6)}px;" aria-hidden="true">🏊</span>
+    <span style="font-size:${Math.round(w / 6)}px;" aria-hidden="true">${EMOJI.sport}</span>
     <span style="font-size:12px;font-weight:800;color:var(--aqua-ink);opacity:0.75;text-align:center;padding:0 14px;">Form photo coming soon</span>
     <img src="${photoUrl}" alt="" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
   </div>`;
@@ -133,7 +133,7 @@ export function detailOverlayHtml(vm) {
     <div data-stop-propagation="1" style="background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-pop);max-width:680px;width:100%;max-height:100%;overflow-y:auto;box-sizing:border-box;">
       <div style="position:relative;">
         <div style="width:100%;height:330px;position:relative;overflow:hidden;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
-          <span style="font-size:60px;" aria-hidden="true">🏊</span>
+          <span style="font-size:60px;" aria-hidden="true">${EMOJI.sport}</span>
           <span style="font-size:13px;font-weight:800;color:var(--aqua-ink);opacity:0.75;">Demo photo coming soon</span>
           <img src="${vm.detailPhotoUrl}" alt="" data-fallback="${vm.detailPhotoFallbackUrl || ""}" onerror="if(this.dataset.fallback&&this.src.indexOf(this.dataset.fallback)<0){this.src=this.dataset.fallback;}else{this.style.display='none';}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
         </div>
@@ -379,8 +379,8 @@ function centerStack(vm, wide) {
   ${vm.showCleanCheck ? `
   <div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:2px solid var(--mint);border-radius:var(--radius-lg);padding:10px 16px;width:100%;max-width:480px;flex-shrink:0;box-sizing:border-box;box-shadow:var(--shadow-soft);">
     <span style="flex:1;font-weight:900;font-size:15px;color:var(--ink);">${vm.cleanCheckQuestion}</span>
-    <button type="button" data-action="pickClean" style="min-height:46px;border:none;border-radius:var(--radius-pill);padding:0 18px;background:var(--mint);color:#fff;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--mint-deep);">✓ Clean</button>
-    <button type="button" data-action="pickWobbly" style="min-height:46px;border:none;border-radius:var(--radius-pill);padding:0 18px;background:var(--sun);color:var(--sun-ink);font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--sun-deep);">😅 Wobbly</button>
+    <button type="button" data-action="pickClean" style="min-height:46px;border:none;border-radius:var(--radius-pill);padding:0 18px;background:var(--mint);color:#fff;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--mint-deep);">${vm.checkCleanLabel}</button>
+    <button type="button" data-action="pickWobbly" style="min-height:46px;border:none;border-radius:var(--radius-pill);padding:0 18px;background:var(--sun);color:var(--sun-ink);font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--sun-deep);">${vm.checkWobblyLabel}</button>
     <button type="button" data-action="skipFormCheck" style="min-height:46px;border:none;border-radius:var(--radius-pill);padding:0 14px;background:transparent;color:var(--ink-soft);font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;">Skip</button>
   </div>` : ""}
 

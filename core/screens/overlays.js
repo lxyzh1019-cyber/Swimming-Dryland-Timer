@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { PRIZE_POOL } from "../data.js";
-import { COPY, IMAGES } from "../sport.js";
+import { COPY, IMAGES, EMOJI } from "../sport.js";
 import { settings, loadQuiz, saveQuiz, logEvent, addXp, addPrize, pendingDrawCount, drawIsWaitingOnSync,
          movePool, rankPool, questionBank, quizPaidToday, quizBankStatus,
          quizQuestionKey, payQuizQuestion } from "../store.js";
@@ -32,7 +32,7 @@ function makeRankQ(rank, kind, ranks) {
     move: rank.name, block: "story", kind,
     tag: kind === "story" ? "YOUR RANK" : "TRUE STORY",
     prompt, opts,
-    why: (kind === "story" ? rank.rank + " · " : "🌊 True · ") + correct
+    why: (kind === "story" ? rank.rank + " · " : EMOJI.world + " True · ") + correct
   };
 }
 
@@ -135,7 +135,7 @@ export function quizDeckHtml(qd) {
     // same deck for XP. Point the kid at the water instead.
     const scoreVerdict = score >= qd.qs.length - 1 ? "Amazing! You really know your moves. 🏆"
       : score >= Math.ceil(qd.qs.length * 0.6) ? "Great job! A few to polish. 💪"
-      : "Good try — now you’ve seen the answers. Take them to practice! 🌊";
+      : "Good try — now you’ve seen the answers. Take them to practice! " + EMOJI.world;
 
     // Say plainly why a round paid nothing. A kid who taps "Play again" and
     // silently gets 0 XP learns that the app is broken or unfair; a kid who is

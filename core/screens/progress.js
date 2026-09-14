@@ -1,4 +1,4 @@
-import { COPY } from "../sport.js";
+import { COPY, EMOJI } from "../sport.js";
 /* ============================================================
    PROGRESS screen — streak hero, prize wallet, milestones,
    training log rail, LVL hero + rank story cards.
@@ -91,7 +91,7 @@ export function progressScreen(vm) {
             <span>${vm.periodStats.xpFirstLabel}</span><span>${vm.periodStats.xpLastLabel}</span>
           </div>
         </div>` : `
-        <div style="font-size:14px;font-weight:700;color:var(--ink-soft);line-height:1.5;">No sessions in this window yet — train a day and the numbers land here. 🌊</div>`}
+        <div style="font-size:14px;font-weight:700;color:var(--ink-soft);line-height:1.5;">No sessions in this window yet — train a day and the numbers land here. ${EMOJI.world}</div>`}
       </div>
 
       <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);margin-bottom:16px;">
@@ -120,7 +120,7 @@ export function progressScreen(vm) {
                 <div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${escapeHtml(hi.dateStr)} · ${escapeHtml(hi.duration)}</div>
                 ${hi.note ? `<div style="font-size:12px;font-weight:700;color:var(--sun-ink);line-height:1.35;">${escapeHtml(hi.note)}</div>` : ""}
               </div>`).join("")
-            : `<div style="padding:14px;font-size:14px;font-weight:700;color:var(--ink-soft);">No sessions yet — your first one lands here. 🌊</div>`}
+            : `<div style="padding:14px;font-size:14px;font-weight:700;color:var(--ink-soft);">No sessions yet — your first one lands here. ${EMOJI.world}</div>`}
             <button type="button" data-action="nav" data-arg="grownup" style="width:150px;flex-shrink:0;background:var(--aqua-wash);border:2px dashed var(--aqua-light);border-radius:var(--radius-lg);padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;scroll-snap-align:start;">
               <span style="font-size:26px;">📖</span>
               <span style="font-size:13px;font-weight:900;color:var(--aqua-ink);text-align:center;line-height:1.2;">Full logbook<br>in Grown-up →</span>

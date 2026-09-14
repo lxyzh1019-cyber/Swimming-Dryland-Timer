@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, RANK_LORE, BLOCK_META, levelCost, fmtXp, overloadWeek } from "../data.js";
-import { SKILL_BLOCK, ATHLETE_DEFAULT, COPY } from "../sport.js";
+import { SKILL_BLOCK, ATHLETE_DEFAULT, COPY, EMOJI } from "../sport.js";
 import { settings, loadSessions, loadJourney, levelFromXp, currentStreakOf, loadDayProgress, countsAsTrained, settledXpByDate, outcomeOf } from "../store.js";
 import { workoutInstances } from "../outcome.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
@@ -255,7 +255,7 @@ export function buildTodayVM(state) {
     /* Sessions she has TRAINED, counted once each. This was `sessions.length` —
        every stored row, try-it rehearsals and GO-and-quits included, and a
        resumed day twice. */
-    { icon: "🏊", value: String(workoutInstances(sessions.filter(countsAsTrained)).length), label: "sessions", color: "var(--sea)" }
+    { icon: EMOJI.sport, value: String(workoutInstances(sessions.filter(countsAsTrained)).length), label: "sessions", color: "var(--sea)" }
   ];
   const journey = buildJourney();
 

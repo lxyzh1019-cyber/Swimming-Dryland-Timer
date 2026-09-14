@@ -1,5 +1,5 @@
 import { POSES } from "../data.js";
-import { COPY } from "../sport.js";
+import { COPY, EMOJI } from "../sport.js";
 /* ============================================================
    GROWN-UP ZONE screen — Overview / Analytics / Coaching /
    Move Library / Settings. Transcribed from the design; the
@@ -551,7 +551,7 @@ function libraryTab(vm) {
       ${vm.libraryList.map(lib => `
         <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);box-shadow:var(--shadow-soft);overflow:hidden;display:flex;flex-direction:column;">
           <div style="width:100%;height:180px;position:relative;overflow:hidden;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
-            <span style="font-size:44px;" aria-hidden="true">🏊</span>
+            <span style="font-size:44px;" aria-hidden="true">${EMOJI.sport}</span>
             <span style="font-size:12px;font-weight:800;color:var(--aqua-ink);opacity:0.75;">Demo photo coming soon</span>
             <img src="${esc(lib.photoUrl)}" alt="" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
           </div>
