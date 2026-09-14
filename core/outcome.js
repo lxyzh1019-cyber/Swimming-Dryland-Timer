@@ -7,9 +7,9 @@
 
    THE TRAFFIC LIGHT DECIDES THE DOSE.
 
-     Green     3 main rounds   warm-up, coordination, main, prep, finisher, swim-skill
-     Yellow    2               warm-up, coordination, main, swim-skill
-     Red       1               warm-up, main, swim-skill
+     Green     3 main rounds   warm-up, coordination, main, prep, finisher, skill
+     Yellow    2               warm-up, coordination, main, skill
+     Red       1               warm-up, main, skill
      Recovery  0               the recovery menu only
 
    The light that counts is the FINAL one — what the adult chose and the session
@@ -514,7 +514,7 @@ export function instanceKeyOf(entry) {
 
    The id is block + round + name. Name, not index: the same block assembles
    differently depending on the valgus gate and on whether the day is a double
-   pool day (see assembleCircuits), so an index would point at a different move
+   double day (see assembleCircuits), so an index would point at a different move
    on the next sitting — which is exactly why bankMove already banks by name.
    Round, because a main move in round two is a different unit of work from the
    same move in round one; `roundBase` numbers those absolutely across sittings

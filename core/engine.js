@@ -19,6 +19,7 @@ import { settings, configuredExerciseRest, configuredRoundRest, configuredSectio
          XP_VERSION, flaggedMoves, isAbnormalCheck, stampReadinessOutcome } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn, speakSafety } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
+import { APP_ID, DAY_LOAD_FIELD, FEATURES } from "./sport.js";
 import { recoveryDoseSecs, refTime, edmontonISO } from "./util.js";
 
 // Moves that deserve a longer "get ready" lead-in before they start. Kept in
@@ -54,6 +55,7 @@ function blankSession() {
     upNextName: "", upNextDose: "", restCue: "",
     stopOverlay: false, confirmEnd: false, painFlag: false,
     pendingCleanCheck: false, cleanCount: 0, wobblyCount: 0, lastWobbly: false,
+    checkKind: null, landings: {}, wobblyStreak: 0, tierDropped: 0,
     spotChecks: [], spotAsked: {}, cleanCheckMove: null, formChecks: [], formResolver: null,
     intentWord: null, microLoop: null,
     exStatus: {},                // "ci-ei" -> done|partial|skipped
@@ -144,7 +146,7 @@ export function assembleRecoveryCircuit(dayKey) {
 /* Rounds a light asks for. Recovery asks for ZERO, and zero has to survive:
    the old `Math.max(1, LIGHT_ROUNDS[light] || 1)` turned it into one, which is
    how a Recovery day launched warm-up, coordination, a main circuit, prep, a
-   finisher and swim-skill work at a body that had just reported pain. */
+   finisher and skill work at a body that had just reported pain. */
 export function roundsForLight(light) {
   const n = LIGHT_ROUNDS[light];
   return Number.isFinite(n) ? n : 1;
@@ -155,6 +157,40 @@ export function roundsForLight(light) {
    the light it started under while still letting a later, worse body check
    shorten what is left of it (see startSession). */
 export const LIGHT_ORDER = ["recovery", "red", "yellow", "green"];
+/* JUMP-FATIGUE TIER-DROP (pure). Two wobbly landings in a row remove the
+   highest remaining main round — never the one in progress. Only a sport with
+   a landing rule asks for landings at all (see FEATURES.landingCheck). */
+export function tierDroppedRounds(currentRounds, wobblyStreak, roundInProgress) {
+  if (wobblyStreak >= 2 && currentRounds > roundInProgress) {
+    return Math.max(roundInProgress, currentRounds - 1);
+  }
+  return currentRounds;
+}
+
+/* Apply a tier-drop mid-run. The circuit's rounds shrink, the steps of the
+   dropped round are taken out of the walk, and — because the day now asks for
+   fewer rounds — the cap is written to the day's progress record so a resume
+   cannot ask the round back, and the owed-work totals are re-derived from the
+   shortened plan. XP, the finish screen and Today then agree on what was owed. */
+function applyTierDrop(circuit, rounds, steps, s, moveName, round) {
+  circuit.rounds = rounds;
+  for (let k = steps.length - 1; k > s; k--) {
+    if (steps[k].circuit === circuit && steps[k].r > rounds) steps.splice(k, 1);
+  }
+  sess.totalSteps = steps.length;
+  sess.tierDropped = (sess.tierDropped || 0) + 1;
+  sess.wobblyStreak = 0;
+  sess.roundsPlanned = rounds;
+  sess.dayRoundsPlanned = Math.min(sess.dayRoundsPlanned, (sess.bankedRounds || 0) + rounds);
+  const prog = readDayProgress();
+  prog.roundsCap = sess.dayRoundsPlanned;
+  saveDayProgress(sess.dayKey, prog);
+  sess.dayExpectedWork = countExpectedWork(assembleCircuits(sess.dayKey, sess.light, { mainRounds: sess.dayRoundsPlanned }));
+  sess.expectedWork = Math.max(sess.dayExpectedWork, countExpectedWork(sess.circuits));
+  sess.expectedByRound = countExpectedByRound(sess.circuits);
+  logEvent("tier_drop", { move: moveName, round, rounds: sess.dayRoundsPlanned });
+}
+
 export function lowerLight(a, b) {
   const ia = LIGHT_ORDER.indexOf(a), ib = LIGHT_ORDER.indexOf(b);
   if (ia < 0) return b;
@@ -204,8 +240,8 @@ export function assembleCircuits(dayKey, light, opts = {}) {
   order.forEach(bk => {
     if (skipBlocks.includes(bk)) return;
     let exs = (day.blocks[bk] || []).slice();
-    // Standing rule: jump rope hidden on double-pool days.
-    if (bk === "warmup" && day.poolLoad === "double") {
+    // Standing rule: jump rope hidden on double-session days.
+    if (bk === "warmup" && day[DAY_LOAD_FIELD] === "double") {
       exs = exs.filter(ex => !/jump rope/i.test(ex.name));
     }
     // A locked gate now actually gates. The app has always DISPLAYED a
@@ -213,8 +249,12 @@ export function assembleCircuits(dayKey, light, opts = {}) {
     // progression would have run whatever the grown-up had set. Locked means
     // every jump stays at Drop-and-Stick, exactly as the Grown-up Zone says.
     if (opts.gated !== false && gateLocked() && exs.some(ex => VALGUS_PROGRESSIONS.includes(ex.name))) {
+      // The floor is looked for in this block, then this day's main, then
+      // anywhere in the week: a jump day that never lists the floor itself
+      // used to lose every jump behind a locked gate instead of keeping one.
       const floor = exs.find(ex => ex.name === VALGUS_FLOOR)
-        || (day.blocks.main || []).find(ex => ex.name === VALGUS_FLOOR);
+        || (day.blocks.main || []).find(ex => ex.name === VALGUS_FLOOR)
+        || Object.values(DAYS).flatMap(d => Object.values(d.blocks || {}).flat()).find(ex => ex && ex.name === VALGUS_FLOOR);
       exs = exs.filter(ex => !VALGUS_PROGRESSIONS.includes(ex.name));
       if (floor && !exs.includes(floor)) exs.push(floor);
     }
@@ -957,7 +997,7 @@ function readDayProgress() {
 
    Moves are recorded by NAME, not by position: the same block assembles
    differently depending on the valgus gate and on whether the day is a double
-   pool day (see assembleCircuits), so an index would come back pointing at a
+   double day (see assembleCircuits), so an index would come back pointing at a
    different move.
 
    Only a `done` row banks. A `partial` row is real work everywhere else in the
@@ -1072,16 +1112,20 @@ function recordBlockDone(blockKey, ci) {
 
    It is an explicit phase now. Rest does not begin until she has answered or
    skipped. Skipping records no verdict, so it can never become valgus credit. */
-function formCheckPrompt(moveName) {
+function formCheckPrompt(moveName, kind = "form") {
   return new Promise(resolve => {
     sess.cleanCheckMove = moveName;
+    sess.checkKind = kind;
     sess.pendingCleanCheck = true;
     setPhase("formcheck");
-    speakIfIdle("How did that feel — clean, or wobbly?");
+    speakIfIdle(kind === "landing"
+      ? "Landing check. Clean and frozen, or a bit wobbly?"
+      : "How did that feel — clean, or wobbly?");
     const finish = (result) => {
       clearInterval(watchdog); clearTimeout(timeout);
       sess.formResolver = null;
       sess.pendingCleanCheck = false;
+      sess.checkKind = null;
       resolve(result);
     };
     const watchdog = setInterval(() => { if (sess.abort) finish("abort"); }, 200);
@@ -1175,7 +1219,10 @@ export function planResume(dayKey, light = "green") {
   const finalLight = lockedLight ? lowerLight(lockedLight, resolvedLight) : resolvedLight;
   const skipBlocks = (prog && prog.done) || [];
   const bankedRounds = (prog && Number(prog.mainRoundsCompleted)) || 0;
-  const mainOwed = care ? 0 : Math.max(0, roundsForLight(finalLight) - bankedRounds);
+  // A tier-drop earlier today lowered what the day asks for; like the locked
+  // light, the cap is only ever written downward.
+  const roundsCap = prog && Number.isFinite(Number(prog.roundsCap)) ? Number(prog.roundsCap) : Infinity;
+  const mainOwed = care ? 0 : Math.max(0, Math.min(roundsForLight(finalLight), roundsCap) - bankedRounds);
   const bankedMoves = (prog && prog.moves) || {};
   const circuits = care
     ? assembleCircuits(dayKey, finalLight, { skip: [] })
@@ -1188,7 +1235,7 @@ export function planResume(dayKey, light = "green") {
         // OF THE DAY and cannot collide with the earlier sitting's.
         roundOffset: bankedRounds
       });
-  return { circuits, prog, light: finalLight, care, mainOwed, bankedRounds, bankedMoves };
+  return { circuits, prog, light: finalLight, care, mainOwed, bankedRounds, bankedMoves, roundsCap };
 }
 
 /* ---- back a move -----------------------------------------------------------
@@ -1350,7 +1397,9 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
      carried in beside it (see bankedCredit in js/outcome.js) — so a day finished
      across two sittings still reads complete, and a two-move sitting on a
      barely-started day reads exactly as short as it is. */
-  sess.dayExpectedWork = countExpectedWork(assembleCircuits(dayKey, sess.light, {}));
+  const dayRounds = Math.min(roundsForLight(sess.light), plan.roundsCap == null ? Infinity : plan.roundsCap);
+  sess.dayExpectedWork = countExpectedWork(assembleCircuits(dayKey, sess.light,
+    Number.isFinite(dayRounds) && dayRounds < roundsForLight(sess.light) ? { mainRounds: dayRounds } : {}));
   sess.expectedWork = isCareSession()
     ? countExpectedWork(sess.circuits)
     : Math.max(sess.dayExpectedWork, countExpectedWork(sess.circuits));
@@ -1369,7 +1418,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
      rounds" on the finish screen, next to XP and a streak that were both
      judging all three. The record already carries day-wide expectedWork and
      bankedCredit for exactly this reason; rounds were the omission. */
-  sess.dayRoundsPlanned = (sess.spa || sess.recovery) ? 0 : roundsForLight(sess.light);
+  sess.dayRoundsPlanned = (sess.spa || sess.recovery) ? 0 : dayRounds;
   sess.bankedRounds = isCareSession() ? 0 : bankedRounds;
   // Computed here rather than at finalize, because the LIVE round check and the
   // saved record must be judged against the same expected counts. Deriving it
@@ -1421,9 +1470,9 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
   for (let s = 0; s < steps.length; s++) {
     const st = steps[s];
     const { ci, r, ei, ex, circuit, absRound } = st;
-    const next = steps[s + 1] || null;
-    const isLastOfRound = !next || next.ci !== ci || next.r !== r;
-    const isLastOfBlock = !next || next.ci !== ci;
+    let next = steps[s + 1] || null;
+    let isLastOfRound = !next || next.ci !== ci || next.r !== r;
+    let isLastOfBlock = !next || next.ci !== ci;
 
     sess.stepIdx = s;
     sess.skipExercise = false;
@@ -1516,6 +1565,30 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     if (circuit.block === "main") commitRoundIfDone(ci, absRound);
     sess.exStatus[key] = row.status === "skipped" ? "skipped"
       : r === circuit.rounds ? row.status : sess.exStatus[key];
+
+    /* LANDING CHECK. A sport with a landing rule grades every gated jump before
+       the rest starts — clean and frozen, or a bit wobbly. Two wobbly in a row
+       drop the highest remaining main round, never the one in progress, and
+       the plan is lowered with it (applyTierDrop). A graded jump is never also
+       spot-checked. Off unless the app turns it on: see FEATURES.landingCheck. */
+    if (FEATURES.landingCheck && ex.gate === "valgus" && row.status !== "skipped" && !sess.pendingCleanCheck) {
+      sess.spotAsked[ex.name] = true;
+      const lg = await formCheckPrompt(ex.name, "landing");
+      if (lg === "abort") return finalize(false);
+      if (wentBack()) { back(); continue; }
+      if (circuit.block === "main") {
+        const dropped = tierDroppedRounds(circuit.rounds, sess.wobblyStreak, r);
+        if (dropped < circuit.rounds) {
+          applyTierDrop(circuit, dropped, steps, s, ex.name, r);
+          next = steps[s + 1] || null;
+          isLastOfRound = !next || next.ci !== ci || next.r !== r;
+          isLastOfBlock = !next || next.ci !== ci;
+          setUpNext(next);
+          await speakAndWait("Two wobbly landings in a row — let's drop a round. Quality over quantity.");
+          if (sess.abort) return finalize(false);
+        }
+      }
+    }
 
     // Self-check only the moves this run is watching (see pickSpotChecks),
     // and only the first time each one comes round — main runs 2–3 rounds.
@@ -1626,7 +1699,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     }
   }
 
-  // Swim-skill extras: micro-loop Q&A + breath rehearsal. These are TRAINING
+  // Skill-block extras: micro-loop Q&A + breath rehearsal. These are TRAINING
   // drills, so no care session runs them — not Spa Sunday, and not a weekday
   // that resolved to Recovery because her body reported pain. The old `!sess.spa`
   // guard let a sore Monday be handed a breath rehearsal anyway.
@@ -1805,7 +1878,7 @@ export function finalize(completed) {
   const safetyStop = !!sess.painFlag;
 
   const entry = {
-    app: "swimming",
+    app: APP_ID,
     athlete: athleteId(),      // the cloud mirror is shared; a restore filters on this
     dayKey: sess.dayKey,
     dayTitle: day.title || sess.dayKey,
@@ -1846,6 +1919,8 @@ export function finalize(completed) {
     plannedSecs: sess.plannedSecs,
     clean: sess.cleanCount, wobbly: sess.wobblyCount,
     formChecks: sess.formChecks || [],       // per-move verdicts from this run's spot-checks
+    // Only a sport with a landing rule writes these; the row shape elsewhere is unchanged.
+    ...(FEATURES.landingCheck ? { landings: sess.landings || {}, tierDropped: sess.tierDropped || 0 } : {}),
     light: sess.light,
     pain: safetyStop,
     endedEarly: !completed,
@@ -2194,8 +2269,18 @@ function recordFormCheck(clean) {
   if (sess.cleanCheckMove) sess.formChecks.push({ name: sess.cleanCheckMove, clean });
   sess.cleanCheckMove = null;
 }
+/* A landing check is a form check with a memory: each grade is kept per move
+   for the grown-up watch-list, and a run of wobbly ones drives the tier-drop. */
+function noteLanding(clean) {
+  if (sess.checkKind !== "landing" || !sess.cleanCheckMove) return;
+  const rec = sess.landings[sess.cleanCheckMove] || { clean: 0, wobbly: 0 };
+  if (clean) { rec.clean += 1; sess.wobblyStreak = 0; }
+  else { rec.wobbly += 1; sess.wobblyStreak = (sess.wobblyStreak || 0) + 1; }
+  sess.landings[sess.cleanCheckMove] = rec;
+}
 export function pickClean() {
   if (!sess.pendingCleanCheck) return;
+  noteLanding(true);
   sess.cleanCount += 1; sess.lastWobbly = false;
   if (sess.formResolver) sess.formResolver(true);
   else { recordFormCheck(true); sess.pendingCleanCheck = false; }
@@ -2203,6 +2288,7 @@ export function pickClean() {
 }
 export function pickWobbly() {
   if (!sess.pendingCleanCheck) return;
+  noteLanding(false);
   sess.wobblyCount += 1; sess.lastWobbly = true;
   if (sess.formResolver) sess.formResolver(false);
   else { recordFormCheck(false); sess.pendingCleanCheck = false; }

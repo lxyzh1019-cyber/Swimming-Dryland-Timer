@@ -24,6 +24,7 @@
    either side; every step can only ADD.
    ============================================================ */
 
+import { LEGACY_JOURNEY_KEYS } from "./sport.js";
 import { settings, mergeSessions, loadSessions, sessionKey, belongsToAthlete, athleteId, athleteAliases,
          journeySnapshot, mergeCloudJourney, rebuildJourneyXp, logEvent,
          loadReadinessLog, mergeReadinessLog, noteSyncResult } from "./store.js";
@@ -89,7 +90,7 @@ export async function restoreFromCloud() {
     // quiz ledger and prize wallet under a key nothing reads any more. Merging
     // only ever moves things up, so merging several is safe.
     let journeyChanged = false;
-    for (const id of athleteAliases()) {
+    for (const id of [...athleteAliases(), ...LEGACY_JOURNEY_KEYS]) {
       if (mergeCloudJourney(await fsGetJourney(id))) journeyChanged = true;
     }
     await fsSaveJourney(me, journeySnapshot());
@@ -176,7 +177,7 @@ export async function flushJourney() {
     // Merge what the other device has published since this one last looked,
     // so the snapshot written below is a union and never a rollback of a prize
     // or a mastered question that only the other device knew about.
-    for (const id of athleteAliases()) mergeCloudJourney(await fsGetJourney(id));
+    for (const id of [...athleteAliases(), ...LEGACY_JOURNEY_KEYS]) mergeCloudJourney(await fsGetJourney(id));
     return await fsSaveJourney(athleteId(), journeySnapshot());
   } catch (e) {
     console.warn("Journey publish skipped:", e);

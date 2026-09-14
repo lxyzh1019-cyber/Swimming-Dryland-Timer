@@ -8,6 +8,7 @@
 
 import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS, migratePrizeAmnesty } from "./store.js";
 import { edmontonDayKey, escapeHtml } from "./util.js";
+import { APP_NAME, ATHLETE_DEFAULT, COPY } from "./sport.js";
 import { DAYS } from "./data.js";
 import { restoreFromCloud, publishJourney, publishReadiness } from "./sync.js";
 import { downloadBackup, restoreBackupFile } from "./backup.js";
@@ -631,7 +632,7 @@ Object.assign(RAW, {
     state.gateBusy = true;
     state.passkeyNote = "";
     render();
-    enrollPasskey(settings.athleteName || "Splash").then(ok => {
+    enrollPasskey(settings.athleteName || APP_NAME).then(ok => {
       state.gateBusy = false;
       state.passkeyNote = ok
         ? "Passkey enrolled on this device. If the PIN is ever forgotten, this is how you get back in."
@@ -780,7 +781,7 @@ Object.assign(RAW, {
      actions now, so they are authorized by the same dispatch as everything
      else and cannot be reached any other way. */
   renameAthlete(arg) {
-    const name = String(arg == null ? "" : arg).trim() || "Jess";
+    const name = String(arg == null ? "" : arg).trim() || ATHLETE_DEFAULT;
     updateSettings({ athleteName: name });
     renameProfile(activeProfileId(), name);
   },
@@ -906,7 +907,7 @@ async function fetchWeather() {
     const data = await r.json();
     const code = data.current.weather_code;
     const icon = code <= 1 ? "☀️" : code <= 3 ? "⛅" : code <= 48 ? "🌤" : code <= 67 ? "🌧" : code <= 86 ? "🌨" : "🌦";
-    state.weather = { icon, temp: Math.round(data.current.temperature_2m), caption: "Pool day!" };
+    state.weather = { icon, temp: Math.round(data.current.temperature_2m), caption: COPY.weatherCaption };
     if (!state.inSession) render();
   } catch { /* keep the placeholder chip */ }
 }

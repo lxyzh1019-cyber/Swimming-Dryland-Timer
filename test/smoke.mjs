@@ -134,7 +134,7 @@ globalThis.fireDocEvent = (type) => {
 
 import fs from "node:fs";
 
-const base = new URL("../js/", import.meta.url).href;
+const base = new URL("../core/", import.meta.url).href;
 const util   = await import(base + "util.js");
 const data   = await import(base + "data.js");
 const store  = await import(base + "store.js");
@@ -381,6 +381,32 @@ store.saveJourney(dipJ);
 ok(store.loadJourney().prizesWon.length === 3, "an XP dip voids nothing — the trim uses the high-water level");
 localStorage.clear();
 
+/* Legacy dates are a minefield: an old migration back-filled `date` from
+   `when` as String(when).slice(0,10), so a real Nov-2023 prize reads
+   "1700000000", and a prize with no date at all reads "". Both sort BEFORE
+   every ISO date, so a naive oldest-first trim kept the junk and evicted the
+   prizes she had actually earned. A sliced stamp is recovered as the seconds
+   it is (2023 here, so it is genuinely her oldest and is kept); a numeric
+   `when` keeps its real place; a prize with no date at all is unknown, goes to
+   the END, and is the one that gets trimmed. */
+localStorage.clear();
+store.migrate();
+store.saveJourney({ xp: lvlXp(4), sessionXp: lvlXp(4), maxLevelSeen: 4, pendingDraws: 0,
+                    prizesWon: [pz(1, "2026-01-01", false), pz(2, "2026-02-02", false), pz(3, "2026-03-03", false),
+                                { id: "junk", label: "no date", redeemed: false },
+                                { id: "epoch", label: "when only", when: Date.UTC(2025, 5, 1), redeemed: false },
+                                { id: "sliced", label: "sliced when", date: "1700000000", redeemed: false }] });
+const legacyDatesJ = store.loadJourney();
+store.reconcileWallet(legacyDatesJ);
+store.saveJourney(legacyDatesJ);
+const legacyKept = store.loadJourney().prizesWon.map(x => x.id).sort();
+ok(String(legacyKept) === "epoch,p1,sliced", "a trim keeps the genuinely oldest prizes — a sliced stamp reads as its real 2023 date, a `when` epoch as its date, no-date junk goes last: " + legacyKept);
+ok(store.prizeDateKey({ date: "1700000000" }) === "2023-11-14", "a sliced ten-digit stamp is recovered as seconds, not read as 1970");
+ok(store.prizeDateKey({}) === "9999-99-99" && store.prizeDateKey({ date: "soon" }) === "9999-99-99",
+   "a missing or nonsense date is unknown, not ancient");
+ok(store.byOldest({ id: "a" }, { id: "b" }) < 0 && store.byOldest({ id: "b" }, { id: "a" }) > 0, "ties break on id so two devices keep the same survivors");
+localStorage.clear();
+
 /* --- XP --- */
 ok(store.xpForSession({ perExercise: [1,2,3,4,5,6] }) === 100, "6 moves = 100 XP");
 ok(store.xpForSession({ sessionType: "spa" }) === 0, "spa earns no XP");
@@ -492,7 +518,11 @@ ok(/Is she trying/.test(gscreen.grownupScreen(gvm.buildGrownupVM({ gsScope: "all
 
 /* A try-it pain stop must reach Safety & Flags without touching training stats. */
 const beforeCompleted = gA("week").indicators[5].total;
-store.saveSession({ practice: true, dayKey: "monday", isoDate: new Date(Date.now() - 86400000).toISOString(),
+// Dated TODAY, not yesterday: the "week" scope is the calendar week (Mon–Sun,
+// Edmonton), so a yesterday stamp fell outside it every Monday and this
+// assertion failed one day in seven — taking the four suites chained after
+// this file down with it.
+store.saveSession({ practice: true, dayKey: "monday", isoDate: new Date().toISOString(),
                     pain: true, sessionType: "try-it", completedFully: false, endedEarly: true, safetyOnly: true, durationSecs: 200 });
 ok(gA("week").hasStops === true, "a try-it pain stop shows up in Safety & Flags");
 ok(gA("week").indicators[5].total === beforeCompleted, "but never counts as a session she trained");
@@ -1160,6 +1190,22 @@ function makeClock() {
       globalThis.setTimeout = realSetTimeout;   globalThis.clearTimeout = realClearTimeout;
     }
   };
+}
+
+/* Pin "now" for a block whose fixtures are dated by offset from today. The
+   week and period views ask the CALENDAR week (Mon–Sun, Edmonton), so a row
+   dated "four days ago" is inside the week on a Friday and outside it on a
+   Monday — and the assertions below failed one day in seven, taking the four
+   suites chained after this file down with them. makeClock() only swaps
+   Date.now; util reads `new Date()`, so the class itself is replaced here. */
+function pinClock(iso) {
+  const RealDate = Date, fixed = new RealDate(iso).getTime();
+  class PinnedDate extends RealDate {
+    constructor(...a) { super(...(a.length ? a : [fixed])); }
+    static now() { return fixed; }
+  }
+  globalThis.Date = PinnedDate;
+  return () => { globalThis.Date = RealDate; };
 }
 
 /* Run a session to completion (or until `stop` says otherwise). Voice off, so
@@ -1934,6 +1980,9 @@ ok(store.backupIdentityMismatch({ data: {} }) === null,
    "a backup too old to carry an identity is not blocked");
 
 /* ---- reports that don't invent things ------------------------------------ */
+// A Saturday: every offset below (1–4 days back) lands inside the same
+// calendar week, whatever day the suite actually runs on.
+const unpinReports = pinClock("2026-09-12T18:00:00Z");
 localStorage.clear();
 store.migrate();
 const iso = n => new Date(Date.now() - n * 86400000).toISOString();
@@ -2027,6 +2076,7 @@ const scheduledSoFar = oneDay.scheduled;
 ok(oneDay.adherence === Math.round((1 / Math.max(1, scheduledSoFar)) * 100),
    "it counts the one DAY she trained, not the two records she left on it");
 localStorage.clear();
+unpinReports();
 
 /* ============================================================
    PHASE 2 — one session-outcome authority
@@ -3717,7 +3767,10 @@ ok(fs.existsSync(new URL("../manifest.webmanifest", import.meta.url)),
    "there is a web app manifest, so Add to Home Screen installs an app rather than a bookmark");
 ok(fs.existsSync(new URL("../sw.js", import.meta.url)),
    "and a service worker, so a fresh launch with no network still gets the shell");
-const swSrc = fs.readFileSync(new URL("../sw.js", import.meta.url), "utf8");
+/* The worker is the shared core's; the app's sw.js only configures it. Both
+   halves are read, so the rules below are checked against the whole. */
+const swSrc = fs.readFileSync(new URL("../sw.js", import.meta.url), "utf8")
+            + fs.readFileSync(new URL("../core/sw-core.js", import.meta.url), "utf8");
 ok(/CACHE_VERSION/.test(swSrc), "the cache is versioned, so a release can retire the old one");
 /* The property that matters is not the absence of a word, it is that the fetch
    handler refuses anything that is not a same-origin GET before it can reach a
@@ -3726,8 +3779,10 @@ ok(/url\.origin\s*!==\s*self\.location\.origin/.test(swSrc) && /req\.method\s*!=
    "and nothing cross-origin or non-GET reaches the cache — the mirror is never cached into a shared shell");
 ok(!SHELL_LISTED_CLOUD(swSrc), "no cloud endpoint is in the precached shell list either");
 function SHELL_LISTED_CLOUD(src) {
-  const list = (src.match(/const SHELL = \[([\s\S]*?)\];/) || [])[1] || "";
-  return /https?:/i.test(list);
+  // Every precache list: the core's CORE_SHELL and the app's `shell:`.
+  const lists = [...src.matchAll(/(?:CORE_SHELL = |shell: )\[([\s\S]*?)\]/g)].map(m => m[1]);
+  ok(lists.length >= 2, "both the core shell list and the app's own were found");
+  return lists.some(list => /https?:/i.test(list));
 }
 
 

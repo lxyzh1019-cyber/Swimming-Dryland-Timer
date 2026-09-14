@@ -7,6 +7,7 @@
 
 import { READINESS_QS, BODY_ZONES, SEVERITY_LEVELS, LIGHT_META, BODY_RESULTS, LIGHT_ROUNDS } from "../data.js";
 import { settings, loadReadiness } from "../store.js";
+import { ATHLETE_DEFAULT } from "../sport.js";
 
 export function newReadinessFlow(dayKey, practice) {
   return {
@@ -324,7 +325,7 @@ export function buildReadinessVM(r, isWide) {
   const prev = loadReadiness();
 
   return {
-    athleteName: settings.athleteName || "Jess",
+    athleteName: settings.athleteName || ATHLETE_DEFAULT,
     stepperRows,
     isWide, isNarrow: !isWide,
     cardDir: isWide ? "row" : "column",

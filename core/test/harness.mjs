@@ -42,8 +42,9 @@ globalThis.document = {
 };
 Object.defineProperty(globalThis, "navigator", { value: {}, configurable: true, writable: true });
 
-const base = new URL("../js/", import.meta.url).href;
+const base = new URL("../", import.meta.url).href;
 export const util    = await import(base + "util.js");
+export const sport   = await import(base + "sport.js");
 export const data    = await import(base + "data.js");
 export const store   = await import(base + "store.js");
 export const engine  = await import(base + "engine.js");
@@ -53,6 +54,11 @@ export const tvm     = await import(base + "vm/today.js");
 export const pvm     = await import(base + "vm/progress.js");
 export const gvm     = await import(base + "vm/grownup.js");
 export const gscreen = await import(base + "screens/grownup.js");
+export const rvm     = await import(base + "vm/readiness.js");
+export const rscreen = await import(base + "screens/readiness.js");
+export const sscreen = await import(base + "screens/session.js");
+export const tscreen = await import(base + "screens/today.js");
+export const overlays = await import(base + "screens/overlays.js");
 export const pscreen = await import(base + "screens/progress.js");
 
 const realNow = Date.now;

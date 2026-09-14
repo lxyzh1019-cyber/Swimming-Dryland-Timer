@@ -1,6 +1,7 @@
+import { COPY, EMOJI } from "../sport.js";
 /* ============================================================
    PROGRESS screen — streak hero, prize wallet, milestones,
-   training log rail, LVL hero + Ocean Story rank cards.
+   training log rail, LVL hero + rank story cards.
 
    EVERY STORED STRING ON THIS SCREEN GOES THROUGH escapeHtml.
 
@@ -90,7 +91,7 @@ export function progressScreen(vm) {
             <span>${vm.periodStats.xpFirstLabel}</span><span>${vm.periodStats.xpLastLabel}</span>
           </div>
         </div>` : `
-        <div style="font-size:14px;font-weight:700;color:var(--ink-soft);line-height:1.5;">No sessions in this window yet — train a day and the numbers land here. 🌊</div>`}
+        <div style="font-size:14px;font-weight:700;color:var(--ink-soft);line-height:1.5;">No sessions in this window yet — train a day and the numbers land here. ${EMOJI.world}</div>`}
       </div>
 
       <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);margin-bottom:16px;">
@@ -119,7 +120,7 @@ export function progressScreen(vm) {
                 <div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${escapeHtml(hi.dateStr)} · ${escapeHtml(hi.duration)}</div>
                 ${hi.note ? `<div style="font-size:12px;font-weight:700;color:var(--sun-ink);line-height:1.35;">${escapeHtml(hi.note)}</div>` : ""}
               </div>`).join("")
-            : `<div style="padding:14px;font-size:14px;font-weight:700;color:var(--ink-soft);">No sessions yet — your first one lands here. 🌊</div>`}
+            : `<div style="padding:14px;font-size:14px;font-weight:700;color:var(--ink-soft);">No sessions yet — your first one lands here. ${EMOJI.world}</div>`}
             <button type="button" data-action="nav" data-arg="grownup" style="width:150px;flex-shrink:0;background:var(--aqua-wash);border:2px dashed var(--aqua-light);border-radius:var(--radius-lg);padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;scroll-snap-align:start;">
               <span style="font-size:26px;">📖</span>
               <span style="font-size:13px;font-weight:900;color:var(--aqua-ink);text-align:center;line-height:1.2;">Full logbook<br>in Grown-up →</span>
@@ -143,12 +144,12 @@ export function progressScreen(vm) {
           </div>
         </div>
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:16px;">
-          <div style="font-weight:900;font-size:12px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">Your ocean story</div>
-          <div style="font-family:var(--font-hand);font-size:19px;font-weight:700;color:var(--aqua-ink);">Every level is a new sea friend 🌊</div>
+          <div style="font-weight:900;font-size:12px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">${COPY.storyTitle}</div>
+          <div style="font-family:var(--font-hand);font-size:19px;font-weight:700;color:var(--aqua-ink);">${COPY.storyTagline}</div>
         </div>
         <div class="rail-wrap">
           <div style="display:flex;gap:14px;overflow-x:auto;padding:12px 2px 12px;scroll-snap-type:x mandatory;" data-rail="1">
-            ${vm.oceanStory.map(os => `
+            ${vm.rankStory.map(os => `
               <div style="${os.cardStyle}">
                 <div style="display:flex;align-items:center;gap:12px;">
                   <div style="${os.iconBubbleStyle}">${os.icon}</div>
@@ -161,8 +162,8 @@ export function progressScreen(vm) {
                 <div style="font-size:14px;font-weight:700;color:var(--ink);line-height:1.5;margin-top:10px;flex:1;">${os.story}</div>
                 ${os.unlocked ? `
                 <div style="background:var(--aqua-wash);border-radius:12px;padding:9px 11px;margin-top:12px;display:flex;gap:8px;align-items:flex-start;">
-                  <span style="font-size:15px;flex-shrink:0;">🏊</span>
-                  <span style="font-size:13px;font-weight:800;color:var(--aqua-ink);line-height:1.4;">${os.swim}</span>
+                  <span style="font-size:15px;flex-shrink:0;">${COPY.transferIcon}</span>
+                  <span style="font-size:13px;font-weight:800;color:var(--aqua-ink);line-height:1.4;">${os.transfer}</span>
                 </div>
                 <div style="background:var(--surface-2);border-radius:12px;padding:9px 11px;margin-top:8px;">
                   <div style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;">Did you know?</div>

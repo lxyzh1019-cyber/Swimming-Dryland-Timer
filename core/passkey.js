@@ -32,8 +32,9 @@
    ============================================================ */
 
 import { readDeviceKey, writeDeviceKey, clearDeviceKey, LS_GROWNUP_PASSKEY } from "./store.js";
+import { APP_TITLE } from "./sport.js";
 
-const RP_NAME = "Splash — Swim Dryland Timer";
+const RP_NAME = APP_TITLE;
 
 export function passkeySupported() {
   return !!(typeof window !== "undefined" && window.PublicKeyCredential
