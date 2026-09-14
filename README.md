@@ -107,15 +107,14 @@ Any static host (e.g. GitHub Pages) works as-is.
 
 ## Tests
 
-A dependency-free smoke test covers the core logic (streak/XP math, readiness
-scoring + the pain-gate, quiz rotation, and that the view-models render):
-
-```
-npm test        # runs the five suites under test/ — no install needed
-```
-
-The `package.json` exists only for this script; the app itself still has no
-build step.
+`npm test` runs `core/test/run.mjs`, which runs every suite in its own
+process under the default timezone and America/New_York and reports every
+failure — the chained `&&` it replaced stopped at the first one, so a
+Monday-only assertion hid four green suites for a day a week. The suites:
+the core's action-layer, invariants, integrity, landing-rule and offline-shell
+suites (`core/test/`, shared with the skate app and run there against its
+content too) and this app's `test/smoke.mjs`. No install needed; the
+`package.json` exists only for this script.
 
 ## Data
 
