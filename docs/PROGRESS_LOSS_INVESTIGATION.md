@@ -1,5 +1,7 @@
 # Why the kids' progress disappears — investigation
 
+> **Paths, as of 2026-09:** the engine now lives in the shared `core/` — `js/engine.js` is `core/engine.js`, `js/store.js` is `core/store.js`, and likewise for `main`, `audio`, `sync`, `firebase`, `util`, `vm/*` and `screens/*`. Only `js/data.js` and `js/sport.js` are still the app's own. Line numbers are as of the commit reviewed.
+
 Scope: how XP, levels, prizes, streaks, week checkmarks and session history are
 persisted, and every path by which they can be lost or appear lost.
 Findings are ordered by how likely they are to be behind the complaint.

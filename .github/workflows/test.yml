@@ -1,6 +1,10 @@
 # Every suite, every push. `npm test` runs core/test/run.mjs, which runs each
 # suite in its own process under two timezones and reports every failure, so a
 # Monday-only assertion can never hide a green suite behind it again.
+#
+# On a pull request the release check also runs: a precached shell file that
+# changed without a bump of `version` in sw.js fails the build, because that is
+# the one release mistake no developer machine ever shows.
 name: test
 on:
   push:
@@ -10,7 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm test
+      - name: Service-worker version bumped when the shell changed
+        if: github.event_name == 'pull_request'
+        run: node core/tools/release-check.mjs origin/${{ github.base_ref }}

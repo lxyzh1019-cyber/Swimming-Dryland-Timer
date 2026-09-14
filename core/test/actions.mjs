@@ -453,6 +453,21 @@ await unlockGrownup();
 main.state.nav = "grownup";
 main.actions.nav("today");
 ok(gate.gateUnlocked() === false, "walking out re-locks it immediately");
+ok(main.gateExpiryArmed() === false, "and the expiry repaint is dropped with it");
+/* The unlock ends ON SCREEN: a timer repaints when the five minutes lapse, so
+   the Zone does not sit open until the next tap. */
+await unlockGrownup();
+main.state.nav = "grownup";
+main.actions.nav("grownup");
+main.actions.setGuTab("settings");
+ok(main.gateExpiryArmed() === false, "an unlock that never went through the gate arms nothing");
+gate.lockGate(); resetGateState();
+main.actions.setVoiceStyle("fun");
+ok(main.state.gateAsk === "setVoiceStyle", "a locked Zone asks");
+main.actions.answerGate(TEST_PIN);
+ok(gate.gateUnlocked() && main.gateExpiryArmed() === true, "answering the PIN arms the expiry repaint");
+main.actions.nav("today");
+ok(main.gateExpiryArmed() === false, "leaving drops it");
 ok(main.state.nav === "today", "leaving is never itself blocked");
 main.actions.nav("grownup");
 ok(main.state.nav !== "grownup" && main.state.gateAsk === "nav", "so coming back asks again");
