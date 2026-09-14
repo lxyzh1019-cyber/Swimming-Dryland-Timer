@@ -1478,6 +1478,35 @@ export function redeemPrize(id) {
 
    Only call this once XP is authoritative (after the cloud merge), never
    mid-boot against a stale total — see rebuildJourneyXp. */
+/* Sort key for a prize. Legacy dates are a minefield: an old migration
+   back-filled `date` from `when` with String(when).slice(0,10), so
+   1700000000000 became "1700000000" — which sorts BEFORE every real ISO date.
+   A missing date maps to "" and sorts first too. Left alone, an oldest-first
+   trim would keep all the malformed junk and evict the real prizes.
+
+   So: an ISO date is itself; a numeric `when` is a real timestamp; a sliced
+   ten-digit `date` is the first ten digits of a millisecond stamp, i.e. that
+   stamp in SECONDS, and is recovered as such (to within seventeen minutes,
+   which is plenty for ordering); anything else is unknown and pushed to the
+   END. The id is a total-order tiebreak — never rely on sort stability, two
+   devices must pick the same survivors. */
+export function prizeDateKey(p) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(p && p.date)) return p.date;
+  const raw = Number(p && (p.when != null ? p.when : p.date));
+  if (Number.isFinite(raw) && raw > 0) {
+    const ms = raw < 1e11 ? raw * 1000 : raw;   // a sliced stamp is seconds
+    const d = new Date(ms);
+    if (!isNaN(d)) return d.toISOString().slice(0, 10);
+  }
+  return "9999-99-99";
+}
+export function byOldest(a, b) {
+  const ka = prizeDateKey(a), kb = prizeDateKey(b);
+  if (ka !== kb) return ka < kb ? -1 : 1;
+  const ia = String(a && a.id), ib = String(b && b.id);
+  return ia < ib ? -1 : ia > ib ? 1 : 0;
+}
+
 export function reconcileWallet(j) {
   const wallet = j.prizesWon || [];
   const earned = drawsEverEarned(j);          // high-water, never the current dip
@@ -1486,7 +1515,7 @@ export function reconcileWallet(j) {
   // Oldest first, full stop. Pinning every redeemed prize ahead of the queue
   // meant a wallet with more redeemed prizes than the level earned trimmed
   // AVAILABLE ones instead — she watched prizes she had never used disappear.
-  const oldestFirst = wallet.slice().sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+  const oldestFirst = wallet.slice().sort(byOldest);
   const keep = new Set();
   for (const p of oldestFirst) {
     if (keep.size >= earned) break;

@@ -161,6 +161,15 @@ build step.
 
 ## Firestore rules
 
+**Two apps, one project, one rules file.** This app and the sibling
+Figure-Skate Dryland Timer share Firebase project `chore-tracker-a461b`; each
+writes its own collection (`jess_swimming_sessions` here,
+`jenn_skating_sessions` there). `firestore.rules` is byte-identical in both
+repositories and names both collections in `isAppCollection`, so deploying it
+from either repo is the same deploy. An earlier version named only this
+collection, and deploying it would have locked the skate app out of its mirror
+entirely — a collection with no match falls through to the deny-all.
+
 Everything the mirror writes lives in one collection,
 `jess_swimming_sessions`, holding three document shapes told apart by `kind`:
 session rows (no `kind`), one `journey-<athlete>` doc, and one

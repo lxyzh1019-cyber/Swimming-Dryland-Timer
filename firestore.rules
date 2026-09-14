@@ -1,19 +1,29 @@
 rules_version = '2';
 
 /* ============================================================
-   FIRESTORE RULES — Swimming Dryland Timer
+   FIRESTORE RULES — Dryland Timers (shared by both apps)
+
+   Two sibling apps share this Firebase project and this rules file:
+
+     - Swimming Dryland Timer      → collection `jess_swimming_sessions`
+     - Figure-Skate Dryland Timer  → collection `jenn_skating_sessions`
+
+   The file is byte-identical in both repositories; deploying it from either
+   one is the same deploy. It was once written for one collection only, and
+   deploying that version would have locked the sibling app out of its mirror
+   entirely (a collection with no match falls through to the deny-all below).
+   Add a collection HERE, in `isAppCollection`, never as a second copy of the
+   match block.
 
    The app has no sign-in. It runs on two phones in one family, and the whole
    point of the mirror is that a session recorded on hers shows up on the
    grown-up's. There is nobody to authenticate against, so these rules cannot
    be about identity. What they CAN do — and what an open database does not —
-   is confine the app to the one collection it uses, refuse anything that does
+   is confine the app to the collections it uses, refuse anything that does
    not look like one of its three document shapes, and make deletion impossible
    so a mis-tap or a stale client can never take her history with it.
 
-   Everything lives in ONE collection, `jess_swimming_sessions`, because adding
-   a second would have meant a second rule to get wrong (see the comments in
-   js/firebase.js). It holds three shapes, told apart by `kind`:
+   Each collection holds three shapes, told apart by `kind`:
 
      - a session document          (no `kind`; written by fsAddSession)
      - `journey-<athlete>`         (kind: "journey")
@@ -23,10 +33,10 @@ rules_version = '2';
    writes are unauthenticated, by an explicit owner decision to keep the
    sign-in-free two-device mirror and accept the risk. Anyone who can reach the
    Firebase project can read training and body-map data and write forged
-   records. What these rules do is confine a MISBEHAVING CLIENT to one
-   collection and three shapes; they do nothing about a hostile one. The app
+   records. What these rules do is confine a MISBEHAVING CLIENT to known
+   collections and three shapes; they do nothing about a hostile one. The app
    defends itself separately, by rendering every stored string as text (see
-   js/screens/progress.js) rather than trusting what comes back.
+   core/screens/progress.js) rather than trusting what comes back.
 
    The deferred upgrade is Firebase Authentication with family-owned document
    paths and server-side ownership rules. It is not in the current scope.
@@ -39,12 +49,17 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    match /jess_swimming_sessions/{docId} {
+    function isAppCollection(col) {
+      return col == 'jess_swimming_sessions'
+          || col == 'jenn_skating_sessions';
+    }
 
-      /* Reading is the mirror's entire purpose, and the collection holds no
+    match /{col}/{docId} {
+
+      /* Reading is the mirror's entire purpose, and the collections hold no
          secrets — training rows, XP, and the sore spots a grown-up is meant to
          see. fsGetRecent and fsGetAll both order by `createdAt`. */
-      allow read: if true;
+      allow read: if isAppCollection(col);
 
       /* SIZE, MEASURED IN THE UNIT THE FUNCTION ACTUALLY RETURNS.
 
@@ -61,13 +76,15 @@ service cloud.firestore {
          guard here is a runaway client appending fields forever — a count, and
          a count is exactly what size() gives. 200 is far above any real record
          and far below anything that could quietly rot the store. */
-      allow create: if request.resource.data.size() < 200
+      allow create: if isAppCollection(col)
+                    && request.resource.data.size() < 200
                     && isKnownShape(request.resource.data);
 
       /* fsUpdateSession patches a session row after the fact (mood, reflection,
          the quiz) and fsSaveReadiness / fsSetJourney rewrite their own single
          doc wholesale. A write may not change what KIND of document this is. */
-      allow update: if request.resource.data.size() < 200
+      allow update: if isAppCollection(col)
+                    && request.resource.data.size() < 200
                     && isKnownShape(request.resource.data)
                     && sameKind(resource.data, request.resource.data);
 
@@ -92,9 +109,9 @@ service cloud.firestore {
     }
 
     /* Firestore denies by default, so this only says out loud what the default
-       already does: nothing outside this app's own collection is reachable. It
-       does NOT narrow the rule above — Firestore grants access when ANY match
-       allows it, so a catch-all deny can never be used to claw one back. */
+       already does: nothing outside the apps' own collections is reachable.
+       Firestore grants access when ANY match allows it, so the wildcard match
+       above carries its own `isAppCollection` guard on every rule. */
     match /{document=**} {
       allow read, write: if false;
     }
