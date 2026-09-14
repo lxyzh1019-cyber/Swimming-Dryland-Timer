@@ -160,6 +160,25 @@ const passkey = await import(base + "passkey.js");
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
 
+/* THE SUITE MUST NOT CARE WHAT DAY IT IS RUN ON.
+
+   Two facts about the calendar kept leaking into assertions, and each of them
+   broke the suite on exactly one weekday:
+
+   1. Sunday is SPA — no blocks, no warm-up, and its own copy ("rest is part of
+      the plan" where a training day says "Your work is saved"). A fixture that
+      took its day key from `edmontonDayKey()` was therefore testing a rest day
+      every Sunday, and asserting training-day copy against it.
+   2. The week scope is a calendar Mon–Sun week, not a rolling seven days, so
+      "now minus a day or four" lands in LAST week every Monday and drops out of
+      every week-scoped view.
+
+   So: fixtures that need a training day use this key rather than today's, and
+   fixtures that need to be inside the week view are dated today. Neither is a
+   weaker test — they are the same assertions, made on the one day-shape that
+   is the same all seven days. */
+const TRAINING_DAY = "monday";
+
 /* Become the grown-up by walking the REAL flow: the device passkey confirms an
    adult, which earns the right to choose a PIN, which unlocks. There is no
    arithmetic question any more — that is the point of this round. */
@@ -490,9 +509,13 @@ await unlockGrownup();
 ok(/Is she trying/.test(gscreen.grownupScreen(gvm.buildGrownupVM({ gsScope: "all", grownupTab: "analytics", isWide: true }))),
    "and it renders on the Analytics tab");
 
-/* A try-it pain stop must reach Safety & Flags without touching training stats. */
+/* A try-it pain stop must reach Safety & Flags without touching training stats.
+   Dated TODAY, not yesterday. The week scope is a calendar Mon–Sun week, so
+   "now minus 24h" sits in the PREVIOUS week every Monday — which is exactly
+   what this assertion did, and why the suite went red on Mondays only. Today is
+   the one offset that is inside the week view on all seven days. */
 const beforeCompleted = gA("week").indicators[5].total;
-store.saveSession({ practice: true, dayKey: "monday", isoDate: new Date(Date.now() - 86400000).toISOString(),
+store.saveSession({ practice: true, dayKey: "monday", isoDate: new Date().toISOString(),
                     pain: true, sessionType: "try-it", completedFully: false, endedEarly: true, safetyOnly: true, durationSecs: 200 });
 ok(gA("week").hasStops === true, "a try-it pain stop shows up in Safety & Flags");
 ok(gA("week").indicators[5].total === beforeCompleted, "but never counts as a session she trained");
@@ -1939,11 +1962,16 @@ store.migrate();
 const iso = n => new Date(Date.now() - n * 86400000).toISOString();
 const row = (o) => ({ app: "swimming", dayKey: "monday", dayTitle: "Mon", xpVersion: store.XP_VERSION,
   sessionType: "main", lightResult: "green", ...o });
-/* a real session, a GO-and-quit on the SAME day, a try-it row and a safety stop */
-store.saveSession(row({ isoDate: iso(1), durationSecs: 1500, completedFully: true, roundsDone: 3,
+/* a real session, a GO-and-quit on the SAME day, a try-it row and a safety stop.
+   The pair sits on TODAY, not yesterday: the week chip below is scoped to the
+   calendar Mon–Sun week, so every fixture dated by an offset from now is in
+   LAST week when the suite runs on a Monday. Today is the only offset that is
+   in the week view on all seven days. The offsets that remain feed 4-week and
+   all-time assertions, which don't care which weekday it is. */
+store.saveSession(row({ isoDate: iso(0), durationSecs: 1500, completedFully: true, roundsDone: 3,
   roundsPlanned: 3, ledger: [...mainRound(1), ...mainRound(2), ...mainRound(3)],
   mood: "great", xpEarned: 360 }));
-store.saveSession(row({ isoDate: iso(1), durationSecs: 20, completedFully: true, roundsDone: 0,
+store.saveSession(row({ isoDate: iso(0), durationSecs: 20, completedFully: true, roundsDone: 0,
   roundsPlanned: 3, ledger: [{ name: "a", status: "skipped" }], xpEarned: 0 }));
 store.saveSession(row({ isoDate: iso(2), durationSecs: 400, practice: true, sessionType: "try-it" }));
 store.saveSession(row({ isoDate: iso(3), durationSecs: 300, safetyStop: true, pain: true,
@@ -3522,8 +3550,10 @@ ok(outcome.workoutInstances(twoFragments).length === 1,
    without ever asking countsForStreak. Below the 75% bar that is simply false,
    and it is the screen the kid reads. */
 localStorage.clear(); store.migrate();
+/* A training day, not today's key — see TRAINING_DAY. The date stays today,
+   which is what keeps the record inside the week view. */
 const shortDay = {
-  isoDate: new Date().toISOString(), dayKey: util.edmontonDayKey(),
+  isoDate: new Date().toISOString(), dayKey: TRAINING_DAY,
   lightResult: "green", suggestedLight: "green", outcomeVersion: outcome.OUTCOME_VERSION,
   xpVersion: 5, roundsDone: 0, roundsPlanned: 3, expectedWork: 10, completedFully: false,
   durationSecs: 600, ledger: Array.from({ length: 10 }, (_, i) => ({
@@ -3765,7 +3795,7 @@ const atRatio = (ratio) => {
   const total = 100;
   const done = Math.round(total * ratio);
   return {
-    isoDate: new Date().toISOString(), dayKey: util.edmontonDayKey(), lightResult: "red",
+    isoDate: new Date().toISOString(), dayKey: TRAINING_DAY, lightResult: "red",
     outcomeVersion: outcome.OUTCOME_VERSION, xpVersion: 5, roundsDone: 0, roundsPlanned: 1,
     dayRoundsPlanned: 1, expectedWork: total, completedFully: false, durationSecs: 800,
     ledger: Array.from({ length: total }, (_, i) => ({
@@ -3781,7 +3811,9 @@ ok(store.outcomeOf(atRatio(0.75)).mainRoundsDone === 0, "and no main round is in
 
 localStorage.clear(); store.migrate();
 store.saveSession(atRatio(0.74));
-const shortText74 = JSON.stringify(tvm.buildTodayVM({ selectedDay: util.edmontonDayKey(), expanded: {}, isWide: true }));
+/* A training day, not today's key — see TRAINING_DAY. The Spa card has no
+   partial-day copy to find, so this read the rest-day card every Sunday. */
+const shortText74 = JSON.stringify(tvm.buildTodayVM({ selectedDay: TRAINING_DAY, expanded: {}, isWide: true }));
 ok(!/counts toward your streak/i.test(shortText74) && /saved/i.test(shortText74),
    "and Today says the work was saved without claiming the streak — the two screens agree");
 
@@ -4269,8 +4301,17 @@ store.setOnlineForTest(true);
    ===================================================================== */
 {
   localStorage.clear(); store.migrate();
-  const iso = new Date().toISOString();
-  const day = util.edmontonDayKey();
+  /* A training day, not today's key — see TRAINING_DAY. This block reads
+     `DAYS[day].blocks.warmup` and leaves it part-finished, and on a Sunday that
+     block is empty, so the fixture had no move to leave outstanding.
+
+     The date has to be the one that key actually falls on this week, not just
+     "now": the week strip files a session by DAY KEY but the grown-up's
+     consistency grid files it by ISO DATE, so a fixture whose key and date
+     disagree ticks one screen and not the other — which is the very agreement
+     these assertions exist to check. Noon UTC is safely mid-day in Edmonton. */
+  const day = TRAINING_DAY;
+  const iso = new Date(util.edmontonWeekISODates()[day] + "T12:00:00Z").toISOString();
   const frag = (id, ledger, extra) => ({
     app: "swimming", dayKey: day, dayTitle: "T", isoDate: iso, sessionType: "main",
     workoutInstanceId: id, xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION,
