@@ -114,4 +114,24 @@ store.saveSession(fullDay("2026-03-01T17:00:00.000Z", { mood: null }));
 ok(store.patchSession("2099-01-01T00:00:00.000Z|monday", { mood: "tired" }) === false, "an unknown key is refused");
 ok(store.loadSessions()[0].mood === null, "and the last row is not patched by accident");
 
+/* --- 8. A journey written by an earlier version of the app reads back whole ---
+   The oldest prizes predate ids; the amnesty pass keyed its wallet by id and
+   dropped them. And a row stamped under a rule that paid a per-landing bonus
+   keeps that bonus as training XP — the quiz-XP migration must not mistake
+   it for quiz XP folded in. */
+localStorage.clear();
+localStorage.setItem(store.LS_SESSIONS, JSON.stringify([
+  { dayKey: "monday", isoDate: "2026-08-20T20:00:00.000Z", completedFully: true, roundsDone: 3, xpEarned: 375, xpVersion: 4, cleanLandings: 3, durationSecs: 1500 },
+  { dayKey: "tuesday", isoDate: "2026-08-21T20:00:00.000Z", completedFully: true, roundsDone: 3, xpEarned: 390, xpVersion: 4, durationSecs: 1500 }]));
+localStorage.setItem(store.LS_JOURNEY, JSON.stringify({ xp: 4600, sessionXp: 4600, prizesWon: [{ label: "Movie night", when: 1700000000000 }], drawLevel: 18, pendingDraws: 0 }));
+store.migrate();
+const legacyRows = store.loadSessions();
+ok(legacyRows[0].xpEarned === 375 && !legacyRows[0].quizXp, "a row stamped with a landing bonus keeps it as training XP");
+ok(legacyRows[1].xpEarned === 360 && legacyRows[1].quizXp === 30, "a row with quiz XP folded in still has it moved out");
+const legacyJ = store.loadJourney();
+ok(legacyJ.prizesWon.length === 1 && legacyJ.prizesWon[0].id != null && legacyJ.prizesWon[0].label === "Movie night",
+   "an id-less legacy prize is kept and given an id, not dropped");
+ok(legacyJ.maxLevelSeen === 18, "the earlier ledger's high-water level is carried across");
+localStorage.clear();
+
 console.log("✓ integrity passed (" + passed + " assertions)");

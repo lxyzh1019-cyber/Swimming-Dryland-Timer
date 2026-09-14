@@ -1740,7 +1740,11 @@ export function migrateQuizXp() {
     if (!s || s.xpVersion !== 4 || s.quizXp != null || !Number.isFinite(s.xpEarned)) return;
     const rounds = s.mini ? 1 : Math.min(3, Math.max(1, s.roundsDone || 1));
     const base = V4[rounds] || 0;
-    const expected = s.completedFully ? base : Math.round(base / 2);
+    /* A row that recorded a per-landing bonus was paid it as TRAINING under
+       the rule it was written under, and keeps it: only what is left above
+       the flat rate and that bonus is quiz XP that was folded in. */
+    const bonus = Number.isFinite(s.landingBonus) ? s.landingBonus : 5 * (Number(s.cleanLandings) || 0);
+    const expected = (s.completedFully ? base : Math.round(base / 2)) + bonus;
     // Move the excess out of xpEarned rather than leaving it there: after this
     // every row in the log means the same thing by xpEarned.
     s.quizXp = Math.max(0, s.xpEarned - expected);
@@ -2454,6 +2458,18 @@ function migrateDrawLedger() {
   saveJourney(j);
 }
 
+/* A prize written before prizes carried ids. Nothing downstream can redeem,
+   merge or void a prize it cannot name, and the amnesty pass used to drop
+   id-less prizes outright — a wallet's oldest prize vanished on first boot. */
+function migratePrizeIds() {
+  const j = loadJourney();
+  if (!j || !Array.isArray(j.prizesWon)) return 0;
+  let n = 0;
+  j.prizesWon = j.prizesWon.map(p => (p && p.id == null) ? (n++, { ...p, id: prizeId() }) : p);
+  if (n) saveJourney(j);
+  return n;
+}
+
 export function migrate() {
   // merge any new default settings keys into the saved blob
   settings = loadSettings();
@@ -2465,6 +2481,7 @@ export function migrate() {
   migrateGateWeeks();
   migrateAthleteIdentity();
   migrateDrawLedger();
+  migratePrizeIds();
   if (loadJourney() == null) {
     const xp = settledTrainingXp(loadSessions());
     saveJourney({ xp, prizesWon: [], pendingDraws: 0, seededAt: Date.now() });
