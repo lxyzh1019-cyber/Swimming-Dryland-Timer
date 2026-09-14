@@ -68,16 +68,23 @@ same(finishVM.roundsLine, "3 of 3 main rounds",
   "the finish screen and the reports agree about the rounds — they used to say 3 of 3 and 2 of 3");
 
 /* --- put the day in the log and ask every screen --- */
-const today = util.edmontonDayKey();
+/* The day these fragments were actually TRAINED — the key runSession was given
+   above — not whatever weekday the suite happens to run on. Sunday is Spa, and
+   the Spa card prints no XP line at all ("No XP today — rest is part of the
+   plan"), so relabelling the workout to today's key made the assertion below
+   read the recovery card every Sunday and find "" where it wanted "+360 XP
+   earned". The ISO dates stay "now", which is what keeps the workout inside the
+   week-scoped views these screens are asked for. */
+const trainedDay = "tuesday";
 localStorage.clear(); store.migrate();
-[frag1, frag2].forEach((f, i) => store.saveSession({ ...f, dayKey: today,
+[frag1, frag2].forEach((f, i) => store.saveSession({ ...f, dayKey: trainedDay,
   isoDate: new Date(Date.now() - (1 - i) * 3600000).toISOString() }));
 store.rebuildJourneyXp();
 
 const journeyXp = (store.loadJourney() || {}).xp;
 same(journeyXp, 360, "one green day is worth 360 XP");
 
-const tv = tvm.buildTodayVM({ selectedDay: today, expanded: {}, isWide: true });
+const tv = tvm.buildTodayVM({ selectedDay: trainedDay, expanded: {}, isWide: true });
 same(tv.dayView.earnedXpLabel, "+360 XP earned",
   "Today quotes what the day was actually paid — it used to add the two stamps and print 450");
 same(tv.statChips[0].value, "1", "Today's streak chip counts the day once");

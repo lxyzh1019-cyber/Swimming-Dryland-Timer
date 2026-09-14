@@ -98,6 +98,21 @@ export function escapeRegex(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/* The text the coach actually SAYS, as opposed to the text on screen — display
+   names run through the pronunciation map first ("Pallof" → "Pal-off"). It
+   lives here rather than in audio.js because two things now need it and they
+   must never disagree: the live speech coach, and the offline renderer that
+   pre-generates clips. A pre-rendered clip is keyed by its spoken text, so if
+   the renderer and the runtime transformed a name differently the lookup would
+   silently miss and the move would fall back to the device voice. */
+export function speakableText(msg, map) {
+  let out = String(msg == null ? "" : msg);
+  for (const [word, pron] of Object.entries(map || {})) {
+    out = out.replace(new RegExp(escapeRegex(word), "gi"), pron);
+  }
+  return out;
+}
+
 export function escapeHtml(text) {
   return String(text == null ? "" : text)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
