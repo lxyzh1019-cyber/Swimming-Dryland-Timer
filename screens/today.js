@@ -257,7 +257,6 @@ function dayPane(vm, wide) {
           <span style="font-size:15px;line-height:1;">${vm.weather.icon}</span>
           <span style="font-size:13px;font-weight:900;">${wide ? vm.weather.caption + " " : ""}${vm.weather.temp}°</span>
         </div>
-        ${dv.showSettings ? `<button type="button" data-action="toggleCoachVoice" aria-label="Toggle coach voice" style="${vm.coachIconBtnStyle}">🎧</button>` : ""}
       </div>
     </div>
     <div style="font-family:var(--font-display);font-weight:600;font-size:${titleSize}px;line-height:1.${wide ? "05" : "1"};margin:12px 0 12px;">${dv.title}</div>

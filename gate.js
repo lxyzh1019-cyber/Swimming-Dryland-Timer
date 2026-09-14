@@ -92,6 +92,7 @@ export const GATE_REASON = {
   restoreBackup:  "write a backup over her live history",
   forgetPasskey:  "remove the grown-up passkey from this device",
   severity3:      "clear a pain report that changed how she moves",
+  rRetryCheck:    "clear a pain report that changed how she moves",
   lightOverride:  "override the light her body check produced",
   safetySettings: "change the safety settings",
   reviewPrizes:   "review the prizes marked used",

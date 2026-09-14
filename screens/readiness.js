@@ -99,16 +99,16 @@ function resultCard(vm, { areaLabel = "" } = {}) {
       <span style="font-size:14px;flex-shrink:0;line-height:1.45;" aria-hidden="true">🧑</span>
       <span style="font-size:13px;font-weight:800;color:var(--ink-soft);line-height:1.45;">${vm.suggestionLine}</span>
     </div>` : ""}
-    <div style="background:var(--surface-2);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:18px;">
-      <div style="font-size:12px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Coach suggests this light — a grown-up can change it:</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <details style="background:var(--surface-2);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:18px;"${vm.wasOverridden ? " open" : ""}>
+      <summary style="font-size:12px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;min-height:28px;"><span aria-hidden="true">🔒</span> Grown-up only — change today's light</summary>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
         ${vm.lightOptions.map(lo => `
           <button type="button" data-action="rPickLight" data-arg="${lo.key}" style="${lo.style}">
             <span style="font-size:18px;line-height:1;">${lo.emoji}</span>
             <span style="font-weight:800;font-size:13px;letter-spacing:0.02em;">${lo.label}</span>
           </button>`).join("")}
       </div>
-    </div>
+    </details>
     ${vm.needsGrownupConfirm ? `
     <button type="button" data-action="rGrownupOk" style="width:100%;display:flex;align-items:center;gap:12px;background:${vm.grownupConfirmed ? "var(--mint-wash)" : "var(--surface-2)"};border:2px solid ${vm.grownupConfirmed ? "var(--mint)" : "var(--hairline)"};border-radius:var(--radius-lg);padding:14px 16px;cursor:pointer;text-align:left;margin-bottom:14px;min-height:56px;">
       <span style="font-size:24px;flex-shrink:0;">${vm.grownupConfirmed ? "☑️" : "⬜"}</span>
@@ -117,7 +117,7 @@ function resultCard(vm, { areaLabel = "" } = {}) {
     <button type="button" ${vm.mayStart ? `data-action="rResultCta" data-arg="${c.action}"` : "disabled"} style="width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:${c.color};color:${c.text};border:none;border-radius:var(--radius-pill);padding:18px;font-family:var(--font-display);font-weight:600;font-size:22px;${vm.mayStart ? "cursor:pointer;box-shadow:0 5px 0 " + c.deep + ";" : "opacity:0.45;cursor:default;"}">
       <span style="font-size:22px;">${c.icon}</span> ${c.label}
     </button>
-    ${c.secondaryLabel ? `<button type="button" data-action="rResultSecondary" data-arg="${c.secondaryAction}" style="width:100%;background:none;border:none;cursor:pointer;font-weight:800;font-size:14px;color:var(--ink-soft);text-decoration:underline;padding:12px 6px 2px;min-height:44px;">${c.secondaryLabel}</button>` : ""}
+    ${c.secondaryLabel ? `<button type="button" data-action="${c.secondaryAction === "retry" ? "rRetryCheck" : "rResultSecondary"}" data-arg="${c.secondaryAction}" style="width:100%;background:none;border:none;cursor:pointer;font-weight:800;font-size:14px;color:var(--ink-soft);text-decoration:underline;padding:12px 6px 2px;min-height:44px;">${c.secondaryLabel}</button>` : ""}
   </div>`;
 }
 
