@@ -28,7 +28,7 @@ import { grownupScreen } from "./screens/grownup.js";
 import { requireGrownup, answerPin, choosePin, allowPinChoice, clearPinChoice,
          pinRefusalReason, gateMode, lockGate, gateUnlocked, unlockByPasskey,
          hasGrownupPin, isFreshDevice, PIN_MIN_DIGITS, PIN_MAX_DIGITS,
-         GATE_REASON, setBootstrapState, bootstrapState, gateNeedsOfflineSetup } from "./gate.js";
+         GATE_REASON, GATE_UNLOCK_MS, setBootstrapState, bootstrapState, gateNeedsOfflineSetup } from "./gate.js";
 import { passkeySupported, hasPasskey, enrollPasskey, verifyPasskey, forgetPasskey } from "./passkey.js";
 import { loadSessions } from "./store.js";
 import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS, recordFormVerdict, repairPrizeWallet, redeemedPrizesForReview, restorePrize } from "./store.js";
@@ -172,7 +172,46 @@ function overlaysHtml() {
   return html;
 }
 
+/* WHAT A FULL RE-RENDER WOULD LOSE, and how it is given back.
+
+   Every render replaces the whole page. That is the simplest possible model
+   and it has one cost: anything the DOM was holding that the state was not.
+   A half-typed athlete name, a prize being written, the caret position, the
+   scrolled position of a tab strip — a background render (the weather
+   arriving, a cloud restore finishing, the redeem-undo timer retiring a
+   button, a passkey ceremony completing) wiped all of them mid-keystroke.
+   Inputs are addressed by `data-input` (and `data-key` where one name covers a
+   row of fields), so the same field can be found again in the new page. */
+function captureFocus() {
+  const el = typeof document !== "undefined" ? document.activeElement : null;
+  if (!el || !el.dataset || !el.dataset.input || el.type === "file") return null;
+  return { input: el.dataset.input, key: el.dataset.key || "", value: el.value,
+           start: el.selectionStart, end: el.selectionEnd };
+}
+function captureScroll() {
+  return [...(root.querySelectorAll("[data-tab-scroll]") || [])].map(el => el.scrollLeft || 0);
+}
+function restoreView(focus, scroll) {
+  [...(root.querySelectorAll("[data-tab-scroll]") || [])].forEach((el, i) => { if (scroll[i]) el.scrollLeft = scroll[i]; });
+  if (!focus) return;
+  const sel = `[data-input="${focus.input}"]` + (focus.key ? `[data-key="${focus.key}"]` : "");
+  const el = root.querySelector(sel);
+  if (!el) return;
+  if (el.value !== focus.value) el.value = focus.value;
+  try {
+    el.focus({ preventScroll: true });
+    if (focus.start != null && typeof el.setSelectionRange === "function") el.setSelectionRange(focus.start, focus.end);
+  } catch (e) { /* a field that cannot take a selection (number inputs in some browsers) — the value is what matters */ }
+}
+
 export function render() {
+  const focus = captureFocus();
+  const scroll = captureScroll();
+  paint();
+  restoreView(focus, scroll);
+}
+
+function paint() {
   state.isWide = computeIsWide();
   if (state.readiness) { renderReadiness(); }
   else if (state.inSession) { renderSession(); }
@@ -274,10 +313,26 @@ export const actions = new Proxy(RAW, {
   get: (_t, name) => (typeof name === "string" ? (arg, el) => dispatch(name, arg, el) : undefined)
 });
 
+/* THE UNLOCK ENDS ON SCREEN, not at the next tap. gateUnlocked() answers by
+   the clock, so a page rendered while unlocked stayed up — Settings, the
+   backup button, the prize review — until something else caused a render,
+   however long after the five minutes that was. The timer repaints the moment
+   the unlock lapses; the repaint then shows the locked Zone, because the
+   screens ask gateUnlocked() themselves. Exported for the test that proves
+   the timer is armed on unlock and dropped on lock. */
+let gateTimer = null;
+function armGateExpiry() {
+  clearTimeout(gateTimer);
+  gateTimer = setTimeout(() => { gateTimer = null; if (!gateUnlocked()) render(); }, GATE_UNLOCK_MS + 250);
+}
+function dropGateExpiry() { clearTimeout(gateTimer); gateTimer = null; }
+export function gateExpiryArmed() { return gateTimer != null; }
+
 /* Close the challenge and re-run whatever she asked for, now that a grown-up is
    here. The re-run goes back through dispatch, so an unlock that somehow did not
    take cannot slip an action past. */
 function finishUnlock() {
+  if (gateUnlocked()) armGateExpiry();
   const p = state.pendingAction;
   state.gateAsk = null;
   state.gateError = "";
@@ -297,7 +352,7 @@ Object.assign(RAW, {
     // Leaving drops the unlock, so coming back asks again — the five-minute
     // expiry is a backstop, not the mechanism. (Getting IN is CHILD_MAY's job.)
     if (arg !== "grownup" && state.nav === "grownup") {
-      lockGate();
+      lockGate(); dropGateExpiry();
       state.prizeReviewOpen = false;
       state.walletRepairNote = ""; state.backupNote = "";
     }
@@ -818,7 +873,7 @@ function leaveSession({ keepDay = false } = {}) {
   state.nav = "today";
   if (!keepDay) state.selectedDay = edmontonDayKey();
   // The unlock does not follow her back out of the Grown-up Zone.
-  lockGate();
+  lockGate(); dropGateExpiry();
   state.gateAsk = null; state.prizeReviewOpen = false;
   render();
 }
