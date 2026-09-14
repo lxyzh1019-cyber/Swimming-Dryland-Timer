@@ -15,7 +15,10 @@ the **Splash — Kids Swim Training** design system.
 - **Session** — guided timer with a real speech coach (cues, counts, tempo
   reps), portrait form-photo slots, STOP rule overlay, clean/wobbly checks,
   "◀ Back a move" (redo the previous move; not across a counted round),
-  mood + reflection on the complete screen
+  mood + reflection on the complete screen. A tap during the coach's
+  announcement starts the move; the red STOP asks whether something hurts
+  before it costs her anything — a plain "just stopping" is paid for the
+  rounds she trained
 - **Explore the moves** — the same session screen with nothing counting
   down: every move once, advanced by tap, no Body Check, nothing recorded
 - **Progress** — streaks, prize wallet, milestones, training log, Ocean Story

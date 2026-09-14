@@ -224,7 +224,11 @@ const CHILD_MAY = {
   // Turning the safety voice back ON never needs a grown-up. Turning it off does.
   toggleSafetyVoice: () => settings.safetyVoiceOn === false,
   // Withdrawing a severity-3 confirmation is always allowed; giving one is not.
-  rGrownupOk: () => !!(state.readiness && state.readiness.grownupOk)
+  rGrownupOk: () => !!(state.readiness && state.readiness.grownupOk),
+  // "Rest 1–2 min, then re-check" wipes the marks. A mild report (1–2) is hers
+  // to redo; a severity-3 report is a pain record a grown-up has to see, and
+  // clearing it used to be one ungated tap on the same button.
+  rRetryCheck: () => { const s = Number(state.readiness && state.readiness.severity) || 0; return s > 0 && s < 3; }
 };
 
 function childMay(name, arg) {
@@ -422,7 +426,9 @@ Object.assign(RAW, {
   rResultCta(arg) {
     const r = state.readiness;
     if (arg === "back") { state.readiness = null; render(); return; }
-    if (arg === "retry") { resetBodyCheck(r); render(); return; }
+    // Re-checking goes back through dispatch, so the severity-3 rule applies
+    // however the retry was reached.
+    if (arg === "retry") { dispatch("rRetryCheck"); return; }
     /* THE SAFETY GATE, IN THE TRANSITION AND NOT ONLY IN THE MARKUP.
 
        A severity-3 body check needs a grown-up to say so before she trains.
@@ -452,8 +458,13 @@ Object.assign(RAW, {
                           suggestedLight: suggested, readiness: check });
   },
   rResultSecondary(arg) {
-    if (arg === "retry") { resetBodyCheck(state.readiness); render(); }
+    if (arg === "retry") dispatch("rRetryCheck");
     else { state.readiness = null; render(); }
+  },
+  rRetryCheck() {
+    if (!state.readiness) return;
+    resetBodyCheck(state.readiness);
+    render();
   },
 
   /* ---- session controls (delegate to the engine) ---- */
@@ -462,7 +473,7 @@ Object.assign(RAW, {
   skipEx() { engine.skipCurrentExercise(); },
   stopNow() { engine.openStopOverlay(); },
   resumeFromStop() { engine.resumeFromStop(); },
-  endFromStop() { engine.endFromStop(); },
+  endFromStop(arg) { engine.endFromStop(arg || "pain"); },
   askEnd() { engine.sess.confirmEnd = true; render(); },
   cancelEnd() { engine.sess.confirmEnd = false; render(); },
   confirmEndEarly() { engine.endEarly(); },

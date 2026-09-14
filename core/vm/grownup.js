@@ -333,20 +333,33 @@ export function buildGrownupVM(state) {
     barStyle: "width:9px;height:" + Math.max(3, Math.round((w.mins / loadMax) * 92)) + "px;border-radius:5px 5px 0 0;background:" + (i === loadBars.length - 1 ? "var(--sun)" : "var(--aqua)") + ";" + (w.mins === 0 ? "opacity:0.3;" : "")
   }));
 
-  /* ---- ACWR (acute:chronic workload ratio) — kept from the old Coach Insights ---- */
-  const acute = minsBetween(now - 7 * DAY_MS, now + DAY_MS);
-  const chronicWeekly = minsBetween(now - 28 * DAY_MS, now + DAY_MS) / 4;
+  /* ---- ACWR (acute:chronic workload ratio) — kept from the old Coach Insights ----
+     Training minutes only: a recovery pass and a pain stop are care and safety,
+     not load, and counting them made a sore week look like a hard one. The
+     windows are the textbook 7 and 28 days ending now; they used to run to
+     tomorrow (8 days against 29 ÷ 4), a quiet inflation of every ratio. */
+  const trainingMinsBetween = (from, to) => all.filter(s => {
+    const t = new Date(s.isoDate).getTime();
+    if (t < from || t >= to) return false;
+    const st = outcomeOf(s).state;
+    return st === "complete" || st === "partial";
+  }).reduce((a, s) => a + mins(s), 0);
+  const acute = trainingMinsBetween(now - 7 * DAY_MS, now);
+  const chronicWeekly = trainingMinsBetween(now - 28 * DAY_MS, now) / 4;
   // A ratio over a near-empty chronic window reads as a scary spike — require
-  // ~2 weeks of history before showing a number.
-  const oldestT = all.length ? new Date(all[0].isoDate).getTime() : now;
+  // 2 weeks of history before showing a number.
+  // The OLDEST row, wherever it sits: a cloud restore can merge rows in any
+  // order, and reading the first one as the oldest hid the ratio behind
+  // "needs history" for an athlete with months of it.
+  const oldestT = all.length ? Math.min(...all.map(s => new Date(s.isoDate).getTime())) : now;
   const acwr = (chronicWeekly > 0 && now - oldestT >= 14 * DAY_MS) ? acute / chronicWeekly : null;
   const acwrView = acwr == null
-    ? { value: "—", label: "Needs ~4 weeks of history", color: "var(--ink-faint)", note: "The acute:chronic workload ratio compares this week's minutes to the 4-week average. It fills in as history builds." }
+    ? { value: "—", label: "Needs 2 weeks of history", color: "var(--ink-faint)", note: "The acute:chronic workload ratio compares the last 7 days' training minutes to the 28-day weekly average. It fills in after two weeks of history." }
     : {
       value: acwr.toFixed(2),
       label: acwr < 0.8 ? "Undertraining zone" : acwr <= 1.3 ? "Sweet spot (0.8–1.3)" : acwr <= 1.5 ? "Caution — ramping fast" : "High spike — back off",
       color: acwr >= 0.8 && acwr <= 1.3 ? "var(--mint-ink)" : acwr <= 1.5 ? "var(--sun-ink)" : "var(--stop)",
-      note: "This week: " + Math.round(acute) + " min vs " + Math.round(chronicWeekly) + " min/week 4-week average. 0.8–1.3 is the safe growth band."
+      note: "Last 7 days: " + Math.round(acute) + " min of training vs " + Math.round(chronicWeekly) + " min/week over 28 days. Recovery and safety stops are left out. 0.8–1.3 is the safe growth band."
     };
 
   /* ---- pace (planned vs actual, last 5 sessions in scope) ---- */

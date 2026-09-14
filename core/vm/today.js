@@ -74,11 +74,18 @@ export function weekStatuses() {
   const workouts = workoutInstances(trained);
   const doneKeys = new Set(workouts.filter(isWholeDay).map(w => w.dayKey).filter(Boolean));
   const partialKeys = new Set(workouts.filter(w => !isWholeDay(w)).map(w => w.dayKey).filter(Boolean));
+  /* A weekday whose light came out Recovery, and whose recovery pass she
+     finished, is a rest day she earned by reporting honestly — the same thing
+     Sunday is. It is not training, so it never reaches `trained`, and it used
+     to fall through to "missed" and a CATCH UP badge: the app told her she had
+     skipped the day it had itself told her not to train. */
+  const restKeys = new Set(sessions.filter(s => outcomeOf(s).state === "recovery").map(s => s.dayKey).filter(Boolean));
   const todayIdx = WEEK_ORDER.indexOf(todayKey);
   const out = {};
   WEEK_ORDER.forEach((k, i) => {
     if (doneKeys.has(k)) out[k] = "done";
     else if (partialKeys.has(k)) out[k] = "partial";
+    else if (restKeys.has(k) && k !== todayKey) out[k] = "rest";
     else if (k === todayKey) out[k] = "today";
     else if (i < todayIdx) out[k] = DAYS[k].spa ? "rest" : "missed";
     else out[k] = DAYS[k].spa ? "rest" : "future";
