@@ -122,7 +122,10 @@ export function buildGrownupVM(state) {
   const done = trainingRows.filter(w => w.outcome.state === "complete");
   const days = scopeDays(scope, all);
   const scheduled = scope === "week" ? days : Math.round(days);   // plan trains daily (Sun = recovery)
-  const totalMins = trainingFrags.reduce((a, s) => a + mins(s), 0);
+  /* Summed in seconds and rounded ONCE. Rounding each sitting to minutes
+     first let a day trained in two goes read a minute short of the workout
+     Progress reports, and the two boards are meant to agree. */
+  const totalMins = Math.round(trainingFrags.reduce((a, s) => a + (s.durationSecs || 0), 0) / 60);
   // Adherence is "how many of the days she was meant to train did she train",
   // so it counts DAYS, not records. Counting records let two attempts at one
   // Tuesday read as two days of adherence — and pushed the figure over 100%

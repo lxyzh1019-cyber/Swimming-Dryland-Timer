@@ -44,6 +44,12 @@ export const STORAGE_KEYS = {
   grownupPasskey: "swim_grownup_passkey_v1"
 };
 
+/* Journey documents an earlier mirror wrote under a key that is not an
+   athlete's — the part after "journey-". Read and merged on every sync so the
+   ledger they hold is never stranded; never written to. Empty when there
+   were none. */
+export const LEGACY_JOURNEY_KEYS = [];
+
 /* How the plan names its sport-specific parts. */
 export const SKILL_BLOCK = "swimskill";         // the technique block that survives every light
 export const TRANSFER_FIELD = "swimTransfer";   // on a move: the skill it builds

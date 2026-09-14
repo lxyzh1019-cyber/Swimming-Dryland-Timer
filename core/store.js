@@ -2442,6 +2442,18 @@ export function migrateAudioSettings() {
   return true;
 }
 
+/* A journey written by an earlier draw ledger carried the highest level it
+   had ever seen as `drawLevel`. The current ledger derives everything a draw
+   depends on from `maxLevelSeen`, so the high-water mark is carried across
+   once; without it a wallet earned at level eighteen would be measured
+   against the level the athlete happens to hold today. */
+function migrateDrawLedger() {
+  const j = loadJourney();
+  if (!j || j.maxLevelSeen != null || !Number.isFinite(j.drawLevel)) return;
+  j.maxLevelSeen = Math.max(1, Math.floor(j.drawLevel));
+  saveJourney(j);
+}
+
 export function migrate() {
   // merge any new default settings keys into the saved blob
   settings = loadSettings();
@@ -2452,6 +2464,7 @@ export function migrate() {
   migrateQuizXp();
   migrateGateWeeks();
   migrateAthleteIdentity();
+  migrateDrawLedger();
   if (loadJourney() == null) {
     const xp = settledTrainingXp(loadSessions());
     saveJourney({ xp, prizesWon: [], pendingDraws: 0, seededAt: Date.now() });
