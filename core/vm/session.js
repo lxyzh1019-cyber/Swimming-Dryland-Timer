@@ -4,7 +4,8 @@
    ============================================================ */
 
 import { sess, refTime, screenRepsDetail, pausedByBackground, canGoBack } from "../engine.js";
-import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, exWork, videoSearchUrl } from "../data.js";
+import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, SESSION_QUIZ, exWork, videoSearchUrl } from "../data.js";
+import { SKILL_BLOCK, COPY } from "../sport.js";
 import { fmtMMSS, exercisePhotoUrl, plural } from "../util.js";
 import { loadSessions } from "../store.js";
 import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION } from "../outcome.js";
@@ -34,33 +35,6 @@ const MOOD_ACK = {
 const REFLECT_WELL = ["My breathing", "Strong holds", "Clean form", "Staying focused"];
 const REFLECT_NEXT = ["Slow down", "Breathe out loud", "Point my toes", "Keep core tight"];
 
-// Coach's Quiz — connects today's land work to the pool.
-const QUIZ = [
-  { id: "superman", q: "Why do we practice Superman holds on land?", why: "A strong Superman hold = a strong streamline off every wall.", opts: [
-    { t: "To get better at flying", ok: false },
-    { t: "To build a long, tight streamline for push-offs", ok: true },
-    { t: "To make our arms tired", ok: false } ] },
-  { id: "squat", q: "Squats make your legs stronger. Where does that power show up in the pool?", why: "Every start and turn is a jump — leg power is pool speed.", opts: [
-    { t: "Faster starts and turns off the block and wall", ok: true },
-    { t: "Comfier goggles", ok: false },
-    { t: "Louder splashing", ok: false } ] },
-  { id: "clean", q: "Why does Coach say “slow and clean beats fast and sloppy”?", why: "Your body learns the shape you practice — so practice the good one.", opts: [
-    { t: "Because slow is easier", ok: false },
-    { t: "Clean shapes on land become clean strokes in the water", ok: true },
-    { t: "So the timer lasts longer", ok: false } ] },
-  { id: "core", q: "Why do we brace our core (like a strong tube) during land work?", why: "A braced core stops your middle from bending, so your push and pull don't leak power.", opts: [
-    { t: "So you can hold your breath longer", ok: false },
-    { t: "A stiff middle sends leg and arm power straight down the pool", ok: true },
-    { t: "To look tough", ok: false } ] },
-  { id: "balance", q: "Balance moves (like Single-Leg Balance) — what do they build for swimming?", why: "Steady hips and ankles keep your body straight and long instead of wobbling and slowing down.", opts: [
-    { t: "A stable, straight body line that glides instead of wobbles", ok: true },
-    { t: "Bigger splashes", ok: false },
-    { t: "Faster blinking", ok: false } ] },
-  { id: "toes", q: "Why do we point our toes in kicking-shape drills on land?", why: "Pointed toes make your foot a longer paddle, so each kick pushes more water.", opts: [
-    { t: "It looks like ballet", ok: false },
-    { t: "Pointed feet act like paddles — more push per kick", ok: true },
-    { t: "It keeps your socks on", ok: false } ] }
-];
 
 /* The day's Coach's Quiz question. Rotates as the training log grows (not fixed
    per weekday), so the completion quiz stays fresh instead of repeating. Both
@@ -68,7 +42,7 @@ const QUIZ = [
    the displayed question and the XP-awarding question always match. */
 export function sessionQuizFor(dayKey) {
   const n = (dayKey ? String(dayKey).length : 0) + loadSessions().length;
-  return QUIZ[n % QUIZ.length];
+  return SESSION_QUIZ[n % SESSION_QUIZ.length];
 }
 
 export function buildSessionVM(state) {
@@ -217,17 +191,17 @@ export function buildSessionVM(state) {
   const timerIsReps = phase === "reps";
   const timerIsTime = !timerIsReps && !isPrompt;
 
-  const bzMap = { warmup: "warmup", coordination: "work", main: "work", prep: "work", finisher: "rest", swimskill: "rest", recovery: "rest" };
+  const bzMap = { warmup: "warmup", coordination: "work", main: "work", prep: "work", finisher: "rest", [SKILL_BLOCK]: "rest", recovery: "rest" };
   const pzMap = { work: bzMap[circuit.block] || "work", rest: "rest", roundRest: "evening", sectionRest: "evening", sideswitch: "rest", getready: "warmup", greeting: "warmup", breath: "rest" };
   const timerZoneType = pzMap[phase] || "work";
   const timerZone = ({ work: "WORK", rest: "REST", roundRest: "ROUND REST", sectionRest: "SECTION REST",
     sideswitch: "SWITCH", getready: "READY", greeting: "READY", breath: "BREATHE" })[phase] || "WORK";
   const timerUrgent = sess.urgent && phase !== "roundRest" && phase !== "sectionRest";
 
-  const bvMap = { warmup: "sun", coordination: "sun", main: "aqua", prep: "grape", finisher: "mint", swimskill: "sea", recovery: "grape" };
+  const bvMap = { warmup: "sun", coordination: "sun", main: "aqua", prep: "grape", finisher: "mint", [SKILL_BLOCK]: "sea", recovery: "grape" };
   const blockBadgeVariant = bvMap[circuit.block] || "aqua";
   const blockLabel = ({ warmup: "Warm-Up 🔥", coordination: "Coordination ⚡", main: "Main Circuit 💪",
-    prep: "Prep Pair 🎯", finisher: "Finisher 🏁", swimskill: "Swim-Skill 🏊", recovery: "Recovery ❄️" })[circuit.block] || circuit.name || "";
+    prep: "Prep Pair 🎯", finisher: "Finisher 🏁", [SKILL_BLOCK]: COPY.skillBlockLabel + " " + BLOCK_META[SKILL_BLOCK].emoji, recovery: "Recovery ❄️" })[circuit.block] || circuit.name || "";
   const roundLabelText = circuit.block === "main" && circuit.rounds > 1 ? ("Round " + sess.round + " of " + circuit.rounds) : "";
 
   const stageTitle =
@@ -251,7 +225,7 @@ export function buildSessionVM(state) {
   // (exStatus keys are per-exercise and top out below rounds × exercises).
   const totalExCount = circuits.reduce((acc, c) => acc + c.exercises.length * c.rounds, 0);
   const doneCount = sess.exDone || 0;
-  const secNames = { warmup: "Warm-Up", coordination: "Coordination", main: "Main", prep: "Prep", finisher: "Finisher", swimskill: "Swim-Skill", recovery: "Recovery" };
+  const secNames = { warmup: "Warm-Up", coordination: "Coordination", main: "Main", prep: "Prep", finisher: "Finisher", [SKILL_BLOCK]: COPY.skillBlockLabel, recovery: "Recovery" };
   const progressLabel = (secNames[circuit.block] || "") + " · " + Math.min(sess.ei + 1, circuit.exercises.length) + " of " + circuit.exercises.length;
   const sessionTimePct = Math.min(100, Math.round(sess.elapsed / Math.max(1, sess.plannedSecs) * 100));
   const roundLine = (circuit.rounds || 1) > 1 ? ((circuit.name || "") + " · Round " + sess.round + " of " + circuit.rounds) : "";
@@ -260,7 +234,7 @@ export function buildSessionVM(state) {
   })) : [];
 
   // Exercise timeline (left pane list)
-  const BLOCK_COLORS = { warmup: "var(--coral)", coordination: "var(--sun-ink)", main: "var(--sea)", prep: "var(--grape)", finisher: "var(--mint-ink)", swimskill: "var(--aqua-ink)", recovery: "var(--grape)" };
+  const BLOCK_COLORS = { warmup: "var(--coral)", coordination: "var(--sun-ink)", main: "var(--sea)", prep: "var(--grape)", finisher: "var(--mint-ink)", [SKILL_BLOCK]: "var(--aqua-ink)", recovery: "var(--grape)" };
   const sessionExList = [];
   circuits.forEach((c, ci) => {
     sessionExList.push({ isHeader: true, name: c.name + (c.rounds > 1 ? ` ×${c.rounds}` : ""), color: BLOCK_COLORS[c.block] || "var(--ink-soft)" });
@@ -325,7 +299,7 @@ export function buildSessionVM(state) {
     detailOverlay: state.detailOverlay,
     detailName: de.name || "", detailDose: de.dose || "", detailCue: de.cue || "",
     detailWatchFor: de.parentWatch || "", detailFix: de.redFlag || de.fix || "",
-    detailSwim: de.swimTransfer || "",
+    detailTransfer: de.transfer || "",
     // The repo holds 39 "- Timer Image.png" files and zero "- Demo Image.png",
     // so asking for a demo photo guaranteed the placeholder on every move.
     detailPhotoUrl: exercisePhotoUrl(de.name, "Demo"),
@@ -375,7 +349,7 @@ export function buildSessionVM(state) {
     curExName: ex.name || "", curExDose,
     curExCue: isResting ? sess.restCue : (ex.cue || ""),
     curExWatchFor: ex.parentWatch || "", curExFix: ex.redFlag || "",
-    curExSwim: ex.swimTransfer || "",
+    curExTransfer: ex.transfer || "",
     curExPhotoUrl: exercisePhotoUrl(ex.name || "rest", "Timer"),
     exActualDisplay: fmtMMSS(curActual), exPlannedDisplay: fmtMMSS(curPlanned),
     exPacePct: Math.round((curPlanned > 0 ? Math.min(1, curActual / curPlanned) : 0) * 100),

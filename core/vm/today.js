@@ -1,10 +1,11 @@
 /* ============================================================
    TODAY view-model — port of the design prototype's renderVals
-   Today slice, fed by real data: DAYS content, swim_sessions_v2
-   history, swim_journey_v1 XP, and live Edmonton dates.
+   Today slice, fed by real data: DAYS content, session
+   history, journey XP, and live Edmonton dates.
    ============================================================ */
 
-import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, levelCost, fmtXp, overloadWeek } from "../data.js";
+import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, RANK_LORE, BLOCK_META, levelCost, fmtXp, overloadWeek } from "../data.js";
+import { SKILL_BLOCK, ATHLETE_DEFAULT, COPY } from "../sport.js";
 import { settings, loadSessions, loadJourney, levelFromXp, currentStreakOf, loadDayProgress, countsAsTrained, settledXpByDate, outcomeOf } from "../store.js";
 import { workoutInstances } from "../outcome.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
@@ -206,17 +207,15 @@ export function buildJourney() {
     return d;
   };
 
-  const chapter = ({
-    "Seahorse": "CHAPTER 1 · THE SHALLOWS", "Sea Turtle": "CHAPTER 1 · THE SHALLOWS",
-    "Penguin": "CHAPTER 2 · THE OPEN WATER", "Sea Otter": "CHAPTER 2 · THE OPEN WATER",
-    "Stingray": "CHAPTER 3 · THE DEEP REEF", "Dolphin": "CHAPTER 3 · THE DEEP REEF",
-    "Shark": "CHAPTER 4 · THE BLUE", "Orca": "CHAPTER 4 · THE BLUE",
-    "Sailfish": "CHAPTER 5 · THE CHAMPIONSHIP CURRENT", "Marlin": "CHAPTER 5 · THE CHAMPIONSHIP CURRENT"
-  })[currentRank.name] || "CHAPTER 1 · THE SHALLOWS";
+  /* One source for a rank's chapter: the lore card that teaches it. A map
+     that listed the first ten ranks by name sent every rank past the tenth
+     back to chapter 1 on the journey card. */
+  const chapterOf = name => String(((RANK_LORE[name] || {}).chapter) || "").toUpperCase();
+  const chapter = chapterOf(currentRank.name) || chapterOf(LADDER[0].name);
 
   return {
     // At the summit there is no next rank. Naming the current rank as the
-    // "next" one would tell a kid who already IS Ocean Legend that they're
+    // "next" one would tell a kid who already holds the top rank that they're
     // still chasing it.
     level, rankName: currentRank.name, atSummit: !nextRank,
     nextRankName: nextRank ? nextRank.name : null,
@@ -265,7 +264,7 @@ export function buildTodayVM(state) {
     { key: "coordination", icon: "⚡", label: "Coordination" },
     { key: "main", icon: "💪", label: "Main" },
     { key: "finisher", icon: "🏁", label: "Finisher" },
-    { key: "swimskill", icon: "🏊", label: "Swim-Skill" }
+    { key: SKILL_BLOCK, icon: BLOCK_META[SKILL_BLOCK].emoji, label: COPY.skillBlockLabel }
   ];
   const selDayFull = DAYS[selectedKey] || {};
   const selDayBlocksRaw = selDayFull.blocks || {};
@@ -282,7 +281,7 @@ export function buildTodayVM(state) {
       isBlockDone: doneBlocks.includes(bd.key),
       moves: exs.map(e => ({
         text: e.name + " · " + e.dose, cue: e.cue,
-        swimTransfer: e.swimTransfer || ""
+        transfer: e.transfer || ""
       })),
       rot: open ? 180 : 0,
       bodyStyle: open
@@ -515,7 +514,7 @@ export function buildTodayVM(state) {
     + " · " + now.toLocaleDateString("en-US", { timeZone: "America/Edmonton", month: "long", day: "numeric" })
     + " · Week " + overloadWeek();
 
-  const weather = state.weather || { icon: "☀️", temp: "–", caption: "Pool day!" };
+  const weather = state.weather || { icon: "☀️", temp: "–", caption: COPY.weatherCaption };
 
   const railNav = (active) => ({
     iconWrap: active ? "width:52px;height:52px;border-radius:18px;background:var(--aqua-wash);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px var(--aqua-light);" : "width:52px;height:52px;display:flex;align-items:center;justify-content:center;opacity:0.55;",
@@ -525,7 +524,7 @@ export function buildTodayVM(state) {
   });
 
   return {
-    athleteName: settings.athleteName || "Jess",
+    athleteName: settings.athleteName || ATHLETE_DEFAULT,
     dateLine, statChips, journey, blocks, week, legend, dayView,
     gearLabel, focusCue, coachIconBtnStyle, practiceLinkLabel, practiceHintLine, practiceBtnStyle,
     echoLine, weather,

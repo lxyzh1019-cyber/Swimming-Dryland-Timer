@@ -5,6 +5,7 @@
    ============================================================ */
 
 import { PRIZE_POOL } from "../data.js";
+import { COPY, IMAGES } from "../sport.js";
 import { settings, loadQuiz, saveQuiz, logEvent, addXp, addPrize, pendingDrawCount, drawIsWaitingOnSync,
          movePool, rankPool, questionBank, quizPaidToday, quizBankStatus,
          quizQuestionKey, payQuizQuestion } from "../store.js";
@@ -14,9 +15,9 @@ import { todayISODate, escapeHtml } from "../util.js";
    The move pool, the question bank and the XP ledger rules live in store.js
    so the grown-up view-model can read mastery without importing a screen. */
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-/* Ocean-chapter questions. The distractors come from OTHER ranks' stories, so
+/* Rank-chapter questions. The distractors come from OTHER ranks' stories, so
    a wrong answer is still a real chapter she has read — the question tests
-   whether she knows which sea friend taught her what, not whether she can spot
+   whether she knows which rank taught her what, not whether she can spot
    the one made-up option. */
 function makeRankQ(rank, kind, ranks) {
   const field = kind === "story" ? "skill" : "fact";
@@ -25,8 +26,8 @@ function makeRankQ(rank, kind, ranks) {
   const correct = rank[field];
   const opts = shuffle([{ t: correct, ok: true }, ...distractors.map(d => ({ t: d, ok: false }))]);
   const prompt = kind === "story"
-    ? ("You earned " + rank.icon + " " + rank.rank + ". What does that rank teach you about swimming?")
-    : ("Every sea friend comes with one true fact. Which one belongs to " + rank.icon + " " + rank.rank + "?");
+    ? ("You earned " + rank.icon + " " + rank.rank + ". " + COPY.rankQuizStory)
+    : (COPY.rankQuizFact + " " + rank.icon + " " + rank.rank + "?");
   return {
     move: rank.name, block: "story", kind,
     tag: kind === "story" ? "YOUR RANK" : "TRUE STORY",
@@ -78,7 +79,7 @@ export function answerQuizDeck(qd, i) {
   qd.picks[qd.idx] = i;
   const q = qd.qs[qd.idx];
   const ok = !!(q.opts[i] && q.opts[i].ok);
-  // per-move mastery record (swim_quiz_v1)
+  // per-move mastery record (the quiz record)
   const quiz = loadQuiz();
   const item = quiz.items[q.move] || { right: 0, wrong: 0, seen: 0 };
   item.seen += 1; if (ok) item.right += 1; else item.wrong += 1;
@@ -156,7 +157,7 @@ export function quizDeckHtml(qd) {
     <div style="position:fixed;inset:0;z-index:80;background:linear-gradient(180deg,var(--aqua-wash),var(--bg));display:flex;flex-direction:column;align-items:center;padding:20px;box-sizing:border-box;overflow-y:auto;">
       <div style="width:100%;max-width:620px;display:flex;flex-direction:column;gap:16px;">
         <div style="background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-lift);padding:26px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;">
-          <img src="assets/swim-marlin.png" style="width:96px;height:96px;object-fit:contain;" alt="">
+          <img src="${IMAGES.mascot}" style="width:96px;height:96px;object-fit:contain;" alt="">
           <div style="font-family:var(--font-display);font-weight:600;font-size:30px;color:var(--ink);">Quiz complete!</div>
           <div style="font-family:var(--font-display);font-weight:600;font-size:48px;color:var(--aqua);line-height:1;">${score} / ${qd.qs.length} correct</div>
           <div style="font-family:var(--font-hand);font-size:22px;font-weight:700;color:var(--aqua-ink);">${scoreVerdict}</div>

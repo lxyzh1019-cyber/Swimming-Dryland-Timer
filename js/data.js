@@ -1004,3 +1004,32 @@ export const POSES = {
   seeyou: "assets/poses/seeyou.png",
   remember: "assets/poses/remember.png"
 };
+
+/* Coach's Quiz — the questions the finish screen asks, connecting today's
+   land work to the sport. Rotated by core/vm/session.js sessionQuizFor(). */
+export const SESSION_QUIZ = [
+  { id: "superman", q: "Why do we practice Superman holds on land?", why: "A strong Superman hold = a strong streamline off every wall.", opts: [
+    { t: "To get better at flying", ok: false },
+    { t: "To build a long, tight streamline for push-offs", ok: true },
+    { t: "To make our arms tired", ok: false } ] },
+  { id: "squat", q: "Squats make your legs stronger. Where does that power show up in the pool?", why: "Every start and turn is a jump — leg power is pool speed.", opts: [
+    { t: "Faster starts and turns off the block and wall", ok: true },
+    { t: "Comfier goggles", ok: false },
+    { t: "Louder splashing", ok: false } ] },
+  { id: "clean", q: "Why does Coach say “slow and clean beats fast and sloppy”?", why: "Your body learns the shape you practice — so practice the good one.", opts: [
+    { t: "Because slow is easier", ok: false },
+    { t: "Clean shapes on land become clean strokes in the water", ok: true },
+    { t: "So the timer lasts longer", ok: false } ] },
+  { id: "core", q: "Why do we brace our core (like a strong tube) during land work?", why: "A braced core stops your middle from bending, so your push and pull don't leak power.", opts: [
+    { t: "So you can hold your breath longer", ok: false },
+    { t: "A stiff middle sends leg and arm power straight down the pool", ok: true },
+    { t: "To look tough", ok: false } ] },
+  { id: "balance", q: "Balance moves (like Single-Leg Balance) — what do they build for swimming?", why: "Steady hips and ankles keep your body straight and long instead of wobbling and slowing down.", opts: [
+    { t: "A stable, straight body line that glides instead of wobbles", ok: true },
+    { t: "Bigger splashes", ok: false },
+    { t: "Faster blinking", ok: false } ] },
+  { id: "toes", q: "Why do we point our toes in kicking-shape drills on land?", why: "Pointed toes make your foot a longer paddle, so each kick pushes more water.", opts: [
+    { t: "It looks like ballet", ok: false },
+    { t: "Pointed feet act like paddles — more push per kick", ok: true },
+    { t: "It keeps your socks on", ok: false } ] }
+];

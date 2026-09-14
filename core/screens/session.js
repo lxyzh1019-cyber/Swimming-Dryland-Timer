@@ -1,3 +1,5 @@
+import { POSES } from "../data.js";
+import { COPY, IMAGES } from "../sport.js";
 /* ============================================================
    SESSION screen — full-screen takeover, wide + narrow, plus a
    targeted per-second updater (updateSessionTick) so the screen
@@ -16,7 +18,7 @@ function timerRing(vm, size) {
   const color = vm.timerUrgent ? "var(--stop)" : (RING_ZONE_COLOR[vm.timerZoneType] || "var(--aqua)");
   const offset = c * (1 - Math.max(0, Math.min(1, vm.timerProgress)));
   return `
-  <div data-action="advance" title="Tap the ring when you're done" style="flex:0 1 ${size}px;max-width:${size}px;min-width:${size >= 300 ? 200 : 140}px;aspect-ratio:1;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;${vm.timerUrgent ? "animation:splash-pulse-ring 1s ease-in-out infinite;" : ""}">
+  <div data-action="advance" title="Tap the ring when you're done" style="flex:0 1 ${size}px;max-width:${size}px;min-width:${size >= 300 ? 200 : 140}px;aspect-ratio:1;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;${vm.timerUrgent ? "animation:pulse-ring 1s ease-in-out infinite;" : ""}">
     <svg width="100%" height="100%" viewBox="0 0 ${size} ${size}" preserveAspectRatio="xMidYMid meet" style="transform:rotate(-90deg);position:absolute;inset:0;">
       <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="var(--surface)" stroke="var(--surface-2)" stroke-width="${stroke}"></circle>
       <circle id="s-ring-arc" cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
@@ -56,7 +58,7 @@ function promptCard(vm, size) {
   if (vm.phase === "microloop") {
     return `
     <div style="flex:0 1 ${size}px;max-width:${size}px;min-width:240px;min-height:${Math.round(size * 0.8)}px;border-radius:26px;background:var(--aqua-wash);border:3px solid var(--aqua);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;box-sizing:border-box;">
-      <img src="assets/poses/think.png" alt="" style="height:70px;object-fit:contain;">
+      <img src="${POSES.think}" alt="" style="height:70px;object-fit:contain;">
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--ink);text-align:center;">${vm.microQ}</div>
       <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
         ${vm.microOpts.map(o => {
@@ -74,7 +76,7 @@ function promptCard(vm, size) {
   if (vm.phase === "formcheck") {
     return `
     <div style="flex:0 1 ${size}px;max-width:${size}px;min-width:240px;min-height:${Math.round(size * 0.6)}px;border-radius:26px;background:var(--mint-wash);border:3px solid var(--mint);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:22px;box-sizing:border-box;">
-      <img src="assets/poses/think.png" alt="" style="height:70px;object-fit:contain;">
+      <img src="${POSES.think}" alt="" style="height:70px;object-fit:contain;">
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--mint-ink);text-align:center;">${vm.formCheckTitle}</div>
       <div style="font-size:15px;font-weight:700;color:var(--ink);text-align:center;line-height:1.45;">${vm.cleanCheckQuestion}<br><span style="font-size:13px;color:var(--ink-soft);">Answer below — or just move on.</span></div>
     </div>`;
@@ -82,7 +84,7 @@ function promptCard(vm, size) {
   // breath rehearsal
   return `
   <div style="flex:0 1 ${size}px;max-width:${size}px;min-width:240px;min-height:${Math.round(size * 0.8)}px;border-radius:26px;background:var(--mint-wash);border:3px solid var(--mint);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;box-sizing:border-box;">
-    <img src="assets/poses/breath.png" alt="" style="height:90px;object-fit:contain;">
+    <img src="${POSES.breath}" alt="" style="height:90px;object-fit:contain;">
     <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--mint-ink);text-align:center;">Breath rehearsal</div>
     <div style="font-size:15px;font-weight:700;color:var(--ink);text-align:center;line-height:1.45;">${vm.breathText}</div>
   </div>`;
@@ -115,7 +117,7 @@ function photoSlot(photoUrl, w, h, radius) {
 function stopOverlay() {
   return `
   <div style="position:absolute;inset:0;z-index:20;background:var(--stop-wash);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px;text-align:center;">
-    <img src="assets/poses/breath.png" alt="" style="height:180px;object-fit:contain;">
+    <img src="${POSES.breath}" alt="" style="height:180px;object-fit:contain;">
     <div style="font-family:var(--font-display);font-weight:600;font-size:34px;color:var(--stop-ink);">Stopped. Good call.</div>
     <div style="font-size:18px;font-weight:700;color:var(--ink);line-height:1.5;max-width:480px;">If something hurts — sharp pain, pinching, or numbness — <b>tell a grown-up right now</b>. Your body matters more than any streak.</div>
     <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;justify-content:center;">
@@ -154,10 +156,10 @@ export function detailOverlayHtml(vm) {
           <div style="font-size:15px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.detailWatchFor}</div>
           ${vm.detailFix ? `<div style="font-size:14px;color:var(--ink-soft);line-height:1.4;margin-top:5px;">🔧 ${vm.detailFix}</div>` : ""}
         </div>` : ""}
-        ${vm.detailSwim ? `
+        ${vm.detailTransfer ? `
         <div style="background:var(--sea-wash);border-radius:var(--radius-md);padding:12px 14px;">
-          <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sea-ink);margin-bottom:4px;">🏊 Swim transfer</div>
-          <div style="font-size:15px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.detailSwim}</div>
+          <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sea-ink);margin-bottom:4px;">${COPY.transferHeading}</div>
+          <div style="font-size:15px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.detailTransfer}</div>
         </div>` : ""}
         ${vm.detailShowResume ? `
         <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch;border-top:1.5px solid var(--hairline);padding-top:14px;">
@@ -255,7 +257,7 @@ function completeScreen(vm) {
   const title = vm.finishedAResume ? "You came back and finished it! 🎉" : c.title;
   return `
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:16px;padding:40px;text-align:center;background:${c.bg};overflow-y:auto;">
-    <img src="assets/poses/${c.pose}.png" alt="" style="height:${c.poseH}px;object-fit:contain;flex-shrink:0;">
+    <img src="${POSES[c.pose]}" alt="" style="height:${c.poseH}px;object-fit:contain;flex-shrink:0;">
     <div style="font-family:var(--font-display);font-weight:600;font-size:34px;color:${c.ink};">${title}</div>
     ${note ? `<div${c.alert ? ` role="alert"` : ""} style="font-size:15px;font-weight:800;${c.noteStyle || "color:var(--mint-ink);background:var(--mint-wash);"}border-radius:16px;padding:10px 16px;max-width:480px;line-height:1.45;">${note}</div>` : ""}
     ${vm.sessionMantra && c.mantra ? `<div style="font-family:var(--font-hand);font-size:26px;font-weight:700;color:var(--aqua-ink);line-height:1.2;">${vm.sessionMantra}</div>` : ""}
@@ -274,7 +276,7 @@ function completeScreen(vm) {
     ${vm.showCompletionExtras ? `
     <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;">
       <div style="display:flex;align-items:center;gap:10px;">
-        <img src="assets/poses/think.png" alt="" style="height:64px;object-fit:contain;">
+        <img src="${POSES.think}" alt="" style="height:64px;object-fit:contain;">
         <div style="font-family:var(--font-hand);font-size:24px;font-weight:700;color:var(--ink);">How did it feel?</div>
       </div>
       <div style="display:flex;gap:12px;">
@@ -304,10 +306,10 @@ function completeScreen(vm) {
     </div>` : ""}
     <div style="display:flex;flex-direction:column;gap:12px;background:var(--surface);border-radius:20px;padding:18px 22px;box-shadow:var(--shadow-soft);max-width:600px;width:100%;box-sizing:border-box;text-align:left;">
       <div style="display:flex;align-items:center;gap:10px;">
-        <img src="assets/swim-marlin.png" style="width:44px;height:44px;object-fit:contain;flex-shrink:0;" alt="">
+        <img src="${IMAGES.mascot}" style="width:44px;height:44px;object-fit:contain;flex-shrink:0;" alt="">
         <div>
           <div style="font-family:var(--font-display);font-weight:600;font-size:18px;color:var(--ink);">Coach's Quiz 🧠</div>
-          <div style="font-size:12px;font-weight:800;color:var(--ink-soft);">How does today's work help you swim?</div>
+          <div style="font-size:12px;font-weight:800;color:var(--ink-soft);">${COPY.sessionQuizIntro}</div>
         </div>
       </div>
       <div style="font-weight:800;font-size:16px;color:var(--ink);line-height:1.4;">${vm.quizQuestion}</div>
@@ -363,7 +365,7 @@ function centerStack(vm, wide) {
 
   ${vm.isBigRest ? `
   <div style="display:flex;align-items:center;gap:10px;background:var(--sun-wash);border-radius:var(--radius-lg);padding:10px 14px;box-sizing:border-box;width:100%;max-width:480px;flex-shrink:0;">
-    <img src="assets/poses/breath.png" style="width:64px;height:58px;object-fit:contain;flex-shrink:0;" alt="">
+    <img src="${POSES.breath}" style="width:64px;height:58px;object-fit:contain;flex-shrink:0;" alt="">
     <div style="font-family:var(--font-hand);font-size:15px;color:var(--sun-ink);font-style:italic;line-height:1.3;">${vm.cheerMsg}</div>
   </div>` : ""}
 
@@ -439,7 +441,7 @@ function controls(vm, wide) {
     ${vm.canSkipExercise ? `<button type="button" data-action="askSkip" style="flex:0 0 auto;min-height:44px;border-radius:var(--radius-pill);border:none;font-weight:900;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 18px;background:transparent;color:var(--ink-faint);font-family:inherit;">⏭ Skip this exercise</button>` : ""}
   </div>` : ""}` : `
   <div style="display:flex;${wide ? "align-items:center;gap:14px;" : "flex-direction:column;gap:8px;"}background:var(--surface-2);border-radius:var(--radius-md);padding:10px 14px;">
-    ${wide ? `<img src="assets/poses/seeyou.png" alt="" style="height:52px;object-fit:contain;flex-shrink:0;">` : ""}
+    ${wide ? `<img src="${POSES.seeyou}" alt="" style="height:52px;object-fit:contain;flex-shrink:0;">` : ""}
     <span style="${wide ? "flex:1;" : ""}font-weight:800;font-size:${wide ? 15 : 14}px;color:var(--ink);">End early? Your progress is saved.</span>
     <div style="display:flex;gap:8px;">
       <button type="button" data-action="cancelEnd" style="${wide ? "" : "flex:1;"}min-height:44px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;padding:0 16px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">Keep going</button>
@@ -468,7 +470,7 @@ function tipsSafety(vm) {
     <div style="font-weight:900;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);">Tips &amp; Safety</div>
     ${vm.curExCue ? `
     <div style="background:var(--aqua-wash);border-radius:var(--radius-md);padding:12px 14px;box-sizing:border-box;display:flex;align-items:center;gap:12px;">
-      <img src="assets/poses/keepgoing.png" alt="" style="width:68px;height:52px;object-fit:contain;flex-shrink:0;">
+      <img src="${POSES.keepgoing}" alt="" style="width:68px;height:52px;object-fit:contain;flex-shrink:0;">
       <div style="min-width:0;">
         <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--aqua-ink);margin-bottom:6px;">Coach tip</div>
         <div style="font-size:16px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.curExCue}</div>
@@ -481,7 +483,7 @@ function tipsSafety(vm) {
       <div style="font-size:15px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.curExWatchFor}</div>
       ${vm.curExFix ? `<div style="font-size:14px;color:var(--ink-soft);line-height:1.4;margin-top:5px;">🔧 ${vm.curExFix}</div>` : ""}
     </div>` : ""}
-    ${vm.curExSwim && vm.notResting ? `<div style="background:var(--sea-wash);border-radius:var(--radius-md);padding:10px 14px;font-size:14px;font-weight:700;color:var(--sea-ink);">🏊 Builds: ${vm.curExSwim}</div>` : ""}
+    ${vm.curExTransfer && vm.notResting ? `<div style="background:var(--sea-wash);border-radius:var(--radius-md);padding:10px 14px;font-size:14px;font-weight:700;color:var(--sea-ink);">${COPY.transferBuilds} ${vm.curExTransfer}</div>` : ""}
     <div style="background:var(--stop-wash);border:2px solid var(--stop);border-radius:var(--radius-md);padding:11px 14px;box-sizing:border-box;display:flex;align-items:center;gap:8px;">
       <span style="font-size:18px;flex-shrink:0;">🔴</span>
       <span style="font-size:15px;font-weight:700;color:var(--stop-ink);line-height:1.3;">Sharp pain, pinching, or numbness → STOP and tell a grown-up.</span>

@@ -5,28 +5,30 @@
    ============================================================ */
 
 import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
+import { STORAGE_KEYS as K, ATHLETE_DEFAULT, LEGACY_ATHLETE, BACKUP_APP, LORE_TRANSFER_FIELD, COPY } from "./sport.js";
+export { LEGACY_ATHLETE, BACKUP_APP };
 import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE } from "./data.js";
 import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION, roundPayCredit,
          streakDatesOf, freezeDatesOf } from "./outcome.js";
 
 /* ---- keys (unchanged from the old app unless noted) ---- */
-export const SETTINGS_KEY     = "swimTrainingSettingsV2";
-export const PROGRESS_KEY     = "swimTrainingProgressV2";
-export const SKIP_HISTORY_KEY = "swimTrainingSkipHistoryV2";
-export const ENGAGE_KEY       = "swimEngagementPickV2";
-export const LS_READINESS     = "swim_readiness";      // v2 schema (4-Q + body map)
-export const LS_READINESS_LOG = "swim_readiness_log_v1"; // every check, kept as history
-export const LS_DAYPROG       = "swim_day_progress";
-export const LS_LEARNING      = "swim_learning_records";
-export const LS_LADDER        = "swim_ladder_rungs";
-export const LS_QUIZ          = "swim_quiz_v1";
-export const LS_GATE          = "swim_gate_state";
-export const LS_SESSIONS      = "swim_sessions_v2";
-export const LS_TRACKER       = "swim_tracker_v2";
-export const LS_EVENTS        = "swim_events_v1";
-export const LS_PRLOG         = "swim_pr_log";
-export const LS_JOURNEY       = "swim_journey_v1";     // NEW: xp / level / prizes
-export const LS_FORMCHECK     = "swim_form_check_v1";  // NEW: parent-verified form
+export const SETTINGS_KEY     = K.settings;
+export const PROGRESS_KEY     = K.progress;
+export const SKIP_HISTORY_KEY = K.skipHistory;
+export const ENGAGE_KEY       = K.engage;
+export const LS_READINESS     = K.readiness;      // v2 schema (4-Q + body map)
+export const LS_READINESS_LOG = K.readinessLog; // every check, kept as history
+export const LS_DAYPROG       = K.dayProgress;
+export const LS_LEARNING      = K.learning;
+export const LS_LADDER        = K.ladder;
+export const LS_QUIZ          = K.quiz;
+export const LS_GATE          = K.gate;
+export const LS_SESSIONS      = K.sessions;
+export const LS_TRACKER       = K.tracker;
+export const LS_EVENTS        = K.events;
+export const LS_PRLOG         = K.prLog;
+export const LS_JOURNEY       = K.journey;     // NEW: xp / level / prizes
+export const LS_FORMCHECK     = K.formCheck;  // NEW: parent-verified form
 
 const SKIP_RETENTION_MS  = 7 * 24 * 60 * 60 * 1000;
 const EVENT_RETENTION_MS = 120 * 24 * 60 * 60 * 1000; // 120 days
@@ -40,7 +42,7 @@ const EVENT_CAP = 1500;
    orphaned; each additional athlete gets "<key>::<profileId>".
    The profile registry itself is never namespaced.
    ============================================================ */
-export const PROFILES_KEY = "swim_profiles_v1";
+export const PROFILES_KEY = K.profiles;
 export const LEGACY_PROFILE_ID = "legacy";
 
 function readRaw(key, fallback) {
@@ -62,7 +64,7 @@ export function loadProfiles() {
   }
   // Literal rather than DEFAULT_SETTINGS: this runs at module init, before the
   // settings block below has been evaluated.
-  const name = (readRaw(SETTINGS_KEY, {}) || {}).athleteName || "Jess";
+  const name = (readRaw(SETTINGS_KEY, {}) || {}).athleteName || ATHLETE_DEFAULT;
   return { active: LEGACY_PROFILE_ID, list: [{ id: LEGACY_PROFILE_ID, name }] };
 }
 let _profiles = loadProfiles();
@@ -185,7 +187,7 @@ export const DEFAULT_SETTINGS = {
   coachSpeechOn: true,      // the coach's spoken cues and encouragement
   timerSoundsOn: true,      // beeps, rep ticks, round/rest cues
   safetyVoiceOn: true,      // pain checks, safety stops, form warnings
-  athleteName: "Jess",      // NEW: editable in Grown-up Settings
+  athleteName: ATHLETE_DEFAULT, // NEW: editable in Grown-up Settings
   prizePool: null,          // NEW: null = default PRIZE_POOL
   cloudMirror: true         // NEW: privacy — mirror completed sessions to Firestore
 };
@@ -223,14 +225,13 @@ export function activePrizePool() {
 /* ---- who a record belongs to ----------------------------------------------
    The cloud mirror is shared between the athletes, so every mirrored record is
    tagged. That tag used to be the athlete's NAME, lowercased — and the name is
-   free text a grown-up can edit in Settings. Renaming "Jess" to "Jessica"
+   free text a grown-up can edit in Settings. Renaming the athlete
    therefore cut the profile off from every record it had ever written, and two
    profiles that happened to share a name merged into one history.
 
    The tag is the PROFILE ID now, which is generated once and never changes.
    Records written under the old scheme are still matched, because each profile
    remembers every name it has been tagged under. */
-export const LEGACY_ATHLETE = "Jess";
 
 export function athleteId() { return String(activeProfileId()); }
 
@@ -669,8 +670,8 @@ export const GATE_MOVE = "Drop-and-Stick";
    cryptographic. It stops a curious 10-year-old from reading the PIN over her
    parent's shoulder in the stored data — which is the actual threat model. It
    would not stop an adult who wanted in, and it is not meant to. */
-export const LS_GROWNUP_PIN     = "swim_grownup_pin_v1";       // NOT in PROFILE_KEYS — see above
-export const LS_GROWNUP_PASSKEY = "swim_grownup_passkey_v1";  // likewise
+export const LS_GROWNUP_PIN     = K.grownupPin;       // NOT in PROFILE_KEYS — see above
+export const LS_GROWNUP_PASSKEY = K.grownupPasskey;  // likewise
 
 /* Device-level storage: no profile namespace, and never in PROFILE_KEYS, so
    neither exportProfileData() nor the Firestore mirror can carry it. Both the
@@ -860,7 +861,7 @@ export function movePool() {
   _movePoolCache = pool; return pool;
 }
 
-/* Ranks the swimmer has actually reached, as quiz topics. The Ocean Story is
+/* Ranks the athlete has actually reached, as quiz topics. The rank story is
    the best-read text in the app and nothing ever asked her about it; now the
    ladder itself teaches. Locked ranks are excluded on purpose — asking about a
    chapter she hasn't unlocked would spoil the mystery card AND quiz her on
@@ -873,13 +874,13 @@ export function rankPool(level) {
     return {
       name: "Rank: " + r.name,      // ledger key space of its own, never a move
       rank: r.name, icon: r.icon, block: "story",
-      skill: lore.swim || "", fact: lore.fact || "", chapter: lore.chapter || ""
+      skill: lore[LORE_TRANSFER_FIELD] || "", fact: lore.fact || "", chapter: lore.chapter || ""
     };
   });
 }
 
 /* Every askable question: one per (topic, kind) that actually has content —
-   the moves asked three ways, plus the unlocked ocean chapters asked two. */
+   the moves asked three ways, plus the unlocked rank chapters asked two. */
 export function questionBank(level) {
   const bank = [];
   movePool().forEach(m => {
@@ -992,7 +993,7 @@ export function setEngagementPick(systemKey) {
 }
 
 /* ============================================================
-   JOURNEY — XP, level, rank, prizes. New with the Splash UI.
+   JOURNEY — XP, level, rank, prizes. New with the journey UI.
    XP rules: a session pays a flat rate for the rounds trained
    (spa = 0); quiz pays for first-time learning only — see the
    quiz XP economy above.
@@ -2285,7 +2286,6 @@ export function flaggedMoves() {
    grown-up can move a kid to a new device or keep a copy that no
    browser eviction can touch.
    ============================================================ */
-export const BACKUP_APP = "splash-swim-dryland";
 export const BACKUP_SCHEMA = 1;
 
 /* Every key that belongs to an athlete. */
@@ -2339,17 +2339,17 @@ export function backupIdentityMismatch(payload) {
      · journey   — higher XP total wins, prize wallets are unioned by id
      · the rest  — filled in only where this device has nothing
    Returns { sessionsAdded, xpAdded, filled: [keys] }. Throws on a file that
-   isn't a Splash backup. */
+   isn't this app's backup. */
 export function importProfileData(payload, opts = {}) {
   if (!payload || payload.app !== BACKUP_APP || !payload.data || typeof payload.data !== "object") {
-    throw new Error("That file isn't a Splash backup.");
+    throw new Error(COPY.backupWrongFile);
   }
   if (Number(payload.schema) > BACKUP_SCHEMA) {
     throw new Error("That backup was made by a newer version of the app.");
   }
   // Whose backup is this? A restore merges XP, prizes and a whole training
   // history into whichever athlete happens to be open, and it cannot be
-  // undone — so Jess's backup opened under Jenn used to silently become
+  // undone — so one athlete's backup opened under another used to silently become
   // Jenn's. Naming the mismatch and making the grown-up confirm is the only
   // point at which it can still be caught.
   const mismatch = backupIdentityMismatch(payload);

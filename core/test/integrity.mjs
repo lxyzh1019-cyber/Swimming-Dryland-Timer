@@ -3,14 +3,14 @@
    agree with themselves across boots, devices and midnight.
    Every case here is a defect the 2026-09 audit found in the code.
    ============================================================ */
-import { store, outcome, util } from "./harness.mjs";
+import { store, outcome, util, sport } from "./harness.mjs";
 import { claimPrize } from "../screens/overlays.js";
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
 const mainRound = (r) => Array.from({ length: 5 }, (_, i) =>
   ({ block: "main", round: r, name: "Move " + (i + 1), status: "done", credit: 1, actualSecs: 30, plannedSecs: 30 }));
-const fullDay = (isoDate, extra = {}) => ({ app: "swimming", dayKey: "monday", isoDate,
+const fullDay = (isoDate, extra = {}) => ({ app: sport.APP_ID, dayKey: "monday", isoDate,
   xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main",
   roundsDone: 3, roundsPlanned: 3, dayRoundsPlanned: 3, completedFully: true, xpEarned: 360,
   expectedWork: 15, ledger: [...mainRound(1), ...mainRound(2), ...mainRound(3)], ...extra });

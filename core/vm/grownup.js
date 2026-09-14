@@ -1,12 +1,13 @@
 /* ============================================================
    GROWN-UP view-model — 5 tabs (Overview / Analytics / Library /
    Settings / Coaching). Every number is computed from real data
-   (swim_sessions_v2, swim_events_v1, swim_quiz_v1, trackers);
+   (sessions, events, quiz, trackers);
    thin history gets honest empty/partial states, never mock data.
    ============================================================ */
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, BODY_ZONES, videoSearchUrl, fmtXp } from "../data.js";
 import { redeemedPrizesForReview } from "../store.js";
+import { ATHLETE_DEFAULT, CSV_FILE_PREFIX } from "../sport.js";
 import { gateUnlocked, GATE_REASON } from "../gate.js";
 import { passkeySupported, hasPasskey } from "../passkey.js";
 import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal, outcomeOf,
@@ -704,7 +705,7 @@ export function buildGrownupVM(state) {
       if (!ex || !ex.name || seen[ex.name]) return; seen[ex.name] = true;
       libraryList.push({
         name: ex.name, dose: ex.dose || "", cue: ex.cue || "",
-        parentWatch: ex.parentWatch || "", fix: ex.redFlag || "", swim: ex.swimTransfer || "",
+        parentWatch: ex.parentWatch || "", fix: ex.redFlag || "", transfer: ex.transfer || "",
         photoUrl: exercisePhotoUrl(ex.name, "Demo"),
         videoUrl: videoSearchUrl(ex)
       });
@@ -785,7 +786,7 @@ export function buildGrownupVM(state) {
     formCheck,
     standingRules: STANDING_RULES,
     libraryList,
-    settingsName: settings.athleteName || "Jess",
+    settingsName: settings.athleteName || ATHLETE_DEFAULT,
     profiles: profileList().map(p => ({
       id: p.id, name: p.name, active: p.id === activeProfileId(),
       style: "min-height:40px;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:14px;padding:0 16px;font-family:inherit;border:2px solid "
@@ -898,7 +899,7 @@ export function exportCsv() {
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
   const a = document.createElement("a");
   a.href = url;
-  a.download = `swim-dryland-summary-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `${CSV_FILE_PREFIX}${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }

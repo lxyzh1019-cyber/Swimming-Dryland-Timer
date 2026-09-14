@@ -5,6 +5,7 @@
 
 import { exportProfileData, importProfileData, settings } from "./store.js";
 import { todayISODate } from "./util.js";
+import { BACKUP_FILE_PREFIX } from "./sport.js";
 
 export function downloadBackup() {
   const payload = exportProfileData();
@@ -12,7 +13,7 @@ export function downloadBackup() {
   const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
   const a = document.createElement("a");
   a.href = url;
-  a.download = `splash-backup-${name}-${todayISODate()}.json`;
+  a.download = `${BACKUP_FILE_PREFIX}${name}-${todayISODate()}.json`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
   return payload;

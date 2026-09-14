@@ -4,7 +4,8 @@
    still boots and saves locally when offline.
    ============================================================ */
 
-const SESSIONS_COL = "jess_swimming_sessions"; // dedicated collection for this app
+import { SESSIONS_COLLECTION } from "./sport.js";
+const SESSIONS_COL = SESSIONS_COLLECTION; // dedicated collection for this app
 
 let _fbPromise = null;
 function fb() {

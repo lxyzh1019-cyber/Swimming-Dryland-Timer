@@ -117,6 +117,7 @@ const base = new URL("../", import.meta.url).href;
 const store  = await import(base + "store.js");
 const engine = await import(base + "engine.js");
 const gate    = await import(base + "gate.js");
+const sport   = await import(base + "sport.js");
 const passkey = await import(base + "passkey.js");
 const main   = await import(base + "main.js");
 const rvm    = await import(base + "vm/readiness.js");
@@ -185,7 +186,7 @@ ok(main.actionNames().includes("togglePractice") === false, "there is no mode le
    session screen with a clock at zero and buttons wired to nothing. */
 main.state.readiness = null;
 localStorage.clear(); store.migrate();
-store.saveDayProgress("monday", { done: ["warmup", "main", "swimskill"], mainRoundsCompleted: 1,
+store.saveDayProgress("monday", { done: ["warmup", "main", sport.SKILL_BLOCK], mainRoundsCompleted: 1,
                                   lockedLight: "red", light: "red", moves: {}, bankedCredit: 12 });
 const doneCard = tvm.buildTodayVM({ selectedDay: "monday", expanded: {}, isWide: true }).dayView;
 ok(doneCard.ctaAction !== "goSession" || !/Finish remaining/.test(doneCard.ctaLabel),

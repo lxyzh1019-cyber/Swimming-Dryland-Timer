@@ -1,10 +1,11 @@
 /* ============================================================
    PROGRESS view-model — the design's Progress screen fed by real
-   data: swim_sessions_v2 history, swim_journey_v1 XP/prizes, and
+   data: session history, journey XP/prizes, and
    the same journey math the Today map uses (one story everywhere).
    ============================================================ */
 
 import { LADDER, RANK_LORE, RANK_TEASE, fmtXp } from "../data.js";
+import { COPY, LORE_TRANSFER_FIELD } from "../sport.js";
 import { levelFromXp, sessionRounds, plannedRoundsAcrossDays, settledXpByDate, settledXpInRange } from "../store.js";
 import { loadSessions, loadJourney, currentStreakOf, redeemPrize, countsAsTrained, prizeUndoOpen, outcomeOf } from "../store.js";
 import { workoutInstances } from "../outcome.js";
@@ -104,8 +105,8 @@ export function buildProgressVM(state) {
     xp: fmtXp(journeyStore.xp || 0), xpToNext: j.xpToNextRank, levelPct: j.levelPct
   };
 
-  // Ocean Story — future ranks stay locked as mystery cards.
-  const oceanStory = LADDER.map(r => {
+  // Rank story — future ranks stay locked as mystery cards.
+  const rankStory = LADDER.map(r => {
     const lore = RANK_LORE[r.name] || {};
     const isCurrent = r.name === j.rankName;
     const isDone = !isCurrent && r.level <= j.level;
@@ -115,8 +116,8 @@ export function buildProgressVM(state) {
       locked: isLocked, unlocked: !isLocked,
       icon: isLocked ? "🔒" : r.icon, name: isLocked ? "? ? ?" : r.name,
       chapter: isLocked ? ("Unlocks at Level " + r.level) : (lore.chapter || ""),
-      story: isLocked ? (RANK_TEASE[r.name] || "A new sea friend is waiting further along your journey…") : (lore.story || ""),
-      swim: isLocked ? "" : (lore.swim || ""), fact: isLocked ? "" : (lore.fact || ""),
+      story: isLocked ? (RANK_TEASE[r.name] || COPY.storyLockedTease) : (lore.story || ""),
+      transfer: isLocked ? "" : (lore[LORE_TRANSFER_FIELD] || ""), fact: isLocked ? "" : (lore.fact || ""),
       iconBubbleStyle: "width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0;"
         + (isCurrent ? "background:var(--aqua);" : isDone ? "background:var(--mint-wash);" : "background:var(--surface-2);"),
       cardStyle: base + (isCurrent
@@ -171,7 +172,7 @@ export function buildProgressVM(state) {
   const trainedWorkouts = workoutInstances(trained).length;
   if (trainedWorkouts) milestones.push({ icon: "🏊", label: trainedWorkouts + " session" + (trainedWorkouts === 1 ? "" : "s"), style: chip("var(--aqua-wash)", "var(--aqua-ink)") });
   if ((journeyStore.xp || 0) > 0) milestones.push({ icon: "💯", label: fmtXp(journeyStore.xp) + " XP earned", style: chip("var(--mint-wash)", "var(--mint-ink)") });
-  if (!milestones.length) milestones.push({ icon: "🌱", label: "Your first splash is one GO away!", style: chip("var(--aqua-wash)", "var(--aqua-ink)") });
+  if (!milestones.length) milestones.push({ icon: "🌱", label: COPY.firstMilestone, style: chip("var(--aqua-wash)", "var(--aqua-ink)") });
 
   // Training log — newest first; Week scope = this week's entries (min 4 recent).
   // Try-it rows (only legacy histories still hold any) were never training and
@@ -311,7 +312,7 @@ export function buildProgressVM(state) {
 
   return {
     periodStats,
-    level, oceanStory, analyticsWeek, milestones,
+    level, rankStory, analyticsWeek, milestones,
     logItems, logScopeTabs, hasLog: allLog.length > 0,
     prizesWon, hasPrizes: prizesWon.length > 0,
     dayStreakVal: String(streak),

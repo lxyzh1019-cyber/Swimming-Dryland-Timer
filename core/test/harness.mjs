@@ -44,6 +44,7 @@ Object.defineProperty(globalThis, "navigator", { value: {}, configurable: true, 
 
 const base = new URL("../", import.meta.url).href;
 export const util    = await import(base + "util.js");
+export const sport   = await import(base + "sport.js");
 export const data    = await import(base + "data.js");
 export const store   = await import(base + "store.js");
 export const engine  = await import(base + "engine.js");

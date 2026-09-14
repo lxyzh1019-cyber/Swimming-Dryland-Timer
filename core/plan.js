@@ -8,6 +8,8 @@
    curve that prices a rank. Nothing in this file names a sport.
    ============================================================ */
 
+import { TRANSFER_FIELD } from "./sport.js";
+
 /* ------------------------------------------------------------
    PROGRESSIVE OVERLOAD  (v2)
    Anchored to the week of Mon May 25, 2026. Capped mid-July.
@@ -222,7 +224,7 @@ export function X(o) {
     cue: o.cue || "",
     redFlag: o.fix || null,               // correction (shown as red-flag / "the fix")
     parentWatch: o.parentWatch || null,   // "what to watch" (feeds quiz/cards)
-    swimTransfer: o.swimTransfer || null, // skill it builds (feeds quiz/cards)
+    transfer: o.transfer || o[TRANSFER_FIELD] || null, // skill it builds (feeds quiz/cards)
     faultAnchor: !!o.faultAnchor,
     gate: o.gate || null,                 // null | "valgus"
     parentEcho: !!o.parentEcho,           // anti-extension breath gate

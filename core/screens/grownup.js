@@ -1,3 +1,5 @@
+import { POSES } from "../data.js";
+import { COPY } from "../sport.js";
 /* ============================================================
    GROWN-UP ZONE screen — Overview / Analytics / Coaching /
    Move Library / Settings. Transcribed from the design; the
@@ -561,7 +563,7 @@ function libraryTab(vm) {
             <a href="${esc(lib.videoUrl)}" target="_blank" rel="noopener" style="align-self:flex-start;display:flex;align-items:center;gap:6px;text-decoration:none;background:var(--aqua-wash);color:var(--aqua-ink);font-weight:900;font-size:13px;border-radius:var(--radius-pill);padding:7px 14px;">▶ Watch the move</a>
             ${lib.cue ? `<div style="font-size:13px;color:var(--ink);line-height:1.4;"><span style="font-weight:900;color:var(--aqua-ink);">Cue · </span>${esc(lib.cue)}</div>` : ""}
             ${lib.parentWatch ? `<div style="font-size:13px;color:var(--ink);line-height:1.4;"><span style="font-weight:900;color:var(--sun-ink);">👀 Watch for · </span>${esc(lib.parentWatch)}${lib.fix ? ` <span style="color:var(--ink-soft);">🔧 ${esc(lib.fix)}</span>` : ""}</div>` : ""}
-            ${lib.swim ? `<div style="font-size:13px;color:var(--ink);line-height:1.4;"><span style="font-weight:900;color:var(--sea-ink);">🏊 Swim transfer · </span>${esc(lib.swim)}</div>` : ""}
+            ${lib.transfer ? `<div style="font-size:13px;color:var(--ink);line-height:1.4;"><span style="font-weight:900;color:var(--sea-ink);">${esc(COPY.transferHeading)} · </span>${esc(lib.transfer)}</div>` : ""}
           </div>
         </div>`).join("")}
     </div>
@@ -763,7 +765,7 @@ function coachingTab(vm) {
 function lockedZone() {
   return `
     <div style="flex:1;min-width:0;padding:24px 26px;overflow-y:auto;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;">
-      <img src="assets/poses/remember.png" alt="" style="height:150px;object-fit:contain;">
+      <img src="${POSES.remember}" alt="" style="height:150px;object-fit:contain;">
       <div style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);">Grown-up Zone 🧑</div>
       <div style="font-size:15px;font-weight:800;color:var(--ink-soft);line-height:1.5;max-width:380px;">This part is for a grown-up. The unlock has timed out — tap 🧑 again and enter the PIN.</div>
       <button type="button" data-action="nav" data-arg="grownup" style="min-height:46px;border:none;border-radius:var(--radius-pill);background:var(--aqua);color:#fff;font-weight:900;font-size:15px;padding:0 22px;cursor:pointer;font-family:inherit;">Unlock</button>

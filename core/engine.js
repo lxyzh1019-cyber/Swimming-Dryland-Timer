@@ -19,6 +19,7 @@ import { settings, configuredExerciseRest, configuredRoundRest, configuredSectio
          XP_VERSION, flaggedMoves, isAbnormalCheck, stampReadinessOutcome } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn, speakSafety } from "./audio.js";
 import { fsAddSession } from "./firebase.js";
+import { APP_ID, DAY_LOAD_FIELD } from "./sport.js";
 import { recoveryDoseSecs, refTime, edmontonISO } from "./util.js";
 
 // Moves that deserve a longer "get ready" lead-in before they start. Kept in
@@ -144,7 +145,7 @@ export function assembleRecoveryCircuit(dayKey) {
 /* Rounds a light asks for. Recovery asks for ZERO, and zero has to survive:
    the old `Math.max(1, LIGHT_ROUNDS[light] || 1)` turned it into one, which is
    how a Recovery day launched warm-up, coordination, a main circuit, prep, a
-   finisher and swim-skill work at a body that had just reported pain. */
+   finisher and skill work at a body that had just reported pain. */
 export function roundsForLight(light) {
   const n = LIGHT_ROUNDS[light];
   return Number.isFinite(n) ? n : 1;
@@ -204,8 +205,8 @@ export function assembleCircuits(dayKey, light, opts = {}) {
   order.forEach(bk => {
     if (skipBlocks.includes(bk)) return;
     let exs = (day.blocks[bk] || []).slice();
-    // Standing rule: jump rope hidden on double-pool days.
-    if (bk === "warmup" && day.poolLoad === "double") {
+    // Standing rule: jump rope hidden on double-session days.
+    if (bk === "warmup" && day[DAY_LOAD_FIELD] === "double") {
       exs = exs.filter(ex => !/jump rope/i.test(ex.name));
     }
     // A locked gate now actually gates. The app has always DISPLAYED a
@@ -957,7 +958,7 @@ function readDayProgress() {
 
    Moves are recorded by NAME, not by position: the same block assembles
    differently depending on the valgus gate and on whether the day is a double
-   pool day (see assembleCircuits), so an index would come back pointing at a
+   double day (see assembleCircuits), so an index would come back pointing at a
    different move.
 
    Only a `done` row banks. A `partial` row is real work everywhere else in the
@@ -1626,7 +1627,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     }
   }
 
-  // Swim-skill extras: micro-loop Q&A + breath rehearsal. These are TRAINING
+  // Skill-block extras: micro-loop Q&A + breath rehearsal. These are TRAINING
   // drills, so no care session runs them — not Spa Sunday, and not a weekday
   // that resolved to Recovery because her body reported pain. The old `!sess.spa`
   // guard let a sore Monday be handed a breath rehearsal anyway.
@@ -1805,7 +1806,7 @@ export function finalize(completed) {
   const safetyStop = !!sess.painFlag;
 
   const entry = {
-    app: "swimming",
+    app: APP_ID,
     athlete: athleteId(),      // the cloud mirror is shared; a restore filters on this
     dayKey: sess.dayKey,
     dayTitle: day.title || sess.dayKey,

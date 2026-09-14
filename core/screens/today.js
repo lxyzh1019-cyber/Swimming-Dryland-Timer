@@ -5,6 +5,8 @@
    ============================================================ */
 
 import { escapeHtml } from "../util.js";
+import { POSES } from "../data.js";
+import { COPY, IMAGES } from "../sport.js";
 
 /* ---- shared fragments (both layouts) ---- */
 
@@ -87,7 +89,7 @@ function journeySvgBg(idSuffix) {
 function journeyRail(j, headerOffset) {
   return `
   <div data-journey-rail="1" style="position:relative;z-index:2;height:calc(100% - ${headerOffset}px);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.4) transparent;">
-    <div style="text-align:center;font-size:11px;font-weight:900;color:rgba(255,255,255,0.75);letter-spacing:0.08em;padding:8px 0 4px;text-shadow:0 1px 4px rgba(10,30,40,0.6);">↑ MORE OF THE OCEAN AWAITS</div>
+    <div style="text-align:center;font-size:11px;font-weight:900;color:rgba(255,255,255,0.75);letter-spacing:0.08em;padding:8px 0 4px;text-shadow:0 1px 4px rgba(10,30,40,0.6);">${COPY.journeyMore}</div>
     <div style="position:relative;height:${j.pathHeight}px;">
       ${j.habitats.map(hb => `<div style="${hb.style}"></div>`).join("")}
       <svg viewBox="0 0 100 ${j.pathHeight}" preserveAspectRatio="none" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;z-index:1;">
@@ -97,7 +99,7 @@ function journeyRail(j, headerOffset) {
       ${j.levelPips.map(lp => `<div style="${lp.style}"></div>`).join("")}
       ${j.waypoints.map(wp => `
         <div data-way="${wp.stateAttr}" style="${wp.circleStyle}">
-          ${wp.showAvatar ? `<img src="assets/swimmer-face.png" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : ""}
+          ${wp.showAvatar ? `<img src="${IMAGES.avatar}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : ""}
           ${wp.showCheck ? `<span>✓</span>` : ""}
           ${wp.showIcon ? `<span>${wp.icon}</span>` : ""}
         </div>
@@ -135,7 +137,7 @@ function journeyMapNarrow(vm) {
     <div style="position:relative;z-index:2;padding:16px 18px 8px;color:#fff;">
       <div style="font-size:11px;font-weight:900;letter-spacing:0.08em;opacity:0.9;">${j.chapter}</div>
       <div style="font-family:var(--font-display);font-weight:600;font-size:17px;line-height:1.2;margin:4px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">LVL ${j.level} · ${j.rankName}</div>
-      <div style="font-size:12px;font-weight:800;opacity:0.9;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${j.atSummit ? "Top of the ladder 🏔️ swim for the love of it" : `${j.xpToNextRank} XP to ${j.nextRankName}`}</div>
+      <div style="font-size:12px;font-weight:800;opacity:0.9;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${j.atSummit ? COPY.summit : `${j.xpToNextRank} XP to ${j.nextRankName}`}</div>
       <div style="height:8px;background:rgba(255,255,255,0.28);border-radius:9px;overflow:hidden;">
         <div style="width:${j.levelPct}%;height:100%;background:#fff;border-radius:9px;"></div>
       </div>
@@ -168,7 +170,7 @@ function dayPane(vm, wide) {
 
   const done = dv.isDone ? `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-      <img src="assets/poses/greatwork.png" alt="" style="height:${wide ? 72 : 64}px;object-fit:contain;flex-shrink:0;">
+      <img src="${POSES.greatwork}" alt="" style="height:${wide ? 72 : 64}px;object-fit:contain;flex-shrink:0;">
       <div style="display:flex;flex-direction:column;gap:1px;">
         <span style="font-weight:900;font-size:${wide ? 16 : 15}px;">✅ ${dv.doneHeadline}</span>
         <span style="font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.85;">${dv.doneSub}</span>
@@ -213,7 +215,7 @@ function dayPane(vm, wide) {
                   <span style="opacity:0.7;flex-shrink:0;">•</span><span style="flex:1;min-width:0;">${m.text}</span>
                 </div>
                 ${m.cue ? `<div style="font-family:var(--font-hand);font-size:14px;font-style:italic;opacity:0.85;margin:2px 0 0 18px;">"${m.cue}"</div>` : ""}
-                ${m.swimTransfer ? `<div style="font-size:12px;font-weight:800;opacity:0.8;margin:2px 0 0 18px;">🏊 pool: ${m.swimTransfer}</div>` : ""}
+                ${m.transfer ? `<div style="font-size:12px;font-weight:800;opacity:0.8;margin:2px 0 0 18px;">${COPY.transferMove} ${m.transfer}</div>` : ""}
               </div>`).join("")}
           </div>
         </div>`).join("")}
@@ -286,9 +288,9 @@ export function todayWide(vm) {
             <div style="font-family:var(--font-display);font-weight:600;font-size:42px;line-height:1;color:var(--ink);white-space:nowrap;">Hi, ${name}!</div>
             <span style="font-size:30px;">🌊</span>
           </div>
-          <div style="font-family:var(--font-hand);font-weight:700;font-size:24px;line-height:1.1;color:var(--aqua-ink);margin-top:5px;">Ready to make a splash?</div>
+          <div style="font-family:var(--font-hand);font-weight:700;font-size:24px;line-height:1.1;color:var(--aqua-ink);margin-top:5px;">${COPY.greeting}</div>
         </div>
-        <img src="assets/poses/welcome.png" alt="" aria-hidden="true" style="height:104px;margin:-10px 8px -14px 0;object-fit:contain;flex-shrink:0;">
+        <img src="${POSES.welcome}" alt="" aria-hidden="true" style="height:104px;margin:-10px 8px -14px 0;object-fit:contain;flex-shrink:0;">
       </div>
 
       <div style="margin-bottom:16px;">
@@ -327,9 +329,9 @@ export function todayNarrow(vm) {
           <div style="font-family:var(--font-display);font-weight:600;font-size:32px;line-height:1;color:var(--ink);white-space:nowrap;">Hi, ${name}!</div>
           <span style="font-size:24px;">🌊</span>
         </div>
-        <div style="font-family:var(--font-hand);font-weight:700;font-size:20px;line-height:1.1;color:var(--aqua-ink);margin-top:4px;">Ready to make a splash?</div>
+        <div style="font-family:var(--font-hand);font-weight:700;font-size:20px;line-height:1.1;color:var(--aqua-ink);margin-top:4px;">${COPY.greeting}</div>
       </div>
-      <img src="assets/poses/welcome.png" alt="" aria-hidden="true" style="height:88px;object-fit:contain;flex-shrink:0;">
+      <img src="${POSES.welcome}" alt="" aria-hidden="true" style="height:88px;object-fit:contain;flex-shrink:0;">
     </div>
 
     <div style="background:var(--surface);border-radius:20px;box-shadow:0 10px 26px rgba(20,59,74,0.12);padding:14px;">
