@@ -248,3 +248,14 @@ Photo slots are intentionally empty until real photos land in
 (e.g. `Hollow Tuck Flutter - Timer Image.png`). A `/` in a name becomes `-`
 since it can't appear in a filename. Get the spelling exactly right — a
 typo means that photo silently falls back to the placeholder.
+
+**Ship the WebP twin.** Every PNG a screen shows — move photos, poses, the
+mascot, the body maps — has a `.webp` beside it at the same pixel size
+(~90 % smaller), and the screens ask for it first, falling back to the PNG.
+`npm test` fails if a twin is missing. After adding or replacing a PNG:
+
+```
+PLAYWRIGHT_MODULE=… node core/tools/webp.mjs "assets/exercises/<New Move> - Timer Image.png"
+```
+
+(`playwright` from `node_modules` works without the variable.)

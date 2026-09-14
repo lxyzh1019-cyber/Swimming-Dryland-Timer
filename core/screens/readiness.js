@@ -6,7 +6,7 @@ import { COPY, IMAGES } from "../sport.js";
    front/back maps share one renderer.
    ============================================================ */
 
-import { escapeHtml } from "../util.js";
+import { escapeHtml, imgWithFallbacks, photoSources } from "../util.js";
 
 /* Zone hit-areas & highlights: percent coords per view. A zone can appear
    twice in a view (shoulders, arms). r = border-radius px. */
@@ -70,7 +70,7 @@ function bodyMap(vm, view) {
   <div style="flex:1;background:var(--bg);border:2px solid var(--hairline);border-radius:22px;padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     ${pill}
     <div style="position:relative;height:480px;width:fit-content;">
-      <img src="${img}" alt="${view === "front" ? "Front" : "Back"} view ${COPY.bodyMapAlt}" style="height:100%;width:auto;display:block;pointer-events:none;">
+      ${imgWithFallbacks(photoSources(img), `alt="${view === "front" ? "Front" : "Back"} view ${COPY.bodyMapAlt}" style="height:100%;width:auto;display:block;pointer-events:none;"`)}
       ${rects.map(z => `<div style="position:absolute;left:${z.l}%;top:${z.t}%;width:${z.w}%;height:${z.h}%;border-radius:${z.r}px;pointer-events:none;${vm.zoneHighlight["n" + z.n]}"></div>`).join("")}
       ${badges.map(b => `<div style="position:absolute;left:${b.l}%;top:${b.t}%;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;pointer-events:none;background:${vm.zoneBadgeBg["n" + b.n]};">${vm.zoneBadge["n" + b.n]}</div>`).join("")}
       ${rects.map(z => `<button type="button" data-action="rPickZone" data-arg="${z.n}" style="position:absolute;left:${z.l}%;top:${z.t}%;width:${z.w}%;height:${z.h}%;background:none;border:none;padding:0;cursor:pointer;" aria-label="${z.label}"></button>`).join("")}
@@ -138,7 +138,7 @@ export function readinessScreen(vm) {
       <div style="background:linear-gradient(165deg,var(--aqua-light) 0%,var(--aqua) 60%,var(--aqua-deep) 100%);color:#fff;padding:18px 20px 16px;display:flex;flex-direction:column;gap:12px;">
         <div style="display:flex;align-items:center;gap:12px;">
           ${backBtn}
-          <img src="${IMAGES.mascot}" style="width:56px;height:56px;object-fit:contain;flex-shrink:0;" alt="">
+          ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:56px;height:56px;object-fit:contain;flex-shrink:0;" alt=""`)}
           <div style="min-width:0;">
             <div style="font-family:var(--font-display);font-weight:600;font-size:24px;line-height:1.1;display:flex;align-items:center;gap:8px;">Body Check <span style="width:24px;height:24px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:#fff;font-size:14px;font-weight:900;">✓</span></span></div>
             <div style="font-size:13px;font-weight:700;opacity:0.9;margin-top:3px;line-height:1.3;">${COPY.readinessIntro}, ${name}!</div>
@@ -148,7 +148,7 @@ export function readinessScreen(vm) {
       </div>` : `
       <div style="width:340px;flex-shrink:0;background:linear-gradient(165deg,var(--aqua-light) 0%,var(--aqua) 60%,var(--aqua-deep) 100%);color:#fff;display:flex;flex-direction:column;padding:26px 28px;">
         ${backBtn}
-        <img src="${IMAGES.mascot}" style="width:140px;height:140px;object-fit:contain;margin:22px 0 10px;" alt="">
+        ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:140px;height:140px;object-fit:contain;margin:22px 0 10px;" alt=""`)}
         <div style="font-family:var(--font-display);font-weight:600;font-size:32px;line-height:1.1;display:flex;align-items:center;gap:12px;">Body Check <span style="width:30px;height:30px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:#fff;font-size:17px;font-weight:900;">✓</span></span></div>
         <div style="font-size:15px;font-weight:700;opacity:0.9;margin-top:8px;line-height:1.4;">${COPY.readinessIntro}, ${name}!</div>
         <div style="margin-top:26px;display:flex;flex-direction:column;gap:12px;">${stepper(vm, 10)}</div>

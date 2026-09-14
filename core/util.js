@@ -98,6 +98,8 @@ export function escapeRegex(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+import { FEATURES } from "./sport.js";
+
 export function escapeHtml(text) {
   return String(text == null ? "" : text)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -108,10 +110,31 @@ export function escapeHtml(text) {
    Image.png" (in-session photo slot) or "<Exercise Name> - Demo Image.png"
    (move-library / detail-overlay photo). "/" can't appear in a filename, so
    it's swapped for "-"; stray whitespace is collapsed before matching. */
-export function exercisePhotoUrl(name, kind) {
+export function exercisePhotoUrl(name, kind, ext = "png") {
   const clean = String(name || "").replace(/\//g, "-").replace(/\s+/g, " ").trim();
   if (!clean) return "";
-  return "assets/exercises/" + encodeURIComponent(clean + " - " + kind + " Image.png");
+  return "assets/exercises/" + encodeURIComponent(clean + " - " + kind + " Image." + ext);
+}
+
+/* THE PICTURES SHE ACTUALLY DOWNLOADS. A move photo is a 1086 × 1448 PNG of
+   about a megabyte; the same pixels as WebP are a tenth of that, and an iPad
+   on cellular was pulling tens of megabytes in its first week of sessions.
+   Where the app ships the WebP twin (FEATURES.webp), it is asked for first;
+   the PNG stays as the fallback for a browser without WebP, and a file that
+   is missing altogether hides the slot as it always did. */
+export function photoSources(pngUrl) {
+  if (!pngUrl) return [];
+  return FEATURES.webp && /\.png$/i.test(pngUrl) ? [pngUrl.replace(/\.png$/i, ".webp"), pngUrl] : [pngUrl];
+}
+
+/* An <img> that tries each URL in turn and hides itself when none loads. The
+   chain rides on the element (data-fallback, "|"-separated) so a re-render
+   starts it over rather than remembering a dead end. */
+const IMG_FALLBACK_JS = "var f=(this.dataset.fallback||'').split('|').filter(Boolean);if(f.length){this.src=f.shift();this.dataset.fallback=f.join('|');}else{this.style.display='none';}";
+export function imgWithFallbacks(urls, attrs = "") {
+  const list = (urls || []).filter(Boolean);
+  if (!list.length) return "";
+  return `<img src="${list[0]}" data-fallback="${list.slice(1).join("|")}" onerror="${IMG_FALLBACK_JS}" ${attrs}>`;
 }
 
 /* Seconds given between sides / sets of the same move, so she can reset. One
