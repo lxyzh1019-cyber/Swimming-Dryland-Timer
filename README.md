@@ -71,6 +71,28 @@ the **Splash — Kids Swim Training** design system.
   thresholds and `levelCost()` are frozen: re-pricing a level would silently
   move a level that has already been earned.
 
+## Shared core
+
+Two apps are built on one engine: this one and the sibling Figure-Skate
+Dryland Timer. Everything that does not name the sport — the session engine,
+the store, the XP and prize rules, the grown-up gate, the sync, the screens,
+the service worker and four of the five test suites — lives under `core/`,
+which is byte-identical in both repositories and shared with `git subtree`.
+What makes this app *this* app is three files it owns:
+
+- `js/sport.js` — its identity: names, storage keys, the Firestore collection,
+  the mascot and body-map images, and the twenty lines of copy that mention
+  water. The core reads them through `core/sport.js` and never names a sport.
+- `js/data.js` — its content: the plan, the ranks and lore, the prizes, the
+  readiness copy, the Coach's Quiz. Built with the mechanism in `core/plan.js`.
+- `css/tokens/*`, `css/fonts.css`, `assets/`, `index.html`, `manifest.webmanifest`
+  and the two-line `sw.js` that configures the shared worker — the design
+  system and the shell.
+
+A change to the rules is made once, in `core/`, and reaches the sibling app
+with one `git subtree pull`. A change to how a level is priced is therefore
+the same change for both athletes by construction, not by a test.
+
 ## Running it
 
 Static files, no build step — but the app uses ES modules, so serve over HTTP
@@ -100,10 +122,10 @@ build step.
 - Everything the kid earns lives in `localStorage` (sessions, XP, prizes,
   quiz mastery, trackers) — nothing earned ever vanishes on reload.
 - Completed sessions are also mirrored to Firebase Firestore when online
-  (`js/firebase.js`); the app works fully offline. A versioned service worker
-  (`sw.js`) precaches the app shell, so an Add-to-Home-Screen launch with no
-  network still boots and can run a whole workout — bump `CACHE_VERSION` on
-  every release. Nothing from the mirror is ever cached: it carries body-map
+  (`core/firebase.js`); the app works fully offline. A versioned service worker
+  (`core/sw-core.js`, configured by `sw.js`) precaches the app shell, so an
+  Add-to-Home-Screen launch with no network still boots and can run a whole
+  workout — bump `version` in `sw.js` on every release. Nothing from the mirror is ever cached: it carries body-map
   notes and readiness answers, and a stale copy of current data is worse than
   none.
 - **A workout has an identity, and one answer.** A day trained in two goes
@@ -126,7 +148,7 @@ build step.
   record (completed moves, banked rounds, the resume position, the locked light)
   is local to the device. A workout is finished on the device it was started on;
   what crosses devices is the log, the journey and the readiness checks, below.
-- **The mirror syncs both ways on every boot** (`js/sync.js`), all of it
+- **The mirror syncs both ways on every boot** (`core/sync.js`), all of it
   additive — nothing is overwritten or deleted on either side:
   1. *pull* — any session this browser is missing is merged into the local log,
      so a cleared or brand-new browser recovers the history instead of starting
@@ -157,7 +179,7 @@ build step.
   Settings are the one exception — untouched defaults are replaced, anything a
   grown-up has actually changed here wins.
 - Workout content lives in `js/data.js` (`DAYS`). Progressive overload
-  machinery is present but **paused** (`OVERLOAD_PAUSED` in `js/data.js`).
+  machinery is present but **paused** (`OVERLOAD_PAUSED` in `core/plan.js`).
 
 ## Firestore rules
 
@@ -189,8 +211,8 @@ is that two phones in one family see the same log without an account — and it
 rests on the assumption that nobody outside the family knows the project
 exists. The rules confine a MISBEHAVING client; they do nothing about a hostile
 one. The app defends itself separately by rendering every stored string as text
-(`js/screens/progress.js`, `js/screens/overlays.js`) and turning away malformed
-rows at the merge (`mergeSessions` in `js/store.js`), so nothing that comes back
+(`core/screens/progress.js`, `core/screens/overlays.js`) and turning away malformed
+rows at the merge (`mergeSessions` in `core/store.js`), so nothing that comes back
 off the wire can execute or break a screen.
 
 The deferred upgrade is Firebase Authentication with family-owned document

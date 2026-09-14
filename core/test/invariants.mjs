@@ -292,7 +292,7 @@ ok(outcome.OUTCOME_VERSION >= 4,
    ============================================================ */
 
 const swSrc = await (await import("node:fs/promises")).readFile(
-  new URL("../../sw.js", import.meta.url), "utf8");
+  new URL("../sw-core.js", import.meta.url), "utf8");
 ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
   "activation deletes only this app's own caches — Cache Storage is per ORIGIN, "
   + "and on GitHub Pages a neighbour's cache is not this worker's to delete");

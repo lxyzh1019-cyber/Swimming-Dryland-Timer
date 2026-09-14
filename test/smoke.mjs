@@ -3767,7 +3767,10 @@ ok(fs.existsSync(new URL("../manifest.webmanifest", import.meta.url)),
    "there is a web app manifest, so Add to Home Screen installs an app rather than a bookmark");
 ok(fs.existsSync(new URL("../sw.js", import.meta.url)),
    "and a service worker, so a fresh launch with no network still gets the shell");
-const swSrc = fs.readFileSync(new URL("../sw.js", import.meta.url), "utf8");
+/* The worker is the shared core's; the app's sw.js only configures it. Both
+   halves are read, so the rules below are checked against the whole. */
+const swSrc = fs.readFileSync(new URL("../sw.js", import.meta.url), "utf8")
+            + fs.readFileSync(new URL("../core/sw-core.js", import.meta.url), "utf8");
 ok(/CACHE_VERSION/.test(swSrc), "the cache is versioned, so a release can retire the old one");
 /* The property that matters is not the absence of a word, it is that the fetch
    handler refuses anything that is not a same-origin GET before it can reach a
@@ -3776,8 +3779,10 @@ ok(/url\.origin\s*!==\s*self\.location\.origin/.test(swSrc) && /req\.method\s*!=
    "and nothing cross-origin or non-GET reaches the cache — the mirror is never cached into a shared shell");
 ok(!SHELL_LISTED_CLOUD(swSrc), "no cloud endpoint is in the precached shell list either");
 function SHELL_LISTED_CLOUD(src) {
-  const list = (src.match(/const SHELL = \[([\s\S]*?)\];/) || [])[1] || "";
-  return /https?:/i.test(list);
+  // Every precache list: the core's CORE_SHELL and the app's `shell:`.
+  const lists = [...src.matchAll(/(?:CORE_SHELL = |shell: )\[([\s\S]*?)\]/g)].map(m => m[1]);
+  ok(lists.length >= 2, "both the core shell list and the app's own were found");
+  return lists.some(list => /https?:/i.test(list));
 }
 
 
