@@ -116,8 +116,10 @@ failure — the chained `&&` it replaced stopped at the first one, so a
 Monday-only assertion hid four green suites for a day a week. The suites:
 the core's action-layer, invariants, integrity, landing-rule and offline-shell
 suites (`core/test/`, shared with the skate app and run there against its
-content too) and this app's `test/smoke.mjs`. No install needed; the
-`package.json` exists only for this script.
+content too), the session-safety suite, and this app's `test/smoke.mjs`. No
+install needed; the `package.json` exists only for this script. On a pull
+request CI also runs `core/tools/release-check.mjs`: a precached shell file
+that changed without a bump of `version` in `sw.js` fails the build.
 
 ## Data
 
