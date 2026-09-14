@@ -1,0 +1,195 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Coach voice — A/B</title>
+<!--
+  THE POINT OF THIS PAGE. Open it on the iPad she actually trains with and tap
+  the same line three ways: the device voice she hears today, then the two
+  rendered candidates. If the rendered ones are not obviously better to YOU on
+  THAT speaker, we stop here and nothing further gets built.
+
+  "Now (device)" is not a neutral baseline — it is rigged to be fair. It uses
+  the app's real defaults (encouraging style, slow speed), the same
+  pronunciation map, and the same voice-picking rule as js/audio.js, so it is
+  genuinely what she hears, not a strawman.
+
+  Serve the repo first — a module page can't fetch from file://:
+      python3 -m http.server 8080
+  then open  http://<this-machine>:8080/tools/voice/compare.html  on the iPad.
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --ink: #12303d; --soft: #5b7b89; --line: #d8e6ec;
+    --aqua: #0e7c96; --wash: #e8f6fa; --bg: #f7fbfd; --card: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#e6f2f7; --soft:#9ab6c2; --line:#24414d; --aqua:#5fd0ea; --wash:#102c36; --bg:#0b1a21; --card:#11242d; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 20px 16px 64px; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .lede { color: var(--soft); margin: 0 0 20px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+         padding: 12px; background: var(--card); border: 1px solid var(--line);
+         border-radius: 14px; margin-bottom: 18px; }
+  .bar label { font-weight: 700; font-size: 13px; color: var(--soft); }
+  .row { background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+         padding: 14px; margin-bottom: 12px; }
+  .kind { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+          color: var(--aqua); }
+  .text { margin: 6px 0 12px; }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  button { font: inherit; font-weight: 800; padding: 11px 16px; border-radius: 999px;
+           border: 2px solid var(--line); background: var(--card); color: var(--ink);
+           cursor: pointer; min-height: 44px; }
+  button.primary { border-color: var(--aqua); background: var(--wash); color: var(--aqua); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .note { color: var(--soft); font-size: 13px; }
+  .warn { background: var(--wash); border: 1px solid var(--aqua); border-radius: 14px;
+          padding: 14px; margin-bottom: 18px; }
+  details { margin-top: 24px; }
+  summary { cursor: pointer; font-weight: 700; color: var(--soft); }
+  pre { overflow-x: auto; font-size: 12px; background: var(--card); padding: 12px;
+        border: 1px solid var(--line); border-radius: 10px; }
+</style>
+
+<div class="wrap">
+  <h1>Coach voice — A/B</h1>
+  <p class="lede">Same line, three ways. Listen on the speaker she actually trains with.</p>
+
+  <div class="bar">
+    <label for="speed">Speed</label>
+    <button id="speed" type="button" class="primary">Slow</button>
+    <span class="note" id="speedNote">Rendered clips slow down without changing pitch.</span>
+  </div>
+
+  <div id="status"></div>
+  <div id="rows"></div>
+
+  <details>
+    <summary>What this device exposes to the Web Speech API</summary>
+    <p class="note">This is the evidence for why the device voice can't simply be
+      swapped for a better one on iOS. On an iPhone or iPad expect a short list of
+      compact voices, and no Siri.</p>
+    <pre id="voices">…</pre>
+  </details>
+</div>
+
+<script type="module">
+import { PRONUNCIATION_MAP } from "../../js/data.js";
+import { speakableText } from "../../js/util.js";
+
+/* The app's real defaults, so the baseline is honest: settings.voiceStyle
+   "encouraging", settings.voiceSpeed "slow". Mirrors VOICE_SPEED × VOICE_PERSONA
+   and the clamp in js/audio.js — if those change, change these with them. */
+const DEVICE = { speedSlow: 0.82, speedNormal: 0.95, personaRate: 0.94, personaPitch: 0.95 };
+const SAFETY_RATE = 0.85;
+
+const rowsEl = document.getElementById("rows");
+const statusEl = document.getElementById("status");
+const speedBtn = document.getElementById("speed");
+let slow = true;
+
+/* ---- the device voice, picked exactly the way js/audio.js picks it ---- */
+let deviceVoice = null;
+function pickVoice() {
+  const voices = speechSynthesis.getVoices() || [];
+  if (!voices.length) return null;
+  const en = voices.filter(v => /^en/i.test(v.lang || ""));
+  const pool = en.length ? en : voices;
+  const preferred = ["natural", "neural", "enhanced", "premium", "siri", "aria",
+                     "jenny", "ava", "guy", "google", "microsoft"];
+  return pool.find(v => preferred.some(h => (v.name || "").toLowerCase().includes(h)))
+    || pool.find(v => v.default) || pool[0] || null;
+}
+function refresh() {
+  deviceVoice = pickVoice();
+  const all = speechSynthesis.getVoices() || [];
+  document.getElementById("voices").textContent = all.length
+    ? all.map(v => `${v.name}  [${v.lang}]${v.localService ? "" : "  (network)"}${v.default ? "  (default)" : ""}`).join("\n")
+      + `\n\n${all.length} voices. Picked: ${deviceVoice ? deviceVoice.name : "none"}`
+    : "getVoices() returned nothing on this device.";
+}
+refresh();
+speechSynthesis.onvoiceschanged = refresh;
+
+function sayOnDevice(clip) {
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(speakableText(clip.text, PRONUNCIATION_MAP));
+  if (clip.safety) { u.rate = SAFETY_RATE; u.pitch = 1; }
+  else {
+    const speed = slow ? DEVICE.speedSlow : DEVICE.speedNormal;
+    u.rate = Math.min(1.3, Math.max(0.6, speed * DEVICE.personaRate));
+    u.pitch = DEVICE.personaPitch;
+  }
+  if (deviceVoice) u.voice = deviceVoice;
+  speechSynthesis.speak(u);
+}
+
+/* ---- the rendered clips ---- */
+let player = null;
+function playClip(voiceKey, clip) {
+  speechSynthesis.cancel();
+  if (player) { player.pause(); player = null; }
+  const a = new Audio(`../../assets/voice/sample/${voiceKey}/${clip.id}.mp3`);
+  /* The whole reason one rendering can serve both speeds: pitch is preserved,
+     so Slow is a slower coach rather than a deeper one. The safety line is
+     already baked slow and must not be slowed twice. */
+  a.preservesPitch = true;
+  a.mozPreservesPitch = true;
+  a.webkitPreservesPitch = true;
+  a.playbackRate = (slow && !clip.safety) ? 0.88 : 1;
+  a.play().catch(err => { statusEl.innerHTML = `<div class="warn">Couldn't play: ${err.message}</div>`; });
+  player = a;
+}
+
+speedBtn.addEventListener("click", () => {
+  slow = !slow;
+  speedBtn.textContent = slow ? "Slow" : "Normal";
+  speedBtn.classList.toggle("primary", slow);
+});
+
+const res = await fetch("../../assets/voice/sample/manifest.json").catch(() => null);
+if (!res || !res.ok) {
+  statusEl.innerHTML = `<div class="warn"><strong>No clips rendered yet.</strong><br>
+    Run <code>OPENAI_API_KEY=sk-… node tools/voice/render.mjs</code> from the repo root,
+    then reload. Until then only the “Now (device)” buttons will work.</div>`;
+}
+const manifest = res && res.ok ? await res.json() : { voices: {}, clips: [] };
+const voiceKeys = Object.keys(manifest.voices);
+
+/* With no manifest there is still something worth doing here: hearing today's
+   device voice on today's device, which is half the comparison. */
+const lines = manifest.clips.length ? manifest.clips : [
+  { id: "count-in", kind: "Bare count-in", text: "Three, two, one, go.", safety: false },
+  { id: "announce-pallof", kind: "Pronunciation map", text: "Pallof Press. Three, two, one, go.", safety: false }
+];
+
+for (const clip of lines) {
+  const row = document.createElement("div");
+  row.className = "row";
+  row.innerHTML = `<div class="kind">${clip.kind}</div>
+    <div class="text">${clip.text.replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]))}</div>
+    <div class="btns"></div>`;
+  const btns = row.querySelector(".btns");
+
+  const now = document.createElement("button");
+  now.type = "button";
+  now.textContent = "Now (device)";
+  now.addEventListener("click", () => sayOnDevice(clip));
+  btns.append(now);
+
+  for (const key of voiceKeys) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "primary";
+    b.textContent = manifest.voices[key].label;
+    b.addEventListener("click", () => playClip(key, clip));
+    btns.append(b);
+  }
+  rowsEl.append(row);
+}
+</script>

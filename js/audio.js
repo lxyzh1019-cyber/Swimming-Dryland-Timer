@@ -15,7 +15,7 @@
 
 import { settings } from "./store.js";
 import { PRONUNCIATION_MAP, ENCOURAGEMENTS_BY_STYLE } from "./data.js";
-import { escapeRegex } from "./util.js";
+import { speakableText } from "./util.js";
 
 const speech = window.speechSynthesis || null;
 let audioCtx = null;
@@ -80,11 +80,7 @@ const VOICE_PERSONA = {
 };
 
 function applyPronunciationMap(msg) {
-  let out = msg;
-  for (const [word, pron] of Object.entries(PRONUNCIATION_MAP)) {
-    out = out.replace(new RegExp(escapeRegex(word), "gi"), pron);
-  }
-  return out;
+  return speakableText(msg, PRONUNCIATION_MAP);
 }
 
 /* The rate every coach line is spoken at. The one place speed and style meet,
