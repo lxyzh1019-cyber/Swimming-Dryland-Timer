@@ -91,10 +91,15 @@ export const GATE_REASON = {
   renameAthlete:  "change the athlete's name",
   restoreBackup:  "write a backup over her live history",
   forgetPasskey:  "remove the grown-up passkey from this device",
-  severity3:      "clear a pain report that changed how she moves",
+  /* Keyed by ACTION NAME — this map is read as GATE_REASON[state.gateAsk] and
+     nothing dispatches "severity3", "lightOverride" or "safetySettings", so
+     the three prompts most worth naming all fell through to "…to continue".
+     The actions that actually ask are rGrownupOk, rPickLight and
+     toggleSafetyVoice. */
+  rGrownupOk:     "clear a pain report that changed how she moves",
   rRetryCheck:    "clear a pain report that changed how she moves",
-  lightOverride:  "override the light her body check produced",
-  safetySettings: "change the safety settings",
+  rPickLight:     "override the light her body check produced",
+  toggleSafetyVoice: "turn off the safety voice",
   reviewPrizes:   "review the prizes marked used",
   restorePrize:   "restore a prize the app marked used",
   confirmRestore: "write a backup over her live history",

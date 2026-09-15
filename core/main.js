@@ -601,6 +601,9 @@ Object.assign(RAW, {
      intentions. The ✕ and a tap on the backdrop are how you dismiss something
      you opened by accident, or close it to keep reading the move on the card —
      they must not start the clock again. Only the Resume button does that. */
+  /* The hold this leaves behind is released by the workout screen's own Resume
+     (see togglePause) — it used to name only two reasons and left this one
+     stranded, which is what made Resume inert after a ✕. */
   closeDetail() {
     state.detailOverlay = false; state.detailEx = null;
     render();

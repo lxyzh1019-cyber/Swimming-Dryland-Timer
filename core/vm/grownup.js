@@ -10,7 +10,7 @@ import { redeemedPrizesForReview } from "../store.js";
 import { ATHLETE_DEFAULT, CSV_FILE_PREFIX } from "../sport.js";
 import { gateUnlocked, GATE_REASON } from "../gate.js";
 import { passkeySupported, hasPasskey } from "../passkey.js";
-import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal, outcomeOf,
+import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, GATE_MOVE, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal, outcomeOf,
          sessionRounds as sessionRoundsDone, sessionRoundsPlanned, plannedRoundsAcrossDays,
          monthKeyOf, formVerdicts, latestFormVerdicts, loadReadinessLog,
          settledXpInRange } from "../store.js";
@@ -723,6 +723,11 @@ export function buildGrownupVM(state) {
         name: ex.name, dose: ex.dose || "", cue: ex.cue || "",
         parentWatch: ex.parentWatch || "", fix: ex.redFlag || "", transfer: ex.transfer || "",
         photoUrl: exercisePhotoUrl(ex.name, "Demo"),
+        /* Not one "- Demo Image" file exists in either app, and this card had
+           no fallback — so every card in the library showed the placeholder.
+           The session's detail overlay has always chained Demo → Timer; the
+           library asks for the same chain. */
+        photoFallbackUrl: exercisePhotoUrl(ex.name, "Timer"),
         videoUrl: videoSearchUrl(ex)
       });
     });
@@ -865,12 +870,13 @@ export function buildGrownupVM(state) {
     })(),
 
     coaching: {
-      gate, gateLabel: gate.unlocked ? "UNLOCKED — jumps allowed beyond Drop-and-Stick" : "LOCKED — all jumps stay at Drop-and-Stick",
+      gate, gateLabel: gate.unlocked ? "UNLOCKED — jumps allowed beyond " + GATE_MOVE : "LOCKED — all jumps stay at " + GATE_MOVE,
       // Says what is actually counted, and counts what it says. The number used
-      // to tick up whenever Drop-and-Stick merely wasn't skipped — no clean
-      // self-check, no separate weeks, nothing the sentence promised.
+      // to tick up whenever the floor move merely wasn't skipped — no clean
+      // self-check, no separate weeks, nothing the sentence promised. (It also
+      // named a swim move to a skater: see GATE_MOVE in core/store.js.)
       gateProgress: (gate.cleanWeeks || []).length + " of " + GATE_WEEKS_REQUIRED
-        + " weeks with a clean Drop-and-Stick logged"
+        + " weeks with a clean " + GATE_MOVE + " logged"
         + (gate.unlocked ? "" : " — a week counts when she does the move AND self-checks it clean, and a grown-up hasn't flagged it."),
       ladderRows, trackerWeek, tracker, prFields,
       engagement, engagementSystems: ENGAGEMENT_SYSTEMS

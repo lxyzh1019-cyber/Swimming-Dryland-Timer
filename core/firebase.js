@@ -26,10 +26,34 @@ function fb() {
       return { db: fs.getFirestore(app), ...fs };
     })().catch(e => {
       console.warn("Firebase unavailable (offline?):", e);
+      // Not remembered: the network can come back while the app is open, and a
+      // single failed load must not make the mirror unreachable for the rest
+      // of the session.
+      _fbPromise = null;
       return null;
     });
   }
   return _fbPromise;
+}
+
+/* WHAT "NOTHING CAME BACK" MEANS ------------------------------------------
+   Every helper here swallowed its own failure and handed back a neutral value
+   — null, [], false — so "the mirror answered and holds nothing" and "we never
+   reached the mirror at all" were the same answer. The boot sync read that as
+   reached-and-empty on a device with no network, which is two real failures:
+   a wiped iPad was offered a fresh grown-up PIN with none of the warning the
+   gate has for exactly that case, and every boot stamped a successful sync
+   time, so prize draws waited on a second device that was never asked.
+
+   A READ that could not be made now throws this. Writes keep their
+   fire-and-forget shape — a write that did not land is not evidence about the
+   connection, and the next boot backfills it. */
+export class MirrorUnreachable extends Error {
+  constructor(cause) {
+    super("The cloud mirror could not be reached.");
+    this.name = "MirrorUnreachable";
+    this.cause = cause;
+  }
 }
 
 /* ---- Fire-and-forget Firestore helpers ---- */
@@ -85,13 +109,13 @@ export async function fsSaveJourney(athlete, snapshot) {
 
 export async function fsGetJourney(athlete) {
   const f = await fb();
-  if (!f) return null;
+  if (!f) throw new MirrorUnreachable();
   try {
     const snap = await f.getDoc(f.doc(f.db, SESSIONS_COL, journeyDocId(athlete)));
     return snap.exists() ? snap.data() : null;
   } catch (e) {
     console.warn("Journey mirror read failed:", e);
-    return null;
+    throw new MirrorUnreachable(e);
   }
 }
 
@@ -123,38 +147,40 @@ export async function fsSaveReadiness(athlete, rows) {
 
 export async function fsGetReadiness(athlete) {
   const f = await fb();
-  if (!f) return null;
+  if (!f) throw new MirrorUnreachable();
   try {
     const snap = await f.getDoc(f.doc(f.db, SESSIONS_COL, readinessDocId(athlete)));
     return snap.exists() ? snap.data() : null;
   } catch (e) {
     console.warn("Readiness mirror read failed:", e);
-    return null;
+    throw new MirrorUnreachable(e);
   }
 }
 
 export async function fsGetRecent(n = 7) {
   const f = await fb();
-  if (!f) return [];
+  if (!f) throw new MirrorUnreachable();
   try {
     const q = f.query(f.collection(f.db, SESSIONS_COL), f.orderBy("createdAt", "desc"), f.limit(n));
     const snap = await f.getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch (e) {
     console.warn("Firestore read failed:", e);
-    return [];
+    throw new MirrorUnreachable(e);
   }
 }
 
+/* The reachability probe as well as the pull: an empty array from here means
+   the mirror answered and holds nothing for this collection, and nothing else. */
 export async function fsGetAll() {
   const f = await fb();
-  if (!f) return [];
+  if (!f) throw new MirrorUnreachable();
   try {
     const q = f.query(f.collection(f.db, SESSIONS_COL), f.orderBy("createdAt", "asc"));
     const snap = await f.getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch (e) {
     console.warn("Firestore read failed:", e);
-    return [];
+    throw new MirrorUnreachable(e);
   }
 }

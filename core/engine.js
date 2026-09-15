@@ -18,7 +18,6 @@ import { settings, configuredExerciseRest, configuredRoundRest, configuredSectio
          addXp, pendingDrawCount, claimSessionXp, athleteId, noteSessionXpAwarded, patchSession, sessionKey,
          XP_VERSION, flaggedMoves, isAbnormalCheck, stampReadinessOutcome } from "./store.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn, speakSafety } from "./audio.js";
-import { fsAddSession } from "./firebase.js";
 import { APP_ID, DAY_LOAD_FIELD, FEATURES } from "./sport.js";
 import { recoveryDoseSecs, refTime, edmontonISO } from "./util.js";
 
@@ -47,6 +46,7 @@ function blankSession() {
     abort: false, skipExercise: false, forceDone: false, forceDoneAt: 0,
     byRepsResolver: null, intentResolver: null, microResolver: null,
     announceResolver: null, lastTapAt: 0,
+    savedEntry: false, saveFailed: false,
     currentEx: null, skipped: [], perExercise: [], justSkipped: false,
     phase: "greeting",           // greeting|getready|work|reps|sideswitch|rest|roundRest|sectionRest|intent|microloop|breath|done
     circuits: [], ci: 0, ei: 0, round: 1, exDone: 0,
@@ -85,7 +85,7 @@ function blankSession() {
        two. Minted when a plan starts, carried on the day's progress record, and
        written onto every session row and event the workout produces. */
     workoutInstanceId: null,
-    savedEntry: null, savedOutcome: null, saveFailed: false,
+    savedOutcome: null,
     blocksCompleted: 0, expectedByRound: {},
     repsCounted: 0, repsTarget: 0, repNow: 0, segmentsDone: 0, segmentsPlanned: 0,
     sideLabel: "", segmentLabel: "",
@@ -114,7 +114,16 @@ function blankSession() {
     dayKey: null, light: "green", practice: false, spa: false, recovery: false,
     endedEarly: false, xpEarned: 0, leveledUp: false,
     mood: null, wentWell: null, nextTime: null, quizPick: null, quizXp: 0,
-    savedEntry: false, saveFailed: false, savedKey: null, fsId: null
+    /* Every key the runner ever writes is declared HERE, because exitSession
+       resets with Object.assign and an assign cannot remove what it does not
+       mention. `quizCapped` leaking into the next session is what made a fresh
+       finish screen say "that's today's quiz XP maxed out" about a quiz she
+       had not taken yet. (`savedEntry` and `saveFailed` were also declared
+       twice in this literal, once as null and once as false, so the "nothing
+       saved" sentinel had two spellings.) */
+    quizCapped: false, saySafetyStop: false,
+    suggestedLight: null, readinessDetail: null, dayIso: null,
+    savedKey: null, fsId: null
   };
 }
 
@@ -769,9 +778,16 @@ async function announce(msg) {
   const skipped = new Promise(resolve => {
     sess.announceResolver = () => { cut = true; resolve(); };
   });
+  // The screen repaints on phase changes, and an announcement is not one — so
+  // the ring went on saying "Done" while a tap meant "go". Both edges are
+  // announced, because the button's label is read off this resolver.
+  notify("phase");
   await Promise.race([speakAndWait(msg), skipped]);
   sess.announceResolver = null;
+  notify("phase");
   if (cut) cancelSpeech();
+  // Whether she cut it short, so a caller can drop the beat that follows.
+  return cut;
 }
 
 /* What comes after the step she is on — read off the step list, which is
@@ -1393,8 +1409,13 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
       resultSource: readiness.resultSource || null
     } : null
   });
-  // What actually ran, back onto the check that suggested it.
-  stampReadinessOutcome(resolvedLight, resolvedSuggestion !== resolvedLight);
+  /* What actually RAN, back onto the check that suggested it — plan.light, not
+     the light this sitting was started with. A Red morning picked up in the
+     evening under a Green check runs Red (planResume holds a workout at the
+     light it started under), and stamping `resolvedLight` told the readiness
+     log the day finished Green and blamed a grown-up for an override nobody
+     made. */
+  stampReadinessOutcome(plan.light, resolvedSuggestion !== plan.light);
 
   const bankedRounds = plan.bankedRounds;
   const mainOwed = plan.mainOwed;
@@ -1468,27 +1489,39 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     red: "RED, 1 round", recovery: "recovery only" }[sess.light] || "";
   const firstEx = circuits[0].exercises[0].name;
 
+  /* THE OPENING IS HERS TO CUT. The mantra, the light and the first move's
+     name ran as an un-interruptible speakAndWait: eleven to thirteen seconds
+     with a real voice, during which the Done ring and every other control sat
+     on screen doing nothing at all. A kid who has heard the mantra fifty times
+     could not get past it, and "the start button does nothing" is exactly how
+     that reads. Spoken through announce(), a tap means "I know this one, go" —
+     the same thing it means on every move. */
   setPhase("greeting");
   playCue("work");
-  if (sess.spa || sess.recovery) {
-    await speakAndWait(sess.spa ? "Spa Sunday. Easy recovery, slow and gentle."
-      : "Recovery today. No workout — just easy, gentle care. Well done for checking in honestly.");
-  } else {
-    await speakAndWait("Say it out loud with me, loud and proud: " + dayMantra + " " +
+  const greetCut = await announce(sess.spa || sess.recovery
+    ? (sess.spa ? "Spa Sunday. Easy recovery, slow and gentle."
+       : "Recovery today. No workout — just easy, gentle care. Well done for checking in honestly.")
+    : "Say it out loud with me, loud and proud: " + dayMantra + " " +
       "Your light today is " + lightLabel + ". Starting with " + firstEx + ".");
-  }
-  const r1 = await sleep(1500);
+  // The beat after the greeting is there to let it land. She just said she
+  // doesn't need it.
+  const r1 = await sleep(greetCut ? 150 : 1500);
   if (r1 === "abort") return finalize(false);
 
   sess.skipExercise = false;
   startElapsed();
 
   setPhase("getready");
+  /* Stamped BEFORE the lead-in is spoken, so a tap during the line — or in the
+     beat between it and the clock — is a decision about this lead-in and not a
+     stale flag to be thrown away. The line itself goes through announce() for
+     the same reason the move names do. */
+  const leadSince = Date.now();
   const firstLead = 5 + setupSecs(circuits[0].exercises[0]);
-  await speakAndWait(firstLead > 5
+  await announce(firstLead > 5
     ? `${firstLead} seconds to the first block — grab what you need for ${firstEx}.`
     : "Five seconds to the first block.");
-  const rGo = await countdown(firstLead);
+  const rGo = await countdown(firstLead, { since: leadSince });
   if (rGo === "abort") return finalize(false);
 
   let preAnnounced = false;
@@ -1912,6 +1945,9 @@ export function finalize(completed) {
   sess.confirmEnd = false;
   cancelSpeech();
   stopElapsed();
+  // Now that everything else has been silenced, the one line that must be
+  // heard. See endEarly.
+  if (sess.saySafetyStop) { sess.saySafetyStop = false; speakSafety("Session stopped."); }
 
   syncClock();
   const elapsedSecs = sess.elapsed;
@@ -2070,7 +2106,18 @@ export function finalize(completed) {
   // Cloud mirror — keep the doc ID so mood/reflection can patch it later.
   // Opt-out via Grown-up settings (privacy): when off, data stays on-device only.
   if (settings.cloudMirror !== false) {
-    fsAddSession(entry).then(id => { sess.fsId = id; flushCloudPatch(id); });
+    /* Imported HERE, not at the top of this file. The service worker states
+       that core/firebase.js is never precached because it is only ever pulled
+       in when the mirror is used (core/sw-core.js) — but a static import made
+       it part of every boot, so an offline launch after a release had bumped
+       the cache could fail to load the engine at all: a blank page, the one
+       thing the worker exists to prevent. The failure is swallowed for the
+       same reason every other mirror call swallows it — an offline device
+       keeps its session locally and the next boot sync carries it up. */
+    import("./firebase.js")
+      .then(m => m.fsAddSession(entry))
+      .then(id => { sess.fsId = id; flushCloudPatch(id); })
+      .catch(() => {});
     // XP moved, so the shared journey did too — publish it rather than making
     // the other device wait until it is next opened.
     import("./sync.js").then(m => m.publishJourney()).catch(() => {});
@@ -2198,12 +2245,19 @@ export function resumeSession(reason = PAUSE_USER) {
    all — the reason set would still be holding it, and the app would look
    broken to a ten-year-old who had done nothing wrong.
 
-   Overlay holds ("instructions", "video") are deliberately NOT released here:
-   their overlay is still open in front of her, and closing it is what says she
-   is done reading. */
+   RESUME MEANS RESUME — every hold, not the two this button happened to name.
+   An overlay hold ("instructions", "video") used to be left in place, on the
+   reasoning that its overlay is still open in front of her. Two of those holds
+   outlive their overlay: the ✕ on the move card closes the card and keeps the
+   hold, and "Watch the move" takes its hold with no overlay on screen at all.
+   In both cases the only control that released it went away with the card, so
+   every later tap of this button did nothing, Done walked on to the next phase
+   with the clock still stopped, and the session could only be ended — the
+   defect the owner reported. This button is the one Resume on the workout
+   screen; it has to mean it however many reasons are stacked behind it. */
 export function togglePause() {
   if (sess.paused) {
-    resumeSession(PAUSE_HIDDEN);
+    [...pauseReasons()].forEach(r => resumeSession(r));
     resumeSession(PAUSE_USER);
   } else pauseSession(PAUSE_USER);
 }
@@ -2235,9 +2289,19 @@ export function advance() {
   if (sess.phase === "intent" && sess.intentResolver) { sess.intentResolver(null); return; }
   if (sess.phase === "microloop" && sess.microResolver) { sess.microResolver(null); return; }
   if (["work", "rest", "roundRest", "sectionRest", "sideswitch", "getready", "greeting", "breath"].includes(sess.phase)) {
-    sess.forceDone = true;   // running countdown/sleep resolves as "done" within 1s
+    /* THE TAP WAITS FOR THE CLOCK, because the clock is what she is tapping at.
+       A rest stamps `since` at the moment its phase begins (see the rest
+       phases below) precisely so a tap during "Rest. Next: ..." counts — but
+       the flag the countdown reads used to be wiped 1.2 s later, and with a
+       real voice the announcement runs 1.5-4 s before the countdown that would
+       have read it even starts. Every such tap was silently dropped: Done and
+       Skip Rest did nothing exactly when a kid uses them most, at the top of
+       the rest. Nothing needs a timer to expire this flag — the next countdown
+       or sleep either consumes it (its `since` is older than the tap) or clears
+       it as stale (its `since` is newer), which is what keeps a tap during a
+       move's announcement meaning "go" rather than "done". */
+    sess.forceDone = true;   // the next countdown/sleep that can honour it, will
     sess.forceDoneAt = Date.now();
-    setTimeout(() => { sess.forceDone = false; }, 1200);
   }
 }
 
@@ -2310,16 +2374,18 @@ export function endEarly() {
   if (sess.intentResolver) sess.intentResolver(null);
   if (sess.microResolver) sess.microResolver(null);
   if (sess.formResolver) sess.formResolver(null);
-  // A stop confirmation is a SAFETY line: it is spoken even with the coach
-  // muted, because "I stopped because it hurt" is the one thing she must hear
-  // acknowledged.
-  //
-  // It is spoken ONCE, by speakSafety, and nothing may follow it. The line used
-  // to be repeated through interruptSpeech, whose speech.cancel() killed the
-  // safety utterance a moment after it started — so with the coach voice ON the
-  // one cue that must never be lost was the one cue that was. speakSafety
-  // already cancels whatever was mid-sentence before it speaks.
-  speakSafety("Session stopped.");
+  /* A stop confirmation is a SAFETY line: it is spoken even with the coach
+     muted, because "I stopped because it hurt" is the one thing she must hear
+     acknowledged.
+
+     It is spoken ONCE, and nothing may follow it — which is why it is not
+     spoken HERE. Saying it here put it in the queue a moment before the runner
+     reached its next await, saw the abort and called finalize, whose first act
+     is cancelSpeech(): the app killed its own safety cue on every stop, and no
+     test could see it because the harness stubs speech to instant. It is
+     raised as a request instead, and finalize speaks it once the cancelling is
+     done. */
+  sess.saySafetyStop = true;
 }
 
 export function pickIntentWord(word) { if (sess.intentResolver) sess.intentResolver(word); }
@@ -2371,7 +2437,9 @@ let _pendingCloudPatch = null;
 
 export function mirrorSessionPatch(patch) {
   if (settings.cloudMirror === false || !patch) return;
-  if (sess.fsId) { import("./firebase.js").then(m => m.fsUpdateSession(sess.fsId, patch)); return; }
+  // Offline, or with the module evicted, this rejects — and an unhandled
+  // rejection from a mood tap is noise in a console a parent might be reading.
+  if (sess.fsId) { import("./firebase.js").then(m => m.fsUpdateSession(sess.fsId, patch)).catch(() => {}); return; }
   _pendingCloudPatch = { ...(_pendingCloudPatch || {}), ...patch };
 }
 
@@ -2379,7 +2447,7 @@ function flushCloudPatch(id) {
   if (!id || !_pendingCloudPatch) return;
   const patch = _pendingCloudPatch;
   _pendingCloudPatch = null;
-  import("./firebase.js").then(m => m.fsUpdateSession(id, patch));
+  import("./firebase.js").then(m => m.fsUpdateSession(id, patch)).catch(() => {});
 }
 
 /* Complete-screen interactions: patch the saved record + Firestore mirror. */
@@ -2404,6 +2472,15 @@ export function setQuizPick(i) { sess.quizPick = i; notify("phase"); }
 
 /* Full reset before Today re-renders (guards double-running timers). */
 export function exitSession() {
+  // Tell the runner to stand down BEFORE the state it is walking is replaced:
+  // a loop still parked on a countdown would otherwise wake up and keep
+  // stepping through the fresh, empty session object.
+  sess.abort = true;
+  if (sess.byRepsResolver) sess.byRepsResolver("abort");
+  if (sess.intentResolver) sess.intentResolver(null);
+  if (sess.microResolver) sess.microResolver(null);
+  if (sess.formResolver) sess.formResolver(null);
+  if (sess.holdResolver) sess.holdResolver("abort");
   stopElapsed();
   cancelSpeech();
   _pendingCloudPatch = null;

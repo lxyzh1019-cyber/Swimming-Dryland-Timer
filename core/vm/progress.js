@@ -12,6 +12,8 @@ import { workoutInstances } from "../outcome.js";
 import { edmontonWeekISODates, edmontonISO, DAY_MS } from "../util.js";
 import { buildJourney } from "./today.js";
 
+/* Every label logEntryView can produce has a chip here; "TRY-IT" fell through
+   to the green one, so a try-it row was painted as a full green day. */
 const LIGHT_CHIP = {
   GREEN: "var(--mint-wash);color:var(--mint-ink)",
   YELLOW: "var(--sun-wash);color:var(--sun-ink)",
@@ -20,7 +22,8 @@ const LIGHT_CHIP = {
   MINI: "var(--aqua-wash);color:var(--aqua-ink)",
   "ENDED EARLY": "color-mix(in srgb, var(--coral) 14%, #fff);color:var(--coral)",
   "NOTHING LOGGED": "var(--surface-2);color:var(--ink-faint)",
-  "SAFETY STOP": "color-mix(in srgb, var(--stop) 12%, #fff);color:var(--stop)"
+  "SAFETY STOP": "color-mix(in srgb, var(--stop) 12%, #fff);color:var(--stop)",
+  "TRY-IT": "var(--aqua-wash);color:var(--aqua-ink)"
 };
 const MOOD_EMOJI = { great: "😀", okay: "🙂", tired: "😴" };
 const MOOD_LABEL = { great: "Great", okay: "Okay", tired: "Tired" };

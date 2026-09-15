@@ -207,6 +207,42 @@ main.actions.startMini("monday");
 ok(main.state.readiness === null && main.state.inSession === false,
    "and dispatching the retired name does nothing at all");
 
+/* ---- B2. THE BODY MAP IS NEVER A DEAD END -------------------------------
+   "Rest 1-2 min, then re-check" and "✨ Feels fine now — remove mark" both
+   clear the marks, and the result card — the only Continue on that step — is
+   drawn from a severity. Clearing them left a child on a screen she could only
+   leave by re-reporting a sore spot she had just said was fine. */
+localStorage.clear(); store.migrate();
+main.state.readiness = null;
+main.actions.goSession("monday");
+["q_sleep", "q_light", "q_ready"].forEach(q => main.actions.rAnswer(q + "|yes"));
+main.actions.rAnswer("q_pain|no");
+ok(main.state.readiness && main.state.readiness.step === "bodyArea", "a sore answer opens the body map");
+main.actions.rPickZone("3");
+main.actions.rSetZoneSev("3|2");
+ok(main.state.readiness.severity === 2, "a tired shoulder is marked");
+{
+  const withMark = rvm.buildReadinessVM(main.state.readiness, true);
+  ok(withMark.showInlineBodyResult === true, "and the result card offers Continue");
+}
+main.actions.rRetryCheck();
+ok(main.state.readiness.severity === null, "'rest, then re-check' clears the marks");
+{
+  const cleared = rvm.buildReadinessVM(main.state.readiness, true);
+  ok(cleared.showInlineBodyResult === false, "which takes the result card away, as it always did");
+  ok(cleared.noZonesYet === true && !!cleared.noMarksCtaLabel,
+     "so the empty map offers its own way on: " + JSON.stringify(cleared.noMarksCtaLabel + " — go with " + cleared.noMarksLight));
+}
+main.actions.rResultCta("continue");
+ok(main.state.readiness === null, "and taking it leaves the check");
+ok(store.loadReadiness() && store.loadReadiness().severity === null,
+   "the check that is saved says nothing was sore");
+ok(store.loadReadiness().light === "green",
+   "and the day is the one her ANSWERS earned, not a light invented by the empty map: " + store.loadReadiness().light);
+engine.exitSession();
+main.state.inSession = false; main.state.pendingSession = null;
+localStorage.clear(); store.migrate();
+
 /* ---- C. closing the instructions is not resuming the workout ----------- */
 localStorage.clear(); store.migrate();
 engine.exitSession();
@@ -227,6 +263,41 @@ ok(main.state.detailEx === null, "and forgotten");
 main.actions.openDetail({ name: "Superman" });
 main.actions.resumeFromDetail();
 ok(engine.sess.paused === false, "only the explicit Resume button restarts the clock");
+
+/* ---- C2. THE HOLD A CLOSED OVERLAY LEAVES BEHIND IS STILL RELEASABLE ------
+   The ✕ deliberately leaves the clock stopped, and the button that released
+   the instructions hold went away with the card. The workout screen's own
+   Resume named only "user" and the backgrounding hold, so from the first ✕
+   onward it did nothing at all: every later tap of Resume was ignored, Done
+   walked on to the next phase with the clock still stopped, and the only way
+   out of the session was to end it. */
+engine.sess.running = true; engine.sess.paused = false; engine.sess.pauseReasons = [];
+main.actions.openDetail({ name: "Superman" });
+main.actions.closeDetail();
+ok(engine.sess.paused === true, "after the ✕ the clock is still stopped");
+main.actions.pauseTimer();
+ok(engine.sess.paused === false,
+   "and the workout screen's Resume starts it again — this is the dead end the owner hit");
+ok((engine.sess.pauseReasons || []).length === 0, "with no hold left stranded behind it");
+
+/* The video hold has no overlay in front of her AT ALL — the link opens
+   another tab — so it could stand the session's whole remaining length. */
+engine.sess.running = true; engine.sess.paused = false; engine.sess.pauseReasons = [];
+main.actions.watchVideo();
+ok(engine.sess.paused === true, "opening the demo video stops the clock before she leaves");
+main.actions.pauseTimer();
+ok(engine.sess.paused === false, "and the Resume she comes back to releases that hold too");
+
+/* What must NOT change: a pause she took herself outlives the card. */
+engine.sess.running = true; engine.sess.paused = false; engine.sess.pauseReasons = [];
+main.actions.pauseTimer();
+main.actions.openDetail({ name: "Superman" });
+main.actions.resumeFromDetail();
+ok(engine.sess.paused === true,
+   "reading a move and closing it does not restart a clock she deliberately stopped");
+main.actions.pauseTimer();
+ok(engine.sess.paused === false, "her own Resume does");
+engine.exitSession();
 ok(main.state.detailOverlay === false, "and it closes the card too");
 
 /* THE VIDEO LINK IS A LEAVING-THE-APP LINK.

@@ -68,7 +68,10 @@
   0%, 100% { transform: rotate(-2deg); }
   50%      { transform: rotate(2deg); }
 }
-@keyframes splash-pulse-ring {
+/* Named for what it is, not for one app: the session ring asks for
+   `pulse-ring` (core/screens/session.js) and nothing defined that, so the
+   last-three-seconds pulse never played in either app. */
+@keyframes pulse-ring {
   0%   { box-shadow: 0 0 0 0 rgba(20, 184, 212, 0.40); }
   100% { box-shadow: 0 0 0 18px rgba(20, 184, 212, 0); }
 }

@@ -87,13 +87,20 @@ export function formChecksOf(s) {
    A pain stop returns counted:false — it is never averaged and never blamed. */
 export function sessionEffort(s) {
   if (!s) return { score: 0, band: "—", reasons: [], painStop: false, counted: false };
-  if (s.pain) {
+  // The same pair the outcome authority tests (js/outcome.js): a row carrying
+  // only `safetyStop` is the same stop, and was being scored as an ordinary
+  // short session and averaged into her effort.
+  if (s.pain || s.safetyStop) {
     return { score: null, band: "Right call", counted: false, painStop: true,
              reasons: ["Stopped for pain — that's the rule working, not a lapse."] };
   }
   const reasons = [];
   const moves = (s.perExercise || []).length;
-  const skipped = (s.perExercise || []).filter(p => p.skipped).length || s.skippedCount || 0;
+  /* A ZERO FROM THE LEDGER IS AN ANSWER. `||` treated it as "no ledger here"
+     and fell back to the raw count of skip TAPS, so a move skipped in round two
+     but done in rounds one and three — which the per-move record deliberately
+     reads as not skipped — was scored and reported as a skipped move anyway. */
+  const skipped = moves ? (s.perExercise || []).filter(p => p.skipped).length : (s.skippedCount || 0);
 
   // finished what the day asked
   let finish;

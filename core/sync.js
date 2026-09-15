@@ -91,7 +91,12 @@ export async function restoreFromCloud() {
     // only ever moves things up, so merging several is safe.
     let journeyChanged = false;
     for (const id of [...athleteAliases(), ...LEGACY_JOURNEY_KEYS]) {
-      if (mergeCloudJourney(await fsGetJourney(id))) journeyChanged = true;
+      /* The pull above already proved the mirror is reachable. A flaky
+         follow-up read is a missing merge, not a verdict on the connection —
+         letting it throw out here would report the whole boot as offline and
+         park every prize draw on a device that had just synced. */
+      try { if (mergeCloudJourney(await fsGetJourney(id))) journeyChanged = true; }
+      catch (e) { console.warn("Journey merge skipped for", id, e && e.message); }
     }
     await fsSaveJourney(me, journeySnapshot());
     const xp = rebuildJourneyXp();
@@ -101,8 +106,10 @@ export async function restoreFromCloud() {
        history under a key nothing reads. Merging only ever adds rows. */
     let checksAdded = 0;
     for (const id of athleteAliases()) {
-      const doc = await fsGetReadiness(id);
-      if (doc && Array.isArray(doc.checks)) checksAdded += mergeReadinessLog(doc.checks);
+      try {
+        const doc = await fsGetReadiness(id);
+        if (doc && Array.isArray(doc.checks)) checksAdded += mergeReadinessLog(doc.checks);
+      } catch (e) { console.warn("Readiness merge skipped for", id, e && e.message); }
     }
     const myChecks = loadReadinessLog().filter(r => r && r.abnormal);
     if (myChecks.length) await fsSaveReadiness(me, myChecks.slice(-READINESS_MIRROR_CAP));
@@ -117,8 +124,12 @@ export async function restoreFromCloud() {
     return { added, uploaded, xp, reachedCloud: true };
   } catch (e) {
     console.warn("Cloud sync skipped:", e);
-    // Not an error worth showing: the app runs offline by design. It does mean
-    // the total on this device is its own, so a draw waits.
+    /* Not an error worth showing: the app runs offline by design. It does mean
+       the total on this device is its own, so a draw waits — and, just as
+       importantly, that `reachedCloud` stays false, so the gate knows it has
+       NOT been told this family is new. A read that could not be made throws
+       MirrorUnreachable to get here; before it did, every offline boot landed
+       on the success path below. */
     noteSyncResult(false);
     return idle;
   }
@@ -152,8 +163,10 @@ export async function publishReadiness() {
     // device that published before it had merged used to erase the other
     // device's checks from the cloud copy.
     for (const id of athleteAliases()) {
-      const doc = await fsGetReadiness(id);
-      if (doc && Array.isArray(doc.checks)) mergeReadinessLog(doc.checks);
+      try {
+        const doc = await fsGetReadiness(id);
+        if (doc && Array.isArray(doc.checks)) mergeReadinessLog(doc.checks);
+      } catch (e) { console.warn("Readiness merge skipped for", id, e && e.message); }
     }
     const rows = loadReadinessLog().filter(r => r && r.abnormal);
     if (!rows.length) return false;
@@ -177,7 +190,10 @@ export async function flushJourney() {
     // Merge what the other device has published since this one last looked,
     // so the snapshot written below is a union and never a rollback of a prize
     // or a mastered question that only the other device knew about.
-    for (const id of [...athleteAliases(), ...LEGACY_JOURNEY_KEYS]) mergeCloudJourney(await fsGetJourney(id));
+    for (const id of [...athleteAliases(), ...LEGACY_JOURNEY_KEYS]) {
+      try { mergeCloudJourney(await fsGetJourney(id)); }
+      catch (e) { console.warn("Journey merge skipped for", id, e && e.message); }
+    }
     return await fsSaveJourney(athleteId(), journeySnapshot());
   } catch (e) {
     console.warn("Journey publish skipped:", e);

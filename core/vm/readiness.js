@@ -342,6 +342,17 @@ export function buildReadinessVM(r, isWide) {
     showBodyArea: step === "bodyArea",
     showInlineReadinessResult, showInlineBodyResult,
     noZonesYet: step === "bodyArea" && selectedNums.length === 0,
+    /* A WAY FORWARD FROM AN EMPTY BODY MAP.
+       The result card — and with it the only Continue on this step — is drawn
+       from a severity, so clearing the marks took it away: "Rest 1-2 min, then
+       re-check" and "✨ Feels fine now — remove mark" both left her on a screen
+       whose only controls were the zone buttons and the back arrow. The way
+       out was to re-report a sore spot she had just said was fine, which is
+       the app teaching a child to under-report pain — the exact opposite of
+       what the body check is for. Saying nothing is off is an answer, and it
+       hands the day to the readiness questions she already answered. */
+    noMarksLight: LIGHT_NAME[r.readinessLight || "green"] || "Green",
+    noMarksCtaLabel: "Nothing feels off now",
     isBodyResultPath, resultDesc, resultCta,
     suggestionLine, combinedLine, wasOverridden, suggestedLight: suggested,
     bodyLight, readinessLight,

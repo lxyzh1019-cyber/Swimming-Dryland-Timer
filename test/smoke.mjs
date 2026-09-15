@@ -3150,7 +3150,13 @@ function stopSaysWhat(coach, safety) {
   store.updateSettings({ coachSpeechOn: coach, safetyVoiceOn: safety, voiceStyle: "classic" });
   spoken.length = 0;
   engine.exitSession();
+  /* THE PATH THE APP ACTUALLY TAKES. endEarly raises the request; the runner
+     sees the abort at its next await and calls finalize, whose first act is to
+     cancel every queued utterance. Driving endEarly alone could never catch
+     the regression this block is named for, because the cancel that ate the
+     line lives in finalize. */
   engine.endEarly();
+  engine.finalize(false);
   return spoken.slice();
 }
 [[true, true], [false, true]].forEach(([coach, safety]) => {

@@ -79,6 +79,51 @@ setSpeechDelay(3000);
   ok(named >= 0, "the next move was announced by name after the skipped rest: " + JSON.stringify(after.slice(0, 2)));
   ok(!after.slice(0, named).includes("Go"), "and not with the bare \"Go\" a finished rest earns");
 }
+
+/* ---- 2b. A TAP WHILE THE COACH IS STILL TALKING THROUGH THE REST ----------
+   The rest stamps `since` at the top of its phase precisely so a tap during
+   "Rest. Next: …" counts. The flag that tap set was wiped 1.2 s later, and
+   with a real voice the line runs several seconds before the countdown that
+   would have read it even begins — so the tap was dropped and the rest ran its
+   full length. Done and Skip Rest did nothing exactly when a kid uses them:
+   the moment the rest starts. */
+{
+  let tapAt = -1, leftAt = -1, hi = 0, lo = Infinity;
+  await runSession({ dayKey: timedDay, light: "red", gateUnlocked: true, seed: voiceOn }, {
+    onTick: (ms, sess) => {
+      if (answerChecks(sess)) return;
+      if (tapAt < 0 && sess.phase === "rest" && speechInFlight()) { tapAt = ms; engine.advance(); return; }
+      if (tapAt < 0 || leftAt >= 0) return;
+      // Only THIS rest, and only once its clock is the thing on screen: before
+      // the coach finishes, sess.timerSecs still holds the move that just ended.
+      if (sess.phase !== "rest") { leftAt = ms; return; }
+      if (!speechInFlight()) { hi = Math.max(hi, sess.timerSecs); lo = Math.min(lo, sess.timerSecs); }
+    }
+  });
+  ok(tapAt > 0, "Done was tapped while the coach was still saying \"Rest. Next: …\"");
+  ok(leftAt > 0, "the rest ended");
+  ok(lo === Infinity || lo >= hi - 1,
+     "and it ended without counting down — the tap was honoured the moment the clock could read it ("
+     + (lo === Infinity ? "the countdown never got a tick in" : lo + "s left of " + hi + "s") + ")");
+}
+
+/* ---- 2c. THE OPENING IS HERS TO CUT --------------------------------------
+   The mantra, the light and the first move's name ran un-interruptible: with a
+   real voice that is eleven seconds of the Done ring on screen doing nothing.
+   A tap means "I know this one, go", the same as on every move. */
+{
+  let tapAt = -1, leftAt = -1;
+  await runSession({ dayKey: timedDay, light: "red", gateUnlocked: true, seed: voiceOn }, {
+    onTick: (ms, sess) => {
+      if (answerChecks(sess)) return;
+      if (tapAt < 0 && sess.phase === "greeting" && speechInFlight()) { tapAt = ms; engine.advance(); return; }
+      if (tapAt >= 0 && leftAt < 0 && sess.phase !== "greeting") leftAt = ms;
+    }
+  });
+  ok(tapAt >= 0, "Done was tapped during the opening");
+  ok(leftAt > 0 && leftAt - tapAt < 1500,
+     "and the workout moved on at once instead of waiting the greeting out (" + (leftAt - tapAt) + " ms)");
+}
 setSpeechDelay(0);
 
 /* ---- 3. A double tap is one tap ----

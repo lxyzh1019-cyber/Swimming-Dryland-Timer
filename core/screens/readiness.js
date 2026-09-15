@@ -208,7 +208,12 @@ export function readinessScreen(vm) {
         </div>
       </div>
 
-      ${vm.noZonesYet ? `<div style="text-align:center;font-family:var(--font-hand);font-size:22px;font-weight:700;color:var(--ink-soft);margin-top:16px;">Tap the spot that feels different — Coach will ask how it feels.</div>` : ""}
+      ${vm.noZonesYet ? `<div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:16px;">
+        <div style="text-align:center;font-family:var(--font-hand);font-size:22px;font-weight:700;color:var(--ink-soft);">Tap the spot that feels different — Coach will ask how it feels.</div>
+        <button type="button" data-action="rResultCta" data-arg="continue" style="display:flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:0 24px;border:2px solid var(--mint);background:var(--mint-wash);color:var(--mint-ink);border-radius:var(--radius-pill);font-weight:900;font-size:16px;cursor:pointer;font-family:inherit;">
+          <span style="font-size:20px;" aria-hidden="true">✨</span> ${vm.noMarksCtaLabel} — go with ${vm.noMarksLight}
+        </button>
+      </div>` : ""}
       ${vm.showInlineBodyResult ? resultCard(vm, { areaLabel: vm.areaLabel }) : ""}
 
       ${vm.showZonePopup ? `
