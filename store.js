@@ -8,7 +8,7 @@ import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.
 import { STORAGE_KEYS as K, ATHLETE_DEFAULT, LEGACY_ATHLETE, BACKUP_APP, LORE_TRANSFER_FIELD, COPY } from "./sport.js";
 export { LEGACY_ATHLETE, BACKUP_APP };
 import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE, VALGUS_FLOOR } from "./data.js";
-import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION, roundPayCredit,
+import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION, roundPayCredit, workoutDate,
          streakDatesOf, freezeDatesOf } from "./outcome.js";
 
 /* ---- keys (unchanged from the old app unless noted) ---- */
@@ -1011,9 +1011,8 @@ export function loadJourney() {
 export function saveJourney(j) { return writeStorage(LS_JOURNEY, j); }
 
 /* XP a stored record is worth. Prefers what was actually awarded at the time;
-   falls back to the formula (halved for an ended-early session, matching
-   finalize()) for records restored from the cloud or written before xpEarned
-   existed. */
+   falls back to the same formula finalize() pays for records restored from the
+   cloud or written before xpEarned existed. */
 export function sessionXp(entry) {
   // Try-it rows are not training (older histories may still hold some) and must
   // never reach the XP total on a rebuild.
@@ -1024,8 +1023,17 @@ export function sessionXp(entry) {
   // the two together was counted twice on every rebuild (360 + 30 came back
   // as 420). migrateQuizXp() splits the historic rows that did.
   if (Number.isFinite(entry && entry.xpEarned)) return Math.max(0, entry.xpEarned);
-  const full = xpForSession(entry || {});
-  return entry && entry.completedFully === false ? Math.round(full / 2) : full;
+  /* NO HALVING. This used to return half for an ended-early row "matching
+     finalize()", and finalize() stopped halving when a session started being
+     paid for the rounds it actually finished (see xpForSession). The comment
+     stayed true-sounding and the code stayed wrong, and the two only disagree
+     where nothing can see them: this branch is reached ONLY by a record with no
+     `xpEarned` stamp, which means a row restored from the cloud or imported
+     from a backup. So the same ended-early three-round session was worth 360 on
+     the tablet it was trained on and 180 once it came home from the mirror —
+     the app quietly docking her for syncing. It is paid for its rounds, here as
+     everywhere else. */
+  return xpForSession(entry || {});
 }
 
 /* A session pays a flat rate for the rounds actually trained. The old rule
@@ -1227,8 +1235,11 @@ export function dayXpKey(entry) {
      (`dayIso`, stamped by the engine from the day-progress record), and the
      budget follows it. Rows written before the field existed fall back to the
      date they were saved. */
-  if (entry && typeof entry.dayIso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(entry.dayIso)) return entry.dayIso;
-  return edmontonISO((entry && entry.isoDate) || Date.now());
+  /* One definition, in js/outcome.js, because the STREAK asks this same question
+     and used to answer it differently — it read the finish stamp, so a bout that
+     crossed midnight was paid to the day it began and counted on the day it
+     ended. Two readings of one fact is how that drift starts. */
+  return workoutDate([entry || {}]) || edmontonISO((entry && entry.isoDate) || Date.now());
 }
 
 /* A budget row is { spent, cap }. Rows written before the key changed were a

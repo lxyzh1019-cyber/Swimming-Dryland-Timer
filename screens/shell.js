@@ -9,10 +9,25 @@ export function page(inner) {
 }
 
 /* White shell card with the 96px left nav rail (wide layouts). */
+/* THE NAV STAYS WHERE SHE LEFT IT.
+
+   The rail was centred inside the card, and the card is 800px tall — so it was
+   centred exactly once, against the top of the page, and then scrolled away
+   with everything else. On a Progress screen that runs long, the way back to
+   Today was several flicks up.
+
+   `position:sticky` with a viewport-tall column centres the buttons against the
+   SCREEN instead, and keeps them there while the content moves past.
+
+   And the reason this was not simply two lines: the card sets `overflow` to
+   clip its 30px corners, and `overflow:hidden` silently makes an element a
+   scroll container — which sticky then sticks to, i.e. not at all. `clip` does
+   the same clipping WITHOUT creating one. That is the whole fix; anything older
+   than Safari 16 falls back to exactly the behaviour it has today. */
 export function shellWithRail(vm, contentHtml, { minHeight = 800 } = {}) {
   return `
-  <div style="display:flex;background:var(--surface);border-radius:30px;box-shadow:0 18px 44px rgba(20,59,74,0.16);overflow:hidden;min-height:${minHeight}px;position:relative;">
-    <div style="width:96px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:22px 0;border-right:2px solid var(--hairline);">
+  <div style="display:flex;background:var(--surface);border-radius:30px;box-shadow:0 18px 44px rgba(20,59,74,0.16);overflow:clip;min-height:${minHeight}px;position:relative;">
+    <div style="width:96px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:22px 0;border-right:2px solid var(--hairline);position:sticky;top:0;align-self:flex-start;height:100vh;max-height:${minHeight}px;box-sizing:border-box;">
       <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:26px;align-items:center;">
         ${railBtn("today", "🏠", "Today", vm.railToday)}
         ${railBtn("progress", "📊", "Progress", vm.railProgress)}

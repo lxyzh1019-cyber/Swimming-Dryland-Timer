@@ -19,31 +19,104 @@ import { COPY, EMOJI } from "../sport.js";
 
 import { escapeHtml } from "../util.js";
 
+/* ============================================================
+   THE WEEK, AS ONE TABLE
+
+   The bars and the day-by-day figures are the same seven days, so they are one
+   <table> and the bars live in its <thead>. That is not a stylistic choice: a
+   chart laid out beside a table is two grids, and two grids over the same seven
+   columns drift apart the moment a label grows, a translation lands or a
+   browser rounds a fraction differently — which is exactly what happened when
+   this was tried as a chart above a table. Inside one table, a bar physically
+   cannot sit anywhere but over its own column.
+
+   The streak sits in the corner cell rather than floating above it, because
+   putting the chart in the header opens a dead rectangle there — bounded by the
+   label column, the caption and the first row — and an empty rectangle that
+   size reads as a mistake.
+
+   Every cell is a field already on the saved record. Nothing new is stored.
+   ============================================================ */
+const PACE_CHIP = {
+  green: "background:var(--mint-wash);color:var(--mint-ink);",
+  amber: "background:var(--sun-wash);color:var(--sun-ink);",
+  yellow: "background:var(--coral-wash);color:var(--coral-ink);",
+  red: "background:var(--stop-wash);color:var(--stop-ink);",
+  care: "background:var(--grape-wash);color:var(--grape-ink);"
+};
+
+function weekTable(vm) {
+  const days = vm.weekDays || [];
+  const th = (d) => `<th scope="col" style="padding:1px 5px 5px;text-align:center;font-size:11px;font-weight:900;text-transform:uppercase;color:${d.isToday ? "var(--sea)" : "var(--ink-soft)"};border-bottom:1.5px solid var(--hairline);">${escapeHtml(d.short)}</th>`;
+  const row = (label, pick) => `
+    <tr>
+      <th scope="row" style="padding:6px 6px 6px 0;text-align:left;font-size:12px;font-weight:700;color:var(--ink-soft);white-space:nowrap;">${label}</th>
+      ${days.map(d => {
+        const v = pick(d);
+        const dim = v === "—" || v === "spa";
+        return `<td style="padding:6px 5px;text-align:center;font-size:12px;font-weight:${dim ? "400" : "800"};font-variant-numeric:tabular-nums;color:${dim ? "var(--ink-faint)" : "var(--ink)"};border-bottom:1px solid var(--hairline);">${v}</td>`;
+      }).join("")}
+    </tr>`;
+  const chip = (d) => d.paceBand
+    ? `<span style="display:inline-block;padding:2px 8px;border-radius:var(--radius-pill);font-size:11px;font-weight:900;${PACE_CHIP[d.paceBand] || ""}">${escapeHtml(d.paceLabel)}</span>`
+    : "—";
+  return `
+    <div style="overflow-x:auto;">
+    <table style="width:100%;min-width:440px;border-collapse:collapse;">
+      <caption class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">Minutes trained and what each day did, Monday to Sunday</caption>
+      <thead>
+        <tr>
+          <th scope="col" style="padding:0 6px 3px 0;vertical-align:bottom;text-align:left;">
+            <span style="display:inline-flex;align-items:center;gap:7px;background:var(--coral-wash);border-radius:14px;padding:7px 10px;">
+              <span style="font-size:20px;line-height:1;">🔥</span>
+              <span style="display:inline-flex;flex-direction:column;align-items:flex-start;">
+                <span style="font-family:var(--font-display);font-weight:600;font-size:20px;color:var(--coral);line-height:1;">${vm.dayStreakVal}</span>
+                <span style="font-size:8.5px;font-weight:900;color:var(--coral);letter-spacing:0.03em;line-height:1.1;">DAY STREAK</span>
+              </span>
+            </span>
+          </th>
+          ${days.map(d => `
+            <th scope="col" style="padding:0 5px 3px;vertical-align:bottom;height:68px;">
+              <span style="display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch;height:64px;gap:2px;">
+                <span style="font-size:9px;font-weight:900;color:var(--ink-soft);font-variant-numeric:tabular-nums;">${escapeHtml(d.minsLabel)}</span>
+                <span style="${d.barStyle}"></span>
+              </span>
+            </th>`).join("")}
+        </tr>
+        <tr><th></th>${days.map(th).join("")}</tr>
+      </thead>
+      <tbody>
+        ${row("Planned", d => escapeHtml(d.plannedLabel))}
+        ${row("Movements", d => escapeHtml(d.movesLabel))}
+        ${row("Skipped", d => escapeHtml(d.skippedLabel))}
+        ${row("Main rounds", d => escapeHtml(d.roundsLabel))}
+        ${row("Ended early", d => escapeHtml(d.earlyLabel))}
+        ${row("Pace", chip)}
+        ${row("Streak", d => d.streakMark || "—")}
+      </tbody>
+    </table>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:9px;font-size:11px;color:var(--ink-soft);">
+      ${[["var(--mint)", "Full pace"], ["var(--sun)", "Almost"], ["var(--coral)", "Short"],
+         ["var(--stop)", "Very short"], ["var(--grape)", "Recovery"], ["var(--hairline)", "Nothing logged"]]
+        .map(([c, t]) => `<span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:${c};"></span>${t}</span>`).join("")}
+      <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:3px;background:var(--surface);box-shadow:0 0 0 2px var(--ink);"></span>Today</span>
+    </div>
+    <div style="font-size:11px;color:var(--ink-soft);margin-top:5px;">🔥 earned the day · ❄️ recovery held it · — didn't earn it</div>`;
+}
+
 export function progressScreen(vm) {
   return `
     <div style="flex:1;min-width:0;padding:24px 26px;overflow-y:auto;box-sizing:border-box;">
       <div style="font-family:var(--font-display);font-weight:600;font-size:32px;color:var(--ink);margin-bottom:18px;">Your Progress 🏅</div>
 
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;">
-        <div style="flex:2;min-width:280px;background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);display:flex;align-items:center;gap:18px;">
-          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--coral-wash);border-radius:20px;padding:12px 16px;flex-shrink:0;">
-            <span style="font-size:30px;line-height:1;">🔥</span>
-            <span style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--coral);line-height:1;">${vm.dayStreakVal}</span>
-            <span style="font-size:11px;font-weight:900;color:var(--coral);letter-spacing:0.03em;">DAY STREAK</span>
+        <div style="flex:2;min-width:280px;background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:2px;">
+            <span style="font-weight:900;font-size:12px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">This week</span>
+            <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${vm.sessionsLabel} · ${vm.minAvgVal} min avg</span>
           </div>
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
-              <span style="font-weight:900;font-size:12px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">This week</span>
-              <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${vm.sessionsLabel} · ${vm.minAvgVal} min avg</span>
-            </div>
-            <div style="display:flex;gap:6px;align-items:flex-end;height:64px;">
-              ${vm.analyticsWeek.map(ab => `
-                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end;">
-                  <div style="${ab.barStyle}"></div>
-                  <span style="font-size:11px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;">${ab.short}</span>
-                </div>`).join("")}
-            </div>
-          </div>
+          ${weekTable(vm)}
         </div>
         <div style="flex:1;min-width:220px;background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-xl);padding:16px 18px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;">
           <div style="font-weight:900;font-size:12px;letter-spacing:0.05em;color:var(--sun-ink);text-transform:uppercase;">My prizes 🎁</div>

@@ -94,8 +94,34 @@ export function buildGrownupVM(state) {
   // so a body that reported Red and was sent out Green flagged nothing.
   const yellowRed = sessions.filter(s => ["yellow", "red"].includes(bodyLight(s)));
   const raised = sessions.filter(wasRaised);
+  /* HOW WELL THE DOSES WERE HELD, for the person who was not in the room.
+
+     The engine has always known that a thirty-second hold ended at twelve
+     seconds is not a thirty-second hold — it files the row as `partial` — and
+     nothing has ever said so out loud to a grown-up. A whole session of moves
+     at forty percent of their time reads, everywhere else, exactly like a
+     session she completed. So it is a flag: not a failure, and not something
+     that costs her XP or a streak day, but the thing worth a quiet word before
+     the next session. Bands and wording are paceReport's, in js/outcome.js, so
+     the kid's screen and this one cannot describe the same evening differently. */
+  const paceDays = safetyRows.map(r => ({ row: r, pace: outcomeOf(r).pace }))
+    .filter(x => x.pace && x.pace.shortCount > 0);
+  const shortMoveCount = paceDays.reduce((a, x) => a + x.pace.shortCount, 0);
+  const paceWorstDay = paceDays.reduce((w, x) =>
+    !w || x.pace.counts.red > w.pace.counts.red ? x : w, null);
+
   const flags = [
     ...stops.map(s => ({ icon: "🛑", rowStyle: alertRow("stop"), text: "Stopped for pain during “" + (s.dayTitle || "session") + "” (" + dstr(s.isoDate) + ")." })),
+    ...(shortMoveCount ? [{
+      icon: paceWorstDay && paceWorstDay.pace.counts.red ? "⚠️" : "🟡",
+      rowStyle: alertRow(paceWorstDay && paceWorstDay.pace.counts.red ? "stop" : "sun"),
+      text: shortMoveCount + " move" + (shortMoveCount === 1 ? "" : "s") + " came in under three quarters of their dose"
+        + (paceWorstDay && paceWorstDay.pace.worst && paceWorstDay.pace.worst.name
+            ? " — worst was " + paceWorstDay.pace.worst.name
+              + " at " + Math.round((paceWorstDay.pace.worst.ratio || 0) * 100) + "% on " + dstr(paceWorstDay.row.isoDate)
+            : "")
+        + ". Still real training and still paid — worth watching, not correcting mid-set."
+    }] : []),
     ...(earlyEnds.length ? [{ icon: "⏱", rowStyle: alertRow("sun"), text: earlyEnds.length + " session" + (earlyEnds.length === 1 ? "" : "s") + " ended early — " + earlyEnds.map(s => dstr(s.isoDate)).join(", ") + "." }] : []),
     ...(yellowRed.length ? [{ icon: "💛", rowStyle: alertRow("sun"), text: yellowRed.length + " yellow/red-light day" + (yellowRed.length === 1 ? "" : "s") + " — her body check asked for a lighter session." }] : []),
     ...(raised.length ? [{ icon: "🔓", rowStyle: alertRow("sun"), text: raised.length + " session" + (raised.length === 1 ? "" : "s") + " where a grown-up raised the light above the body check — " + raised.map(s => bodyLight(s) + "→" + ranLight(s) + " (" + dstr(s.isoDate) + ")").join(", ") + "." }] : [])
