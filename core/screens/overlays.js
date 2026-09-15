@@ -9,7 +9,7 @@ import { COPY, IMAGES, EMOJI } from "../sport.js";
 import { settings, loadQuiz, saveQuiz, logEvent, addXp, addPrize, pendingDrawCount, drawIsWaitingOnSync,
          movePool, rankPool, questionBank, quizPaidToday, quizBankStatus,
          quizQuestionKey, payQuizQuestion } from "../store.js";
-import { todayISODate, escapeHtml } from "../util.js";
+import { todayISODate, escapeHtml, imgWithFallbacks, photoSources } from "../util.js";
 
 /* ---- quiz engine (port of _movePool/_makeQ/_buildQuizDeck) ----
    The move pool, the question bank and the XP ledger rules live in store.js
@@ -157,7 +157,7 @@ export function quizDeckHtml(qd) {
     <div style="position:fixed;inset:0;z-index:80;background:linear-gradient(180deg,var(--aqua-wash),var(--bg));display:flex;flex-direction:column;align-items:center;padding:20px;box-sizing:border-box;overflow-y:auto;">
       <div style="width:100%;max-width:620px;display:flex;flex-direction:column;gap:16px;">
         <div style="background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-lift);padding:26px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;">
-          <img src="${IMAGES.mascot}" style="width:96px;height:96px;object-fit:contain;" alt="">
+          ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:96px;height:96px;object-fit:contain;" alt=""`)}
           <div style="font-family:var(--font-display);font-weight:600;font-size:30px;color:var(--ink);">Quiz complete!</div>
           <div style="font-family:var(--font-display);font-weight:600;font-size:48px;color:var(--aqua);line-height:1;">${score} / ${qd.qs.length} correct</div>
           <div style="font-family:var(--font-hand);font-size:22px;font-weight:700;color:var(--aqua-ink);">${scoreVerdict}</div>

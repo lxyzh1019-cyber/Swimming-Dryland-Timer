@@ -1,3 +1,4 @@
+import { imgWithFallbacks, photoSources } from "../util.js";
 import { POSES } from "../data.js";
 import { COPY, IMAGES, EMOJI } from "../sport.js";
 /* ============================================================
@@ -58,7 +59,7 @@ function promptCard(vm, size) {
   if (vm.phase === "microloop") {
     return `
     <div style="flex:0 1 ${size}px;max-width:${size}px;min-width:240px;min-height:${Math.round(size * 0.8)}px;border-radius:26px;background:var(--aqua-wash);border:3px solid var(--aqua);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;box-sizing:border-box;">
-      <img src="${POSES.think}" alt="" style="height:70px;object-fit:contain;">
+      ${imgWithFallbacks(photoSources(POSES.think), `alt="" style="height:70px;object-fit:contain;"`)}
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--ink);text-align:center;">${vm.microQ}</div>
       <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
         ${vm.microOpts.map(o => {
@@ -76,7 +77,7 @@ function promptCard(vm, size) {
   if (vm.phase === "formcheck") {
     return `
     <div style="flex:0 1 ${size}px;max-width:${size}px;min-width:240px;min-height:${Math.round(size * 0.6)}px;border-radius:26px;background:var(--mint-wash);border:3px solid var(--mint);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:22px;box-sizing:border-box;">
-      <img src="${POSES.think}" alt="" style="height:70px;object-fit:contain;">
+      ${imgWithFallbacks(photoSources(POSES.think), `alt="" style="height:70px;object-fit:contain;"`)}
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--mint-ink);text-align:center;">${vm.formCheckTitle}</div>
       <div style="font-size:15px;font-weight:700;color:var(--ink);text-align:center;line-height:1.45;">${vm.cleanCheckQuestion}<br><span style="font-size:13px;color:var(--ink-soft);">${vm.checkNote}</span></div>
     </div>`;
@@ -84,7 +85,7 @@ function promptCard(vm, size) {
   // breath rehearsal
   return `
   <div style="flex:0 1 ${size}px;max-width:${size}px;min-width:240px;min-height:${Math.round(size * 0.8)}px;border-radius:26px;background:var(--mint-wash);border:3px solid var(--mint);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;box-sizing:border-box;">
-    <img src="${POSES.breath}" alt="" style="height:90px;object-fit:contain;">
+    ${imgWithFallbacks(photoSources(POSES.breath), `alt="" style="height:90px;object-fit:contain;"`)}
     <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--mint-ink);text-align:center;">Breath rehearsal</div>
     <div style="font-size:15px;font-weight:700;color:var(--ink);text-align:center;line-height:1.45;">${vm.breathText}</div>
   </div>`;
@@ -105,24 +106,28 @@ function badge(variant, label) {
 
 /* Exercise photo slot — photos land at assets/exercises/<name> - Timer Image.png;
    until then a watercolor-wash placeholder shows through. */
-function photoSlot(photoUrl, w, h, radius) {
+function photoSlot(photoUrl, w, h, radius) {   // photoUrl: the list of sources, WebP first
   return `
   <div style="flex:1 1 ${w}px;max-width:${w}px;min-width:0;aspect-ratio:${w} / ${h};border-radius:${radius}px;overflow:hidden;position:relative;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
     <span style="font-size:${Math.round(w / 6)}px;" aria-hidden="true">${EMOJI.sport}</span>
     <span style="font-size:12px;font-weight:800;color:var(--aqua-ink);opacity:0.75;text-align:center;padding:0 14px;">Form photo coming soon</span>
-    <img src="${photoUrl}" alt="" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+    ${imgWithFallbacks(photoUrl, `alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"`)}
   </div>`;
 }
 
 function stopOverlay() {
   return `
   <div style="position:absolute;inset:0;z-index:20;background:var(--stop-wash);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px;text-align:center;">
-    <img src="${POSES.breath}" alt="" style="height:180px;object-fit:contain;">
+    ${imgWithFallbacks(photoSources(POSES.breath), `alt="" style="height:180px;object-fit:contain;"`)}
     <div style="font-family:var(--font-display);font-weight:600;font-size:34px;color:var(--stop-ink);">Stopped. Good call.</div>
     <div style="font-size:18px;font-weight:700;color:var(--ink);line-height:1.5;max-width:480px;">If something hurts — sharp pain, pinching, or numbness — <b>tell a grown-up right now</b>. Your body matters more than any streak.</div>
     <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;justify-content:center;">
       <button type="button" data-action="resumeFromStop" style="min-height:56px;border:none;border-radius:var(--radius-pill);padding:0 26px;background:var(--mint);color:#fff;font-weight:900;font-size:16px;cursor:pointer;font-family:inherit;box-shadow:0 4px 0 var(--mint-deep);">I'm okay — keep going</button>
-      <button type="button" data-action="endFromStop" style="min-height:56px;border:2px solid var(--stop);border-radius:var(--radius-pill);padding:0 26px;background:var(--surface);color:var(--stop-ink);font-weight:900;font-size:16px;cursor:pointer;font-family:inherit;">End session</button>
+    </div>
+    <div style="font-size:14px;font-weight:800;color:var(--ink-soft);margin-top:6px;">Or end the session:</div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;">
+      <button type="button" data-action="endFromStop" data-arg="pain" style="min-height:56px;border:2px solid var(--stop);border-radius:var(--radius-pill);padding:0 22px;background:var(--surface);color:var(--stop-ink);font-weight:900;font-size:15px;cursor:pointer;font-family:inherit;">🤕 Something hurts — stop</button>
+      <button type="button" data-action="endFromStop" data-arg="break" style="min-height:56px;border:2px solid var(--hairline);border-radius:var(--radius-pill);padding:0 22px;background:var(--surface);color:var(--ink);font-weight:900;font-size:15px;cursor:pointer;font-family:inherit;">I'm fine, just stopping today</button>
     </div>
   </div>`;
 }
@@ -135,7 +140,7 @@ export function detailOverlayHtml(vm) {
         <div style="width:100%;height:330px;position:relative;overflow:hidden;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
           <span style="font-size:60px;" aria-hidden="true">${EMOJI.sport}</span>
           <span style="font-size:13px;font-weight:800;color:var(--aqua-ink);opacity:0.75;">Demo photo coming soon</span>
-          <img src="${vm.detailPhotoUrl}" alt="" data-fallback="${vm.detailPhotoFallbackUrl || ""}" onerror="if(this.dataset.fallback&&this.src.indexOf(this.dataset.fallback)<0){this.src=this.dataset.fallback;}else{this.style.display='none';}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+          ${imgWithFallbacks(vm.detailPhotoSources, `alt="""}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"`)}
         </div>
         <button type="button" data-action="closeDetail" style="position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;border:none;background:rgba(20,59,74,0.55);color:#fff;font-size:16px;font-weight:900;cursor:pointer;" aria-label="Close">✕</button>
       </div>
@@ -257,7 +262,7 @@ function completeScreen(vm) {
   const title = vm.finishedAResume ? "You came back and finished it! 🎉" : c.title;
   return `
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:16px;padding:40px;text-align:center;background:${c.bg};overflow-y:auto;">
-    <img src="${POSES[c.pose]}" alt="" style="height:${c.poseH}px;object-fit:contain;flex-shrink:0;">
+    ${imgWithFallbacks(photoSources(POSES[c.pose]), `alt="" style="height:${c.poseH}px;object-fit:contain;flex-shrink:0;"`)}
     <div style="font-family:var(--font-display);font-weight:600;font-size:34px;color:${c.ink};">${title}</div>
     ${note ? `<div${c.alert ? ` role="alert"` : ""} style="font-size:15px;font-weight:800;${c.noteStyle || "color:var(--mint-ink);background:var(--mint-wash);"}border-radius:16px;padding:10px 16px;max-width:480px;line-height:1.45;">${note}</div>` : ""}
     ${vm.sessionMantra && c.mantra ? `<div style="font-family:var(--font-hand);font-size:26px;font-weight:700;color:var(--aqua-ink);line-height:1.2;">${vm.sessionMantra}</div>` : ""}
@@ -276,7 +281,7 @@ function completeScreen(vm) {
     ${vm.showCompletionExtras ? `
     <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;">
       <div style="display:flex;align-items:center;gap:10px;">
-        <img src="${POSES.think}" alt="" style="height:64px;object-fit:contain;">
+        ${imgWithFallbacks(photoSources(POSES.think), `alt="" style="height:64px;object-fit:contain;"`)}
         <div style="font-family:var(--font-hand);font-size:24px;font-weight:700;color:var(--ink);">How did it feel?</div>
       </div>
       <div style="display:flex;gap:12px;">
@@ -306,7 +311,7 @@ function completeScreen(vm) {
     </div>` : ""}
     <div style="display:flex;flex-direction:column;gap:12px;background:var(--surface);border-radius:20px;padding:18px 22px;box-shadow:var(--shadow-soft);max-width:600px;width:100%;box-sizing:border-box;text-align:left;">
       <div style="display:flex;align-items:center;gap:10px;">
-        <img src="${IMAGES.mascot}" style="width:44px;height:44px;object-fit:contain;flex-shrink:0;" alt="">
+        ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:44px;height:44px;object-fit:contain;flex-shrink:0;" alt=""`)}
         <div>
           <div style="font-family:var(--font-display);font-weight:600;font-size:18px;color:var(--ink);">Coach's Quiz 🧠</div>
           <div style="font-size:12px;font-weight:800;color:var(--ink-soft);">${COPY.sessionQuizIntro}</div>
@@ -338,7 +343,7 @@ function centerStack(vm, wide) {
     : timerRing(vm, ringSize);
   return `
   <div style="display:flex;gap:${wide ? 24 : 16}px;align-items:center;justify-content:center;width:100%;min-width:0;flex-shrink:0;flex-wrap:${wide ? "nowrap" : "wrap"};">
-    ${vm.notResting && (!vm.isPrompt || vm.isFormCheck) ? photoSlot(vm.curExPhotoUrl, wide ? 360 : 210, wide ? 480 : 280, wide ? 20 : 16) : ""}
+    ${vm.notResting && (!vm.isPrompt || vm.isFormCheck) ? photoSlot(vm.curExPhotoSources, wide ? 360 : 210, wide ? 480 : 280, wide ? 20 : 16) : ""}
     ${ring}
   </div>
 
@@ -365,7 +370,7 @@ function centerStack(vm, wide) {
 
   ${vm.isBigRest ? `
   <div style="display:flex;align-items:center;gap:10px;background:var(--sun-wash);border-radius:var(--radius-lg);padding:10px 14px;box-sizing:border-box;width:100%;max-width:480px;flex-shrink:0;">
-    <img src="${POSES.breath}" style="width:64px;height:58px;object-fit:contain;flex-shrink:0;" alt="">
+    ${imgWithFallbacks(photoSources(POSES.breath), `style="width:64px;height:58px;object-fit:contain;flex-shrink:0;" alt=""`)}
     <div style="font-family:var(--font-hand);font-size:15px;color:var(--sun-ink);font-style:italic;line-height:1.3;">${vm.cheerMsg}</div>
   </div>` : ""}
 
@@ -441,7 +446,7 @@ function controls(vm, wide) {
     ${vm.canSkipExercise ? `<button type="button" data-action="askSkip" style="flex:0 0 auto;min-height:44px;border-radius:var(--radius-pill);border:none;font-weight:900;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 18px;background:transparent;color:var(--ink-faint);font-family:inherit;">⏭ Skip this exercise</button>` : ""}
   </div>` : ""}` : `
   <div style="display:flex;${wide ? "align-items:center;gap:14px;" : "flex-direction:column;gap:8px;"}background:var(--surface-2);border-radius:var(--radius-md);padding:10px 14px;">
-    ${wide ? `<img src="${POSES.seeyou}" alt="" style="height:52px;object-fit:contain;flex-shrink:0;">` : ""}
+    ${wide ? `${imgWithFallbacks(photoSources(POSES.seeyou), `alt="" style="height:52px;object-fit:contain;flex-shrink:0;"`)}` : ""}
     <span style="${wide ? "flex:1;" : ""}font-weight:800;font-size:${wide ? 15 : 14}px;color:var(--ink);">End early? Your progress is saved.</span>
     <div style="display:flex;gap:8px;">
       <button type="button" data-action="cancelEnd" style="${wide ? "" : "flex:1;"}min-height:44px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;padding:0 16px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">Keep going</button>
@@ -470,7 +475,7 @@ function tipsSafety(vm) {
     <div style="font-weight:900;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);">Tips &amp; Safety</div>
     ${vm.curExCue ? `
     <div style="background:var(--aqua-wash);border-radius:var(--radius-md);padding:12px 14px;box-sizing:border-box;display:flex;align-items:center;gap:12px;">
-      <img src="${POSES.keepgoing}" alt="" style="width:68px;height:52px;object-fit:contain;flex-shrink:0;">
+      ${imgWithFallbacks(photoSources(POSES.keepgoing), `alt="" style="width:68px;height:52px;object-fit:contain;flex-shrink:0;"`)}
       <div style="min-width:0;">
         <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--aqua-ink);margin-bottom:6px;">Coach tip</div>
         <div style="font-size:16px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.curExCue}</div>

@@ -453,6 +453,21 @@ await unlockGrownup();
 main.state.nav = "grownup";
 main.actions.nav("today");
 ok(gate.gateUnlocked() === false, "walking out re-locks it immediately");
+ok(main.gateExpiryArmed() === false, "and the expiry repaint is dropped with it");
+/* The unlock ends ON SCREEN: a timer repaints when the five minutes lapse, so
+   the Zone does not sit open until the next tap. */
+await unlockGrownup();
+main.state.nav = "grownup";
+main.actions.nav("grownup");
+main.actions.setGuTab("settings");
+ok(main.gateExpiryArmed() === false, "an unlock that never went through the gate arms nothing");
+gate.lockGate(); resetGateState();
+main.actions.setVoiceStyle("fun");
+ok(main.state.gateAsk === "setVoiceStyle", "a locked Zone asks");
+main.actions.answerGate(TEST_PIN);
+ok(gate.gateUnlocked() && main.gateExpiryArmed() === true, "answering the PIN arms the expiry repaint");
+main.actions.nav("today");
+ok(main.gateExpiryArmed() === false, "leaving drops it");
 ok(main.state.nav === "today", "leaving is never itself blocked");
 main.actions.nav("grownup");
 ok(main.state.nav !== "grownup" && main.state.gateAsk === "nav", "so coming back asks again");
@@ -471,6 +486,31 @@ ok(main.state.readiness.grownupOk === true, "a grown-up who is actually there ca
 gate.lockGate(); resetGateState();
 main.actions.rGrownupOk();
 ok(main.state.readiness.grownupOk === false, "and withdrawing the confirmation is always allowed");
+
+/* "Rest 1–2 min, then re-check" wipes the body-check marks. A mild report is
+   hers to redo; a severity-3 report is a pain record a grown-up has to see, and
+   the same ungated tap used to clear it. */
+gate.lockGate(); resetGateState();
+main.state.readiness = { answers: {}, zoneSev: { 3: 2 }, severity: 2, grownupOk: false, light: "yellow", overridden: false, step: "result" };
+main.actions.rRetryCheck();
+ok(main.state.readiness.severity === null && main.state.gateAsk === null, "a child may re-check after a mild (severity 2) report");
+main.state.readiness = { answers: {}, zoneSev: { 3: 3 }, severity: 3, grownupOk: false, light: "red", overridden: false, step: "result" };
+main.actions.rRetryCheck();
+ok(main.state.readiness.severity === 3, "a severity-3 pain report is NOT cleared by the child's re-check tap");
+ok(main.state.gateAsk === "rRetryCheck", "it asks for a grown-up");
+main.actions.cancelGate();
+main.actions.rResultSecondary("retry");
+ok(main.state.readiness.severity === 3 && main.state.gateAsk === "rRetryCheck", "nor through the result card's own retry path");
+main.actions.cancelGate();
+main.actions.rResultCta("retry");
+ok(main.state.readiness.severity === 3 && main.state.gateAsk === "rRetryCheck", "nor through the primary button's");
+main.actions.answerGate(TEST_PIN);
+ok(main.state.readiness.severity === null, "a grown-up who is there can clear it and start the check over");
+main.state.readiness = { answers: {}, zoneSev: {}, grownupOk: false, light: "green", overridden: false };
+gate.lockGate(); resetGateState();
+main.actions.rRetryCheck();
+ok(main.state.gateAsk === "rRetryCheck", "and with no severity recorded there is nothing for her to re-check");
+main.actions.cancelGate();
 
 /* Overriding the light the body check produced is an adult decision. */
 gate.lockGate(); resetGateState();

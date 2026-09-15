@@ -1,5 +1,7 @@
 # Multi-Role Review — Splash Swim Dryland Timer
 
+> **Paths, as of 2026-09:** the engine now lives in the shared `core/` — `js/engine.js` is `core/engine.js`, `js/store.js` is `core/store.js`, and likewise for `main`, `audio`, `sync`, `firebase`, `util`, `vm/*` and `screens/*`. Only `js/data.js` and `js/sport.js` are still the app's own. Line numbers are as of the commit reviewed.
+
 ## Context
 
 A five-hat review of the app — senior software engineer (bugs), senior

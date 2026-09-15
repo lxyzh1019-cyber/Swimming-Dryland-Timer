@@ -15,7 +15,10 @@ the **Splash — Kids Swim Training** design system.
 - **Session** — guided timer with a real speech coach (cues, counts, tempo
   reps), portrait form-photo slots, STOP rule overlay, clean/wobbly checks,
   "◀ Back a move" (redo the previous move; not across a counted round),
-  mood + reflection on the complete screen
+  mood + reflection on the complete screen. A tap during the coach's
+  announcement starts the move; the red STOP asks whether something hurts
+  before it costs her anything — a plain "just stopping" is paid for the
+  rounds she trained
 - **Explore the moves** — the same session screen with nothing counting
   down: every move once, advanced by tap, no Body Check, nothing recorded
 - **Progress** — streaks, prize wallet, milestones, training log, Ocean Story
@@ -113,8 +116,10 @@ failure — the chained `&&` it replaced stopped at the first one, so a
 Monday-only assertion hid four green suites for a day a week. The suites:
 the core's action-layer, invariants, integrity, landing-rule and offline-shell
 suites (`core/test/`, shared with the skate app and run there against its
-content too) and this app's `test/smoke.mjs`. No install needed; the
-`package.json` exists only for this script.
+content too), the session-safety suite, and this app's `test/smoke.mjs`. No
+install needed; the `package.json` exists only for this script. On a pull
+request CI also runs `core/tools/release-check.mjs`: a precached shell file
+that changed without a bump of `version` in `sw.js` fails the build.
 
 ## Data
 
@@ -245,3 +250,14 @@ Photo slots are intentionally empty until real photos land in
 (e.g. `Hollow Tuck Flutter - Timer Image.png`). A `/` in a name becomes `-`
 since it can't appear in a filename. Get the spelling exactly right — a
 typo means that photo silently falls back to the placeholder.
+
+**Ship the WebP twin.** Every PNG a screen shows — move photos, poses, the
+mascot, the body maps — has a `.webp` beside it at the same pixel size
+(~90 % smaller), and the screens ask for it first, falling back to the PNG.
+`npm test` fails if a twin is missing. After adding or replacing a PNG:
+
+```
+PLAYWRIGHT_MODULE=… node core/tools/webp.mjs "assets/exercises/<New Move> - Timer Image.png"
+```
+
+(`playwright` from `node_modules` works without the variable.)

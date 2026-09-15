@@ -4,7 +4,7 @@
    values come from buildTodayVM.
    ============================================================ */
 
-import { escapeHtml } from "../util.js";
+import { escapeHtml, imgWithFallbacks, photoSources } from "../util.js";
 import { POSES } from "../data.js";
 import { COPY, IMAGES, EMOJI } from "../sport.js";
 
@@ -99,7 +99,7 @@ function journeyRail(j, headerOffset) {
       ${j.levelPips.map(lp => `<div style="${lp.style}"></div>`).join("")}
       ${j.waypoints.map(wp => `
         <div data-way="${wp.stateAttr}" style="${wp.circleStyle}">
-          ${wp.showAvatar ? `<img src="${IMAGES.avatar}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : ""}
+          ${wp.showAvatar ? `${imgWithFallbacks(photoSources(IMAGES.avatar), `alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"`)}` : ""}
           ${wp.showCheck ? `<span>✓</span>` : ""}
           ${wp.showIcon ? `<span>${wp.icon}</span>` : ""}
         </div>
@@ -170,7 +170,7 @@ function dayPane(vm, wide) {
 
   const done = dv.isDone ? `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-      <img src="${POSES.greatwork}" alt="" style="height:${wide ? 72 : 64}px;object-fit:contain;flex-shrink:0;">
+      ${imgWithFallbacks(photoSources(POSES.greatwork), `alt="" style="height:${wide ? 72 : 64}px;object-fit:contain;flex-shrink:0;"`)}
       <div style="display:flex;flex-direction:column;gap:1px;">
         <span style="font-weight:900;font-size:${wide ? 16 : 15}px;">✅ ${dv.doneHeadline}</span>
         <span style="font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.85;">${dv.doneSub}</span>
@@ -257,7 +257,6 @@ function dayPane(vm, wide) {
           <span style="font-size:15px;line-height:1;">${vm.weather.icon}</span>
           <span style="font-size:13px;font-weight:900;">${wide ? vm.weather.caption + " " : ""}${vm.weather.temp}°</span>
         </div>
-        ${dv.showSettings ? `<button type="button" data-action="toggleCoachVoice" aria-label="Toggle coach voice" style="${vm.coachIconBtnStyle}">🎧</button>` : ""}
       </div>
     </div>
     <div style="font-family:var(--font-display);font-weight:600;font-size:${titleSize}px;line-height:1.${wide ? "05" : "1"};margin:12px 0 12px;">${dv.title}</div>
@@ -290,7 +289,7 @@ export function todayWide(vm) {
           </div>
           <div style="font-family:var(--font-hand);font-weight:700;font-size:24px;line-height:1.1;color:var(--aqua-ink);margin-top:5px;">${COPY.greeting}</div>
         </div>
-        <img src="${POSES.welcome}" alt="" aria-hidden="true" style="height:104px;margin:-10px 8px -14px 0;object-fit:contain;flex-shrink:0;">
+        ${imgWithFallbacks(photoSources(POSES.welcome), `alt="" aria-hidden="true" style="height:104px;margin:-10px 8px -14px 0;object-fit:contain;flex-shrink:0;"`)}
       </div>
 
       <div style="margin-bottom:16px;">
@@ -331,7 +330,7 @@ export function todayNarrow(vm) {
         </div>
         <div style="font-family:var(--font-hand);font-weight:700;font-size:20px;line-height:1.1;color:var(--aqua-ink);margin-top:4px;">${COPY.greeting}</div>
       </div>
-      <img src="${POSES.welcome}" alt="" aria-hidden="true" style="height:88px;object-fit:contain;flex-shrink:0;">
+      ${imgWithFallbacks(photoSources(POSES.welcome), `alt="" aria-hidden="true" style="height:88px;object-fit:contain;flex-shrink:0;"`)}
     </div>
 
     <div style="background:var(--surface);border-radius:20px;box-shadow:0 10px 26px rgba(20,59,74,0.12);padding:14px;">

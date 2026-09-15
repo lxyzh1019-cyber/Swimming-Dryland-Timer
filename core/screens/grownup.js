@@ -7,7 +7,7 @@ import { COPY, EMOJI } from "../sport.js";
    gate, engagement systems — carried over from the old app).
    ============================================================ */
 
-import { escapeHtml } from "../util.js";
+import { escapeHtml, imgWithFallbacks, photoSources } from "../util.js";
 
 /* EVERY STORED STRING ON THIS SCREEN GOES THROUGH HERE.
 
@@ -553,7 +553,7 @@ function libraryTab(vm) {
           <div style="width:100%;height:180px;position:relative;overflow:hidden;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
             <span style="font-size:44px;" aria-hidden="true">${EMOJI.sport}</span>
             <span style="font-size:12px;font-weight:800;color:var(--aqua-ink);opacity:0.75;">Demo photo coming soon</span>
-            <img src="${esc(lib.photoUrl)}" alt="" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+            ${imgWithFallbacks(photoSources(lib.photoUrl).map(esc), `loading="lazy" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"`)}
           </div>
           <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
             <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;">
@@ -765,7 +765,7 @@ function coachingTab(vm) {
 function lockedZone() {
   return `
     <div style="flex:1;min-width:0;padding:24px 26px;overflow-y:auto;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;">
-      <img src="${POSES.remember}" alt="" style="height:150px;object-fit:contain;">
+      ${imgWithFallbacks(photoSources(POSES.remember), `alt="" style="height:150px;object-fit:contain;"`)}
       <div style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);">Grown-up Zone 🧑</div>
       <div style="font-size:15px;font-weight:800;color:var(--ink-soft);line-height:1.5;max-width:380px;">This part is for a grown-up. The unlock has timed out — tap 🧑 again and enter the PIN.</div>
       <button type="button" data-action="nav" data-arg="grownup" style="min-height:46px;border:none;border-radius:var(--radius-pill);background:var(--aqua);color:#fff;font-weight:900;font-size:15px;padding:0 22px;cursor:pointer;font-family:inherit;">Unlock</button>

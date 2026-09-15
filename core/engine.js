@@ -46,6 +46,7 @@ function blankSession() {
     running: false, paused: false, pauseReasons: [], pauseCount: 0,
     abort: false, skipExercise: false, forceDone: false, forceDoneAt: 0,
     byRepsResolver: null, intentResolver: null, microResolver: null,
+    announceResolver: null, lastTapAt: 0,
     currentEx: null, skipped: [], perExercise: [], justSkipped: false,
     phase: "greeting",           // greeting|getready|work|reps|sideswitch|rest|roundRest|sectionRest|intent|microloop|breath|done
     circuits: [], ci: 0, ei: 0, round: 1, exDone: 0,
@@ -448,15 +449,24 @@ function countdown(seconds, opts = {}) {
     sess.timerSecs = seconds; sess.timerMax = seconds; sess.urgent = false;
     notify("tick");
     const started = Date.now();
+    const since = Math.min(started, Number(opts.since) || started);
     let deadline = started + seconds * 1000;
     let lastWhole = seconds;
     const id = setInterval(() => {
       if (sess.abort)        { clearInterval(id); resolve("abort"); return; }
       if (sess.backTo != null) { clearInterval(id); resolve("back"); return; }
       // Honor a Done-tap only if it landed AFTER this countdown began — a stale
-      // flag from the previous phase must not skip a freshly-started one.
-      if (sess.forceDone && sess.forceDoneAt >= started) { sess.forceDone = false; clearInterval(id); endBeep(); resolve("done"); return; }
-      if (sess.forceDone && sess.forceDoneAt < started) sess.forceDone = false;   // drop the stale flag
+      // flag from the previous phase must not skip a freshly-started one. A
+      // REST passes `since`, the moment its phase began: a Skip Rest tap while
+      // the coach is still saying "Rest. Next: …" is a decision about this
+      // rest, and used to be dropped as stale because the clock had not
+      // started yet. Work never passes it — a tap in the beat after a move's
+      // announcement is "go", not "done". A countdown SHE ended resolves
+      // "cut", not "done": a rest she skipped is not a rest that ran out, and
+      // the caller has to know which (see the rest phase, where "done" earns
+      // a "Go" and "cut" earns the move's name).
+      if (sess.forceDone && sess.forceDoneAt >= since) { sess.forceDone = false; clearInterval(id); endBeep(); resolve("cut"); return; }
+      if (sess.forceDone && sess.forceDoneAt < since) sess.forceDone = false;   // drop the stale flag
       if (sess.skipExercise) { clearInterval(id); resolve("skip");  return; }
       if (sess.paused) { deadline = Date.now() + lastWhole * 1000; return; }
 
@@ -739,6 +749,29 @@ function setPhase(phase) {
   // whatever came next — so every transition clears it.
   sess.confirmSkip = false;
   notify("phase");
+}
+
+/* Two Done taps this close together are one double tap, and the second half
+   of it is not a decision about whatever phase the first half started. The old
+   guard was a 1200 ms flag that self-cleared, which is the wrong shape: it let
+   the second tap ride into a rest that had already begun and cut it short. */
+export const DONE_GUARD_MS = 300;
+
+/* The move's announcement — "Dead Bug. Three, two, one, go." — spoken and
+   waited for, but hers to cut short: a tap during it means "I know this one,
+   go", and the clock starts at once. It used to be un-interruptible, so a tap
+   during the three or four seconds of speech did nothing at all (reps) or
+   expired before the countdown began (timed work). The clock is also charged
+   only from the end of the announcement, not from the start of the phase: the
+   speech was being counted as work she had done. */
+async function announce(msg) {
+  let cut = false;
+  const skipped = new Promise(resolve => {
+    sess.announceResolver = () => { cut = true; resolve(); };
+  });
+  await Promise.race([speakAndWait(msg), skipped]);
+  sess.announceResolver = null;
+  if (cut) cancelSpeech();
 }
 
 /* What comes after the step she is on — read off the step list, which is
@@ -1492,20 +1525,22 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     playCue("work");
     if (ex.byReps) {
       setPhase("reps");
-      if (!preAnnounced) await speakAndWait(ex.name + "." + (ex.reset ? " " + ex.reset : "") + " Go.");
+      if (!preAnnounced) await announce(ex.name + "." + (ex.reset ? " " + ex.reset : "") + " Go.");
       preAnnounced = false;
       if (sess.abort) return finalize(false);
       if (wentBack()) { back(); continue; }
+      resetExerciseClock();
       const result = await runPrescribedReps(ex);
       if (result === "abort") return finalize(false);
       if (result === "back" || wentBack()) { back(); continue; }
     } else {
       sess.timerSecs = work; sess.timerMax = work;
       setPhase("work");
-      if (!preAnnounced) await speakAndWait(ex.name + "." + (ex.reset ? " " + ex.reset : "") + " Three, two, one, go.");
+      if (!preAnnounced) await announce(ex.name + "." + (ex.reset ? " " + ex.reset : "") + " Three, two, one, go.");
       preAnnounced = false;
       if (sess.abort) return finalize(false);
       if (wentBack()) { back(); continue; }
+      resetExerciseClock();
 
       if (ex.eachSide) {
         const half = Math.floor(work / 2);
@@ -1524,7 +1559,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
           if (r4 !== "skip") {
             sess.sideLabel = `${half}s second side`;
             setPhase("work");
-            await speakAndWait(ex.name + " second side. Three, two, one, go.");
+            await announce(ex.name + " second side. Three, two, one, go.");
             if (sess.abort) return finalize(false);
             if (wentBack()) { back(); continue; }
             const r5 = await countdown(half);
@@ -1619,6 +1654,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
         }
         playCue("rest");
         setPhase("roundRest");
+        const restSince = Date.now();   // a Skip Rest tap from here on counts
         const roundProgress = `Round ${r} done! You've got ${circuit.rounds - r} more to crush!`;
         await speakAndWait(roundProgress);
         if (sess.abort) return finalize(false);
@@ -1626,6 +1662,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
         if (voiceOn()) speakIfIdle("Did that feel different from the first round? Just ask yourself.");
         const leadTime = upcomingEx && HARD_EXERCISES.has(upcomingEx.name) ? 8 : 5;
         const result = await countdown(configuredRoundRest() + setupSecs(upcomingEx), {
+          since: restSince,
           onTick: (rem) => {
             if (rem === leadTime && upcomingEx) {
               speakIfIdle("Get ready for " + upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : ""));
@@ -1640,10 +1677,12 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
       } else if (isBlockBreak) {
         playCue("rest");
         setPhase("sectionRest");
+        const restSince = Date.now();   // a Skip Rest tap from here on counts
         await speakAndWait(`Block done! Next up: ${circuits[ci + 1].name}.`);
         if (sess.abort) return finalize(false);
         if (wentBack()) { back(); continue; }
         const result = await countdown(configuredSectionRest() + setupSecs(upcomingEx), {
+          since: restSince,
           onTick: (rem) => {
             if (rem === 4 && upcomingEx) {
               speakIfIdle("Get ready for " + upcomingEx.name + (upcomingEx.reset ? ". " + upcomingEx.reset : ""));
@@ -1663,6 +1702,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
         sess.restCue = setup && upcomingEx ? `Get set up: ${upcomingEx.name}`
           : upcomingEx && upcomingEx.reset ? `Next: ${upcomingEx.reset}` : "Breathe and reset.";
         setPhase("rest");
+        const restSince = Date.now();   // a Skip Rest tap from here on counts
         const nextName = upcomingEx ? upcomingEx.name : "";
         if (voiceOn()) await speakAndWait(nextName
           ? (setup ? `Rest. Next: ${nextName} — get it set up.` : `Rest. Next: ${nextName}.`)
@@ -1671,13 +1711,19 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
         if (wentBack()) { back(); continue; }
         let said = {};
         const result = await countdown(restDuration, {
+          since: restSince,
           onTick: (rem) => {
             if (rem >= 1 && rem <= 3 && !said[rem]) { said[rem] = true; speak(String(rem)); }
           }
         });
         if (result === "abort") return finalize(false);
         if (result === "back") { back(); continue; }
-        if (result !== "skip") { speak("Go"); preAnnounced = true; }
+        // A rest that RAN OUT has already said "Rest. Next: <move>" and counted
+        // down, so "Go" is all that is left to say. A rest she cut short with
+        // Skip Rest used to take the same branch, which marked the next move as
+        // announced and skipped its name — she heard "Go" and nothing else. A
+        // cut rest gets the move's full announcement.
+        if (result === "done") { speak("Go"); preAnnounced = true; }
       }
     }
 
@@ -2179,6 +2225,12 @@ export function advance() {
   // nothing: the button sat on screen and did nothing for up to thirty
   // seconds. Done during the question means "move on" — no verdict recorded.
   if (sess.phase === "formcheck") { skipFormCheck(); return; }
+  // The tail of a double tap, not a decision about this phase — see DONE_GUARD_MS.
+  const now = Date.now();
+  if (now - (sess.lastTapAt || 0) < DONE_GUARD_MS) return;
+  sess.lastTapAt = now;
+  // "I know this one — go": cut the announcement and start the clock.
+  if (sess.announceResolver) { sess.announceResolver(); return; }
   if (sess.phase === "reps" && sess.byRepsResolver) { sess.byRepsResolver("done"); return; }
   if (sess.phase === "intent" && sess.intentResolver) { sess.intentResolver(null); return; }
   if (sess.phase === "microloop" && sess.microResolver) { sess.microResolver(null); return; }
@@ -2233,9 +2285,16 @@ export function resumeFromStop() {
   resumeSession("stop");
   notify("phase");
 }
-export function endFromStop() {
+/* The red STOP asks WHY before it ends anything. "Something hurts" is a safety
+   stop: the record says so, nothing is paid, and the day does not count. "I
+   just need to stop" is an ordinary early end — paid for the rounds she
+   trained, streak judged by the normal rule. Every red STOP used to be a pain
+   stop, so a bathroom break or a doorbell cost her the whole day's XP and the
+   streak day with it. With no reason given it is still the safe reading. */
+export function endFromStop(reason = "pain") {
   sess.stopOverlay = false;
-  sess.painFlag = true;
+  sess.painFlag = reason !== "break";
+  logEvent("stop", { reason: sess.painFlag ? "pain" : "break", ex: sess.currentEx ? sess.currentEx.name : null });
   endEarly();
 }
 export function endEarly() {
