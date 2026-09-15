@@ -8,7 +8,9 @@ import { LADDER, RANK_LORE, RANK_TEASE, fmtXp } from "../data.js";
 import { COPY, EMOJI, LORE_TRANSFER_FIELD } from "../sport.js";
 import { levelFromXp, sessionRounds, plannedRoundsAcrossDays, settledXpByDate, settledXpInRange } from "../store.js";
 import { loadSessions, loadJourney, currentStreakOf, redeemPrize, countsAsTrained, prizeUndoOpen, outcomeOf } from "../store.js";
-import { workoutInstances } from "../outcome.js";
+import { workoutInstances, freezeDatesOf, streakDatesOf } from "../outcome.js";
+import { dayPlanState } from "../engine.js";
+import { DAYS } from "../data.js";
 import { edmontonWeekISODates, edmontonISO, DAY_MS } from "../util.js";
 import { buildJourney } from "./today.js";
 
@@ -148,11 +150,65 @@ export function buildProgressVM(state) {
   const wk = order.map(k => ({ short: shorts[k], mins: minsByIso[isoDates[k]] || 0 }));
   const wkMax = Math.max(...wk.map(d => d.mins), 1);
   const todayIdx = order.indexOf(new Date().toLocaleString("en-US", { timeZone: "America/Edmonton", weekday: "long" }).toLowerCase());
-  const analyticsWeek = wk.map((d, i) => ({
-    short: d.short,
-    barStyle: "width:100%;height:" + Math.max(6, Math.round((d.mins / wkMax) * 100)) + "%;background:" + (i === todayIdx ? "var(--sun)" : "var(--aqua)") + ";border-radius:6px 6px 0 0;transition:height 0.4s;"
-      + (d.mins === 0 ? "opacity:0.35;" : "")
-  }));
+
+  /* ============================================================
+     THE WEEK, DAY BY DAY
+
+     The card showed seven bars and a streak number and nothing else, so "🔥 2"
+     could sit beside two full-height bars with no way to see why a third day
+     had not counted, or how long any of them actually took against what they
+     asked for. Every figure below was ALREADY on the saved record —
+     durationSecs, plannedSecs, the ledger, roundsDone, endedEarly — and none of
+     it had ever been shown.
+
+     ONE array feeds both the bars and the columns underneath. It used to be two
+     (`analyticsWeek` for the chart), and two arrays over one week is how a
+     chart and a table start disagreeing about which day is which.
+
+     Per WORKOUT, through workoutInstances, so a day trained in two goes is one
+     column of thirty minutes rather than two of fifteen.
+
+     The bar's COLOUR now says how well the day went rather than which day is
+     today — height has always been how long she trained, and a second encoding
+     for "today" is a ring, which does not need a colour of its own. A day that
+     has not happened is not a zero; it says so. ============================================================ */
+  const freezeDays = freezeDatesOf(sessions);
+  const streakDays = streakDatesOf(sessions);
+  const BAND_COLOR = { green: "var(--mint)", amber: "var(--sun)", yellow: "var(--coral)", red: "var(--stop)" };
+  const weekDays = order.map((k, i) => {
+    const iso = isoDates[k];
+    const frags = trained.filter(x => edmontonISO(x.isoDate) === iso);
+    const inst = workoutInstances(frags)[0] || null;
+    const arrived = i <= todayIdx;
+    const isSpa = !!(DAYS[k] && DAYS[k].spa);
+    const care = !!(inst && inst.outcome.state === "recovery");
+    const st = inst ? dayPlanState(k, { fragments: inst.fragments.filter(f => f.sessionType !== "recovery" && f.sessionType !== "spa") }) : null;
+    const mins = minsByIso[iso] || 0;
+    const band = care ? null : (inst && inst.outcome.pace && inst.outcome.pace.band) || null;
+    const color = care ? "var(--grape)" : band ? BAND_COLOR[band] : "var(--hairline)";
+    return {
+      key: k, short: shorts[k], iso, arrived, isSpa, care,
+      isToday: i === todayIdx,
+      hasWork: !!inst,
+      mins,
+      minsLabel: inst ? mins + "m" : "—",
+      barStyle: "width:100%;height:" + Math.max(4, Math.round((mins / wkMax) * 100)) + "%;background:" + color
+        + ";border-radius:5px 5px 0 0;transition:height 0.4s;"
+        + (i === todayIdx ? "box-shadow:0 0 0 2px var(--ink);" : ""),
+      // "—" rather than 0: a Thursday that has not happened has not failed.
+      plannedLabel: inst && st ? Math.max(1, Math.round((inst.fragments.reduce((a, f) => Math.max(a, Number(f.plannedSecs) || 0), 0)) / 60)) + "m"
+        : isSpa && !arrived ? "spa" : "—",
+      movesLabel: care ? "care" : st ? st.done + "/" + st.planned : "—",
+      skippedLabel: care ? "—" : st ? String(st.rows.filter(r => r && r.status === "skipped").length) : "—",
+      roundsLabel: care ? "n/a" : inst ? inst.outcome.mainRoundsDone + "/" + (Number(inst.fragments[inst.fragments.length - 1].dayRoundsPlanned) || Number(inst.fragments[inst.fragments.length - 1].roundsPlanned) || 0) : "—",
+      earlyLabel: inst ? (inst.outcome.state === "complete" ? "No" : "Yes") : "—",
+      paceLabel: care ? "Care" : band ? { green: "Full", amber: "Almost", yellow: "Short", red: "Very short" }[band] : "—",
+      paceBand: care ? "care" : band || "",
+      streakMark: streakDays.has(iso) ? "🔥" : freezeDays.has(iso) ? "❄️" : inst ? "—" : ""
+    };
+  });
+
+  const analyticsWeek = weekDays;
 
   const weekSessions = trained.filter(s => Object.values(isoDates).includes(edmontonISO(s.isoDate)));
   // Streak days are the ones that cleared the bar, not every day with work on it.
@@ -315,7 +371,7 @@ export function buildProgressVM(state) {
 
   return {
     periodStats,
-    level, rankStory, analyticsWeek, milestones,
+    level, rankStory, analyticsWeek, weekDays, milestones,
     logItems, logScopeTabs, hasLog: allLog.length > 0,
     prizesWon, hasPrizes: prizesWon.length > 0,
     dayStreakVal: String(streak),
