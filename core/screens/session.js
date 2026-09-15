@@ -140,7 +140,7 @@ export function detailOverlayHtml(vm) {
         <div style="width:100%;height:330px;position:relative;overflow:hidden;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
           <span style="font-size:60px;" aria-hidden="true">${EMOJI.sport}</span>
           <span style="font-size:13px;font-weight:800;color:var(--aqua-ink);opacity:0.75;">Demo photo coming soon</span>
-          ${imgWithFallbacks(vm.detailPhotoSources, `alt="""}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"`)}
+          ${imgWithFallbacks(vm.detailPhotoSources, `alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"`)}
         </div>
         <button type="button" data-action="closeDetail" style="position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;border:none;background:rgba(20,59,74,0.55);color:#fff;font-size:16px;font-weight:900;cursor:pointer;" aria-label="Close">✕</button>
       </div>

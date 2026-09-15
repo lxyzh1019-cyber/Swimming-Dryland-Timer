@@ -7,7 +7,7 @@
 import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
 import { STORAGE_KEYS as K, ATHLETE_DEFAULT, LEGACY_ATHLETE, BACKUP_APP, LORE_TRANSFER_FIELD, COPY } from "./sport.js";
 export { LEGACY_ATHLETE, BACKUP_APP };
-import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE } from "./data.js";
+import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE, VALGUS_FLOOR } from "./data.js";
 import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION, roundPayCredit,
          streakDatesOf, freezeDatesOf } from "./outcome.js";
 
@@ -650,7 +650,13 @@ export function clearDayProgress(dayKey) {
    to take a fortnight. It banks WEEKS now, and only for a session where the
    move was actually done AND self-checked clean. */
 export const GATE_WEEKS_REQUIRED = 2;
-export const GATE_MOVE = "Drop-and-Stick";
+/* THE MOVE THE GATE IS ABOUT IS THE APP'S, NOT THIS FILE'S. It was the literal
+   "Drop-and-Stick", which is a move in the swim plan and in no other: in the
+   skate app no ledger row could ever match it, so `creditValgusWeek` never
+   banked a week and the gate could only be opened by the grown-up's manual
+   toggle — the two-week promise on the Coaching tab was unreachable there.
+   VALGUS_FLOOR is the same idea stated once per app (see js/data.js). */
+export const GATE_MOVE = VALGUS_FLOOR;
 
 /* ---- the grown-up PIN ------------------------------------------------------
    The secret behind every grown-up decision in the app (js/gate.js).
