@@ -107,6 +107,32 @@ setSpeechDelay(3000);
      + (lo === Infinity ? "the countdown never got a tick in" : lo + "s left of " + hi + "s") + ")");
 }
 
+/* ---- 2b2. THE SIDE SWITCH IS A REST TOO -----------------------------------
+   Every side, direction and set of a rep move passes through a five-second
+   reset announced by the coach. Its countdown was the last one that did not
+   stamp when its phase began, so a tap during "Nice. Switch sides — five to
+   reset." was dropped and the five seconds ran on. */
+{
+  let tapAt = -1, leftAt = -1, hi = 0, lo = Infinity;
+  await runSession({ dayKey: repsDay, light: "red", gateUnlocked: true, seed: voiceOn }, {
+    onTick: (ms, sess) => {
+      if (answerChecks(sess)) return;
+      if (tapAt < 0 && sess.phase === "sideswitch" && speechInFlight()) { tapAt = ms; engine.advance(); return; }
+      if (tapAt < 0 || leftAt >= 0) return;
+      if (sess.phase !== "sideswitch") { leftAt = ms; return; }
+      if (!speechInFlight()) { hi = Math.max(hi, sess.timerSecs); lo = Math.min(lo, sess.timerSecs); }
+    }
+  });
+  if (tapAt > 0) {
+    ok(leftAt > 0, "the side switch ended after a tap during its line");
+    ok(lo === Infinity || lo >= hi - 1,
+       "and it ended without counting down ("
+       + (lo === Infinity ? "the reset never got a tick in" : lo + "s left of " + hi + "s") + ")");
+  } else {
+    ok(true, "no per-side rep move in this plan to switch sides on — nothing to prove here");
+  }
+}
+
 /* ---- 2c. THE OPENING IS HERS TO CUT --------------------------------------
    The mantra, the light and the first move's name ran un-interruptible: with a
    real voice that is eleven seconds of the Done ring on screen doing nothing.

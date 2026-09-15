@@ -603,11 +603,18 @@ async function runOneRep(ex, p, n, stopped) {
    the exercise" — advance() routes it to the countdown, not the resolver. */
 async function segmentBreak(seg) {
   setPhase("sideswitch");
+  /* Stamped before the line is spoken, like the rests: she is switching sides
+     while the coach says so, and a tap then means "I'm round, go". Without it
+     the countdown only honoured a tap made after IT started, so a tap during
+     the line — or in the beat after it — was thrown away as stale and the five
+     seconds ran on. Every side, direction and set of every rep move passes
+     through here. */
+  const switchSince = Date.now();
   const line = seg.transition === "side"      ? "Nice. Switch sides — five to reset."
              : seg.transition === "direction" ? "Nice. Other direction — five to reset."
              :                                  "Nice. Next set — five to reset.";
   await speakAndWait(line);
-  return countdown(SIDE_SWITCH_BUFFER);
+  return countdown(SIDE_SWITCH_BUFFER, { since: switchSince });
 }
 
 /* A prescribed range ("2–3 clean reps", "8–10/side") counts the LOW number —
@@ -1583,10 +1590,13 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
         if (r3 === "back") { back(); continue; }
         if (r3 !== "skip") {
           setPhase("sideswitch");
+          // Same as segmentBreak: the tap belongs to the switch, not to the
+          // clock that starts once the coach has finished saying so.
+          const switchSince = Date.now();
           await speakAndWait("Nice. Switch sides — five to reset.");
           if (sess.abort) return finalize(false);
           if (wentBack()) { back(); continue; }
-          const r4 = await countdown(SIDE_SWITCH_BUFFER);
+          const r4 = await countdown(SIDE_SWITCH_BUFFER, { since: switchSince });
           if (r4 === "abort") return finalize(false);
           if (r4 === "back") { back(); continue; }
           if (r4 !== "skip") {
