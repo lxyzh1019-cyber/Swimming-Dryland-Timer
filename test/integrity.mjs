@@ -5,6 +5,7 @@
    ============================================================ */
 import { store, outcome, util, sport } from "./harness.mjs";
 import { claimPrize } from "../screens/overlays.js";
+import { readFileSync } from "node:fs";
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
@@ -133,5 +134,35 @@ ok(legacyJ.prizesWon.length === 1 && legacyJ.prizesWon[0].id != null && legacyJ.
    "an id-less legacy prize is kept and given an id, not dropped");
 ok(legacyJ.maxLevelSeen === 18, "the earlier ledger's high-water level is carried across");
 localStorage.clear();
+
+/* --- N. "THE MIRROR ANSWERED" IS NOT THE SAME AS "THE MIRROR SAID NOTHING" --
+   Every Firestore read used to swallow its own failure and return a neutral
+   value, so an offline boot was indistinguishable from a mirror that answered
+   and held nothing. restoreFromCloud reported reachedCloud:true either way,
+   which cost two real things: the gate offered a first grown-up PIN on a wiped
+   device with none of the offline warning it has for exactly that case, and
+   every boot stamped a successful sync, so an offline prize draw waited on a
+   second device that had never been asked. Read from the source, because the
+   alternative is a test that talks to the real Firebase project. */
+{
+  const src = readFileSync(new URL("../firebase.js", import.meta.url), "utf8");
+  const body = (name) => (src.split("export async function " + name)[1] || "").split("\nexport ")[0];
+  for (const fn of ["fsGetAll", "fsGetJourney", "fsGetReadiness", "fsGetRecent"]) {
+    const b = body(fn);
+    ok(b.length > 0, fn + " is still a read helper here");
+    ok(/if \(!f\) throw new MirrorUnreachable\(\)/.test(b),
+       fn + " throws rather than inventing an answer when the SDK never loaded");
+    ok(/throw new MirrorUnreachable\(e\)/.test(b),
+       fn + " throws rather than inventing an answer when the read itself failed");
+    ok(!/return \[\];|return null;/.test(b.split("catch")[1] || ""),
+       fn + " never hands back an empty answer it did not get");
+  }
+  const sync = readFileSync(new URL("../sync.js", import.meta.url), "utf8");
+  const restore = sync.split("export async function restoreFromCloud")[1].split("\n/*")[0];
+  ok(restore.indexOf("noteSyncResult(true)") > restore.indexOf("await fsGetAll()"),
+     "the boot sync only calls the mirror reached AFTER a read that really came back");
+  ok(/reachedCloud: true/.test(restore) && /reachedCloud: false/.test(sync),
+     "and both verdicts exist — the gate is told which one it got");
+}
 
 console.log("✓ integrity passed (" + passed + " assertions)");

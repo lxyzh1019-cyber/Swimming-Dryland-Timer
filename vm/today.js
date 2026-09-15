@@ -6,7 +6,7 @@
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, RANK_LORE, BLOCK_META, levelCost, fmtXp, overloadWeek } from "../data.js";
 import { SKILL_BLOCK, ATHLETE_DEFAULT, COPY, EMOJI } from "../sport.js";
-import { settings, loadSessions, loadJourney, levelFromXp, currentStreakOf, loadDayProgress, countsAsTrained, settledXpByDate, outcomeOf } from "../store.js";
+import { settings, loadSessions, loadJourney, levelFromXp, currentStreakOf, loadDayProgress, countsAsTrained, settledXpByDate, dayXpKey, outcomeOf } from "../store.js";
 import { workoutInstances } from "../outcome.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
 import { assembleCircuits, estimateSessionSecs, planResume } from "../engine.js";
@@ -250,7 +250,14 @@ export function buildTodayVM(state) {
   const sessions = loadSessions();
   const selectedKey = state.selectedDay || todayKey;
 
-  const weekDoneCount = WEEK_ORDER.filter(k => statuses[k] === "done" || statuses[k] === "partial").length;
+  /* A finished Recovery day counts toward the week. It is a day she showed up
+     for and did what the check asked — the chip could never read 7/7 while the
+     one honest answer to a sore body was the one that did not count. (Today
+     itself still reads "today" until it is finished, which is why the record
+     is asked for as well as the status.) */
+  const recoveredKeys = new Set(sessions.filter(s => outcomeOf(s).state === "recovery").map(s => s.dayKey).filter(Boolean));
+  const weekDoneCount = WEEK_ORDER.filter(k =>
+    statuses[k] === "done" || statuses[k] === "partial" || statuses[k] === "rest" || recoveredKeys.has(k)).length;
   const statChips = [
     /* The streak asks a stricter question than "did she train" — a day has to be
        a session, not a piece of one. Everything else here still counts any work.
@@ -389,7 +396,12 @@ export function buildTodayVM(state) {
        adding them overstated it, because a stamp is what a sitting is worth and
        the day has a ceiling. This line read "+450 XP earned" for a 360 XP day
        while the journey, which settles properly, held 360. */
-    const dayIso = dayRecord ? edmontonISO(dayRecord.isoDate) : null;
+    /* Keyed the way settledXpByDate keys it — by the date the WORKOUT started
+       (dayXpKey), not by the date the row was saved. A bout begun at 23:40 and
+       finished at 00:10 is filed under the day it began, so the lookup missed
+       and the card quietly dropped the "+N XP earned" line for a day that had
+       been paid in full. */
+    const dayIso = dayRecord ? dayXpKey(dayRecord) : null;
     const earnedXp = dayIso ? (settledXpByDate(sessions).get(dayIso) || 0) : 0;
     /* DID THIS DAY ACTUALLY EARN THE STREAK?
 
