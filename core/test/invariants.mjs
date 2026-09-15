@@ -297,4 +297,161 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
   "activation deletes only this app's own caches — Cache Storage is per ORIGIN, "
   + "and on GitHub Pages a neighbour's cache is not this worker's to delete");
 
+/* ============================================================
+   8. A WORKOUT BELONGS TO THE DAY IT BEGAN — EVERYWHERE
+
+   The XP budget has keyed off `dayIso` since a bout that crossed midnight could
+   draw two days' budgets. The streak asked a different question — the finish
+   stamp — so a Monday session finalized at 00:10 was FILED under Tuesday, and
+   training Monday night and Tuesday night gave two workouts on one date. The
+   Set of streak dates kept one. The child had trained two days running and was
+   shown 🔥 1.
+
+   Two readings of one fact is the defect; this asserts there is one. */
+{
+  localStorage.clear(); store.migrate();
+  const dayOf = (dayKey, iso, dayIso, id) => ({
+    app: "x", dayKey, isoDate: iso, dayIso, workoutInstanceId: id,
+    xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION,
+    sessionType: "main", lightResult: "green", roundsDone: 1, roundsPlanned: 1,
+    expectedWork: 2, completedFully: true, durationSecs: 900,
+    ledger: [{ name: "a", block: "warmup", round: 1, status: "done" },
+             { name: "b", block: "warmup", round: 1, status: "done" }]
+  });
+  // Monday's bout ran past midnight; Tuesday's was an ordinary evening.
+  const mon = dayOf("monday", "2026-09-15T06:10:00.000Z", "2026-09-14", "w-mon");
+  const tue = dayOf("tuesday", "2026-09-15T23:00:00.000Z", "2026-09-15", "w-tue");
+  same(store.dayXpKey(mon), outcome.workoutInstances([mon])[0].date,
+    "the date the XP is charged to and the date the streak counts are the same date");
+  same(outcome.workoutInstances([mon])[0].date, "2026-09-14",
+    "and it is the day the workout BEGAN, not the day it was saved");
+  [mon, tue].forEach(r => store.saveSession(r));
+  same(outcome.streakDatesOf(store.loadSessions()).size, 2,
+    "two nights of training are two streak days, even when one crossed midnight");
+  localStorage.clear(); store.migrate();
+}
+
+/* ============================================================
+   9. THE CARD NEVER PROMISES A RESUME THE ENGINE WILL NOT RUN
+
+   The label was chosen from the session LOG (which remembers a partial day
+   forever) while the work came from the day-progress record (which lives for
+   one calendar day). When they disagreed the button lied: "Finish remaining
+   moves" opened the whole workout at move one.
+   ============================================================ */
+{
+  localStorage.clear(); store.migrate();
+  const dayKey = util.edmontonDayKey();
+  const circuits = engine.assembleCircuits(dayKey, "green");
+  const ledger = [];
+  circuits.forEach(c => { for (let r = 1; r <= c.rounds; r++) c.exercises.forEach(e => {
+    if (e.rounds && r > e.rounds) return;
+    ledger.push({ name: e.name, block: c.block, round: (c.roundBase ? c.roundBase + r - 1 : r),
+      status: "partial", driver: "time", actualSecs: 9, plannedSecs: 30 });
+  }); });
+  store.saveSession({ app: "x", dayKey, isoDate: new Date().toISOString(),
+    dayIso: util.todayISODate(), workoutInstanceId: "w-short",
+    xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION,
+    sessionType: "main", lightResult: "green", roundsDone: 0, roundsPlanned: 3,
+    dayRoundsPlanned: 3, expectedWork: engine.countExpectedWork(circuits),
+    expectedByRound: engine.countExpectedByRound(circuits),
+    completedFully: false, endedEarly: true, durationSecs: 400, plannedSecs: 1600, ledger });
+
+  const card = tvm.buildTodayVM({ selectedDay: dayKey, expanded: {}, isWide: true }).dayView;
+  const owed = engine.planResume(dayKey, "green").circuits.length;
+  ok(/Finish remaining/.test(card.ctaLabel || "") === (owed > 0),
+    "the button offers to finish exactly when the engine has something to run");
+
+  /* And the numbers on the same card agree with each other. The header counted
+     distinct movements, the panel under "REVIEW WHAT YOU DID" walked a fixed
+     list of block names with no `prep` in it, and the plan itself asks for main
+     once per ROUND — three numbers, three sources, printed together. */
+  const vm = tvm.buildTodayVM({ selectedDay: dayKey, expanded: {}, isWide: true });
+  const st = engine.dayPlanState(dayKey);
+  same(vm.blocks.reduce((a, b) => a + b.count, 0), st.planned,
+    "the panel adds up to everything the day asks for, prep and every round included");
+  same(vm.blocks.some(b => b.key === "prep"), st.blocks.some(b => b.block === "prep"),
+    "and it shows the prep block exactly when the day has one");
+  localStorage.clear(); store.migrate();
+}
+
+/* ============================================================
+   10. PACE IS A REPORT, NOT A VERDICT
+
+   The bands exist so a grown-up can see a twelve-second version of a
+   thirty-second hold. They must never quietly become a second way to lose XP or
+   a streak day — a kid punished twice for one tired evening would be the app
+   turning a coaching note into a penalty.
+   ============================================================ */
+{
+  const rows = (secs) => Array.from({ length: 4 }, (_, i) => ({
+    name: "m" + i, block: "main", round: 1, status: "partial",
+    driver: "time", actualSecs: secs, plannedSecs: 30 }));
+  const at = (secs) => outcome.deriveSessionOutcome({
+    ledger: rows(secs), expectedWork: 4, outcomeVersion: outcome.OUTCOME_VERSION,
+    sessionType: "main", roundsDone: 1 });
+  same(outcome.bandOf(0.90), "green", "ninety percent is a pass");
+  same(outcome.bandOf(0.8999), "amber", "and a hair under it is not");
+  same(outcome.bandOf(0.75), "amber", "three quarters is 'almost'");
+  same(outcome.bandOf(0.7499), "yellow", "just under is 'short'");
+  same(outcome.bandOf(0.50), "yellow", "half is still 'short'");
+  same(outcome.bandOf(0.4999), "red", "and under half is 'very short'");
+  same(outcome.paceBand({ status: "done" }), "green",
+    "a finished move with no measurable dose is a pass, not an unknown");
+  same(outcome.paceBand({ status: "partial", driver: "time", actualSecs: 10, plannedSecs: 0 }), null,
+    "but a partial with no denominator is UNGRADED — never a green we cannot prove");
+  same(outcome.paceBand({ status: "skipped" }), null, "and a skip is not a short move");
+  same(at(27).pace.band, "green", "four full-ish holds band green");
+  same(at(9).pace.band, "red", "and four nine-second holds band red");
+  /* The clean statement of "reported, never charged for": a FINISHED move is
+     worth one whole unit and is deliberately not re-measured against its clock
+     (see streakCredit — the engine's 80% floor is what decides `done`, and
+     pro-rating a done row would move that floor without saying so). So two
+     sessions of finished moves, one nine seconds into every thirty and one
+     twenty-seven, differ in BAND and in nothing else. If pace ever leaks into
+     the price or the flame, this is the assertion that catches it.
+
+     (A `partial` row is a different story and always has been: the round rule
+     already pays a short round the fraction it produced. That is the dose rule
+     from the XP section of the README, not this band.) */
+  const doneRows = (secs) => Array.from({ length: 4 }, (_, i) => ({
+    name: "m" + i, block: "main", round: 1, status: "done",
+    driver: "time", actualSecs: secs, plannedSecs: 30 }));
+  const asRow = (secs) => ({ app: "x", dayKey: "monday", isoDate: new Date().toISOString(),
+    xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main",
+    lightResult: "green", roundsDone: 1, roundsPlanned: 1, dayRoundsPlanned: 1,
+    expectedWork: 4, expectedByRound: { 1: 4 }, completedFully: true, ledger: doneRows(secs) });
+  same(outcome.outcomeOf(asRow(9)).pace.band, "red", "nine seconds of every thirty bands red");
+  same(outcome.outcomeOf(asRow(27)).pace.band, "green", "twenty-seven bands green");
+  same(store.xpForSession(asRow(9)), store.xpForSession(asRow(27)),
+    "and the two are worth exactly the same XP — pace is reported, never charged for");
+  same(store.countsForStreak(asRow(9)), store.countsForStreak(asRow(27)),
+    "and both earn the same streak day — a band is a coaching note, not a penalty");
+}
+
+/* ============================================================
+   11. A RESTORED SESSION IS WORTH WHAT IT EARNED
+
+   `claimSessionXp` pays for the rounds finished; the fallback used for a record
+   with no `xpEarned` stamp still halved an ended-early session "matching
+   finalize()", which finalize stopped doing. A row only ever arrives without
+   that stamp from a CLOUD RESTORE or a backup import — so the same session was
+   worth 360 on the tablet and 180 once it came home.
+   ============================================================ */
+{
+  const row = { app: "x", dayKey: "monday", isoDate: new Date().toISOString(),
+    xpVersion: store.XP_VERSION, outcomeVersion: outcome.OUTCOME_VERSION,
+    sessionType: "main", lightResult: "green", roundsDone: 3, roundsPlanned: 3,
+    expectedWork: 4, expectedByRound: { 1: 2, 2: 2 },
+    completedFully: false, endedEarly: true,
+    ledger: [{ name: "a", block: "main", round: 1, status: "done" },
+             { name: "b", block: "main", round: 1, status: "done" },
+             { name: "a", block: "main", round: 2, status: "done" },
+             { name: "b", block: "main", round: 2, status: "done" }] };
+  same(store.sessionXp(row), store.xpForSession(row),
+    "a row restored without its xpEarned stamp is worth exactly what it earned");
+  same(store.sessionXp({ ...row, xpEarned: 270 }), 270,
+    "and a row that carries the stamp is still worth the stamp");
+}
+
 console.log("✓ invariants passed (" + passed + " assertions)");

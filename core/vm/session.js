@@ -138,6 +138,24 @@ export function buildSessionVM(state) {
       : `You got ${donePercent}% of today done${skippedPhrase ? ", and " + skippedPhrase : ""}. Everything you DID do is saved — the moves, the minutes and the XP for them. Today didn't reach the streak${Number.isFinite(streakShortBy) && streakShortBy > 0 ? ` — about ${plural(streakShortBy, "more move")} would do it` : ""}. Come back later today and finish the rest; it still counts for today. 💛`;
   const completionNote = completionState === "partial" ? partialNote : null;
 
+  /* HOW WELL SHE HELD IT, which is a different question from how much of it
+     there was, and one the finish screen has never asked. A thirty-second hold
+     let go at twelve seconds and one held the whole way both left the screen
+     saying "done". The bands come off the same ledger everything else here
+     reads — see paceReport in js/outcome.js — and they change no XP and no
+     streak day: this is a coaching line, not a verdict. */
+  const pace = liveOutcome.pace || null;
+  const paceCounts = pace ? pace.counts : null;
+  const paceNote = !pace || !pace.graded ? null
+    : pace.shortCount === 0
+      ? (paceCounts.amber
+          ? `Every move was there. ${plural(paceCounts.green, "hold")} full, ${paceCounts.amber} nearly — good, steady work.`
+          : "Every move held its full time. That's the whole dose. 💪")
+      : `${plural(pace.shortCount, "move")} came in short today`
+        + (pace.worst && pace.worst.name && Number.isFinite(pace.worst.ratio)
+            ? ` — ${pace.worst.name} at ${Math.round(pace.worst.ratio * 100)}% of its hold.` : ".")
+        + " Holding the whole time is what makes it count in the water.";
+
   /* A DAY SHE CAME BACK AND FINISHED reads differently from one done in a
      single go, and should: coming back is the harder thing. bankedCredit is
      only ever above zero on a resumed sitting. */
@@ -347,6 +365,9 @@ export function buildSessionVM(state) {
 
     sessionDayTitle: day.title || "",
     elapsedDisplay: fmtMMSS(sess.elapsed),
+    paceNote,
+    paceBand: (pace && pace.band) || "",
+    paceCounts,
     sessionPlannedDisplay: Math.max(1, Math.round(sess.plannedSecs / 60)) + " min",
     sessionTimePct, roundLine, roundDots,
     progressLabel, progressValue: Math.min(doneCount, Math.max(1, totalExCount)), progressMax: Math.max(1, totalExCount),

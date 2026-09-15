@@ -1,4 +1,4 @@
-import { imgWithFallbacks, photoSources } from "../util.js";
+import { imgWithFallbacks, photoSources, escapeHtml } from "../util.js";
 import { POSES } from "../data.js";
 import { COPY, IMAGES, EMOJI } from "../sport.js";
 /* ============================================================
@@ -265,6 +265,15 @@ function completeScreen(vm) {
     ${imgWithFallbacks(photoSources(POSES[c.pose]), `alt="" style="height:${c.poseH}px;object-fit:contain;flex-shrink:0;"`)}
     <div style="font-family:var(--font-display);font-weight:600;font-size:34px;color:${c.ink};">${title}</div>
     ${note ? `<div${c.alert ? ` role="alert"` : ""} style="font-size:15px;font-weight:800;${c.noteStyle || "color:var(--mint-ink);background:var(--mint-wash);"}border-radius:16px;padding:10px 16px;max-width:480px;line-height:1.45;">${note}</div>` : ""}
+    ${vm.paceNote ? `
+    <div style="display:flex;align-items:flex-start;gap:9px;max-width:480px;text-align:left;border-radius:16px;padding:10px 14px;font-size:14px;font-weight:800;line-height:1.45;${
+      vm.paceBand === "red" ? "background:var(--stop-wash);color:var(--stop-ink);"
+      : vm.paceBand === "yellow" ? "background:var(--coral-wash);color:var(--coral-ink);"
+      : vm.paceBand === "amber" ? "background:var(--sun-wash);color:var(--sun-ink);"
+      : "background:var(--mint-wash);color:var(--mint-ink);"}">
+      <span style="flex-shrink:0;font-size:16px;">${vm.paceBand === "red" ? "⚠️" : vm.paceBand === "yellow" ? "🟡" : vm.paceBand === "amber" ? "🟠" : "✅"}</span>
+      <span>${escapeHtml(vm.paceNote)}</span>
+    </div>` : ""}
     ${vm.sessionMantra && c.mantra ? `<div style="font-family:var(--font-hand);font-size:26px;font-weight:700;color:var(--aqua-ink);line-height:1.2;">${vm.sessionMantra}</div>` : ""}
     <div style="font-size:16px;font-weight:700;color:var(--ink-soft);">${vm.sessionDayTitle}${vm.explore ? "" : ` · ${vm.sessionMinutes} min`}${vm.showRoundsLine ? ` · ${vm.roundsLine}` : ""}${vm.xpEarned ? ` · ⭐ +${vm.xpEarned} XP` : ""}</div>
     ${vm.showRoundsLine && (vm.roundShortNotes || []).length ? `

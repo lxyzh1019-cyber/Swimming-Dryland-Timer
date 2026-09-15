@@ -110,6 +110,89 @@ export const OUTCOME_VERSION = 5;
 export const STREAK_WORK_FRACTION = 0.75;
 export const RECOVERY_STREAK_FRACTION = 1;
 
+/* ---- HOW WELL A MOVE WAS HELD, SAID OUT LOUD --------------------------------
+
+   The engine has always measured a timed move against its dose and quietly
+   filed anything under DONE_WORK_FRACTION as `partial`. Nothing on screen ever
+   said so, so a thirty-second hold let go at twelve seconds and one held the
+   whole way read exactly alike on the card, and a grown-up had no way to know
+   the difference without watching every rep.
+
+   Four bands, and the gaps between them are the point:
+
+     green   >= 90%   the dose, held
+     amber   >= 75%   almost — worth a word, not a warning
+     yellow  >= 50%   short
+     red      < 50%   very short
+
+   This is a REPORT, never a verdict. It changes no XP and no streak day: the
+   flame asks whether she finished the plan, this asks how well she held it, and
+   conflating them would punish a kid twice for one bad evening.
+
+   A move with no measurable dose scores NOTHING rather than green. Rep work is
+   judged on reps and timed work on seconds — the same split exerciseStatus
+   already makes in js/engine.js — and a row that kept neither denominator is a
+   row we cannot grade. Grading it green would be the app inventing a pass. */
+export const PACE_BANDS = { green: 0.90, amber: 0.75, yellow: 0.50 };
+export const PACE_ORDER = ["green", "amber", "yellow", "red"];
+
+export function bandOf(ratio) {
+  if (!Number.isFinite(ratio)) return null;
+  if (ratio >= PACE_BANDS.green) return "green";
+  if (ratio >= PACE_BANDS.amber) return "amber";
+  if (ratio >= PACE_BANDS.yellow) return "yellow";
+  return "red";
+}
+
+/* The dose a row actually produced, 0..1, or null when it cannot be proved.
+   A skipped move is not a short move — it is no move — so it bands as `red`
+   only through paceOf below, never by pretending its ratio is zero work. */
+export function paceRatio(row) {
+  if (!row || row.status === "skipped") return null;
+  const frac = (got, planned) =>
+    Number.isFinite(Number(planned)) && Number(planned) > 0
+      ? Math.min(1, Math.max(0, Number(got) / Number(planned))) : null;
+  const byReps = frac(row.repsCounted, row.repsPlanned);
+  const byTime = frac(row.actualSecs, row.plannedSecs);
+  if (row.driver === "reps") return byReps;
+  if (row.driver === "time") return byTime;
+  return byReps !== null ? byReps : byTime;
+}
+
+export function paceBand(row) {
+  if (!row) return null;
+  if (row.status === "done" && paceRatio(row) === null) return "green";
+  return bandOf(paceRatio(row));
+}
+
+/* The whole sitting's pace: how many rows landed in each band, and the mean of
+   the rows we could actually grade. Rows with no provable dose are counted in
+   `ungraded` rather than dragged into the mean — an average that silently
+   includes unmeasurable rows is an average of two different things. */
+export function paceReport(rows) {
+  const counts = { green: 0, amber: 0, yellow: 0, red: 0 };
+  let sum = 0, graded = 0, ungraded = 0, worst = null;
+  (rows || []).forEach(row => {
+    if (!row || row.status === "skipped") return;
+    const band = paceBand(row);
+    if (!band) { ungraded++; return; }
+    counts[band]++;
+    const r = paceRatio(row);
+    if (Number.isFinite(r)) { sum += r; graded++; }
+    if (!worst || PACE_ORDER.indexOf(band) > PACE_ORDER.indexOf(worst.band)) {
+      worst = { band, name: row.name || "", ratio: Number.isFinite(r) ? r : null };
+    }
+  });
+  const ratio = graded ? sum / graded : null;
+  return {
+    counts, ungraded, graded, ratio,
+    band: ratio === null ? null : bandOf(ratio),
+    worst,
+    // What a grown-up is actually being asked to look at.
+    shortCount: counts.yellow + counts.red
+  };
+}
+
 export const OUTCOME_STATES = ["none", "partial", "complete", "safety-stop", "recovery"];
 
 /* A ledger row is WORK if the move was actually performed to any degree.
@@ -404,13 +487,44 @@ export function deriveSessionOutcome(input = {}) {
   const streakJudged = Number(outcomeVersion) >= 2;
   const streakWork = banked + rows.reduce((a, l) => a + streakCredit(l, countPartial), 0);
   const workRatio = expected !== null && expected > 0 ? streakWork / expected : null;
+  /* SHE FINISHED THE PLAN. THAT IS A TRAINING DAY.
+
+     The dose bar above asks for three quarters of the plan's WORTH, and a girl
+     who walked through every single move a beat early on each one scored 0.70
+     and lost the day: the card said PARTLY DONE, the XP was paid, and the flame
+     did not move. Nothing on the screen could explain that to her, because from
+     where she stood she had done the whole workout.
+
+     So there are two ways to earn the day now, and this is the second: every
+     move the plan asked for is in the ledger, none of them was SKIPPED, and no
+     single move came in under half its dose. Reaching the end of the plan is
+     itself the achievement the streak is supposed to be about.
+
+     The floor is ROUND_ROW_FLOOR, the same half-dose the round rule already
+     uses, and it is what stops this from re-opening the hole the bar was dug
+     for: three seconds of every thirty-second hold still earns nothing, because
+     every row is under the floor. What it newly allows is a day at half to
+     three-quarters of every move with nothing skipped and nothing missing —
+     which is a kid who trained, tired.
+
+     NOT gated behind a new outcome version, and deliberately so. Every other
+     rule in this file is gated because re-scoring history could take away a day
+     she is standing on. This one can only ever ADD a day — a record that earned
+     the streak still earns it — so it applies to everything already judged by
+     the bar, which is the only way the day on her device tonight starts
+     counting. Nothing stored changes shape. */
+  const wholePlanAttempted = expected !== null && rows.length > 0
+    && !rows.some(l => l && l.status === "skipped")
+    && rows.length + banked >= expected
+    && rows.every(l => streakCredit(l, countPartial) >= ROUND_ROW_FLOOR);
+
   let countsForStreak;
   if (!streakJudged || workRatio === null) {
     countsForStreak = isTraining;                   // the old reading, unchanged
   } else if (state === "recovery") {
     countsForStreak = false;                        // care freezes, never counts
   } else if (isTraining) {
-    countsForStreak = workRatio >= STREAK_WORK_FRACTION;
+    countsForStreak = workRatio >= STREAK_WORK_FRACTION || wholePlanAttempted;
   } else {
     countsForStreak = false;                        // no work, or a safety stop
   }
@@ -440,6 +554,16 @@ export function deriveSessionOutcome(input = {}) {
     // What the streak was judged on, so a screen can say "3 more moves" rather
     // than leaving her to guess why a day she worked at did not count.
     workRatio,
+    /* And what the ratio was measured AGAINST. A ten-year-old has no unit for a
+       percentage point of a plan; she has a unit for a move. Reported, never
+       judged on — no reader re-scores anything with it. */
+    expectedWork: expected,
+    // Which of the two doors the day came through, so the card can say so.
+    wholePlanAttempted,
+    /* How well it was held, as opposed to how much of it there was. Carried on
+       the outcome so the session screen, the day card, the Progress table and
+       the Grown-up Zone all read one reading rather than four. */
+    pace: paceReport(rows),
     streakJudged,
     xpEligible: isTraining || state === "recovery"
   };
@@ -624,6 +748,39 @@ export function workoutOutcome(fragments) {
   });
 }
 
+/* ============================================================
+   WHICH DAY A WORKOUT BELONGS TO
+
+   Every fragment is stamped `isoDate` when finalize() runs — the moment the
+   sitting ENDED — and this used to read that. So a bout begun at 23:40 and
+   finished at 00:10 was filed under the next day: train again that evening and
+   the two workouts collapsed onto one date, the Set below kept one of them, and
+   a kid who had trained two nights running was shown a streak of one.
+
+   The record already carries the answer. `dayIso` is the day the workout
+   STARTED, stamped by the engine off the day-progress record, and the XP budget
+   has keyed off it since the day a midnight bout could draw two budgets (see
+   dayXpKey in js/store.js). XP knew; the streak never asked. One rule now, and
+   store.js's dayXpKey delegates here so there is exactly one definition of it.
+
+   The EARLIEST dayIso any fragment declares, because that is the one that names
+   the day the work began. Rows written before the field existed have none and
+   fall back to the finish stamp, which is how they already read — no history is
+   re-dated. */
+export function workoutDate(fragments) {
+  const frags = fragments || [];
+  let began = null;
+  frags.forEach(s => {
+    const d = s && s.dayIso;
+    if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      if (began === null || d < began) began = d;
+    }
+  });
+  if (began) return began;
+  const last = frags[frags.length - 1];
+  return edmontonISO(last && last.isoDate) || "";
+}
+
 export function workoutInstances(sessions) {
   const byKey = new Map();
   (sessions || []).forEach(s => {
@@ -641,7 +798,7 @@ export function workoutInstances(sessions) {
       key,
       workoutInstanceId: last.workoutInstanceId || null,
       isoDate: last.isoDate,
-      date: edmontonISO(last.isoDate),
+      date: workoutDate(frags),
       dayKey: last.dayKey,
       lightResult: last.lightResult || last.light || null,
       sessionType: last.sessionType || null,
