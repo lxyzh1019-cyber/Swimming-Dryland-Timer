@@ -405,7 +405,17 @@ export function buildSessionVM(state) {
         ? "Were your " + sess.cleanCheckMove + " reps clean?"
         : "Were your reps clean?",
     wobblyBanner: !!sess.lastWobbly && !isResting && !isPrompt,
-    doneLabel: explore ? "Next move ▶" : isResting ? "⏭ Skip Rest" : isFormCheck ? "Move on →" : "✓ Done — Next",
+    /* THE BUTTON SAYS WHAT THE TAP WILL DO. While the coach is announcing a
+       move, a tap means "I know this one, go" and starts the clock — it does
+       not end the move. The button said "✓ Done — Next" throughout, so the
+       first tap looked like it had been ignored and the second one, landing on
+       a move that had only just started, looked like it had skipped something.
+       Same button, same action, honest label. */
+    doneLabel: explore ? "Next move ▶"
+      : isResting ? "⏭ Skip Rest"
+      : isFormCheck ? "Move on →"
+      : sess.announceResolver ? "▶ Go"
+      : "✓ Done — Next",
 
     // prompts
     intentWords: INTENT_WORDS, microQ: MICRO_LOOP.q, microOpts: ["the hips", "the arms", "the knees"],

@@ -778,8 +778,13 @@ async function announce(msg) {
   const skipped = new Promise(resolve => {
     sess.announceResolver = () => { cut = true; resolve(); };
   });
+  // The screen repaints on phase changes, and an announcement is not one — so
+  // the ring went on saying "Done" while a tap meant "go". Both edges are
+  // announced, because the button's label is read off this resolver.
+  notify("phase");
   await Promise.race([speakAndWait(msg), skipped]);
   sess.announceResolver = null;
+  notify("phase");
   if (cut) cancelSpeech();
   // Whether she cut it short, so a caller can drop the beat that follows.
   return cut;
