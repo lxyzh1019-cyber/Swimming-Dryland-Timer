@@ -65,6 +65,7 @@ const CORE_SHELL = [
   "./core/data.js",
   "./core/sport.js",
   "./core/util.js",
+  "./core/layout.js",
   "./core/audio.js",
   "./core/effort.js",
   "./core/gate.js",

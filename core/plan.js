@@ -267,3 +267,35 @@ export function levelCost(n) {
   return 1500 + (n - 18) * 50;
 }
 export function fmtXp(n) { return Math.round(n).toLocaleString("en-US"); }
+
+/* What the coach SAYS the dose is. The screen's `dose` is written to be read
+   ("2×8/side", "30s · Parent Echo") and is nonsense out loud, so the spoken
+   form is built from the numbers instead of the label.
+
+   A two-sided TIMED move splits `work` in half per side (see eachSide in
+   engine.js), so the spoken number is the half — saying "30 seconds per side"
+   for a 30-second move would have her hold each side twice as long as the
+   plan asks. */
+function sayClock(secs) {
+  if (secs < 60) return `${secs} second${secs === 1 ? "" : "s"}`;
+  const m = Math.floor(secs / 60), r = secs % 60;
+  const mins = `${m} minute${m === 1 ? "" : "s"}`;
+  return r ? `${mins} ${r} second${r === 1 ? "" : "s"}` : mins;   // "1 minute 15 seconds", not "75 seconds"
+}
+
+export function spokenDose(ex) {
+  if (!ex) return "";
+  if (ex.byReps) {
+    const m = String(ex.repsDetail || ex.dose || "").trim()
+      .match(/^(?:(\d+)\s*[×x]\s*)?(\d+)\s*(\/\s*side|per side)?/i);
+    if (!m) return "";
+    const [, sets, reps, side] = m;
+    const core = sets ? `${sets} sets of ${reps}` : `${reps} rep${reps === "1" ? "" : "s"}`;
+    return side ? `${core} per side` : core;
+  }
+  const total = Number(ex.work) || 0;
+  if (!total) return "";
+  const secs = ex.eachSide ? Math.floor(total / 2) : total;
+  const said = sayClock(secs);
+  return ex.eachSide ? `${said} per side` : said;
+}

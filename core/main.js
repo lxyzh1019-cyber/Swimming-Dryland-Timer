@@ -13,12 +13,13 @@ import { DAYS } from "./data.js";
 import { restoreFromCloud, publishJourney, publishReadiness } from "./sync.js";
 import { downloadBackup, restoreBackupFile } from "./backup.js";
 import { buildTodayVM, journeyPathScrollIntoView } from "./vm/today.js";
+import { layoutFor } from "./layout.js";
 import { todayWide, todayNarrow } from "./screens/today.js";
 import { page, shellWithRail, bottomNav } from "./screens/shell.js";
 import { newReadinessFlow, answerQuestion, setZoneSev, resetBodyCheck, confirmGrownup, buildReadinessVM, mayStartFromReadiness } from "./vm/readiness.js";
 import { readinessScreen } from "./screens/readiness.js";
 import * as engine from "./engine.js";
-import { buildSessionVM, sessionQuizFor } from "./vm/session.js";
+import { buildSessionVM, sessionQuizFor, sessionListScrollIntoView } from "./vm/session.js";
 import { sessionScreen, updateSessionTick } from "./screens/session.js";
 import { buildQuizDeck, answerQuizDeck, finishQuizDeck, quizDeckHtml, newPrizeDraw, claimPrize, prizeDrawHtml } from "./screens/overlays.js";
 import { buildProgressVM, toggleRedeem } from "./vm/progress.js";
@@ -63,14 +64,23 @@ export const state = {
   walletRepairNote: "",         // result line under the prize wallet repair
   pendingRestore: null,         // { file, from, to } — a backup from another athlete, awaiting confirmation
   storageError: null,           // { name } — set when a write is rejected (disk full)
-  isWide: true
+  /* Set from layoutFor() on every paint — see computeLayout. isTablet and
+     tightColumn used to be absent entirely, which read as `undefined` and so as
+     false: the session screen asked for them, got nothing, and every iPad drew
+     the desktop proportions or the phone layout. */
+  isWide: true, isTablet: false, tightColumn: false,
+  railOpen: true,               // the session rail; collapsed by hand, never on its own
+  watchOpen: false              // the ❗ beside the coach tip
 };
 
 const root = document.getElementById("app");
 let undoTimer = null;              // repaints the prize wallet when an undo window closes
 
-function computeIsWide() {
-  return window.innerWidth >= 900 && window.innerWidth > window.innerHeight;
+/* The one place the viewport is measured. The rule itself lives in layout.js so
+   a test can ask it about a device without a browser — but a pure function
+   nothing calls is just a well-tested opinion, so this is the call. */
+function computeLayout() {
+  return layoutFor(window.innerWidth, window.innerHeight);
 }
 
 /* ---- screen renderers (filled in phase by phase) ---- */
@@ -92,6 +102,9 @@ function renderReadiness() {
 function renderSession() {
   const vm = buildSessionVM(state);
   root.innerHTML = page(sessionScreen(vm));
+  // The whole screen is replaced on every phase change, so the exercise list
+  // comes back scrolled to the top unless something puts it back.
+  sessionListScrollIntoView(root);
 }
 
 engine.onSessionUpdate(kind => {
@@ -212,7 +225,7 @@ export function render() {
 }
 
 function paint() {
-  state.isWide = computeIsWide();
+  Object.assign(state, computeLayout());
   if (state.readiness) { renderReadiness(); }
   else if (state.inSession) { renderSession(); }
   else if (state.nav === "progress") {
@@ -529,9 +542,11 @@ Object.assign(RAW, {
   stopNow() { engine.openStopOverlay(); },
   resumeFromStop() { engine.resumeFromStop(); },
   endFromStop(arg) { engine.endFromStop(arg || "pain"); },
-  askEnd() { engine.sess.confirmEnd = true; render(); },
-  cancelEnd() { engine.sess.confirmEnd = false; render(); },
-  confirmEndEarly() { engine.endEarly(); },
+  toggleWatch() { state.watchOpen = !state.watchOpen; render(); },
+  toggleRail() { state.railOpen = state.railOpen === false; render(); },
+  askRestart() { engine.sess.confirmRestart = true; render(); },
+  cancelRestart() { engine.sess.confirmRestart = false; render(); },
+  doRestart() { restartDay(); },
   askSkip() { engine.sess.confirmSkip = true; render(); },
   cancelSkip() { engine.sess.confirmSkip = false; render(); },
   confirmSkipEx() { engine.sess.confirmSkip = false; engine.skipCurrentExercise(); },
@@ -890,11 +905,34 @@ function leaveSession({ keepDay = false } = {}) {
    dead "Ready?" with a clock at zero and buttons wired to a runner that did not
    exist. A reload was the only way out. Now a refusal steps straight back to
    Today and says why. */
+/* "I need to start over": bin this attempt and run the same day again.
+
+   The relaunch cannot be the next statement — discardSession only ASKS the
+   runner to stop, and the runner is several awaits from noticing. Starting
+   here would hit startSession's `if (sess.running) return` and quietly do
+   nothing, leaving her on a dead finish screen. So we wait on the run's own
+   promise, which resolves after finalize has cleaned up. */
+async function restartDay() {
+  const again = state.pendingSession ? { ...state.pendingSession } : null;
+  const finished = sessionRun;
+  engine.discardSession();
+  await finished;
+  engine.exitSession();
+  if (!again) { leaveSession(); return; }
+  state.detailOverlay = false; state.detailEx = null;
+  state.watchOpen = false;
+  launchSession(again);
+  render();
+}
+
+let sessionRun = null;
 function launchSession(pending) {
   state.pendingSession = pending;
   state.inSession = true;
   render();
-  engine.startSession(pending);
+  /* Kept, because "start over" has to WAIT for this run to unwind before it
+     can begin another: startSession refuses outright while one is running. */
+  sessionRun = engine.startSession(pending);
   if (engine.sess.running) return;
   state.inSession = false;
   state.pendingSession = null;
@@ -965,8 +1003,9 @@ root.addEventListener("change", e => {
 });
 
 window.addEventListener("resize", () => {
-  const wide = computeIsWide();
-  if (wide !== state.isWide) render();
+  const next = computeLayout();
+  if (next.isWide !== state.isWide || next.isTablet !== state.isTablet
+      || next.tightColumn !== state.tightColumn) render();
 });
 
 /* Weather chip (Red Deer, same source as the old app) — cosmetic, fails silently. */

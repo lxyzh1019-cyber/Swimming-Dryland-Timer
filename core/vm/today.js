@@ -721,6 +721,7 @@ export function buildTodayVM(state) {
   });
 
   return {
+    tightColumn: !!state.tightColumn,
     athleteName: settings.athleteName || ATHLETE_DEFAULT,
     dateLine, statChips, journey, blocks, week, legend, dayView,
     gearLabel, focusCue, coachIconBtnStyle, practiceLinkLabel, practiceHintLine, practiceBtnStyle,

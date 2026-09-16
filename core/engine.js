@@ -18,6 +18,7 @@ import { settings, configuredExerciseRest, configuredRoundRest, configuredSectio
          loadDayProgress, saveDayProgress, clearDayProgress, gateLocked, creditValgusWeek, addSkipRecord,
          addXp, pendingDrawCount, claimSessionXp, athleteId, noteSessionXpAwarded, patchSession, sessionKey,
          XP_VERSION, flaggedMoves, isAbnormalCheck, stampReadinessOutcome, loadSessions } from "./store.js";
+import { spokenDose } from "./plan.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn, speakSafety } from "./audio.js";
 import { APP_ID, DAY_LOAD_FIELD, FEATURES } from "./sport.js";
 import { recoveryDoseSecs, refTime, edmontonISO, todayISODate, plural } from "./util.js";
@@ -56,6 +57,7 @@ function blankSession() {
     clockAt: 0, activeMs: 0, pausedMs: 0, exMs: 0,
     upNextName: "", upNextDose: "", restCue: "",
     stopOverlay: false, confirmEnd: false, painFlag: false,
+    discard: false, stopReason: null, confirmRestart: false,
     pendingCleanCheck: false, cleanCount: 0, wobblyCount: 0, lastWobbly: false,
     checkKind: null, landings: {}, wobblyStreak: 0, tierDropped: 0,
     spotChecks: [], spotAsked: {}, cleanCheckMove: null, formChecks: [], formResolver: null,
@@ -781,6 +783,15 @@ function setPhase(phase) {
    guard was a 1200 ms flag that self-cleared, which is the wrong shape: it let
    the second tap ride into a rest that had already begun and cut it short. */
 export const DONE_GUARD_MS = 300;
+
+/* "Dead Bug. 8 reps per side. Back flat, exhale on extend. Three, two, one,
+   go." The dose used to be missing: she heard the name and a countdown and had
+   to look at the screen to learn whether it was eight reps or thirty seconds —
+   which is exactly the moment she is meant to be looking at her own body. */
+function openingLine(ex, tail) {
+  const dose = spokenDose(ex);
+  return ex.name + "." + (dose ? " " + dose + "." : "") + (ex.reset ? " " + ex.reset : "") + " " + tail;
+}
 
 /* The move's announcement — "Dead Bug. Three, two, one, go." — spoken and
    waited for, but hers to cut short: a tap during it means "I know this one,
@@ -1800,7 +1811,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     playCue("work");
     if (ex.byReps) {
       setPhase("reps");
-      if (!preAnnounced) await announce(ex.name + "." + (ex.reset ? " " + ex.reset : "") + " Go.");
+      if (!preAnnounced) await announce(openingLine(ex, "Go."));
       preAnnounced = false;
       if (sess.abort) return finalize(false);
       if (wentBack()) { back(); continue; }
@@ -1811,7 +1822,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     } else {
       sess.timerSecs = work; sess.timerMax = work;
       setPhase("work");
-      if (!preAnnounced) await announce(ex.name + "." + (ex.reset ? " " + ex.reset : "") + " Three, two, one, go.");
+      if (!preAnnounced) await announce(openingLine(ex, "Three, two, one, go."));
       preAnnounced = false;
       if (sess.abort) return finalize(false);
       if (wentBack()) { back(); continue; }
@@ -2300,17 +2311,24 @@ export function finalize(completed) {
     });
   }
   sess.perExercise = entry.perExercise;
-  const saved = saveSession(entry);
+  /* "I need to start over" throws the attempt away: no row, so no XP, no
+     streak day, no prize — every one of which already keys off `saved`, so
+     the discard rides the same path a failed write does rather than needing
+     its own branch through eighty lines of settlement. */
+  const saved = sess.discard ? false : saveSession(entry);
   // The RECORD, not a boolean. The finish screen has to say what the saved row
   // says — read back through outcomeOf, the same authority the parent reports
   // will use tomorrow — and it cannot do that from a `true`.
   sess.savedEntry = saved ? entry : null;
-  sess.saveFailed = !saved;   // the complete screen must not claim a save that didn't happen
+  // ...with one difference: a discard is a CHOICE, not a failed write. Saying
+  // "we couldn't save that" to a kid who asked to start over is a lie that
+  // reads like a bug.
+  sess.saveFailed = !saved && !sess.discard;
   sess.savedKey = saved ? sessionKey(entry) : null;
   logEvent(completed ? "session_complete" : "session_abort", {
     day: sess.dayKey, durationSecs: elapsedSecs,
     skipped: sess.skipped.length, pauses: sess.pauseCount || 0,
-    pain: !!sess.painFlag
+    pain: !!sess.painFlag, discarded: !!sess.discard
   });
 
   // Valgus earn-back. This used to tick up whenever Drop-and-Stick merely
@@ -2603,10 +2621,36 @@ export function resumeFromStop() {
    trained, streak judged by the normal rule. Every red STOP used to be a pain
    stop, so a bathroom break or a doorbell cost her the whole day's XP and the
    streak day with it. With no reason given it is still the safe reading. */
+export const STOP_REASONS = ["pain", "break", "restart"];
+/* Start over: end this attempt and keep NONE of it. Separate from endFromStop
+   because the other two reasons record what she did and this one deliberately
+   does not. The caller relaunches the day once the runner has unwound. */
+export function discardSession() {
+  sess.stopOverlay = false;
+  sess.confirmRestart = false;
+  sess.painFlag = false;
+  sess.stopReason = "restart";
+  sess.discard = true;
+  logEvent("stop", { reason: "restart", hurt: false, ex: sess.currentEx ? sess.currentEx.name : null });
+  endEarly();
+}
+/* Three reasons, two consequences. Only "hurt" withholds the day; "break" (no
+   time) and "restart" (starting the session over) are ordinary early ends and
+   are paid for the rounds she trained.
+
+   The flag stays a DENY-LIST, not `reason === "pain"`: an unknown or missing
+   reason must still read as a pain stop, which is the safe reading and the
+   reason the parameter defaults to "pain". Only the two reasons we have
+   deliberately decided are harmless clear it.
+
+   The log keeps the reason SHE picked, not the flag. It used to write back
+   `painFlag ? "pain" : "break"`, so a third reason could never be told apart
+   from the second one in the record however many buttons the screen grew. */
 export function endFromStop(reason = "pain") {
   sess.stopOverlay = false;
-  sess.painFlag = reason !== "break";
-  logEvent("stop", { reason: sess.painFlag ? "pain" : "break", ex: sess.currentEx ? sess.currentEx.name : null });
+  sess.painFlag = reason !== "break" && reason !== "restart";
+  sess.stopReason = STOP_REASONS.includes(reason) ? reason : "pain";
+  logEvent("stop", { reason: sess.stopReason, hurt: sess.painFlag, ex: sess.currentEx ? sess.currentEx.name : null });
   endEarly();
 }
 export function endEarly() {

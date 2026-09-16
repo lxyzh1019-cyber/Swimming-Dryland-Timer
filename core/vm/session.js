@@ -212,8 +212,13 @@ export function buildSessionVM(state) {
   const bzMap = { warmup: "warmup", coordination: "work", main: "work", prep: "work", finisher: "rest", [SKILL_BLOCK]: "rest", recovery: "rest" };
   const pzMap = { work: bzMap[circuit.block] || "work", rest: "rest", roundRest: "evening", sectionRest: "evening", sideswitch: "rest", getready: "warmup", greeting: "warmup", breath: "rest" };
   const timerZoneType = pzMap[phase] || "work";
-  const timerZone = ({ work: "WORK", rest: "REST", roundRest: "ROUND REST", sectionRest: "SECTION REST",
-    sideswitch: "SWITCH", getready: "READY", greeting: "READY", breath: "BREATHE" })[phase] || "WORK";
+  /* "WORK" only said "not a rest". It never said which KIND of work, which is
+     the thing she needs: a clock she has to outlast, or a count she has to
+     finish. The rep ring says BY REPS, so the timed one says TIMED SET —
+     "session" is already the whole workout here (Session time, End session)
+     and would collide. */
+  const timerZone = ({ work: "TIMED SET", rest: "REST", roundRest: "ROUND REST", sectionRest: "SECTION REST",
+    sideswitch: "SWITCH", getready: "READY", greeting: "READY", breath: "BREATHE" })[phase] || "TIMED SET";
   const timerUrgent = sess.urgent && phase !== "roundRest" && phase !== "sectionRest";
 
   const bvMap = { warmup: "sun", coordination: "sun", main: "aqua", prep: "grape", finisher: "mint", [SKILL_BLOCK]: "sea", recovery: "grape" };
@@ -292,7 +297,7 @@ export function buildSessionVM(state) {
       const st = sess.exStatus[ci + "-" + ei];
       const isCur = sess.running && ci === sess.ci && ei === sess.ei && !sessionDone;
       sessionExList.push({
-        isEx: true, num: ei + 1, name: e.name, ci, ei,
+        isEx: true, num: ei + 1, name: e.name, ci, ei, isCur,
         cardStyle: "display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:12px;margin:2px 0;box-sizing:border-box;"
           + (isCur ? "background:var(--aqua-wash);box-shadow:inset 0 0 0 2px var(--aqua-light);" : ""),
         numStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;"
@@ -349,10 +354,11 @@ export function buildSessionVM(state) {
     : "Good try! The best answer is highlighted — now you know it." + quizXpLine + (quizXp ? " 💭" : "");
 
   return {
-    isWide: state.isWide, isNarrow: !state.isWide,
+    isWide: state.isWide, isNarrow: !state.isWide, isTablet: !!state.isTablet, tightColumn: !!state.tightColumn,
+    watchOpen: !!state.watchOpen,
     sessionDone, sessionInProgress: !sessionDone,
-    stopOverlay: sess.stopOverlay, confirmEnd: sess.confirmEnd, notConfirmingEnd: !sess.confirmEnd,
-    confirmSkip: !!sess.confirmSkip && !sess.confirmEnd,
+    stopOverlay: sess.stopOverlay,
+    confirmSkip: !!sess.confirmSkip,
     detailOverlay: state.detailOverlay,
     detailName: de.name || "", detailDose: de.dose || "", detailCue: de.cue || "",
     detailWatchFor: de.parentWatch || "", detailFix: de.redFlag || de.fix || "",
@@ -402,6 +408,16 @@ export function buildSessionVM(state) {
     timerIsTime, timerIsReps, isPrompt, phase,
     timerDisplay: fmtMMSS(sess.timerSecs || 0),
     timerZone, timerZoneType, timerUrgent,
+    /* The side is live on TIMED two-sided moves too (engine sets sideLabel to
+       "15s first side"), but it only ever reached the small italic dose line —
+       the LEFT/RIGHT chips are gated on phase === "reps". The ring label can
+       carry it at the same size as the phase word. */
+    timerSideWord: (sess.totalSides > 1 && /first side/i.test(sess.sideLabel || "")) ? "FIRST SIDE"
+      : (sess.totalSides > 1 && /second side/i.test(sess.sideLabel || "")) ? "SECOND SIDE" : "",
+    railOpen: state.railOpen !== false,
+    confirmRestart: !!sess.confirmRestart,
+    restartExercises: sess.exDone || 0,
+    restartRounds: sess.roundsCompleted || 0,
     timerProgress: sess.timerMax > 0 ? Math.max(0, sess.timerSecs / sess.timerMax) : 1,
     timerIsPaused: sess.paused, timerNotPaused: !sess.paused,
     // Paused BY the app, because the page went away — see PAUSE_HIDDEN in
@@ -531,4 +547,22 @@ export function buildSessionVM(state) {
     quizFeedback,
     quizFeedbackColor: quizCorrect ? "var(--mint-ink)" : "var(--coral)"
   };
+}
+
+/* Keep the move she is ON in the middle of the exercise list.
+
+   renderSession() replaces the whole screen on every phase change, so the
+   list came back scrolled to the top every time and the current move walked
+   off the bottom as the session ran. The journey map solved this already
+   (journeyPathScrollIntoView in vm/today.js); this is the same three lines
+   WITHOUT its run-once latch, because here it has to happen again at every
+   phase. Assigning scrollTop is instant, so there is no motion to reduce. */
+export function sessionListScrollIntoView(rootEl) {
+  const el = rootEl && rootEl.querySelector("[data-ex-list]");
+  if (!el) return;
+  const put = () => {
+    const cur = el.querySelector("[data-ex-cur]");
+    if (cur) el.scrollTop = Math.max(0, cur.offsetTop - el.clientHeight / 2 + cur.offsetHeight / 2);
+  };
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(put); else put();
 }

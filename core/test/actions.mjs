@@ -123,6 +123,9 @@ const main   = await import(base + "main.js");
 const rvm    = await import(base + "vm/readiness.js");
 const data   = await import(base + "data.js");
 const tvm    = await import(base + "vm/today.js");
+const svm    = await import(base + "vm/session.js");
+const sscreen= await import(base + "screens/session.js");
+const layout = await import(base + "layout.js");
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
@@ -695,5 +698,103 @@ ok(/marked used/.test(note), "it says plainly that prizes are still marked used"
 ok(store.redeemedPrizesForReview().length === 2, "and offers them for review");
 
 engine.exitSession();
+
+/* ---- EVERY BUTTON THE SCREEN DRAWS MUST DO SOMETHING ----------------------
+
+   The ❗ beside the coach tip shipped inert: the session screen emitted
+   data-action="toggleWatch" and the action table had no such entry, so tapping
+   it dispatched into nothing. dispatch() returns silently on an unknown name —
+   correct for a typo'd attribute, and exactly why a missing handler is
+   invisible. The markup was right and the handler was absent, and no test
+   joined the two. This one does. */
+{
+  const names = new Set(main.actionNames());
+  const emitted = new Set();
+  for (const st of [
+    { isWide: true,  isTablet: false, tightColumn: false },
+    { isWide: true,  isTablet: true,  tightColumn: true },
+    { isWide: false, isTablet: false, tightColumn: false }
+  ]) {
+    for (const extra of [{}, { stopOverlay: true }, { stopOverlay: true, confirmRestart: true }]) {
+      /* A REAL session state, not a hand-posed one: the ❗ only draws when the
+         current move actually has a parentWatch, so a stub sess would render a
+         screen with no ❗ on it and the test would pass by drawing nothing. */
+      engine.exitSession();
+      main.actions.goExplore("monday");        // builds real circuits for the day
+      /* ...then aim it at a move that HAS a parentWatch, and out of explore
+         mode, because the ❗ only draws for a move with something to watch for
+         and explore has its own reduced control set. A stub session renders a
+         screen with no ❗ on it, and the test would pass by drawing nothing. */
+      let ci = 0, ei = 0, pick = null;
+      (engine.sess.circuits || []).forEach((c, i) =>
+        (c.exercises || []).forEach((e, j) => { if (!pick && e.parentWatch) { pick = e; ci = i; ei = j; } }));
+      Object.assign(engine.sess, { phase: "work", running: true, explore: false,
+                                   ci, ei, stepIdx: 2, currentEx: pick }, extra);
+      const html = sscreen.sessionScreen(svm.buildSessionVM(
+        { inSession: true, detailOverlay: false, detailEx: null, ...st }));
+      for (const m of html.matchAll(/data-action="([a-zA-Z]+)"/g)) emitted.add(m[1]);
+    }
+  }
+  ok(emitted.size > 12, "the session screen emits a realistic number of actions: " + emitted.size);
+  const orphans = [...emitted].filter(a => !names.has(a));
+  ok(orphans.length === 0, "every data-action the session screen draws has a handler — orphans: " + orphans.join(", "));
+  ok(emitted.has("toggleWatch") && names.has("toggleWatch"),
+     "including the ❗, which is the one that shipped without one");
+}
+
+/* ---- THE BREAKPOINT HAS TO BE CALLED, NOT JUST BE CORRECT ----------------
+
+   layoutFor() was written, unit-tested, and imported by nobody: main.js still
+   measured the viewport with its own older rule, so state.isTablet and
+   state.tightColumn stayed undefined and every iPad held UPRIGHT drew the
+   phone layout. The pure function passed its test; the app did not call it.
+
+   So assert the wiring instead of the opinion: move the viewport, repaint,
+   read the state back. */
+{
+  const at = (w, h) => {
+    window.innerWidth = w; window.innerHeight = h;
+    main.render();
+    return { isWide: main.state.isWide, isTablet: main.state.isTablet,
+             tightColumn: main.state.tightColumn };
+  };
+  const ipad = at(810, 1080), want = layout.layoutFor(810, 1080);
+  ok(ipad.isWide === want.isWide && ipad.isTablet === want.isTablet
+     && ipad.tightColumn === want.tightColumn,
+     "a repaint sets all three flags from layoutFor — upright iPad got " + JSON.stringify(ipad));
+  ok(ipad.isWide === true && ipad.tightColumn === true,
+     "an upright iPad is wide with a tight column, not the phone layout");
+  const phone = at(393, 852);
+  ok(phone.isWide === false && phone.isTablet === false && phone.tightColumn === false,
+     "a phone is still a phone: " + JSON.stringify(phone));
+  const desk = at(1440, 900);
+  ok(desk.isWide === true && desk.isTablet === false && desk.tightColumn === false,
+     "a desktop still gets desktop proportions: " + JSON.stringify(desk));
+  window.innerWidth = 1200; window.innerHeight = 800;
+}
+
+/* ---- AND THE LIST HAS TO BE PUT BACK ------------------------------------
+
+   sessionListScrollIntoView was written, exported, and called by nobody, so the
+   exercise list still came back scrolled to the top on every phase change and
+   the current move still walked off the bottom. Same shape of bug as the
+   breakpoint: the helper was right, the call site was missing.
+
+   Watch for the query it makes, rather than for a scroll position the shim
+   cannot have. */
+{
+  const asked = [];
+  const realQS = testRoot.querySelector;
+  testRoot.querySelector = (sel) => { asked.push(sel); return null; };
+  engine.exitSession();
+  main.actions.goExplore("monday");
+  main.state.inSession = true;
+  main.render();
+  testRoot.querySelector = realQS;
+  main.state.inSession = false;
+  ok(asked.includes("[data-ex-list]"),
+     "painting the session screen asks the list to re-centre — selectors seen: " + asked.join(" "));
+}
+
 console.log(`✓ action-layer tests passed (${passed} assertions)`);
 process.exit(0);
