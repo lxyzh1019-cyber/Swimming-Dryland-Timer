@@ -529,6 +529,10 @@ Object.assign(RAW, {
   stopNow() { engine.openStopOverlay(); },
   resumeFromStop() { engine.resumeFromStop(); },
   endFromStop(arg) { engine.endFromStop(arg || "pain"); },
+  toggleRail() { state.railOpen = state.railOpen === false; render(); },
+  askRestart() { engine.sess.confirmRestart = true; render(); },
+  cancelRestart() { engine.sess.confirmRestart = false; render(); },
+  doRestart() { restartDay(); },
   askEnd() { engine.sess.confirmEnd = true; render(); },
   cancelEnd() { engine.sess.confirmEnd = false; render(); },
   confirmEndEarly() { engine.endEarly(); },
@@ -890,11 +894,34 @@ function leaveSession({ keepDay = false } = {}) {
    dead "Ready?" with a clock at zero and buttons wired to a runner that did not
    exist. A reload was the only way out. Now a refusal steps straight back to
    Today and says why. */
+/* "I need to start over": bin this attempt and run the same day again.
+
+   The relaunch cannot be the next statement — discardSession only ASKS the
+   runner to stop, and the runner is several awaits from noticing. Starting
+   here would hit startSession's `if (sess.running) return` and quietly do
+   nothing, leaving her on a dead finish screen. So we wait on the run's own
+   promise, which resolves after finalize has cleaned up. */
+async function restartDay() {
+  const again = state.pendingSession ? { ...state.pendingSession } : null;
+  const finished = sessionRun;
+  engine.discardSession();
+  await finished;
+  engine.exitSession();
+  if (!again) { leaveSession(); return; }
+  state.detailOverlay = false; state.detailEx = null;
+  state.watchOpen = false;
+  launchSession(again);
+  render();
+}
+
+let sessionRun = null;
 function launchSession(pending) {
   state.pendingSession = pending;
   state.inSession = true;
   render();
-  engine.startSession(pending);
+  /* Kept, because "start over" has to WAIT for this run to unwind before it
+     can begin another: startSession refuses outright while one is running. */
+  sessionRun = engine.startSession(pending);
   if (engine.sess.running) return;
   state.inSession = false;
   state.pendingSession = null;

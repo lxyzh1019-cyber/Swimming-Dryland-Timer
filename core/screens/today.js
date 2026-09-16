@@ -278,16 +278,24 @@ function dayPane(vm, wide) {
 
 export function todayWide(vm) {
   const name = escapeHtml(vm.athleteName);
-  return `
-    <div style="flex:1;min-width:0;padding:24px 26px;display:flex;flex-direction:column;">
+  /* An upright iPad is "wide" now, and this layout was drawn for a desktop: the
+     day card is a HARD 452px that refuses to shrink, so at 810px the column
+     beside it collapsed to about 200 and set the greeting, the week strip and
+     the Quiz Deck one word per line. Above 900 the two columns are unchanged;
+     at 810 they stack, which is the only honest thing to do with that width. */
+  const tight = !!vm.tightColumn;
+  const open  = tight ? `<div style="flex:1;min-width:0;display:flex;flex-direction:column;">` : "";
+  const close = tight ? `</div>` : "";
+  return `${open}
+    <div style="flex:${tight ? "0 0 auto" : "1"};min-width:0;padding:${tight ? "18px 20px 0" : "24px 26px"};display:flex;flex-direction:column;">
 
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:18px;">
         <div>
           <div style="display:flex;align-items:center;gap:10px;">
-            <div style="font-family:var(--font-display);font-weight:600;font-size:42px;line-height:1;color:var(--ink);white-space:nowrap;">Hi, ${name}!</div>
+            <div style="font-family:var(--font-display);font-weight:600;font-size:${tight ? 32 : 42}px;line-height:1;color:var(--ink);white-space:nowrap;">Hi, ${name}!</div>
             <span style="font-size:30px;">${EMOJI.world}</span>
           </div>
-          <div style="font-family:var(--font-hand);font-weight:700;font-size:24px;line-height:1.1;color:var(--aqua-ink);margin-top:5px;">${COPY.greeting}</div>
+          <div style="font-family:var(--font-hand);font-weight:700;font-size:${tight ? 20 : 24}px;line-height:1.1;color:var(--aqua-ink);margin-top:5px;">${COPY.greeting}</div>
         </div>
         ${imgWithFallbacks(photoSources(POSES.welcome), `alt="" aria-hidden="true" style="height:104px;margin:-10px 8px -14px 0;object-fit:contain;flex-shrink:0;"`)}
       </div>
@@ -312,9 +320,9 @@ export function todayWide(vm) {
       ${journeyMapWide(vm)}
     </div>
 
-    <div style="width:452px;flex-shrink:0;margin:14px;border-radius:26px;background:linear-gradient(165deg,var(--aqua-light) 0%,var(--aqua) 60%,var(--aqua-deep) 100%);color:#fff;display:flex;flex-direction:column;position:relative;overflow:hidden;">
+    <div style="${tight ? "width:auto;margin:14px 20px 20px;" : "width:452px;flex-shrink:0;margin:14px;"}border-radius:26px;background:linear-gradient(165deg,var(--aqua-light) 0%,var(--aqua) 60%,var(--aqua-deep) 100%);color:#fff;display:flex;flex-direction:column;position:relative;overflow:hidden;">
       ${dayPane(vm, true)}
-    </div>`;
+    </div>${close}`;
 }
 
 export function todayNarrow(vm) {

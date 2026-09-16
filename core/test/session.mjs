@@ -5,6 +5,9 @@
    move, so it holds for both. Voice ON with a SLOW synthesiser where the bug was
    a race with the coach's speech; voice OFF where it was not. */
 import { engine, store, sport, data, tvm, gvm, runSession, setSpeechDelay, speechInFlight, spoken, pinClock } from "./harness.mjs";
+const base   = new URL("../", import.meta.url).href;
+const layout = await import(base + "layout.js");
+const plan   = await import(base + "plan.js");
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
@@ -246,6 +249,100 @@ const stopInRoundTwo = (reason) => ({
   const notYet = (() => { localStorage.clear(); store.migrate(); [1, 5, 9].forEach(d => store.saveSession(row(d, {})));
     return gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics", isWide: true }).analytics.acwr; })();
   ok(notYet.value === "—" && /2 weeks/.test(notYet.label), "under two weeks of history it says what it is waiting for: " + notYet.label);
+}
+
+/* ============================================================
+   TIMER SCREEN — the layout rule, the spoken dose, and the three
+   ways a session can be stopped.
+
+   These exist because each one is a place where the obvious
+   implementation is wrong in a way no rendered markup shows.
+   ============================================================ */
+{
+  /* ---- the breakpoint ----------------------------------------------------
+     It used to be `w >= 900 && w > h`: every iPad held UPRIGHT fell through to
+     the phone layout. The rule is asserted as a table because the risk is not
+     that tablets fail — it is that phones quietly start passing. */
+  for (const [label, w, h, wide, tablet, tight] of [
+    ["iPad mini upright",      744, 1133, true,  true,  true],
+    ["iPad 10.2 upright",      810, 1080, true,  true,  true],
+    ["iPad Air upright",       820, 1180, true,  true,  true],
+    ["iPad Pro 11 upright",    834, 1194, true,  true,  true],
+    ["iPad Pro 12.9 upright", 1024, 1366, true,  true,  false],
+    ["iPad 10.2 landscape",   1080,  810, true,  true,  false],
+    ["iPad Pro 12.9 landscape",1366,1024, true,  false, false],
+    ["iPhone 15 portrait",     393,  852, false, false, false],
+    ["iPhone Max portrait",    430,  932, false, false, false],
+    ["iPhone landscape",       932,  430, true,  true,  false],
+    ["laptop",                1440,  900, true,  false, false],
+    ["short laptop",          1512,  780, true,  false, false]
+  ]) {
+    const r = layout.layoutFor(w, h);
+    ok(r.isWide === wide && r.isTablet === tablet && r.tightColumn === tight,
+       `${label} ${w}×${h}: wide=${r.isWide} tablet=${r.isTablet} tight=${r.tightColumn}`);
+  }
+
+  /* ---- the spoken dose ---------------------------------------------------
+     The screen's `dose` is written to be READ ("2×8/side") and is nonsense out
+     loud. The one that matters: a two-sided TIMED move splits `work` in half
+     per side, so saying the whole number would ask for twice the work. */
+  const said = (ex) => plan.spokenDose(ex);
+  ok(said({ work: 30 }) === "30 seconds", "a timed move says its seconds");
+  ok(said({ work: 60 }) === "1 minute", "sixty seconds is a minute, not sixty seconds");
+  ok(said({ work: 75 }) === "1 minute 15 seconds", "and 75 is not '75 seconds'");
+  ok(said({ work: 60, eachSide: true }) === "30 seconds per side",
+     "a two-sided timed move says the HALF — the side is half the work: " + said({ work: 60, eachSide: true }));
+  ok(said({ byReps: true, repsDetail: "8/side" }) === "8 reps per side", "reps per side");
+  ok(said({ byReps: true, repsDetail: "2×8/side" }) === "2 sets of 8 per side", "sets of reps per side");
+  ok(said({ byReps: true, repsDetail: "10" }) === "10 reps", "plain reps");
+  ok(said({ byReps: true, repsDetail: "" }) === "", "an unreadable dose is silent, not wrong");
+  ok(said(null) === "", "and no move at all is silent");
+
+  /* ---- what the coach actually says -------------------------------------- */
+  localStorage.clear(); store.migrate(); voiceOn();
+  spoken.length = 0;
+  await runSession({ dayKey: timedDay, light: "green", gateUnlocked: true, limitMs: 240000 },
+    { onTick: (ms, s) => { answerChecks(s); if (ms > 120000) engine.endFromStop("break"); } });
+  const opening = spoken.find(l => /Three, two, one, go\.$/.test(l));
+  ok(opening && /\d/.test(opening),
+     "the opening announcement carries the dose, not just the name: " + opening);
+
+  /* ---- three reasons, two consequences -----------------------------------
+     painFlag is a DENY-list on purpose: an unknown or missing reason must
+     still read as a pain stop. A third reason that silently read as "pain"
+     would have cost her the day's XP and the streak. */
+  const stopWith = (reason) => {
+    engine.exitSession();
+    Object.assign(engine.sess, { running: true, currentEx: { name: "x" }, explore: false });
+    if (reason === undefined) engine.endFromStop(); else engine.endFromStop(reason);
+    return { hurt: engine.sess.painFlag, why: engine.sess.stopReason };
+  };
+  ok(stopWith("pain").hurt === true, "'something hurts' is a safety stop");
+  ok(stopWith("break").hurt === false, "'no time' is an ordinary early end");
+  const r = stopWith("restart");
+  ok(r.hurt === false && r.why === "restart",
+     "'start over' is not a pain stop, and is recorded as itself — not collapsed into 'break'");
+  ok(stopWith(undefined).hurt === true, "NO reason given still reads as pain — the safe reading");
+  ok(stopWith("nonsense").hurt === true && stopWith("nonsense").why === "pain",
+     "and so does a reason we do not recognise");
+
+  /* ---- starting over keeps nothing ---------------------------------------- */
+  localStorage.clear(); store.migrate();
+  const before = store.loadSessions().length;
+  await runSession({ dayKey: timedDay, light: "green", gateUnlocked: true, limitMs: 240000 },
+    { onTick: (ms, s) => { answerChecks(s); if (ms === 60000) engine.discardSession(); } });
+  ok(store.loadSessions().length === before, "a discarded attempt writes no row at all");
+  ok(engine.sess.xpEarned === 0, "and pays no XP");
+  ok(engine.sess.saveFailed === false,
+     "and is NOT reported as a failed save — she chose it, nothing went wrong");
+  ok(engine.sess.stopReason === "restart", "the record knows why it was discarded");
+
+  /* A stale discard flag must not bin the NEXT workout too. */
+  localStorage.clear(); store.migrate();
+  engine.sess.discard = true;
+  await runSession({ dayKey: timedDay, light: "green", gateUnlocked: true, limitMs: 240000 },
+    { onTick: (ms, s) => { answerChecks(s); if (ms > 120000) engine.endFromStop("break"); } });
+  ok(store.loadSessions().length === 1, "a discard does not leak into the session after it");
 }
 
 console.log("✓ session safety passed (" + passed + " assertions)");
