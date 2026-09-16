@@ -156,10 +156,21 @@ function dayPane(vm, wide) {
 
   const chips = dv.showChips ? `
     <div style="display:flex;gap:${wide ? 10 : 8}px;margin-bottom:14px;flex-wrap:wrap;">
-      <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>⏱</span> ${dv.mins} min</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>⏱</span> ${dv.minsLabel || (dv.mins + " min")}</span>
       <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>⚡</span> ${dv.movesLabel}</span>
       ${vm.gearLabel ? `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>🎒</span> ${vm.gearLabel}</span>` : ""}
       ${dv.earnedXpLabel ? `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.28);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>⭐</span> ${dv.earnedXpLabel}</span>` : ""}
+    </div>` : "";
+
+  /* WHAT THE GROWN-UP IS BEING ASKED TO LOOK AT, on the screen they already
+     open. A move held for twelve seconds of thirty used to look exactly like
+     one held the whole way, and the only way to know was to have watched it.
+     Yellow for short, red for very short — the same two words the session
+     screen and the Grown-up Zone use, so nobody has to translate. */
+  const paceFlag = dv.paceNote ? `
+    <div style="display:flex;gap:9px;align-items:flex-start;background:${dv.paceBand === "red" ? "rgba(226,86,78,0.20)" : "rgba(242,184,75,0.22)"};border:1.5px solid rgba(255,255,255,0.45);border-radius:12px;padding:10px 12px;margin-bottom:12px;">
+      <span style="font-size:15px;flex-shrink:0;">${dv.paceBand === "red" ? "⚠️" : "🟡"}</span>
+      <span style="font-size:${wide ? 13 : 12}px;font-weight:700;line-height:1.4;">${escapeHtml(dv.paceNote)}</span>
     </div>` : "";
 
   const focus = dv.showFocus ? `
@@ -174,6 +185,7 @@ function dayPane(vm, wide) {
       <div style="display:flex;flex-direction:column;gap:1px;">
         <span style="font-weight:900;font-size:${wide ? 16 : 15}px;">✅ ${dv.doneHeadline}</span>
         <span style="font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.85;">${dv.doneSub}</span>
+        ${dv.xpNote ? `<span style="font-size:${wide ? 13 : 12}px;font-weight:700;opacity:0.78;">${escapeHtml(dv.xpNote)}</span>` : ""}
       </div>
     </div>` : "";
 
@@ -204,8 +216,10 @@ function dayPane(vm, wide) {
         <div style="background:${b.rowBg};border-radius:16px;overflow:hidden;transition:background 0.15s ease;">
           <button type="button" data-action="toggleBlock" data-arg="${b.key}" style="width:100%;display:flex;align-items:center;gap:${wide ? 11 : 10}px;padding:${wide ? "13px 15px" : "12px 14px"};background:none;border:none;cursor:pointer;color:#fff;transition:transform 0.1s ease;">
             <span style="width:${wide ? 34 : 32}px;height:${wide ? 34 : 32}px;border-radius:50%;background:rgba(255,255,255,0.94);display:flex;align-items:center;justify-content:center;font-size:${wide ? 18 : 17}px;flex-shrink:0;box-shadow:0 2px 5px rgba(10,40,55,0.18);">${b.icon}</span>
-            <span style="font-weight:900;font-size:${wide ? 15 : 14}px;flex:1;text-align:left;display:flex;align-items:center;gap:6px;">${b.name}${b.isBlockDone ? `<span style="font-size:${wide ? 13 : 12}px;">✓</span>` : ""}</span>
-            <span style="font-size:${wide ? 12 : 11}px;font-weight:800;opacity:0.85;">${b.countLabel} · ${b.mins} min</span>
+            <span style="font-weight:900;font-size:${wide ? 15 : 14}px;flex:1;text-align:left;display:flex;align-items:center;gap:6px;">${b.name}${b.isBlockDone ? `<span style="font-size:${wide ? 13 : 12}px;">✓</span>` : b.isBlockSkipped ? `<span style="font-size:${wide ? 11 : 10}px;font-weight:800;opacity:0.8;">skipped</span>` : ""}</span>
+            <!-- Under "REVIEW WHAT YOU DID", what she DID leads; what the block
+                 asked for follows it. The panel used to show only the ask. -->
+            <span style="font-size:${wide ? 12 : 11}px;font-weight:800;opacity:0.85;text-align:right;">${b.doneLabel ? escapeHtml(b.doneLabel) + " · " : ""}${b.countLabel} · ${b.mins} min</span>
             <span style="font-size:13px;transition:transform 0.2s;transform:rotate(${b.rot}deg);">▾</span>
           </button>
           <div style="${b.bodyStyle}">
@@ -264,6 +278,7 @@ function dayPane(vm, wide) {
     ${chips}
     ${focus}
     ${done}
+    ${paceFlag}
     ${missed}
     ${rest}
     ${blocksList}

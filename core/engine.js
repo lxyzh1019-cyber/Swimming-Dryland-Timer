@@ -8,7 +8,8 @@
      notify("tick")  → targeted per-second DOM writes only
    ============================================================ */
 
-import { deriveSessionOutcome, mainRoundsFromLedger, mainRoundReport, OUTCOME_VERSION } from "./outcome.js";
+import { deriveSessionOutcome, mainRoundsFromLedger, mainRoundReport, OUTCOME_VERSION,
+         mergeLedgerRows, logicalRowId, workoutDate, paceReport } from "./outcome.js";
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA,
          exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
          needsSetup, SETUP_SECONDS,
@@ -16,11 +17,11 @@ import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SID
 import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent,
          loadDayProgress, saveDayProgress, clearDayProgress, gateLocked, creditValgusWeek, addSkipRecord,
          addXp, pendingDrawCount, claimSessionXp, athleteId, noteSessionXpAwarded, patchSession, sessionKey,
-         XP_VERSION, flaggedMoves, isAbnormalCheck, stampReadinessOutcome } from "./store.js";
+         XP_VERSION, flaggedMoves, isAbnormalCheck, stampReadinessOutcome, loadSessions } from "./store.js";
 import { spokenDose } from "./plan.js";
 import { speak, speakIfIdle, speakAndWait, interruptSpeech, cancelSpeech, nextEncouragement, beep, endBeep, playCue, ensureAudio, voiceOn, speakSafety } from "./audio.js";
 import { APP_ID, DAY_LOAD_FIELD, FEATURES } from "./sport.js";
-import { recoveryDoseSecs, refTime, edmontonISO } from "./util.js";
+import { recoveryDoseSecs, refTime, edmontonISO, todayISODate, plural } from "./util.js";
 
 // Moves that deserve a longer "get ready" lead-in before they start. Kept in
 // sync with the names that actually appear in the 2026.2 content (js/data.js);
@@ -68,7 +69,7 @@ function blankSession() {
     // into the day's progress record — see bankMainRounds.
     // Credit for moves finished EARLIER TODAY, carried in so a resumed sitting is
     // judged against the whole day rather than its own leftovers.
-    bankedCredit: 0, dayExpectedWork: 0,
+    bankedCredit: 0, dayExpectedWork: 0, dayPlannedSecs: 0,
     // `roundsCounted` is which rounds have already been committed, keyed
     // "ci:absoluteRound" — a round is committed the instant its last row lands,
     // and the check runs again at the bottom of the loop, so it has to be
@@ -201,6 +202,14 @@ function applyTierDrop(circuit, rounds, steps, s, moveName, round) {
   sess.expectedWork = Math.max(sess.dayExpectedWork, countExpectedWork(sess.circuits));
   sess.expectedByRound = countExpectedByRound(sess.circuits);
   logEvent("tier_drop", { move: moveName, round, rounds: sess.dayRoundsPlanned });
+}
+
+/* lowerLight where either side may be missing — two sources for the same fact,
+   and a fact only one of them holds is still the fact. */
+export function lowerOrNull(a, b) {
+  if (!a) return b || null;
+  if (!b) return a || null;
+  return lowerLight(a, b);
 }
 
 export function lowerLight(a, b) {
@@ -1078,7 +1087,20 @@ function readDayProgress() {
    against the whole day instead of against its own leftovers. */
 function bankMove(row) {
   if (!ownsDayProgress()) return;
-  if (!row || row.status !== "done") return;
+  if (!row) return;
+  /* A RECORD EXISTS THE MOMENT SHE ATTEMPTS A MOVE, not the moment she finishes
+     one. This returned here unless the row was `done`, so an evening where she
+     went through the whole workout a beat short of every clock — every row
+     `partial`, which is real work that saves and pays — wrote NO day-progress
+     record at all. The day then had nothing to resume from, and the card, which
+     was reading that record, had nothing to say about a workout she had just
+     spent half an hour on. The locked light, the workout id, the day the bout
+     began and the rounds behind her all went with it.
+
+     A partial move is still NOT banked: it is not finished, it is offered
+     again, and it earns its credit again — the rule below is unchanged. What
+     changes is that attempting it is enough to open the record. */
+  if (row.status !== "done" && row.status !== "partial") return;
   const block = row.block;
   /* PREP IS THE ONE BLOCK DELIBERATELY NOT BANKED, and not because it is
      unimportant — it is the movement prep that runs immediately before main.
@@ -1092,10 +1114,12 @@ function bankMove(row) {
      displayed, so nothing reads as over 100%. */
   if (!block || block === "prep") return;
   const prog = readDayProgress();
-  const list = prog.moves[block] || (prog.moves[block] = []);
-  if (list.includes(row.name)) return;      // a resume must not re-bank a name
-  list.push(row.name);
-  prog.bankedCredit = Number(prog.bankedCredit) + 1;
+  if (row.status === "done") {
+    const list = prog.moves[block] || (prog.moves[block] = []);
+    if (list.includes(row.name)) return;    // a resume must not re-bank a name
+    list.push(row.name);
+    prog.bankedCredit = Number(prog.bankedCredit) + 1;
+  }
   prog.light = sess.light;
   saveDayProgress(sess.dayKey, prog);
 }
@@ -1277,20 +1301,217 @@ export function buildSteps(circuits) {
    Resolves the light exactly as a start does: a spa day is recovery, a locked
    light on the day's progress record can only ever LOWER the one asked for
    (see startSession), and a care session reads no progress at all. */
+/* ============================================================
+   WHAT THE DAY HAS ACTUALLY DONE, ASKED OF THE TRAINING LOG
+
+   THE STORES, AND WHICH ONE ANSWERS WHAT.
+
+   There are two, they are both right, and reading them as if they were
+   interchangeable is the single defect behind almost everything this change
+   repairs.
+
+     · The TRAINING LOG (js/store.js, `sessions_v2`) is permanent, mirrored to
+       the cloud, and in every backup. It is merged across every sitting of a
+       day. It is what XP, the streak, the week strip and every report are
+       derived from. It cannot know about a sitting that is still running,
+       because a row is only written at finalize().
+
+     · The DAY-PROGRESS record (LS_DAYPROG) is local, never mirrored, expires at
+       midnight and is deleted when the day completes. It is written LIVE, move
+       by move. Its one irreplaceable job is crash safety: if the tablet sleeps
+       in the middle of round two, the log holds nothing and this holds
+       everything up to the last finished move.
+
+   The Today card was reading the SECOND one to tell a child what she had done.
+   So "+360 XP earned" (from the log, which had merged both her sittings and
+   could prove three main rounds) sat directly above "Still open: Warm-up,
+   Coordination, Main Circuit, Skate-Skill" (from a record that had expired, or
+   had never been written because nothing she did that evening cleared the
+   `done` floor). Two true sentences from two different sources, printed side by
+   side, contradicting each other on the one screen she reads.
+
+   So: THE LOG IS THE REPORTING AUTHORITY. The day-progress record may only ever
+   subtract work from the next plan — never put a claim on a screen. This
+   function is the log's answer, and planResume below now starts from it.
+
+   Only TODAY's fragments count, which is the No-Debt rule stated directly
+   rather than borrowed from a cache's expiry: a partial never carries into a
+   new day. Dated by workoutDate, so a bout that crossed midnight belongs to the
+   day it began — the same key the XP budget uses. */
+export function dayFragmentsFromLog(dayKey, isoDate = null) {
+  const iso = isoDate || todayISODate();
+  return loadSessions().filter(s => s && !s.practice && s.dayKey === dayKey
+    && s.sessionType !== "recovery" && s.sessionType !== "spa"
+    && workoutDate([s]) === iso);
+}
+
+/* The light the day is LOCKED to, recovered from the log rather than trusted
+   from the local cache. `lockedLight` was only ever "the lowest light any
+   sitting ran under", and every sitting saves its own `lightResult`, so the
+   fact was always in the log — it simply had nowhere to be read from. */
+export function lockedLightFromLog(frags) {
+  return (frags || []).reduce((lo, s) => {
+    const l = s.lightResult || s.light || null;
+    if (!l) return lo;
+    return lo ? lowerLight(lo, l) : l;
+  }, null);
+}
+
+/* And the day's round cap after a tier drop, likewise: `dayRoundsPlanned` is
+   saved on every row (see finalize), and the cap is the smallest one the day
+   ever declared. */
+export function roundsCapFromLog(frags) {
+  let cap = Infinity;
+  (frags || []).forEach(s => {
+    const n = Number(s && s.dayRoundsPlanned);
+    if (Number.isFinite(n) && n > 0) cap = Math.min(cap, n);
+  });
+  return cap;
+}
+
+/* THE ONE READING every screen asks for: the day's plan, and what the merged
+   ledger can prove about it, side by side.
+
+   `planned` counts PERFORMANCES — a main move in round two is a different unit
+   of work from the same move in round one, which is exactly how expectedWork
+   and the streak already count. `movements` counts DISTINCT movements, once
+   each however many rounds they run, which is what the day card has always
+   shown a kid. Both are returned, named for what they are, because the card
+   used to print one of them beside a minute total computed from the other. */
+export function dayPlanState(dayKey, opts = {}) {
+  const frags = opts.fragments || dayFragmentsFromLog(dayKey, opts.isoDate || null);
+  const day = DAYS[dayKey] || {};
+  const fallbackLight = day.spa ? "recovery" : (day.defaultLight || "green");
+  /* The light the day was actually TRAINED under, not the weekday's default.
+     planStats has always priced every card as green, so a Red day — a third the
+     size — was shown the green plan's minutes and move count and then told it
+     had skipped the difference. */
+  const light = lockedLightFromLog(frags) || fallbackLight;
+  const cap = roundsCapFromLog(frags);
+  const rounds = Math.min(roundsForLight(light), cap);
+  const circuits = assembleCircuits(dayKey, light,
+    Number.isFinite(rounds) && rounds < roundsForLight(light) ? { mainRounds: rounds } : {});
+
+  const rows = mergeLedgerRows(frags.reduce((a, s) => a.concat(s.ledger || []), []));
+  const byId = new Map();
+  rows.forEach(r => byId.set(logicalRowId(r), r));
+
+  const blocks = [];
+  const owed = [];
+  let planned = 0, done = 0, performed = 0;
+  const seen = new Set(), didMove = new Set(), touched = new Set();
+  circuits.forEach(c => {
+    const base = Number.isFinite(Number(c.roundBase)) ? Number(c.roundBase) : 1;
+    let bPlanned = 0, bDone = 0, bPerformed = 0, bSkipped = 0, bSecs = 0;
+    for (let r = 1; r <= c.rounds; r++) {
+      c.exercises.forEach(ex => {
+        if (ex.rounds && r > ex.rounds) return;
+        const round = base + r - 1;
+        const id = logicalRowId({ block: c.block, round, name: ex.name });
+        const row = byId.get(id);
+        planned++; bPlanned++; bSecs += refTime(ex);
+        seen.add(ex.name);
+        /* PERFORMED is not the same question as DONE, and the card needs both.
+           `done` is the engine's verdict against its 80% floor and is what the
+           resume and the round rule turn on. `performed` is simply "she was
+           there for it" — which is the unit the streak now rewards, and the
+           only honest thing to put beside a Skipped count. Without it a day
+           where every move came in a beat short read "0 of 28 movements" next
+           to a flame it had genuinely earned. */
+        if (row && row.status !== "skipped") { performed++; bPerformed++; touched.add(ex.name); }
+        if (row && row.status === "done") { done++; bDone++; didMove.add(ex.name); }
+        else {
+          if (row && row.status === "skipped") bSkipped++;
+          owed.push({ block: c.block, circuit: c.name, round, name: ex.name, ex });
+        }
+      });
+    }
+    blocks.push({
+      block: c.block, name: c.name, rounds: c.rounds,
+      perRound: c.exercises.length,
+      planned: bPlanned, done: bDone, performed: bPerformed, skipped: bSkipped,
+      mins: Math.max(1, Math.round(bSecs / 60))
+    });
+  });
+
+  return {
+    light, circuits, blocks, owed, rows,
+    planned, done, performed,
+    movements: seen.size,
+    movementsDone: didMove.size,
+    movementsPerformed: touched.size,
+    pace: paceReport(rows),
+    hasRecord: frags.length > 0,
+    fragments: frags
+  };
+}
+
 export function planResume(dayKey, light = "green") {
   const day = DAYS[dayKey] || {};
   const resolvedLight = day.spa ? "recovery" : light;
   const care = !!day.spa || resolvedLight === "recovery";
   const prog = care ? null : loadDayProgress(dayKey);
-  const lockedLight = prog && prog.lockedLight;
+  /* THE LOG FIRST, THE RECORD AS A SUPPLEMENT.
+
+     This used to read the day-progress record and nothing else, so everything
+     the record could not see was offered to her again: a day whose work was
+     already saved but whose record had expired, been cleared on completion, or
+     never been written at all (bankMove banks only `done` rows) came back as
+     the WHOLE workout, from move one, under a button that said "Finish
+     remaining moves".
+
+     So what the day owes starts from the training log, which is permanent and
+     merged across every sitting. The record is still read, and still matters —
+     it is the only thing that knows about a sitting that never reached
+     finalize(), which is what a crash mid-round leaves behind. But it can only
+     ever SUBTRACT work from the plan, never add a claim: every value below
+     takes whichever source proves MORE work done, so neither can lose what the
+     other saw. See dayPlanState above for why the two stores exist at all. */
+  const logFrags = care ? [] : dayFragmentsFromLog(dayKey);
+  const logRows = mergeLedgerRows(logFrags.reduce((a, r) => a.concat(r.ledger || []), []));
+  const logDone = logRows.filter(r => r && r.status === "done");
+  const logRounds = care ? 0 : mainRoundsFromLedger(logRows, null, OUTCOME_VERSION);
+
+  const lockedLight = lowerOrNull(prog && prog.lockedLight, lockedLightFromLog(logFrags));
   const finalLight = lockedLight ? lowerLight(lockedLight, resolvedLight) : resolvedLight;
-  const skipBlocks = (prog && prog.done) || [];
-  const bankedRounds = (prog && Number(prog.mainRoundsCompleted)) || 0;
+
+  const bankedRounds = Math.max((prog && Number(prog.mainRoundsCompleted)) || 0, logRounds || 0);
+
+  /* Moves finished today, by block, from both sources. The log's are keyed on
+     the block the runner actually ran them in (see recordExercise), which is
+     the same key bankMove writes, so the two sets are directly unionable. */
+  const bankedMoves = {};
+  Object.entries((prog && prog.moves) || {}).forEach(([b, list]) => {
+    bankedMoves[b] = [...(list || [])];
+  });
+  logDone.forEach(r => {
+    const b = r.block;
+    if (!b || b === "prep") return;          // prep is re-run every sitting, by design
+    // A main move only counts as banked once its whole round is behind us;
+    // `mainPartialRound` below handles the round still in progress.
+    if (b === "main" && Number(r.round) <= bankedRounds) return;
+    if (!bankedMoves[b]) bankedMoves[b] = [];
+    if (!bankedMoves[b].includes(r.name)) bankedMoves[b].push(r.name);
+  });
+
+  /* Blocks fully retired: the record's list, plus any block the log can prove
+     every planned instance of. Computed against the day's own ask under the
+     final light, never against the weekday's default. */
+  const skipBlocks = [...((prog && prog.done) || [])];
+  if (!care) {
+    const st = dayPlanState(dayKey, { fragments: logFrags });
+    st.blocks.forEach(b => {
+      if (b.block === "prep" || b.block === "main") return;
+      if (b.planned > 0 && b.done >= b.planned && !skipBlocks.includes(b.block)) skipBlocks.push(b.block);
+    });
+  }
+
   // A tier-drop earlier today lowered what the day asks for; like the locked
   // light, the cap is only ever written downward.
-  const roundsCap = prog && Number.isFinite(Number(prog.roundsCap)) ? Number(prog.roundsCap) : Infinity;
+  const roundsCap = Math.min(
+    prog && Number.isFinite(Number(prog.roundsCap)) ? Number(prog.roundsCap) : Infinity,
+    roundsCapFromLog(logFrags));
   const mainOwed = care ? 0 : Math.max(0, Math.min(roundsForLight(finalLight), roundsCap) - bankedRounds);
-  const bankedMoves = (prog && prog.moves) || {};
   const circuits = care
     ? assembleCircuits(dayKey, finalLight, { skip: [] })
     : assembleCircuits(dayKey, finalLight, {
@@ -1459,6 +1680,8 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
      this and steps back to Today rather than leaving a dead session screen up.
      Keep it synchronous. */
   if (!sess.circuits.length) { sess.running = false; return; }
+  // A provisional value only: the day's own figure replaces it below, once the
+  // light and the round cap are resolved. The clock on screen reads this.
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
   /* THE ASK IS THE DAY'S, NOT THIS SITTING'S.
 
@@ -1475,6 +1698,18 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
   sess.expectedWork = isCareSession()
     ? countExpectedWork(sess.circuits)
     : Math.max(sess.dayExpectedWork, countExpectedWork(sess.circuits));
+  /* AND THE MINUTES ARE THE DAY'S TOO, for exactly the reason above.
+
+     `plannedSecs` was set from `sess.circuits` — the REMAINDER a resume was
+     handed — so a day trained in two goes saved two rows each claiming the
+     plan was the ten minutes that sitting had left. The Progress table's
+     "Planned" row reads that field, and a thirty-three minute day that took
+     two sittings reported a plan of eleven minutes. Same defect expectedWork
+     had, same fix: take the day's, and never let a remainder shrink it. */
+  sess.dayPlannedSecs = isCareSession() ? estimateSessionSecs(sess.circuits)
+    : estimateSessionSecs(assembleCircuits(dayKey, sess.light,
+        Number.isFinite(dayRounds) && dayRounds < roundsForLight(sess.light) ? { mainRounds: dayRounds } : {}));
+  sess.plannedSecs = Math.max(sess.dayPlannedSecs, estimateSessionSecs(sess.circuits)) + 8;
   sess.roundsPlanned = (sess.spa || sess.recovery) ? 0 : mainOwed;
   /* WHAT THE DAY ASKED FOR, and how much of it was already done.
 
@@ -2020,6 +2255,9 @@ export function finalize(completed) {
     pauseCount: sess.pauseCount || 0,
     pausedSecs: sess.pausedSecs,
     plannedSecs: sess.plannedSecs,
+    // The DAY's planned minutes, for a reader that has to report the day rather
+    // than the sitting — see dayPlannedSecs above.
+    dayPlannedSecs: sess.dayPlannedSecs || sess.plannedSecs,
     clean: sess.cleanCount, wobbly: sess.wobblyCount,
     formChecks: sess.formChecks || [],       // per-move verdicts from this run's spot-checks
     // Only a sport with a landing rule writes these; the row shape elsewhere is unchanged.
