@@ -67,7 +67,7 @@ function blankSession() {
     // into the day's progress record — see bankMainRounds.
     // Credit for moves finished EARLIER TODAY, carried in so a resumed sitting is
     // judged against the whole day rather than its own leftovers.
-    bankedCredit: 0, dayExpectedWork: 0,
+    bankedCredit: 0, dayExpectedWork: 0, dayPlannedSecs: 0,
     // `roundsCounted` is which rounds have already been committed, keyed
     // "ci:absoluteRound" — a round is committed the instant its last row lands,
     // and the check runs again at the bottom of the loop, so it has to be
@@ -1387,11 +1387,11 @@ export function dayPlanState(dayKey, opts = {}) {
 
   const blocks = [];
   const owed = [];
-  let planned = 0, done = 0;
-  const seen = new Set(), didMove = new Set();
+  let planned = 0, done = 0, performed = 0;
+  const seen = new Set(), didMove = new Set(), touched = new Set();
   circuits.forEach(c => {
     const base = Number.isFinite(Number(c.roundBase)) ? Number(c.roundBase) : 1;
-    let bPlanned = 0, bDone = 0, bSkipped = 0, bSecs = 0;
+    let bPlanned = 0, bDone = 0, bPerformed = 0, bSkipped = 0, bSecs = 0;
     for (let r = 1; r <= c.rounds; r++) {
       c.exercises.forEach(ex => {
         if (ex.rounds && r > ex.rounds) return;
@@ -1400,6 +1400,14 @@ export function dayPlanState(dayKey, opts = {}) {
         const row = byId.get(id);
         planned++; bPlanned++; bSecs += refTime(ex);
         seen.add(ex.name);
+        /* PERFORMED is not the same question as DONE, and the card needs both.
+           `done` is the engine's verdict against its 80% floor and is what the
+           resume and the round rule turn on. `performed` is simply "she was
+           there for it" — which is the unit the streak now rewards, and the
+           only honest thing to put beside a Skipped count. Without it a day
+           where every move came in a beat short read "0 of 28 movements" next
+           to a flame it had genuinely earned. */
+        if (row && row.status !== "skipped") { performed++; bPerformed++; touched.add(ex.name); }
         if (row && row.status === "done") { done++; bDone++; didMove.add(ex.name); }
         else {
           if (row && row.status === "skipped") bSkipped++;
@@ -1410,16 +1418,17 @@ export function dayPlanState(dayKey, opts = {}) {
     blocks.push({
       block: c.block, name: c.name, rounds: c.rounds,
       perRound: c.exercises.length,
-      planned: bPlanned, done: bDone, skipped: bSkipped,
+      planned: bPlanned, done: bDone, performed: bPerformed, skipped: bSkipped,
       mins: Math.max(1, Math.round(bSecs / 60))
     });
   });
 
   return {
     light, circuits, blocks, owed, rows,
-    planned, done,
+    planned, done, performed,
     movements: seen.size,
     movementsDone: didMove.size,
+    movementsPerformed: touched.size,
     pace: paceReport(rows),
     hasRecord: frags.length > 0,
     fragments: frags
@@ -1660,6 +1669,8 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
      this and steps back to Today rather than leaving a dead session screen up.
      Keep it synchronous. */
   if (!sess.circuits.length) { sess.running = false; return; }
+  // A provisional value only: the day's own figure replaces it below, once the
+  // light and the round cap are resolved. The clock on screen reads this.
   sess.plannedSecs = estimateSessionSecs(sess.circuits) + 8;
   /* THE ASK IS THE DAY'S, NOT THIS SITTING'S.
 
@@ -1676,6 +1687,18 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
   sess.expectedWork = isCareSession()
     ? countExpectedWork(sess.circuits)
     : Math.max(sess.dayExpectedWork, countExpectedWork(sess.circuits));
+  /* AND THE MINUTES ARE THE DAY'S TOO, for exactly the reason above.
+
+     `plannedSecs` was set from `sess.circuits` — the REMAINDER a resume was
+     handed — so a day trained in two goes saved two rows each claiming the
+     plan was the ten minutes that sitting had left. The Progress table's
+     "Planned" row reads that field, and a thirty-three minute day that took
+     two sittings reported a plan of eleven minutes. Same defect expectedWork
+     had, same fix: take the day's, and never let a remainder shrink it. */
+  sess.dayPlannedSecs = isCareSession() ? estimateSessionSecs(sess.circuits)
+    : estimateSessionSecs(assembleCircuits(dayKey, sess.light,
+        Number.isFinite(dayRounds) && dayRounds < roundsForLight(sess.light) ? { mainRounds: dayRounds } : {}));
+  sess.plannedSecs = Math.max(sess.dayPlannedSecs, estimateSessionSecs(sess.circuits)) + 8;
   sess.roundsPlanned = (sess.spa || sess.recovery) ? 0 : mainOwed;
   /* WHAT THE DAY ASKED FOR, and how much of it was already done.
 
@@ -2221,6 +2244,9 @@ export function finalize(completed) {
     pauseCount: sess.pauseCount || 0,
     pausedSecs: sess.pausedSecs,
     plannedSecs: sess.plannedSecs,
+    // The DAY's planned minutes, for a reader that has to report the day rather
+    // than the sitting — see dayPlannedSecs above.
+    dayPlannedSecs: sess.dayPlannedSecs || sess.plannedSecs,
     clean: sess.cleanCount, wobbly: sess.wobblyCount,
     formChecks: sess.formChecks || [],       // per-move verdicts from this run's spot-checks
     // Only a sport with a landing rule writes these; the row shape elsewhere is unchanged.

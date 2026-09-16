@@ -22,6 +22,19 @@ import { assembleCircuits, estimateSessionSecs, planResume, dayPlanState } from 
    main block runs 2–3 rounds, and ignored every rest. It is built from the
    same circuits the runner assembles and the same estimate the session screen
    shows, so the card and the workout can no longer disagree about the day. */
+/* A bare symbol like ⚡ (U+26A1) has no variation selector, so a browser is free
+   to draw it as monochrome TEXT — which, inside the white circle these icons sit
+   in, is a blank circle. Asking for emoji presentation costs one character and
+   removes the whole class. Only the legacy symbol block needs it; anything above
+   U+1F000 is emoji-only already. */
+export function emojiPresentation(ch) {
+  if (!ch) return ch;
+  const pts = [...ch];
+  if (pts.length !== 1) return ch;
+  const cp = pts[0].codePointAt(0);
+  return cp < 0x1F000 ? ch + "\uFE0F" : ch;
+}
+
 export function planStats(dayKey, light = null) {
   const key = typeof dayKey === "string" ? dayKey : null;
   const day = key ? DAYS[key] : dayKey;
@@ -347,7 +360,7 @@ export function buildTodayVM(state) {
     const open = !!state.expanded[b.block];
     const meta = BLOCK_META[b.block] || {};
     return {
-      key: b.block, icon: meta.emoji || "•",
+      key: b.block, icon: emojiPresentation(meta.emoji) || "•",
       // The skill block is named by the app that owns it, never by the core.
       name: b.block === SKILL_BLOCK ? COPY.skillBlockLabel : (BLOCK_LABEL[b.block] || b.name),
       count: b.planned,
@@ -356,10 +369,16 @@ export function buildTodayVM(state) {
       countLabel: b.rounds > 1
         ? plural(b.perRound, "move") + " × " + b.rounds + " rounds"
         : plural(b.perRound, "move"),
-      doneLabel: showActuals ? b.done + " of " + b.planned : "",
+      /* PERFORMED, for the same reason the header counts performed: a block she
+         went through a beat short of every clock is not a block she skipped,
+         and labelling it "skipped · 0 of 5" under a headline saying she did all
+         eighteen movements was the card arguing with itself. The tick is still
+         reserved for a block actually FINISHED; how short the rest fell is the
+         pace line's job, in words. */
+      doneLabel: showActuals ? b.performed + " of " + b.planned : "",
       mins: b.mins,
       isBlockDone: showActuals ? (b.planned > 0 && b.done >= b.planned) : doneBlocks.includes(b.block),
-      isBlockSkipped: showActuals && b.done === 0,
+      isBlockSkipped: showActuals && b.performed === 0,
       moves: exs.map(e => ({
         text: e.name + " · " + e.dose, cue: e.cue,
         transfer: e.transfer || ""
@@ -566,8 +585,13 @@ export function buildTodayVM(state) {
          moves" beside a minute total that counted all three main rounds, so the
          two numbers could not both be about the same thing — and the panel
          below, which was missing Prep entirely, agreed with neither. */
+      /* Movements she was THERE for, not only the ones that cleared the 80%
+         floor. A day walked all the way through a beat early on every move read
+         "0 of 19 movements" beside a flame it had earned — the one number on
+         the card that called her a liar. What fell short is said by the pace
+         line underneath, in the words for it. */
       movesLabel: (showActuals
-        ? planState.movementsDone + " of " + planState.movements + " movements"
+        ? planState.movementsPerformed + " of " + planState.movements + " movements"
         : plural(planState.movements, "distinct movement")),
       earnedXpLabel: isSpaDay || !earnedXp ? "" : "+" + earnedXp + " XP earned",
       xpNote,

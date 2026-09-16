@@ -196,9 +196,16 @@ export function buildProgressVM(state) {
         + ";border-radius:5px 5px 0 0;transition:height 0.4s;"
         + (i === todayIdx ? "box-shadow:0 0 0 2px var(--ink);" : ""),
       // "—" rather than 0: a Thursday that has not happened has not failed.
-      plannedLabel: inst && st ? Math.max(1, Math.round((inst.fragments.reduce((a, f) => Math.max(a, Number(f.plannedSecs) || 0), 0)) / 60)) + "m"
+      /* The DAY's planned minutes. `dayPlannedSecs` is written by the engine and
+         is the whole day's ask; `plannedSecs` is the sitting's and on a resume
+         is only the remainder, so the largest across the fragments is the
+         fallback for rows written before the day-level field existed. */
+      plannedLabel: inst && st ? Math.max(1, Math.round(inst.fragments.reduce((a, f) =>
+          Math.max(a, Number(f.dayPlannedSecs) || Number(f.plannedSecs) || 0), 0) / 60)) + "m"
         : isSpa && !arrived ? "spa" : "—",
-      movesLabel: care ? "care" : st ? st.done + "/" + st.planned : "—",
+      // Performed, not only finished — see dayPlanState. "Skipped" below is the
+      // counterpoint; a move done a beat short belongs on neither of those.
+      movesLabel: care ? "care" : st ? st.performed + "/" + st.planned : "—",
       skippedLabel: care ? "—" : st ? String(st.rows.filter(r => r && r.status === "skipped").length) : "—",
       roundsLabel: care ? "n/a" : inst ? inst.outcome.mainRoundsDone + "/" + (Number(inst.fragments[inst.fragments.length - 1].dayRoundsPlanned) || Number(inst.fragments[inst.fragments.length - 1].roundsPlanned) || 0) : "—",
       earlyLabel: inst ? (inst.outcome.state === "complete" ? "No" : "Yes") : "—",

@@ -454,4 +454,63 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
     "and a row that carries the stamp is still worth the stamp");
 }
 
+/* ============================================================
+   12. THE MINUTES ON THE RECORD ARE THE DAY'S, NOT THE SITTING'S
+
+   `plannedSecs` was computed from the circuits the sitting was handed, and a
+   resume is handed only the remainder — so a day trained in two goes saved two
+   rows each claiming the plan was the ten minutes that sitting had left. The
+   Progress table's "Planned" column reads that field. `expectedWork` had the
+   identical defect and was fixed years of commits ago; this is the same fix for
+   the clock. ============================================================ */
+{
+  localStorage.clear(); store.migrate();
+  const dayKey = util.edmontonDayKey();
+  // A sitting handed only part of the day: a block and a round already banked.
+  store.saveDayProgress(dayKey, { done: ["warmup"], moves: {}, mainRoundsCompleted: 1,
+    bankedCredit: 4, lockedLight: "green", light: "green" });
+  await runSession({ dayKey, light: "green", gateUnlocked: true }, {
+    onTick: (ms, sess) => { if (sess.phase === "formcheck") engine.pickClean(); }
+  });
+  const row = store.loadSessions()[0];
+  /* Measured AFTER the run, because runSession shortens the configured rests and
+     estimateSessionSecs reads them — comparing against a figure taken under the
+     app's defaults would be comparing two different days. */
+  const whole = engine.estimateSessionSecs(engine.assembleCircuits(dayKey, "green"));
+  const remainder = engine.estimateSessionSecs(engine.planResume(dayKey, "green").circuits);
+  ok(remainder < whole,
+    "the sitting really was handed a remainder (" + remainder + "s of " + whole + "s)");
+  same(Number(row.dayPlannedSecs), whole,
+    "and it still records the DAY's planned minutes, not the remainder's");
+  localStorage.clear(); store.migrate();
+}
+
+/* ============================================================
+   13. THE TIMELINE SAYS HOW WELL, NOT JUST WHETHER
+
+   Every finished move got the same tick, so a thirty-second hold let go at
+   twelve looked exactly like one held the whole way on the list she watches
+   while she trains. The dot is that difference, and it must never become a
+   status of its own. ============================================================ */
+{
+  localStorage.clear(); store.migrate();
+  const dayKey = util.edmontonDayKey();
+  let cut = 0;
+  await runSession({ dayKey, light: "red", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      if (sess.phase === "formcheck") { engine.pickClean(); return; }
+      if (sess.phase === "work" && sess.exElapsed >= 3 && cut < 2 && sess.timerSecs > 4) {
+        cut++; engine.advance();
+      }
+    }
+  });
+  const list = (svm.buildSessionVM({ detailEx: {}, isWide: true }).sessionExList || []).filter(x => x.isEx);
+  ok(list.length > 0, "the timeline has moves on it");
+  ok(list.every(x => !x.paceDotStyle || /background:var\(--(mint|sun|coral|stop)\)/.test(x.paceDotStyle)),
+    "every pace dot is one of the four bands and nothing else");
+  ok(list.every(x => !x.paceDotStyle || x.paceTitle),
+    "and every dot carries words, so it is not colour-only");
+  localStorage.clear(); store.migrate();
+}
+
 console.log("✓ invariants passed (" + passed + " assertions)");
