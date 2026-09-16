@@ -170,6 +170,23 @@ ok(engine.sess.running === true && engine.sess.dayKey === "monday", "and the eng
 
 main.actions.goBack();
 ok(main.state.gateAsk === null, "Back is hers too");
+await new Promise(r => setTimeout(r, 0));
+
+/* ---- AND THE LIST IS THE NAVIGATION -------------------------------------
+   Looking at one move used to mean tapping through every move in front of it.
+   The row is a button now, and the status pill she is already reading is the
+   tap target. */
+const exploreSteps = engine.sess.steps || [];
+const jumpTarget = exploreSteps[exploreSteps.length - 1];
+ok(jumpTarget && exploreSteps.length > 1, "explore walks the whole day as a step list");
+main.dispatch("goToMove", jumpTarget.ci + "|" + jumpTarget.ei);
+await new Promise(r => setTimeout(r, 0));
+ok(main.state.gateAsk === null, "tapping a move needs no grown-up");
+ok(engine.sess.ci === jumpTarget.ci && engine.sess.ei === jumpTarget.ei,
+   "and lands on the move she tapped, however far down the list it was");
+ok(store.loadSessions().length === 0 && store.loadDayProgress("monday") === null,
+   "jumping around records nothing, because explore records nothing");
+
 main.actions.exitExplore();
 ok(main.state.inSession === false && engine.sess.running === false, "Done looking closes it");
 ok(main.state.selectedDay === "monday", "and leaves her on the day she was looking at");
@@ -182,6 +199,21 @@ ok(main.state.readiness !== null, "the next GO opens Body Check");
 ok(main.state.inSession === false, "not explore again");
 ok(store.loadSessions().length === 0, "and looking at the moves wrote no session record at all");
 ok(main.actionNames().includes("togglePractice") === false, "there is no mode left to toggle");
+/* The jump is EXPLORE'S ALONE. A real session's ledger is one row per step in
+   order, and a row that never arrives is a round she did not finish, so this
+   has to be a no-op anywhere else — including with no session at all. */
+main.state.readiness = null; main.state.inSession = false;
+engine.exitSession();
+main.dispatch("goToMove", "0|0");
+ok(engine.sess.running === false, "tapping a move outside explore starts nothing");
+ok(main.actionNames().includes("goSessionRedo"), "and \"+ Add them back\" is a real action");
+main.actions.goSessionRedo("monday");
+ok(main.state.gateAsk === null && main.state.readiness !== null,
+   "which a child can take on her own, through the same Body Check as GO");
+ok(main.state.redoPartials === true, "carrying her ask for the moves she cut short");
+main.actions.goSession("monday");
+ok(main.state.redoPartials === false, "and a plain GO clears it again");
+main.state.readiness = null;
 
 /* A DAY WITH NOTHING LEFT NEVER OPENS A DEAD SCREEN. A Red day fully trained
    used to be offered "Finish remaining moves" for blocks Red never asked for;

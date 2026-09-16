@@ -281,40 +281,124 @@ export function buildSessionVM(state) {
      a status: a `done` move is still done, still paid, still a streak unit.
      Only the colour says how close it was. */
   const PACE_DOT = { green: "var(--mint)", amber: "var(--sun)", yellow: "var(--coral)", red: "var(--stop)" };
-  const paceByRow = new Map();
-  (sess.ledger || []).forEach(l => {
-    if (!l || l.status === "skipped") return;
+
+  /* ---- THE LIST IS THE DAY, AND THE PILL IS WHERE SHE PICKS UP -------------
+
+     The list used to render `sess.circuits` — what THIS SITTING runs. On a
+     resume that is the remainder, so a day half-trained showed a short stub of
+     leftovers with every pill blank: nothing on screen said what she had
+     already done, what she had cut short, or where in the day she was picking
+     up, which is the one question the list exists to answer. The engine now
+     hands over `listCircuits` (the whole day) and `priorRows` (today's merged
+     ledger from the earlier sittings) so it can say all three.
+
+     Rows are keyed `block|name`, because the list has always collapsed rounds —
+     a main circuit prints its moves once under a "×3" header — and that key is
+     the one thing a day row and a live ledger row can both be matched on. The
+     old `ci-ei` index cannot: `listCircuits` and `circuits` are different
+     arrays on a resume, where a main block is two circuits to the day's one. */
+  const listCircuits = (sess.listCircuits && sess.listCircuits.length)
+    ? sess.listCircuits : circuits;
+  const moveKey = (block, name) => block + "|" + name;
+
+  const historyRows = (sess.priorRows || []).concat(sess.ledger || []);
+  /* How every round of each move landed. A move reads `done` only once every
+     round the day asked for is done; one skip anywhere makes it skipped, and
+     anything short of that with work in it is a move she cut short. */
+  const seenByMove = new Map();
+  historyRows.forEach(l => {
+    if (!l || !l.block || !l.name) return;
+    const k = moveKey(l.block, l.name);
+    const cur = seenByMove.get(k) || { done: 0, partial: 0, skipped: 0 };
+    if (l.status === "done") cur.done += 1;
+    else if (l.status === "skipped") cur.skipped += 1;
+    else if (l.status === "partial") cur.partial += 1;
+    seenByMove.set(k, cur);
+  });
+  const paceByMove = new Map();
+  historyRows.forEach(l => {
+    if (!l || l.status === "skipped" || !l.block || !l.name) return;
     const band = paceBand(l);
     if (!band) return;
-    const key = l.ci + "-" + l.ei;
-    // The move she is standing on is the one worth showing: latest wins.
-    paceByRow.set(key, band);
+    // The most recent attempt is the one worth showing: latest wins.
+    paceByMove.set(moveKey(l.block, l.name), band);
   });
+
+  // Where she is standing, named rather than indexed — for the same reason.
+  const curKey = (sess.running && !sessionDone && circuit && circuit.exercises[sess.ei])
+    ? moveKey(circuit.block, circuit.exercises[sess.ei].name) : null;
+
+  /* Five states, in the four colours the finish screen and the Grown-up Zone
+     already use, so nobody has to learn a second vocabulary. Standing on a move
+     outranks its history: she has to be able to find herself first. */
+  const PILL = {
+    done:    { bg: "var(--mint)",      ink: "#fff",            icon: "✓", sec: "var(--mint)" },
+    partial: { bg: "var(--sun)",       ink: "var(--sun-ink)",  icon: "½", sec: "var(--sun-deep)" },
+    skipped: { bg: "var(--coral)",     ink: "#fff",            icon: "⏭", sec: "var(--coral)" },
+    current: { bg: "var(--aqua)",      ink: "#fff",            icon: "▶", sec: "var(--aqua)" },
+    pending: { bg: "var(--surface-2)", ink: "var(--ink-soft)", icon: "",  sec: "var(--ink-faint)" }
+  };
+  const NAME_INK = {
+    done: "var(--ink-faint);text-decoration:line-through;",
+    partial: "var(--ink-soft);", skipped: "var(--ink-faint);",
+    current: "var(--ink);", pending: "var(--ink-soft);"
+  };
+
+  let sawHistory = false;
   const sessionExList = [];
-  circuits.forEach((c, ci) => {
+  listCircuits.forEach((c, ci) => {
     sessionExList.push({ isHeader: true, name: c.name + (c.rounds > 1 ? ` ×${c.rounds}` : ""), color: BLOCK_COLORS[c.block] || "var(--ink-soft)" });
     c.exercises.forEach((e, ei) => {
-      const st = sess.exStatus[ci + "-" + ei];
-      const isCur = sess.running && ci === sess.ci && ei === sess.ei && !sessionDone;
+      const k = moveKey(c.block, e.name);
+      const isCur = !!curKey && k === curKey;
+      /* Explore writes no ledger at all — nothing there is recorded, which is
+         the whole point of it — so its own in-memory verdicts answer instead. */
+      let st;
+      if (explore) {
+        st = sess.exStatus[ci + "-" + ei];
+      } else {
+        const seen = seenByMove.get(k);
+        // What this move was asked for: its own round cap where it has one.
+        const asked = Math.min(c.rounds, Number(e.rounds) > 0 ? Number(e.rounds) : c.rounds);
+        if (seen) {
+          st = seen.skipped ? "skipped"
+            : seen.done >= asked ? "done"
+            : (seen.done || seen.partial) ? "partial" : undefined;
+        }
+      }
+      if (st) sawHistory = true;
+      const state = isCur ? "current" : st === "done" ? "done"
+        : st === "partial" ? "partial" : st === "skipped" ? "skipped" : "pending";
+      const pill = PILL[state];
       sessionExList.push({
         isEx: true, num: ei + 1, name: e.name, ci, ei, isCur,
+        /* Tapping a move is navigation, and navigation is explore's alone: a
+           real session's ledger is one row per step, written in order, and a
+           row that never arrives is a round she did not finish. */
+        jumpAction: explore && sess.running && !sessionDone && !isCur,
         cardStyle: "display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:12px;margin:2px 0;box-sizing:border-box;"
           + (isCur ? "background:var(--aqua-wash);box-shadow:inset 0 0 0 2px var(--aqua-light);" : ""),
         numStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;"
-          + (st === "done" ? "background:var(--mint);color:#fff;" : isCur ? "background:var(--aqua);color:#fff;" : "background:var(--surface-2);color:var(--ink-soft);"),
-        nameStyle: "flex:1;min-width:0;font-weight:800;color:" + (st === "done" ? "var(--ink-faint);text-decoration:line-through;" : isCur ? "var(--ink);" : "var(--ink-soft);"),
-        statusIcon: st === "done" ? "✓" : st === "skipped" ? "⏭" : isCur ? "▶" : "",
-        paceDotStyle: paceByRow.has(ci + "-" + ei)
-          ? "width:8px;height:8px;border-radius:50%;flex-shrink:0;background:" + PACE_DOT[paceByRow.get(ci + "-" + ei)] + ";"
+          + "background:" + pill.bg + ";color:" + pill.ink + ";",
+        nameStyle: "flex:1;min-width:0;font-weight:800;color:" + NAME_INK[state],
+        statusIcon: pill.icon,
+        paceDotStyle: paceByMove.has(k)
+          ? "width:8px;height:8px;border-radius:50%;flex-shrink:0;background:" + PACE_DOT[paceByMove.get(k)] + ";"
           : "",
-        paceTitle: paceByRow.has(ci + "-" + ei)
+        paceTitle: paceByMove.has(k)
           ? { green: "Held the full time", amber: "Almost the full time",
-              yellow: "Short of the full time", red: "Well short of the full time" }[paceByRow.get(ci + "-" + ei)]
+              yellow: "Short of the full time", red: "Well short of the full time" }[paceByMove.get(k)]
           : "",
-        secColor: st === "done" ? "var(--mint)" : isCur ? "var(--aqua)" : "var(--ink-faint)"
+        secColor: pill.sec
       });
     });
   });
+  /* What the colours mean, said once and only where there is history to read.
+     Done and cut-short shared a glyph before this. */
+  const exListLegend = (!explore && sawHistory)
+    ? "✓ done · ½ cut short · ⏭ skipped — you’re picking up at ▶"
+    : "";
+
 
   const de = state.detailEx || {};
   const day = DAYS[sess.dayKey] || {};
@@ -380,7 +464,7 @@ export function buildSessionVM(state) {
        something when a clock is running: pause, stop, the session time, the
        end-early confirm. */
     explore,
-    exploreBanner: explore ? "🧪 EXPLORE — just looking. Tap Next to move on. Nothing counts down and nothing is recorded." : "",
+    exploreBanner: explore ? "🧪 EXPLORE — just looking. Tap Next, or tap any move in the list to jump straight to it. Nothing counts down and nothing is recorded." : "",
     showClock: !explore,
     showPause: !explore, showStop: !explore,
     // "◀ Back a move" — only where the engine can honour it (see canGoBack).
@@ -403,7 +487,7 @@ export function buildSessionVM(state) {
     sessionPlannedDisplay: Math.max(1, Math.round(sess.plannedSecs / 60)) + " min",
     sessionTimePct, roundLine, roundDots,
     progressLabel, progressValue: Math.min(doneCount, Math.max(1, totalExCount)), progressMax: Math.max(1, totalExCount),
-    sessionExList,
+    sessionExList, exListLegend,
 
     timerIsTime, timerIsReps, isPrompt, phase,
     timerDisplay: fmtMMSS(sess.timerSecs || 0),

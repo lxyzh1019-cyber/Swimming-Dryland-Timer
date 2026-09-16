@@ -65,7 +65,7 @@ export const UNGATED_ACTIONS = [
   "selectDay", "toggleBlock", "logScope", "progressScope",
   "setGuTab", "setGsScope", "formCheckMonth", "dismissStorageError",
   // her own session, start to finish
-  "goSession", "goExplore", "exitExplore", "goBack",
+  "goSession", "goSessionRedo", "goExplore", "exitExplore", "goBack", "goToMove",
   "advance", "pauseTimer", "skipEx", "stopNow", "resumeFromStop", "endFromStop",
   "askEnd", "cancelEnd", "confirmEndEarly",
   "askSkip", "cancelSkip", "confirmSkipEx", "pickIntent", "answerMicro",

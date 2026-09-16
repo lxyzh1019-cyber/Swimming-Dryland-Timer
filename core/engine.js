@@ -52,6 +52,13 @@ function blankSession() {
     currentEx: null, skipped: [], perExercise: [], justSkipped: false,
     phase: "greeting",           // greeting|getready|work|reps|sideswitch|rest|roundRest|sectionRest|intent|microloop|breath|done
     circuits: [], ci: 0, ei: 0, round: 1, exDone: 0,
+    /* WHAT THE SIDE LIST SHOWS, which is not what the runner walks. A resume
+       runs the REMAINDER; the list shows the WHOLE DAY, with her own history
+       on it, because the coloured pill beside each move is how she finds where
+       she is picking up. `priorRows` is today's merged ledger from earlier
+       sittings, which is where those colours come from. Both equal the
+       runner's own view on a first sitting, in explore and in care. */
+    listCircuits: [], priorRows: [],
     timerSecs: 0, timerMax: 0, urgent: false,
     exElapsed: 0, elapsed: 0, pausedSecs: 0, plannedSecs: 0, expectedWork: 0,
     clockAt: 0, activeMs: 0, pausedMs: 0, exMs: 0,
@@ -112,8 +119,9 @@ function blankSession() {
        row per step already walked, so rewinding is a truncation. */
     stepIdx: 0, totalSteps: 0, backTo: null, steps: [],
     /* EXPLORE — the same screen with nothing counting down and nothing saved.
-       `holdResolver` is how a move ends in explore: not a clock, a tap. */
-    explore: false, holdResolver: null,
+       `holdResolver` is how a move ends in explore: not a clock, a tap, and
+       `jumpTo` is the step a tap on the LIST asked for. */
+    explore: false, holdResolver: null, jumpTo: null,
     dayKey: null, light: "green", practice: false, spa: false, recovery: false,
     endedEarly: false, xpEarned: 0, leveledUp: false,
     mood: null, wentWell: null, nextTime: null, quizPick: null, quizXp: 0,
@@ -1049,6 +1057,7 @@ function readDayProgress() {
   // All three added after the record already existed on devices, so they are
   // filled in on read rather than migrated.
   if (!prog.moves) prog.moves = {};
+  if (!prog.partials) prog.partials = {};   // moves she tapped Done on early
   if (!Number.isFinite(Number(prog.bankedCredit))) prog.bankedCredit = 0;
   // Every write goes through here, so this is the one place the id has to be
   // stamped for a resume to be able to read it back.
@@ -1116,9 +1125,43 @@ function bankMove(row) {
   const prog = readDayProgress();
   if (row.status === "done") {
     const list = prog.moves[block] || (prog.moves[block] = []);
-    if (list.includes(row.name)) return;    // a resume must not re-bank a name
-    list.push(row.name);
-    prog.bankedCredit = Number(prog.bankedCredit) + 1;
+    // A resume must not re-bank a name, or pay for it twice. The light write
+    // below still has to happen, so this no longer returns out of the function.
+    if (!list.includes(row.name)) {
+      list.push(row.name);
+      prog.bankedCredit = Number(prog.bankedCredit) + 1;
+      // Finishing it properly retires the "cut short" mark.
+      if (prog.partials[block]) {
+        prog.partials[block] = prog.partials[block].filter(n => n !== row.name);
+      }
+    }
+  }
+  /* A MOVE SHE TAPPED DONE ON IS A MOVE SHE HAS BEEN THROUGH.
+
+     "Finish remaining moves" used to hand back the whole workout from move one
+     to a kid who had walked the entire warm-up a beat early: every row landed
+     `partial`, nothing banked, and the resume could not tell that evening from
+     one where she had never started at all.
+
+     A partial is remembered by NAME now, in its own list, so the resume does
+     not ask for it again and the session list can show it amber — "you cut
+     this one short" is a different thing to say than "you finished it" or "you
+     never got to it", and the pill beside each move is how she finds where she
+     is picking up.
+
+     Its own list, and not `moves`, because the two answer different questions:
+     `moves` is what has been FINISHED and is what `bankedCredit`, the streak
+     and the XP are priced off, and none of those may move because of this.
+     Only what the next sitting is OFFERED changes — and she can ask for them
+     back from the day card (see redoPartials in planResume).
+
+     Main is the exception: its unit is the round, not the move (see
+     bankMainRounds and mainRoundReport), so a round that fell short is re-run
+     whole and its moves are never marked here. */
+  else if (row.status === "partial" && block !== "main"
+           && !(prog.moves[block] || []).includes(row.name)) {
+    const cut = prog.partials[block] || (prog.partials[block] = []);
+    if (!cut.includes(row.name)) cut.push(row.name);
   }
   prog.light = sess.light;
   saveDayProgress(sess.dayKey, prog);
@@ -1130,14 +1173,23 @@ function bankMove(row) {
    Only a banked name comes off, and the credit that went on with it. */
 function unbankMove(row) {
   if (!ownsDayProgress()) return;
-  if (!row || row.status !== "done") return;
+  if (!row) return;
   const block = row.block;
   if (!block || block === "prep") return;
   const prog = readDayProgress();
-  const list = prog.moves[block];
-  if (!list || !list.includes(row.name)) return;
-  prog.moves[block] = list.filter(n => n !== row.name);
-  prog.bankedCredit = Math.max(0, Number(prog.bankedCredit) - 1);
+  const list = prog.moves[block] || [];
+  const cut = prog.partials[block] || [];
+  // A partial is remembered too now (see bankMove), so backing over one has to
+  // forget it as well — or the resume would never ask for a move she went back
+  // to redo, and a skip the second time would retire it for good.
+  const wasDone = list.includes(row.name);
+  const wasCut = cut.includes(row.name);
+  if (!wasDone && !wasCut) return;
+  if (wasDone) {
+    prog.moves[block] = list.filter(n => n !== row.name);
+    prog.bankedCredit = Math.max(0, Number(prog.bankedCredit) - 1);
+  }
+  if (wasCut) prog.partials[block] = cut.filter(n => n !== row.name);
   saveDayProgress(sess.dayKey, prog);
 }
 
@@ -1164,6 +1216,7 @@ function bankMainRounds() {
      list would drop them from the NEXT round too — a banked name is a name the
      resume does not ask for, and a finished round does not excuse round three. */
   prog.moves.main = [];
+  prog.partials.main = [];
   prog.light = sess.light;
   sess.roundsBanked = sess.roundsCompleted;
   saveDayProgress(sess.dayKey, prog);
@@ -1446,7 +1499,12 @@ export function dayPlanState(dayKey, opts = {}) {
   };
 }
 
-export function planResume(dayKey, light = "green") {
+export function planResume(dayKey, light = "green", opts = {}) {
+  /* `redoPartials` is her own answer to the moves she cut short. They are not
+     offered again by default (see bankMove), and the day card says so with a
+     button that turns this on — so "not asked for again" is never the app
+     deciding she is finished with a move she knows she rushed. */
+  const redoPartials = !!opts.redoPartials;
   const day = DAYS[dayKey] || {};
   const resolvedLight = day.spa ? "recovery" : light;
   const care = !!day.spa || resolvedLight === "recovery";
@@ -1470,6 +1528,14 @@ export function planResume(dayKey, light = "green") {
   const logFrags = care ? [] : dayFragmentsFromLog(dayKey);
   const logRows = mergeLedgerRows(logFrags.reduce((a, r) => a.concat(r.ledger || []), []));
   const logDone = logRows.filter(r => r && r.status === "done");
+  /* What the next sitting does not ask for: every move she finished, plus —
+     unless she asked for them back — the ones she tapped Done on early. Main is
+     never in the second set: its unit is the round, not the move, so a short
+     round is re-run whole (see bankMove, and mainRoundReport in js/outcome.js
+     for what makes a round count). `logDone` stays the `done`-only set, because
+     the main-round arithmetic below is priced off finished work alone. */
+  const logBankable = redoPartials ? logDone : logRows.filter(r => r &&
+    (r.status === "done" || (r.status === "partial" && r.block !== "main")));
   const logRounds = care ? 0 : mainRoundsFromLedger(logRows, null, OUTCOME_VERSION);
 
   const lockedLight = lowerOrNull(prog && prog.lockedLight, lockedLightFromLog(logFrags));
@@ -1484,7 +1550,14 @@ export function planResume(dayKey, light = "green") {
   Object.entries((prog && prog.moves) || {}).forEach(([b, list]) => {
     bankedMoves[b] = [...(list || [])];
   });
-  logDone.forEach(r => {
+  if (!redoPartials) {
+    Object.entries((prog && prog.partials) || {}).forEach(([b, list]) => {
+      if (b === "main") return;
+      const into = bankedMoves[b] || (bankedMoves[b] = []);
+      (list || []).forEach(n => { if (!into.includes(n)) into.push(n); });
+    });
+  }
+  logBankable.forEach(r => {
     const b = r.block;
     if (!b || b === "prep") return;          // prep is re-run every sitting, by design
     // A main move only counts as banked once its whole round is behind us;
@@ -1523,7 +1596,11 @@ export function planResume(dayKey, light = "green") {
         // OF THE DAY and cannot collide with the earlier sitting's.
         roundOffset: bankedRounds
       });
-  return { circuits, prog, light: finalLight, care, mainOwed, bankedRounds, bankedMoves, roundsCap };
+  /* The log rows go back with the plan because the session screen needs them:
+     the list shows the WHOLE day with her history on it, and these are where
+     the colour beside each move comes from. See startSession. */
+  return { circuits, prog, logRows, light: finalLight, care, mainOwed,
+           bankedRounds, bankedMoves, roundsCap };
 }
 
 /* ---- back a move -----------------------------------------------------------
@@ -1584,7 +1661,7 @@ const wentBack = () => sess.backTo != null;
 /* ============================================================
    MAIN RUNNER
    ============================================================ */
-export async function startSession({ dayKey, light = "green", mode = null, suggestedLight = null, readiness = null }) {
+export async function startSession({ dayKey, light = "green", mode = null, suggestedLight = null, readiness = null, redoPartials = false }) {
   if (sess.running) return;
   const day = DAYS[dayKey];
   if (!day) return;
@@ -1624,7 +1701,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
 
      All of that — and the same-day resume that skips what is already banked —
      is planResume's, so the Today card can ask the identical question. */
-  const plan = planResume(dayKey, resolvedLight);
+  const plan = planResume(dayKey, resolvedLight, { redoPartials });
   const prog = plan.prog;
   Object.assign(sess, blankSession(), {
     running: true, dayKey, mode: sessionMode,
@@ -1693,8 +1770,12 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
      across two sittings still reads complete, and a two-move sitting on a
      barely-started day reads exactly as short as it is. */
   const dayRounds = Math.min(roundsForLight(sess.light), plan.roundsCap == null ? Infinity : plan.roundsCap);
-  sess.dayExpectedWork = countExpectedWork(assembleCircuits(dayKey, sess.light,
-    Number.isFinite(dayRounds) && dayRounds < roundsForLight(sess.light) ? { mainRounds: dayRounds } : {}));
+  /* THE WHOLE DAY, assembled once. Three things want it — what the day asked
+     for, how long the day was meant to take, and the list she reads — and it
+     used to be built twice and kept by neither. */
+  const dayCircuits = assembleCircuits(dayKey, sess.light,
+    Number.isFinite(dayRounds) && dayRounds < roundsForLight(sess.light) ? { mainRounds: dayRounds } : {});
+  sess.dayExpectedWork = countExpectedWork(dayCircuits);
   sess.expectedWork = isCareSession()
     ? countExpectedWork(sess.circuits)
     : Math.max(sess.dayExpectedWork, countExpectedWork(sess.circuits));
@@ -1707,8 +1788,21 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
      two sittings reported a plan of eleven minutes. Same defect expectedWork
      had, same fix: take the day's, and never let a remainder shrink it. */
   sess.dayPlannedSecs = isCareSession() ? estimateSessionSecs(sess.circuits)
-    : estimateSessionSecs(assembleCircuits(dayKey, sess.light,
-        Number.isFinite(dayRounds) && dayRounds < roundsForLight(sess.light) ? { mainRounds: dayRounds } : {}));
+    : estimateSessionSecs(dayCircuits);
+  /* WHAT THE LIST SHOWS IS THE DAY, NOT THIS SITTING.
+
+     A resume runs the remainder, and the side list rendered exactly that: a
+     short stub of leftovers with every status pill blank. Nothing on the screen
+     said what she had already done, what she had cut short, or where in the day
+     she was picking up — which is the one question the list exists to answer.
+
+     So the list is the whole day, and `priorRows` is this day's merged ledger
+     from earlier sittings, which is where each move's colour comes from. The
+     runner is untouched: it still walks `circuits`, the remainder, in order.
+     Care is its own short thing and is not the training day's work at all, so
+     there it stays the runner's own view. */
+  sess.listCircuits = isCareSession() ? sess.circuits : dayCircuits;
+  sess.priorRows = isCareSession() ? [] : (plan.logRows || []);
   sess.plannedSecs = Math.max(sess.dayPlannedSecs, estimateSessionSecs(sess.circuits)) + 8;
   sess.roundsPlanned = (sess.spa || sess.recovery) ? 0 : mainOwed;
   /* WHAT THE DAY ASKED FOR, and how much of it was already done.
@@ -2081,6 +2175,8 @@ async function runExplore(dayKey) {
   Object.assign(sess, blankSession(), {
     running: true, explore: true, mode: "explore", dayKey, light,
     spa: !!day.spa, recovery: light === "recovery", circuits,
+    // Explore runs the whole day already, so the list and the runner agree.
+    listCircuits: circuits,
     expectedByRound: {}
   });
   const steps = buildSteps(circuits);
@@ -2114,13 +2210,26 @@ async function runExplore(dayKey) {
       return;
     }
     const key = ci + "-" + ei;
+    /* A TAP ON THE LIST. Looking at one move should not mean tapping through
+       everything in front of it, so the list is the navigation: the tap says
+       which step, and the walk simply resumes there. The move she was standing
+       on gets no verdict — she left it, she did not finish or skip it. */
+    if (r === "jump") {
+      const t = sess.jumpTo; sess.jumpTo = null;
+      if (Number.isFinite(t)) s = t - 1;
+      continue;
+    }
     if (r === "back") {
-      if (s > 0) { delete sess.exStatus[(steps[s - 1].ci) + "-" + steps[s - 1].ei]; sess.exDone = s - 1; s -= 2; }
+      if (s > 0) { delete sess.exStatus[(steps[s - 1].ci) + "-" + steps[s - 1].ei]; s -= 2; }
       else s -= 1;
+      sess.exDone = Object.keys(sess.exStatus).length;
       continue;
     }
     sess.exStatus[key] = r === "skip" ? "skipped" : "done";
-    sess.exDone = s + 1;
+    /* HOW MANY SHE HAS LOOKED AT, not how far down the list she is. Once the
+       list can be tapped, the step index says nothing about progress — she can
+       be on the last move having seen two. The bar counts verdicts. */
+    sess.exDone = Object.keys(sess.exStatus).length;
   }
   sess.running = false;
   setPhase("done");
@@ -2569,6 +2678,25 @@ export function advance() {
     sess.forceDone = true;   // the next countdown/sleep that can honour it, will
     sess.forceDoneAt = Date.now();
   }
+}
+
+/* A TAP ON A MOVE IN THE LIST — explore only.
+
+   A real session's ledger is one row per step, written in order, and
+   countExpectedByRound counts a row that never arrived as a round she did not
+   finish. Jumping the cursor there would quietly cost her the round, so in a
+   real session the list stays what it has always been: something to read. The
+   pill beside each move is what it says, and the runner walks in order. */
+export function jumpToExercise(ci, ei) {
+  if (!sess.explore || !sess.running) return;
+  const target = (sess.steps || []).findIndex(st => st.ci === ci && st.ei === ei);
+  if (target < 0 || target === sess.stepIdx) return;
+  // Only when the walk is actually parked on a tap. Between one move and the
+  // next there is no resolver, and recording a jump nobody will read would
+  // leave it to fire against whichever move happened to come up.
+  if (!sess.holdResolver) return;
+  sess.jumpTo = target;
+  sess.holdResolver("jump");
 }
 
 export function skipCurrentExercise() {

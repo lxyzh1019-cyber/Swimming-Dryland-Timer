@@ -52,6 +52,7 @@ export const state = {
   expanded: {},                 // day-card block expansion
   selectedDay: null,            // monday..sunday
   startNote: "",                // one-line reason a GO could not start, shown on the day card
+  redoPartials: false,          // this GO also wants back the moves she cut short
   inSession: false,
   readiness: null,              // active readiness-check flow state (null = not in flow)
   pendingSession: null,         // { light, dayKey } — readiness → session handoff
@@ -387,7 +388,7 @@ Object.assign(RAW, {
     const id = addProfile(name);
     if (id && switchProfile(id)) location.reload();
   },
-  selectDay(arg) { state.selectedDay = arg; state.expanded = {}; state.startNote = ""; render(); },
+  selectDay(arg) { state.selectedDay = arg; state.expanded = {}; state.startNote = ""; state.redoPartials = false; render(); },
   toggleBlock(arg) { state.expanded[arg] = !state.expanded[arg]; render(); },
   /* Every one of these lives in the Grown-up Zone and changes how her sessions
      run or what gets recorded. All of them were reachable by anyone holding the
@@ -410,6 +411,18 @@ Object.assign(RAW, {
     // GO always means GO. Looking at the moves has its own button, so nothing
     // can re-point this one at the move list behind her.
     state.startNote = "";
+    state.redoPartials = false;
+    state.readiness = newReadinessFlow(dayKey);
+    render();
+  },
+  /* "+ Add them back" — the same start, asking for the moves she tapped Done on
+     early as well. They are held back by default (see bankMove and planResume
+     in js/engine.js) so a rushed warm-up is not handed to her all over again;
+     this is how she says she wants one back. */
+  goSessionRedo(arg) {
+    const dayKey = arg || state.selectedDay || edmontonDayKey();
+    state.startNote = "";
+    state.redoPartials = true;
     state.readiness = newReadinessFlow(dayKey);
     render();
   },
@@ -419,6 +432,7 @@ Object.assign(RAW, {
   goExplore(arg) {
     const dayKey = arg || state.selectedDay || edmontonDayKey();
     state.startNote = "";
+    state.redoPartials = false;
     state.readiness = null;
     state.selectedDay = dayKey;   // Done looking lands back on this day
     state.detailOverlay = false; state.detailEx = null;
@@ -430,6 +444,12 @@ Object.assign(RAW, {
     leaveSession({ keepDay: true });
   },
   goBack() { engine.goBackExercise(); },
+  /* A tap on a move in the side list. Explore only — the engine refuses it
+     anywhere else, because a real session's ledger is written in step order. */
+  goToMove(arg) {
+    const [ci, ei] = String(arg).split("|").map(Number);
+    engine.jumpToExercise(ci, ei);
+  },
   startQuizDeck() {
     state.quizDeck = buildQuizDeck(8);
     render();
@@ -523,7 +543,8 @@ Object.assign(RAW, {
     // must get there whether or not a session follows this tap.
     publishReadiness();
     startPendingSession({ light: r.light || "green", dayKey: r.dayKey,
-                          suggestedLight: suggested, readiness: check });
+                          suggestedLight: suggested, readiness: check,
+                          redoPartials: !!state.redoPartials });
   },
   rResultSecondary(arg) {
     if (arg === "retry") dispatch("rRetryCheck");
@@ -604,7 +625,11 @@ Object.assign(RAW, {
   openDetailCur() { actions.openDetail(engine.sess.currentEx); },
   openDetailAt(arg) {
     const [ci, ei] = arg.split("|").map(Number);
-    const c = engine.sess.circuits[ci];
+    // The list is the DAY on a resume, not this sitting's remainder, so the row
+    // index addresses `listCircuits` — the array the row was rendered from.
+    const from = (engine.sess.listCircuits && engine.sess.listCircuits.length)
+      ? engine.sess.listCircuits : engine.sess.circuits;
+    const c = from[ci];
     if (c && c.exercises[ei]) actions.openDetail(c.exercises[ei]);
   },
   watchVideo() {
