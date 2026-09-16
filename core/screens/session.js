@@ -596,14 +596,23 @@ function controls(vm, wide) {
 function exList(vm, wide, tablet) {
   const nameSize = tablet ? 16 : wide ? 17 : 15;
   const iconSize = tablet ? 24 : wide ? 26 : 24;
-  return vm.sessionExList.map(sitem => sitem.isHeader ? `
+  /* The number and the name are a BUTTON where the list is navigable — which
+     is explore only, where nothing is recorded and walking in order is not the
+     point. The number is the status pill, so the tap target is the thing she is
+     already reading. The ⓘ stays a sibling: a button cannot hold a button. */
+  const jumpOpen = "flex:1;min-width:0;display:flex;align-items:center;gap:9px;background:none;border:none;padding:0;margin:0;cursor:pointer;font-family:inherit;text-align:left;min-height:44px;";
+  const legend = vm.exListLegend ? `
+    <div style="font-size:${wide ? 12 : 11}px;font-weight:800;color:var(--ink-faint);line-height:1.35;padding:${wide ? "2px 0 6px" : "2px 0 5px"};">${vm.exListLegend}</div>` : "";
+  return legend + vm.sessionExList.map(sitem => sitem.isHeader ? `
     <div style="display:flex;align-items:center;gap:8px;padding:${wide ? "12px 0 4px" : "10px 0 4px"};">
       <span style="width:${wide ? 10 : 9}px;height:${wide ? 10 : 9}px;border-radius:50%;background:${sitem.color};flex-shrink:0;"></span>
       <span style="font-weight:900;font-size:12px;letter-spacing:0.05em;text-transform:uppercase;color:${sitem.color};">${sitem.name}</span>
     </div>` : `
     <div ${sitem.isCur ? 'data-ex-cur="1" ' : ""}style="${sitem.cardStyle}">
+      ${sitem.jumpAction ? `<button type="button" data-action="goToMove" data-arg="${sitem.ci}|${sitem.ei}" title="Jump to this move" style="${jumpOpen}">` : ""}
       <span style="${sitem.numStyle}">${sitem.num}</span>
       <span style="${sitem.nameStyle}font-size:${nameSize}px;">${sitem.name}</span>
+      ${sitem.jumpAction ? "</button>" : ""}
       <button type="button" data-action="openDetailAt" data-arg="${sitem.ci}|${sitem.ei}" title="See detail photo &amp; video" style="flex-shrink:0;width:${iconSize}px;height:${iconSize}px;border-radius:50%;border:none;background:var(--surface-2);color:var(--ink-soft);font-size:${tablet ? 13 : wide ? 14 : 13}px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">ⓘ</button>
       ${sitem.paceDotStyle ? `<span title="${sitem.paceTitle}" aria-label="${sitem.paceTitle}" style="${sitem.paceDotStyle}"></span>` : ""}
       <span style="font-size:${nameSize}px;flex-shrink:0;width:${wide ? 18 : 16}px;text-align:center;color:${sitem.secColor};">${sitem.statusIcon}</span>

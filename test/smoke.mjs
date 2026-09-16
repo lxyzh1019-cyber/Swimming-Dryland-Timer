@@ -626,6 +626,21 @@ ok(exploreGaps.goHijacked.length === 0, "while the start button still starts the
 const tryVM = tvm.buildTodayVM({ selectedDay: launchDays[0], expanded: {}, isWide: true });
 ok(/min-height:48px/.test(tryVM.practiceBtnStyle), "with a 48px tap target — the old link was ~16px");
 ok(tryVM.practiceMode === undefined, "and there is no armed state left for a screen to read");
+/* ONE WAY IN, NOT TWO. On a day she had finished, the big button already WAS
+   explore — "🧪 Look at the moves", or "🧘 Do it again" on a spa day — and the
+   card printed a second "🧪 Explore the moves" immediately underneath it. */
+const doubleExplore = [];
+launchDays.forEach(d => {
+  const dv = tvm.buildTodayVM({ selectedDay: d, expanded: {}, isWide: true }).dayView;
+  if (dv.ctaAction === "goExplore" && dv.showExplore) doubleExplore.push(d);
+});
+ok(doubleExplore.length === 0, "a card whose own button is explore never prints a second one");
+launchDays.forEach(d => {
+  const vm = tvm.buildTodayVM({ selectedDay: d, expanded: {}, isWide: true });
+  if (!vm.dayView.showCta && !vm.dayView.showExplore) return;
+  const hits = (tscreen.todayWide(vm).match(/data-action="goExplore"/g) || []).length;
+  ok(hits <= 1, "and the rendered card offers exactly one way into explore (" + d + ")");
+});
 
 /* EXPLORE IS THE WORKOUT SCREEN WITH NOTHING COUNTING DOWN.
 
@@ -2963,15 +2978,36 @@ const partialProg = store.loadDayProgress("tuesday");
 const cutRow = engine.sess.ledger.find(l => l.name === cutShort);
 ok(cutRow && cutRow.status === "partial", "the first move really was recorded partial, not skipped");
 ok(!(partialProg.moves.warmup || []).includes(cutShort),
-   "a partial move is NOT banked — it would otherwise never get finished");
+   "a partial move is still NOT a finished move — it is not on the banked list");
 ok((partialProg.moves.warmup || []).length >= 1,
    "while the moves that were actually finished around it are");
+/* IT IS REMEMBERED, THOUGH, in its own list. Offering it again by default is
+   what handed a kid who tapped Done a beat early on every warm-up move the
+   whole workout from move one, under a button that said "Finish remaining
+   moves". She can still ask for it back — see redoPartials below. */
+ok((partialProg.partials.warmup || []).includes(cutShort),
+   "a move she cut short is remembered by name, in its own list");
+ok(Number(partialProg.bankedCredit) === (partialProg.moves.warmup || []).length,
+   "and it earns no banked credit: the streak and the XP still read `done` only");
 const resumedPartial = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true,
   seed: () => store.saveDayProgress("tuesday", partialProg)
 });
-ok((resumedPartial.circuits.find(c => c.block === "warmup") || { exercises: [] })
+ok(!(resumedPartial.circuits.find(c => c.block === "warmup") || { exercises: [] })
      .exercises.some(ex => ex.name === cutShort),
-   "so it is offered again on the next attempt");
+   "so the next attempt does not hand it back to her unasked");
+const resumedRedo = await runSession({ dayKey: "tuesday", light: "green", gateUnlocked: true,
+  redoPartials: true,
+  seed: () => store.saveDayProgress("tuesday", partialProg)
+});
+ok((resumedRedo.circuits.find(c => c.block === "warmup") || { exercises: [] })
+     .exercises.some(ex => ex.name === cutShort),
+   "and \"+ Add them back\" is how she gets it back");
+/* THE DAY'S REPORTING IS UNTOUCHED BY ANY OF IT. Only what the next sitting is
+   OFFERED changed, which is why the credit assertion above is the one that
+   matters: a move she cut short is still not a movement she finished. */
+ok(!(resumedRedo.circuits.find(c => c.block === "warmup") || { exercises: [] })
+     .exercises.some(ex => (partialProg.moves.warmup || []).includes(ex.name)),
+   "while a move she genuinely finished is never offered back, either way");
 
 /* --- A DAY TRAINED IN TWO GOES, END TO END --------------------------------
    The whole point of the banking, proven the only way that counts: run a real
@@ -4567,5 +4603,9 @@ store.setOnlineForTest(true);
   unpin();
   localStorage.clear(); store.migrate();
 }
+
+/* The finished-day case for that rule — where the card's own button turns
+   into explore and the second one used to appear under it — is asserted in
+   core/test/session.mjs, because the rule is the core's, not this app's. */
 
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

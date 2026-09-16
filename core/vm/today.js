@@ -508,6 +508,27 @@ export function buildTodayVM(state) {
        workout. */
     const resumable = resumeCircuits.length > 0;
     const remainingLabel = remaining.join(", ");
+    /* THE MOVES SHE CUT SHORT, and the offer to have them back.
+
+       A move she tapped Done on before its clock ran out is not asked for
+       again — otherwise a rushed warm-up handed her the whole workout from move
+       one under a button that said "Finish remaining moves" (see bankMove in
+       js/engine.js). But "not asked for again" must never be the app deciding
+       she is finished with a move she knows she rushed, so the card says how
+       many there are and offers them back. The count is the difference the two
+       plans disagree about, asked of the same function the engine will ask. */
+    // Only where there is a resume to add them TO — this is a second pass over
+    // the day's log, and a day with nothing left has no offer to make.
+    const redoCircuits = (isToday && resumeCircuits.length)
+      ? planResume(selectedKey, planState.light, { redoPartials: true })
+          .circuits.filter(c => c.block !== "prep")
+      : [];
+    const redoMoves = [...new Set(redoCircuits.flatMap(c => c.exercises.map(e => e.name)))]
+      .filter(n => !owedMoves.includes(n));
+    const partialSkipLabel = redoMoves.length
+      ? plural(redoMoves.length, "move") + " you cut short "
+        + (redoMoves.length === 1 ? "isn\u2019t" : "aren\u2019t") + " included"
+      : "";
     // Read what the session ACTUALLY earned instead of recomputing it here.
     // This line used to carry its own copy of the XP formula (moves × 10 + 40),
     // so once a session started paying a flat rate for its rounds, the day card
@@ -627,6 +648,8 @@ export function buildTodayVM(state) {
       ctaVariant: (isSpaDay || !resumable) ? "secondary" : "primary",
       ctaSubtext: isSpaDay ? "Doesn't change progress" : (resumable ? "" : "The workout screen, nothing counting down, nothing recorded"),
       ctaAction: (isSpaDay || !resumable) ? "goExplore" : "goSession",
+      // Only where it is an offer she can act on: a resume she can add them to.
+      partialSkipLabel: (!isSpaDay && resumable) ? partialSkipLabel : "",
       showSettings: false
     };
   } else if (status === "missed") {
@@ -685,7 +708,10 @@ export function buildTodayVM(state) {
      move list until something disarmed it again. Arming a mode to read an
      instruction is a lot of machinery for "what does this one look like?", and
      while it was armed the real GO button was not where she left it. */
-  dayView.showExplore = canLaunch;
+  /* ONE Explore button, never two. A finished day's CTA already IS Explore —
+     "🧪 Look at the moves", and "🧘 Do it again" on a spa day — and this
+     rendered a second "🧪 Explore the moves" directly underneath it. */
+  dayView.showExplore = canLaunch && dayView.ctaAction !== "goExplore";
   if (dayView.isActive && !dayView.ctaSubtext) dayView.ctaSubtext = (dayView.movesLabel || "") + " · about " + (dayView.mins || "?") + " min · that’s the whole thing — no surprises.";
   dayView.showBlocksList = !!(dayView.isActive || dayView.isDone || dayView.isPreview || dayView.isMissed) && !isSpaDay;
   dayView.blocksHint = dayView.isDone ? "REVIEW WHAT YOU DID 👀" : dayView.isPreview ? "PEEK AT WHAT'S COMING 👀" : dayView.isMissed ? "READY WHEN YOU ARE — PEEK INSIDE 👀" : "TAP A BLOCK TO PEEK INSIDE 👀";

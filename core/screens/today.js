@@ -251,7 +251,12 @@ function dayPane(vm, wide) {
       <button type="button" data-action="${dv.ctaAction}" data-arg="${vm.selectedKey}" style="${dv.ctaButtonStyle}width:100%;">
         <span style="font-size:22px;">${dv.ctaIcon}</span> ${dv.ctaLabel}
       </button>
-      ${dv.ctaSubtext ? `<div style="text-align:center;font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.8;padding-top:8px;">${dv.ctaSubtext}</div>` : ""}` : ""}
+      ${dv.ctaSubtext ? `<div style="text-align:center;font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.8;padding-top:8px;">${dv.ctaSubtext}</div>` : ""}
+      ${dv.partialSkipLabel ? `
+        <div style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;padding-top:8px;text-align:center;">
+          <span style="font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.85;">${dv.partialSkipLabel}</span>
+          <button type="button" data-action="goSessionRedo" data-arg="${vm.selectedKey}" style="min-height:44px;border-radius:var(--radius-pill);border:2px solid rgba(255,255,255,0.55);background:rgba(255,255,255,0.16);color:#fff;font-family:inherit;font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;">+ Add them back</button>
+        </div>` : ""}` : ""}
     ${dv.startNote ? `<div role="status" style="margin-bottom:10px;background:rgba(255,255,255,0.18);border:2px solid rgba(255,255,255,0.55);border-radius:var(--radius-lg);padding:10px 14px;font-size:13px;font-weight:800;line-height:1.4;">ℹ️ ${dv.startNote}</div>` : ""}
     ${dv.showExplore ? `
       <div style="padding-top:${wide ? 10 : 8}px;">

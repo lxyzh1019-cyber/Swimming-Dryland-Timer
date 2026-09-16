@@ -4,7 +4,7 @@
    Run against whichever app's content this core is under: nothing here names a
    move, so it holds for both. Voice ON with a SLOW synthesiser where the bug was
    a race with the coach's speech; voice OFF where it was not. */
-import { engine, store, sport, data, tvm, gvm, svm, sscreen, runSession, setSpeechDelay, speechInFlight, spoken, pinClock } from "./harness.mjs";
+import { engine, store, sport, data, util, tvm, gvm, svm, sscreen, tscreen, runSession, setSpeechDelay, speechInFlight, spoken, pinClock } from "./harness.mjs";
 const base   = new URL("../", import.meta.url).href;
 const layout = await import(base + "layout.js");
 const plan   = await import(base + "plan.js");
@@ -405,6 +405,190 @@ const stopInRoundTwo = (reason) => ({
   ok(/TIMED SET|BY REPS/.test(roomy), "the ring names the kind of effort, not just 'not a rest'");
   ok(/data-action="toggleRail"/.test(roomy) && !/data-action="toggleRail"/.test(narrow),
      "the rail collapses where there is a rail, and not on a phone");
+}
+
+/* ---- THE PILL IS WHERE SHE PICKS UP -------------------------------------
+
+   A resume runs the REMAINDER, and the side list used to render exactly that:
+   a short stub of leftovers with every status pill blank. Nothing on the screen
+   said what she had already done, what she had cut short, or where in the day
+   she was starting again — which is the one question the list exists to answer.
+
+   The list is the whole day now, and each move's pill is coloured from today's
+   merged ledger. */
+{
+  const dayKey = timedDay;
+  store.updateSettings({ coachSpeechOn: false });
+  setSpeechDelay(0);
+  /* A first sitting that ends part-way, with one move cut short in it. */
+  let cut = null, stop = false;
+  await runSession({ dayKey, light: "red", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      if (answerChecks(sess)) return;
+      /* Cut the SECOND warm-up move short: past MIN_EXERCISE_SECS so it lands
+         `partial` rather than skipped, and not the first move, so the resume
+         does not simply reopen on it. */
+      if (!cut && (sess.phase === "work" || sess.phase === "reps")
+          && sess.currentEx && sess.exElapsed >= 6
+          && sess.currentEx.block === "warmup" && sess.ledger.length >= 1) {
+        cut = sess.currentEx.name; engine.advance(); return;
+      }
+      if (cut && !stop && sess.ledger.some(l => l.name === cut) && sess.running) {
+        stop = true; engine.endEarly();
+      }
+    }
+  });
+  const firstRows = (store.loadSessions().pop() || {}).ledger || [];
+  ok(firstRows.length > 0, "the first sitting left rows in the log");
+  engine.exitSession();
+
+  /* And the resume that follows it. Read the list at the moment it opens. */
+  let listAtStart = null, legendAtStart = "";
+  await runSession({ dayKey, light: "red", gateUnlocked: true, wipe: false, limitMs: 120000 }, {
+    onTick: (ms, sess) => {
+      if (answerChecks(sess)) return;
+      if (!listAtStart && sess.running && sess.currentEx
+          && (sess.phase === "work" || sess.phase === "reps")) {
+        const vm = svm.buildSessionVM({ railOpen: true });
+        listAtStart = vm.sessionExList;
+        legendAtStart = vm.exListLegend;
+        engine.endEarly();
+      }
+    }
+  });
+  ok(listAtStart, "the resumed session builds a list");
+  const listed = listAtStart.filter(r => r.isEx).map(r => r.name);
+  const ran = (engine.sess.circuits || []).flatMap(c => c.exercises.map(e => e.name));
+  ok(listed.length > ran.length,
+     "which is the WHOLE day, not just the remainder this sitting runs");
+  firstRows.forEach(r => {
+    ok(listed.includes(r.name), "every move she already went through is on it: " + r.name);
+  });
+  /* Each one carries its own verdict, in its own colour — done and cut-short
+     used to share a tick, and a move she never reached looked the same as one
+     she had finished. */
+  const rowFor = (n) => listAtStart.find(r => r.isEx && r.name === n);
+  const doneRow = firstRows.find(r => r.status === "done");
+  if (doneRow) {
+    const d = rowFor(doneRow.name);
+    ok(d && /var\(--mint\)/.test(d.numStyle) && d.statusIcon === "✓",
+       "a move she finished reads done, in mint");
+  }
+  const cutRow = firstRows.find(r => r.status === "partial");
+  ok(cutRow, "the first sitting really did leave a move cut short");
+  const c = rowFor(cutRow.name);
+  ok(c && /var\(--sun\)/.test(c.numStyle) && c.statusIcon === "½",
+     "a move she cut short says so, in its own colour and its own glyph");
+  const untouched = listAtStart.find(r => r.isEx && !firstRows.some(l => l.name === r.name) && !r.isCur);
+  ok(untouched && /var\(--surface-2\)/.test(untouched.numStyle) && !untouched.statusIcon,
+     "and a move she has not reached yet is plainly blank");
+  ok(listAtStart.filter(r => r.isEx && r.isCur).length === 1,
+     "exactly one move is marked as the one she is standing on");
+  ok(/picking up/.test(legendAtStart || ""),
+     "and the colours are explained, once, above the list");
+  /* The list is NOT the runner. Nothing about what she is asked to do moved. */
+  ok(!ran.some(n => (firstRows.filter(l => l.status === "done").map(l => l.name)).includes(n)),
+     "a move she finished is still never handed back to her");
+  engine.exitSession();
+}
+
+/* ---- A MOVE SHE TAPPED DONE ON IS NOT HANDED BACK TO HER -----------------
+
+   A move ended before DONE_WORK_FRACTION of its clock is `partial`: real work,
+   and not a finished move. It was offered again on the next sitting, which is
+   right in principle and wrong in practice — a kid who taps Done a beat early
+   on every warm-up move banks nothing, and "Finish remaining moves" hands her
+   the whole workout from move one.
+
+   So a partial is remembered by name now, in its own list, and the next sitting
+   does not ask for it. Nothing about what it is WORTH moved: the streak, the XP
+   and `bankedCredit` still read `done` and nothing else. And she can have them
+   back — the day card offers it, and redoPartials is what the button sets. */
+{
+  localStorage.clear(); store.migrate();
+  store.updateSettings({ coachSpeechOn: false });
+  setSpeechDelay(0);
+  /* Today's own weekday, so the DAY CARD can be read as well — a resume is only
+     ever offered for today (the No-Debt rule). */
+  const dayKey = util.edmontonDayKey();
+  let cut = null, stop = false;
+  await runSession({ dayKey, light: "red", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      if (answerChecks(sess)) return;
+      if (!cut && (sess.phase === "work" || sess.phase === "reps") && sess.currentEx
+          && sess.exElapsed >= 6 && sess.currentEx.block === "warmup" && sess.ledger.length >= 1) {
+        cut = sess.currentEx.name; engine.advance(); return;
+      }
+      if (cut && !stop && sess.ledger.some(l => l.name === cut) && sess.running) {
+        stop = true; engine.endEarly();
+      }
+    }
+  });
+  engine.exitSession();
+  const prog = store.loadDayProgress(dayKey) || { moves: {}, partials: {} };
+  const cutRow = ((store.loadSessions().pop() || {}).ledger || [])
+    .find(l => l.status === "partial");
+  ok(cutRow, "the sitting left a move cut short");
+  ok(!(prog.moves[cutRow.block] || []).includes(cutRow.name),
+     "a move she cut short is still not a FINISHED move");
+  ok((prog.partials[cutRow.block] || []).includes(cutRow.name),
+     "but it is remembered, by name, in its own list");
+  const banked = Object.values(prog.moves).reduce((n, l) => n + (l || []).length, 0);
+  ok(Number(prog.bankedCredit) === banked,
+     "and it earns no credit: the streak and the XP read `done` only, as before");
+
+  const held = engine.planResume(dayKey, "red");
+  const heldMoves = held.circuits.flatMap(c => c.exercises.map(e => e.name));
+  ok(!heldMoves.includes(cutRow.name),
+     "so the next sitting does not hand it back to her unasked");
+  const redo = engine.planResume(dayKey, "red", { redoPartials: true });
+  ok(redo.circuits.flatMap(c => c.exercises.map(e => e.name)).includes(cutRow.name),
+     "and \"+ Add them back\" on the day card is how she asks for it");
+  /* MAIN IS THE EXCEPTION, and deliberately so: its unit is the ROUND, not the
+     move, so a round that fell short is re-run whole. Marking its moves would
+     empty the ragged-round remainder and renumber rows straight onto the ones
+     already in the log. */
+  ok(!(prog.partials.main || []).length, "main's moves are never marked this way");
+
+  /* AND THE CARD SAYS SO, rather than quietly deciding for her. */
+  const cardVm = tvm.buildTodayVM({ selectedDay: dayKey, expanded: {}, isWide: true });
+  if (cardVm.dayView.showCta && cardVm.dayView.ctaAction === "goSession") {
+    ok(/cut short/.test(cardVm.dayView.partialSkipLabel || ""),
+       "the day card names the moves it is holding back");
+    ok(/data-action="goSessionRedo"/.test(tscreen.todayWide(cardVm)),
+       "and offers a button that asks for them back");
+  }
+  localStorage.clear(); store.migrate();
+}
+
+/* ---- ONE WAY INTO EXPLORE, ON A DAY SHE HAS FINISHED ---------------------
+   A finished day's own button already IS explore — "Look at the moves", or
+   "Do it again" on a spa day — and the card printed a second "Explore the
+   moves" immediately underneath it. */
+{
+  localStorage.clear(); store.migrate();
+  engine.exitSession();
+  const doneKey = util.edmontonDayKey();
+  await runSession({ dayKey: doneKey, light: "green", gateUnlocked: true },
+                   { onTick: (ms, sess) => { answerChecks(sess); } });
+  engine.exitSession();
+  const vm = tvm.buildTodayVM({ selectedDay: doneKey, expanded: {}, isWide: true });
+  ok(vm.dayView.isDone || vm.dayView.isRest, "the card reads as a finished day");
+  const hits = (tscreen.todayWide(vm).match(/data-action="goExplore"/g) || []).length;
+  ok(hits === 1, "which offers exactly one explore button, not the two it used to stack");
+  if (vm.dayView.ctaAction === "goExplore") {
+    ok(vm.dayView.showExplore === false,
+       "the secondary button stands down when the card's own button is already explore");
+  }
+  /* And a day with work still in it keeps BOTH, because they are two different
+     offers: finish what is left, or go and look at the moves. */
+  const openVm = tvm.buildTodayVM({ selectedDay: timedDay === doneKey ? repsDay : timedDay,
+                                    expanded: {}, isWide: true });
+  if (openVm.dayView.showExplore) {
+    ok(openVm.dayView.ctaAction !== "goExplore",
+       "while a day she can still train keeps its own start button");
+  }
+  localStorage.clear(); store.migrate();
 }
 
 console.log("✓ session safety passed (" + passed + " assertions)");
