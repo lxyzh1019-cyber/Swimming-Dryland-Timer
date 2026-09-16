@@ -57,10 +57,10 @@ export const ENCOURAGEMENTS_BY_STYLE = {
 };
 
 /* ------------------------------------------------------------
-   HOW-TO / VALIDATED COACHING CHANNELS — each block routes to ONE
-   trusted channel covering that kind of work. The demo link is a
-   broad YouTube search with the channel NAME appended, so it always
-   returns real videos while biasing toward the validated channel.
+   HOW-TO / VALIDATED COACHING CHANNELS — a reference list, not a
+   mechanism. Nothing appends these names. Where a move's best demo
+   comes from one of these channels, the name is written INTO that
+   move's `search` string by hand.
    ------------------------------------------------------------ */
 export const COACH_CHANNELS = {
   swim:     { label: "Swim technique",       name: "Effortless Swimming", url: "https://www.youtube.com/@effortlessswimming" },
@@ -75,8 +75,6 @@ export const BLOCK_CHANNEL = {
   swimskill: "swim"
 };
 export const channelForBlock = b => COACH_CHANNELS[BLOCK_CHANNEL[b]] || COACH_CHANNELS.strength;
-export const yt = (q, ch) =>
-  "https://www.youtube.com/results?search_query=" + encodeURIComponent(q + " " + ch.name);
 
 export const EXERCISE_HOWTO = {
   // — 2026.2 swim-skill drills —
