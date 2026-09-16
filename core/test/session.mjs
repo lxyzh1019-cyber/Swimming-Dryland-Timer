@@ -4,11 +4,13 @@
    Run against whichever app's content this core is under: nothing here names a
    move, so it holds for both. Voice ON with a SLOW synthesiser where the bug was
    a race with the coach's speech; voice OFF where it was not. */
-import { engine, store, sport, data, tvm, gvm, runSession, setSpeechDelay, speechInFlight, spoken, pinClock } from "./harness.mjs";
+import { engine, store, sport, data, tvm, gvm, svm, sscreen, runSession, setSpeechDelay, speechInFlight, spoken, pinClock } from "./harness.mjs";
 const base   = new URL("../", import.meta.url).href;
 const layout = await import(base + "layout.js");
 const plan   = await import(base + "plan.js");
 
+/* RegExp.escape is not in Node 18, and a cue contains "." and "/" */
+const escapeForRe = (t) => String(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
 const voiceOn = () => store.updateSettings({ coachSpeechOn: true, voiceStyle: "classic" });
@@ -343,6 +345,66 @@ const stopInRoundTwo = (reason) => ({
   await runSession({ dayKey: timedDay, light: "green", gateUnlocked: true, limitMs: 240000 },
     { onTick: (ms, s) => { answerChecks(s); if (ms > 120000) engine.endFromStop("break"); } });
   ok(store.loadSessions().length === 1, "a discard does not leak into the session after it");
+}
+
+
+/* ---- THE SHAPE OF THE SCREEN ---------------------------------------------
+
+   Behaviour is asserted above; this asserts what is actually DRAWN, at each of
+   the three layouts. Every one of these is something the change either added
+   or removed, and none of them is visible from the engine. */
+{
+  let snap = null;
+  await runSession({ dayKey: timedDay, light: "green", gateUnlocked: true }, {
+    onTick: (ms, sx) => {
+      answerChecks(sx);
+      const ex = engine.sess.currentEx;
+      if (!snap && ["work", "reps"].includes(sx.phase) && ex && ex.cue && ex.parentWatch)
+        snap = { ...engine.sess, circuits: engine.sess.circuits };
+    },
+    limitMs: 1800000
+  });
+  ok(snap, "found a mid-session moment on a move with both a cue and a watch-for");
+
+  const draw = (st) => {
+    engine.exitSession(); Object.assign(engine.sess, snap);
+    return sscreen.sessionScreen(svm.buildSessionVM(
+      { inSession: true, detailOverlay: false, detailEx: null, ...st }));
+  };
+  const count = (h, re) => (h.match(re) || []).length;
+  const roomy  = draw({ isWide: true,  isTablet: false, tightColumn: false });
+  const tight  = draw({ isWide: true,  isTablet: true,  tightColumn: true  });
+  const narrow = draw({ isWide: false, isTablet: false, tightColumn: false });
+  const PHOTO = /linear-gradient\(165deg,var\(--aqua-wash\)/;
+
+  for (const [name, html] of [["roomy", roomy], ["tight", tight], ["narrow", narrow]]) {
+    /* End session was a strict subset of STOP and is gone; Skip took its slot. */
+    ok(!/data-action="askEnd"/.test(html) && !/data-action="confirmEndEarly"/.test(html),
+       name + ": the screen no longer offers End session, which STOP already did");
+    ok(/data-action="askSkip"/.test(html), name + ": and offers Skip this exercise in its place");
+    /* The pain rule moved out of the far-left rail to under the buttons — in
+       BOTH trees, which is the half that is easy to forget. */
+    ok(/Sharp pain, pinching, or numbness/.test(html), name + ": the pain rule is on screen");
+    /* Exactly one current row, and one scroller to centre it in. */
+    ok(count(html, /data-ex-cur/g) === 1, name + ": exactly one row is marked current");
+    ok(count(html, /data-ex-list/g) === 1, name + ": and exactly one list scroller to centre it in");
+    /* The cue MOVED to the ring; it was not copied there. */
+    ok(count(html, new RegExp(escapeForRe(snap.currentEx.cue), "g")) === 1,
+       name + ": the coach tip appears exactly once — moved, not duplicated");
+  }
+
+  /* The picture is the clock's tenant, not its landlord: it goes when the
+     column is too narrow to seat both, and the ⓘ still opens it. */
+  ok(PHOTO.test(roomy), "a roomy screen shows the form photo");
+  ok(!PHOTO.test(tight), "an upright iPad does not — its clock column is phone-sized");
+  ok(!PHOTO.test(narrow), "and neither does a phone");
+  ok(/data-action="openDetailCur"/.test(tight) && /data-action="openDetailCur"/.test(narrow),
+     "but both still offer the ⓘ, which is where the photo went");
+
+  /* The ring says which KIND of effort, and the rail can be collapsed. */
+  ok(/TIMED SET|BY REPS/.test(roomy), "the ring names the kind of effort, not just 'not a rest'");
+  ok(/data-action="toggleRail"/.test(roomy) && !/data-action="toggleRail"/.test(narrow),
+     "the rail collapses where there is a rail, and not on a phone");
 }
 
 console.log("✓ session safety passed (" + passed + " assertions)");
