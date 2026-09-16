@@ -26,6 +26,37 @@ ok(/importScripts\("core\/sw-core\.js"\)/.test(appSrc), "the app's worker hands 
 ok(/cachePrefix: "[a-z]+-"/.test(appSrc) && /version: "v\d+"/.test(appSrc), "the app names its cache prefix and version");
 ok(!/firebase\.js/.test(coreSrc.split("CORE_SHELL")[1].split("]")[0]), "firebase.js is never precached");
 
+/* ...AND THE LIST IS COMPLETE. Everything above proves each listed path is a
+   real file. It says nothing about the other direction, and the other direction
+   is the one that bites: core/layout.js was added, imported by core/main.js,
+   and left off the list. It loads perfectly every time there is a network, and
+   breaks a cold offline launch OUTRIGHT — a static import that 404s fails the
+   whole module graph, so the app does not come up at all. Renaming a module is
+   the case the list was written for; ADDING one is the case nobody remembers.
+   So walk the graph from the entry module and insist the list covers every
+   in-repo file it reaches. The middle of the pattern cannot cross a semicolon,
+   which is what keeps a multi-line `import { a, b } from "..."` in and an
+   `export const x = 1;` out. A dynamic `import(...)` has no `from` and is
+   deliberately not matched — core/firebase.js is reached only that way. */
+const listed = new Set([...coreShell, ...appShell]);
+const walked = new Set();
+const walk = (rel) => {
+  if (walked.has(rel)) return;
+  walked.add(rel);
+  const src = readFileSync(path.join(root, rel), "utf8");
+  const dir = path.posix.dirname(rel);
+  for (const m of src.matchAll(/^\s*(?:import|export)\b[^;]*?\bfrom\s*["']([^"']+)["']/gm)) {
+    const spec = m[1];
+    if (!spec.startsWith(".")) continue;            // a bare specifier is not ours to cache
+    const target = path.posix.normalize(path.posix.join(dir, spec));
+    if (target.startsWith("..")) continue;          // outside the app
+    ok(listed.has("./" + target), "precached: " + target + " (imported by " + rel + ")");
+    walk(target);
+  }
+};
+walk("core/main.js");
+ok(walked.size > 15, "the walk reached the whole module graph (" + walked.size + " files)");
+
 /* THE PICTURES SHE DOWNLOADS. An app that says it ships WebP twins
    (FEATURES.webp) must ship one for every PNG a screen can ask for — the
    mascot and body maps, every pose, every move photo — or the screens fall
