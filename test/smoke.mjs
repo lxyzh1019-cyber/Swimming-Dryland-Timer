@@ -4165,6 +4165,9 @@ store.setOnlineForTest(true);
   ok(!/Finish remaining/.test(card.ctaLabel || ""), "so the card does not offer to finish anything");
   ok(!/Coordination|Finisher/.test(card.doneSub || ""), "and does not claim she skipped blocks the light never asked for");
   // A green day with only the warm-up banked still names what is left — without the warm-up.
+  const unpin = pinClock("2026-09-15T18:00:00Z");   // a Tuesday, noon Edmonton, because
+  // buildTodayVM only works out what is still open for TODAY (the No-Debt rule): naming a
+  // weekday instead made these two pass on Tuesdays and fail the other six days.
   localStorage.clear(); store.migrate();
   store.saveDayProgress("tuesday", { done: ["warmup"], mainRoundsCompleted: 0, lockedLight: "green", light: "green", moves: {}, bankedCredit: 4 });
   store.saveSession({ app: "swimming", dayKey: "tuesday", dayTitle: "Tue", isoDate: new Date().toISOString(),
@@ -4174,6 +4177,7 @@ store.setOnlineForTest(true);
   const greenCard = tvm.buildTodayVM({ selectedDay: "tuesday", expanded: {}, isWide: true }).dayView;
   ok(/Finish remaining/.test(greenCard.ctaLabel) && greenCard.ctaAction === "goSession", "a day with moves left is still offered them");
   ok(/Still open:/.test(greenCard.doneSub) && !/Still open:[^.]*Warm-Up/.test(greenCard.doneSub), "and the list of what is open leaves out the finished warm-up");
+  unpin();
   localStorage.clear(); store.migrate();
 }
 
