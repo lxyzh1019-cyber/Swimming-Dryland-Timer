@@ -474,6 +474,7 @@ function exList(vm, wide) {
       <span style="${sitem.numStyle}">${sitem.num}</span>
       <span style="${sitem.nameStyle}font-size:${wide ? 16 : 14}px;">${sitem.name}</span>
       <button type="button" data-action="openDetailAt" data-arg="${sitem.ci}|${sitem.ei}" title="See detail photo &amp; video" style="flex-shrink:0;width:${wide ? 22 : 20}px;height:${wide ? 22 : 20}px;border-radius:50%;border:none;background:var(--surface-2);color:var(--ink-soft);font-size:${wide ? 13 : 12}px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">ⓘ</button>
+      ${sitem.paceDotStyle ? `<span title="${sitem.paceTitle}" aria-label="${sitem.paceTitle}" style="${sitem.paceDotStyle}"></span>` : ""}
       <span style="font-size:${wide ? 16 : 14}px;flex-shrink:0;width:${wide ? 18 : 16}px;text-align:center;color:${sitem.secColor};">${sitem.statusIcon}</span>
     </div>`).join("");
 }
