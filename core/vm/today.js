@@ -4,12 +4,16 @@
    history, journey XP, and live Edmonton dates.
    ============================================================ */
 
-import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, RANK_LORE, BLOCK_META, levelCost, fmtXp, overloadWeek } from "../data.js";
+import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, RANK_LORE, BLOCK_META, BLOCK_LABEL, levelCost, fmtXp, overloadWeek } from "../data.js";
 import { SKILL_BLOCK, ATHLETE_DEFAULT, COPY, EMOJI } from "../sport.js";
 import { settings, loadSessions, loadJourney, levelFromXp, currentStreakOf, loadDayProgress, countsAsTrained, settledXpByDate, dayXpKey, outcomeOf } from "../store.js";
-import { workoutInstances } from "../outcome.js";
+/* STREAK_WORK_FRACTION is imported, not re-typed. This file used to carry a
+   bare 0.75 beside the bar it was describing — the same class of mistake as
+   the XP formula it once kept its own copy of, which is why the card and the
+   ladder disagreed about one session. */
+import { workoutInstances, STREAK_WORK_FRACTION } from "../outcome.js";
 import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, edmontonISO, plural, refTime } from "../util.js";
-import { assembleCircuits, estimateSessionSecs, planResume } from "../engine.js";
+import { assembleCircuits, estimateSessionSecs, planResume, dayPlanState } from "../engine.js";
 
 /* Whole-plan stats for a day card.
 
@@ -18,13 +22,31 @@ import { assembleCircuits, estimateSessionSecs, planResume } from "../engine.js"
    main block runs 2–3 rounds, and ignored every rest. It is built from the
    same circuits the runner assembles and the same estimate the session screen
    shows, so the card and the workout can no longer disagree about the day. */
-export function planStats(dayKey) {
+/* A bare symbol like ⚡ (U+26A1) has no variation selector, so a browser is free
+   to draw it as monochrome TEXT — which, inside the white circle these icons sit
+   in, is a blank circle. Asking for emoji presentation costs one character and
+   removes the whole class. Only the legacy symbol block needs it; anything above
+   U+1F000 is emoji-only already. */
+export function emojiPresentation(ch) {
+  if (!ch) return ch;
+  const pts = [...ch];
+  if (pts.length !== 1) return ch;
+  const cp = pts[0].codePointAt(0);
+  return cp < 0x1F000 ? ch + "\uFE0F" : ch;
+}
+
+export function planStats(dayKey, light = null) {
   const key = typeof dayKey === "string" ? dayKey : null;
   const day = key ? DAYS[key] : dayKey;
   if (!day) return { mins: 0, moves: 0 };
   const resolvedKey = key || Object.keys(DAYS).find(k => DAYS[k] === day);
   if (!resolvedKey) return { mins: 0, moves: 0 };
-  const circuits = assembleCircuits(resolvedKey, day.spa ? "recovery" : (day.defaultLight || "green"));
+  /* THE LIGHT IT WAS TRAINED AT, when the caller knows it. This only ever asked
+     for the weekday's default, so every card was priced as a green day: a Red
+     session — a third of the size — was shown green's minutes and movement
+     count, and then told it had skipped the difference. */
+  const circuits = assembleCircuits(resolvedKey,
+    day.spa ? "recovery" : (light || day.defaultLight || "green"));
   if (!circuits.length) return { mins: 0, moves: 0 };
   // Distinct movements she will meet, counted once however many rounds they run.
   const moves = new Set(circuits.flatMap(c => c.exercises.map(ex => ex.name))).size;
@@ -255,9 +277,35 @@ export function buildTodayVM(state) {
      one honest answer to a sore body was the one that did not count. (Today
      itself still reads "today" until it is finished, which is why the record
      is asked for as well as the status.) */
-  const recoveredKeys = new Set(sessions.filter(s => outcomeOf(s).state === "recovery").map(s => s.dayKey).filter(Boolean));
-  const weekDoneCount = WEEK_ORDER.filter(k =>
-    statuses[k] === "done" || statuses[k] === "partial" || statuses[k] === "rest" || recoveredKeys.has(k)).length;
+  /* ONLY DAYS THAT HAVE ARRIVED, AND ONLY THIS WEEK'S RECORDS.
+
+     This line had lost both, and each cost a whole day of credit.
+
+     weekStatuses hands a spa day the word "rest" whether it is behind her or
+     ahead of her — the strip folds both into one "upcoming" cell so it never
+     showed there, but this chip read them apart and counted the future one.
+     Sunday is the only spa day, so an EMPTY week read 1/7 from Monday morning:
+     the app congratulating a ten-year-old for a rest day she had not reached.
+     Two days trained by Tuesday then read 3/7, which is what was reported.
+
+     And the recovery lookup ran over the WHOLE history, so a Wednesday recovery
+     pass from six weeks ago quietly added a Wednesday to every week after it,
+     for good. weekStatuses already scopes itself with currentWeekSessions();
+     this copy had simply lost the filter.
+
+     The denominator stays 7 because the strip above it has seven cells and 7/7
+     is the number she is chasing. A finished Recovery day still counts — today
+     itself reads "today" until it is done, which is why the record is asked for
+     as well as the status. */
+  const todayIdx = WEEK_ORDER.indexOf(todayKey);
+  const recoveredKeys = new Set(currentWeekSessions()
+    .filter(s => outcomeOf(s).state === "recovery").map(s => s.dayKey).filter(Boolean));
+  const weekDoneCount = WEEK_ORDER.filter((k, i) => i <= todayIdx && (
+    statuses[k] === "done" || statuses[k] === "partial" ||
+    statuses[k] === "rest" || recoveredKeys.has(k))).length;
+  // Counted once so the number and the word under it cannot disagree — this
+  // rendered "1 sessions" for as long as it has existed.
+  const trainedWorkouts = workoutInstances(sessions.filter(countsAsTrained)).length;
   const statChips = [
     /* The streak asks a stricter question than "did she train" — a day has to be
        a session, not a piece of one. Everything else here still counts any work.
@@ -269,30 +317,68 @@ export function buildTodayVM(state) {
     /* Sessions she has TRAINED, counted once each. This was `sessions.length` —
        every stored row, try-it rehearsals and GO-and-quits included, and a
        resumed day twice. */
-    { icon: EMOJI.sport, value: String(workoutInstances(sessions.filter(countsAsTrained)).length), label: "sessions", color: "var(--sea)" }
+    { icon: EMOJI.sport, value: String(trainedWorkouts), label: plural(trainedWorkouts, "session").replace(/^\d+\s*/, ""), color: "var(--sea)" }
   ];
   const journey = buildJourney();
 
-  const _BLOCK_DEFS = [
-    { key: "warmup", icon: "🎯", label: "Warm-Up" },
-    { key: "coordination", icon: "⚡", label: "Coordination" },
-    { key: "main", icon: "💪", label: "Main" },
-    { key: "finisher", icon: "🏁", label: "Finisher" },
-    { key: SKILL_BLOCK, icon: BLOCK_META[SKILL_BLOCK].emoji, label: COPY.skillBlockLabel }
-  ];
   const selDayFull = DAYS[selectedKey] || {};
-  const selDayBlocksRaw = selDayFull.blocks || {};
   const dayProg = loadDayProgress(selectedKey);   // same-day resume: blocks already done today
   const doneBlocks = (dayProg && dayProg.done) || [];
-  const blocks = _BLOCK_DEFS.map(bd => {
-    const exs = selDayBlocksRaw[bd.key] || [];
+  /* THE PANEL UNDER "REVIEW WHAT YOU DID" SHOWS WHAT SHE DID.
+
+     It was built from DAYS[day].blocks — the authored plan — so under that
+     heading it listed what she had been ASKED to do, with the same numbers
+     whether she had done all of it or none of it. Three consequences, and all
+     three were on screen at once in the report that started this:
+
+       · It walked a fixed list of five block names that has no `prep` entry, so
+         the two Prep moves vanished from the panel while the header above kept
+         counting them. That is the whole of "17 moves" over a panel summing to
+         15 — exactly the two Prep moves, nothing subtler.
+
+       · It showed Main once, at its per-round size, so a block that runs three
+         rounds read "4 moves · 3 min" next to a header minute total that had
+         counted all three. 17 moves can never take 27 minutes.
+
+       · It priced every day as the weekday's DEFAULT light, so a Red day — a
+         third the size — was shown the green plan and then told it had skipped
+         the difference.
+
+     So it is built from the circuits the runner assembles under the light the
+     day was actually trained under, and each row carries what the merged ledger
+     can prove about it. See dayPlanState in js/engine.js. */
+  const weekIsoDates = edmontonWeekISODates();
+  /* Dated by the day being LOOKED AT, not by today, so Monday's card can still
+     show what Monday did. Whether any of it is still finishable is a different
+     question and is answered separately below — the No-Debt rule. */
+  const planState = dayPlanState(selectedKey, { isoDate: weekIsoDates[selectedKey] });
+  const showActuals = planState.hasRecord;
+  const blocks = planState.blocks.map(b => {
+    const circuit = planState.circuits.find(c => c.block === b.block && c.name === b.name);
+    const exs = (circuit && circuit.exercises) || [];
     if (!exs.length) return null;
-    const open = !!state.expanded[bd.key];
-    const blockMins = Math.max(1, Math.round(exs.reduce((a, e) => a + refTime(e), 0) / 60));
+    const open = !!state.expanded[b.block];
+    const meta = BLOCK_META[b.block] || {};
     return {
-      key: bd.key, icon: bd.icon, name: bd.label, count: exs.length,
-      countLabel: plural(exs.length, "move"), mins: blockMins,
-      isBlockDone: doneBlocks.includes(bd.key),
+      key: b.block, icon: emojiPresentation(meta.emoji) || "•",
+      // The skill block is named by the app that owns it, never by the core.
+      name: b.block === SKILL_BLOCK ? COPY.skillBlockLabel : (BLOCK_LABEL[b.block] || b.name),
+      count: b.planned,
+      /* Rounds said out loud, because it is the only thing that makes the
+         block's share of the day's minutes add up for someone reading it. */
+      countLabel: b.rounds > 1
+        ? plural(b.perRound, "move") + " × " + b.rounds + " rounds"
+        : plural(b.perRound, "move"),
+      /* PERFORMED, for the same reason the header counts performed: a block she
+         went through a beat short of every clock is not a block she skipped,
+         and labelling it "skipped · 0 of 5" under a headline saying she did all
+         eighteen movements was the card arguing with itself. The tick is still
+         reserved for a block actually FINISHED; how short the rest fell is the
+         pace line's job, in words. */
+      doneLabel: showActuals ? b.performed + " of " + b.planned : "",
+      mins: b.mins,
+      isBlockDone: showActuals ? (b.planned > 0 && b.done >= b.planned) : doneBlocks.includes(b.block),
+      isBlockSkipped: showActuals && b.performed === 0,
       moves: exs.map(e => ({
         text: e.name + " · " + e.dose, cue: e.cue,
         transfer: e.transfer || ""
@@ -340,7 +426,7 @@ export function buildTodayVM(state) {
   // One computed number, not the authored timeLo/timeHi. Those were written
   // against a runner that counted 10 reps for every prescription, so the card
   // promised 18–22 minutes for work the session screen then estimated at 30.
-  const stats = planStats(selectedKey);
+  const stats = planStats(selectedKey, planState.hasRecord ? planState.light : null);
   const isSpaDay = !!(fullDay && fullDay.spa);
   let status = statuses[selectedKey];
   if (status === "rest" || status === "future") status = isSpaDay ? "rest" : "future";
@@ -354,7 +440,7 @@ export function buildTodayVM(state) {
   if (status === "today") {
     const base = {
       badgeLabel: "TODAY" + (tag ? " · " + tag : ""), title: fullDay.title,
-      mins: stats.mins, movesLabel: plural(stats.moves, "move"),
+      mins: stats.mins, movesLabel: plural(stats.moves, "distinct movement"),
       showChips: true, isActive: true, showCta: true, showSettings: true, ctaAction: "goSession"
     };
     dayView = { ...base, ctaLabel: isSpaDay ? "Start Recovery" : "Let's go!", ctaIcon: isSpaDay ? "🧘" : "▶️" };
@@ -370,18 +456,57 @@ export function buildTodayVM(state) {
        Check into a start with nothing in it. planResume applies the locked
        light and the banked moves exactly as startSession does, so this card
        cannot offer a session the engine will refuse. */
-    const dayLight = (dayProg && (dayProg.lockedLight || dayProg.light)) || "green";
-    const owed = dayProg ? planResume(selectedKey, dayLight).circuits.filter(c => c.block !== "prep") : [];
-    const remaining = [...new Set(owed.map(c => c.name))];
+    /* ASKED OF THE LOG, NOT OF THE CACHE.
+
+       The previous version read the day-progress record, which is local, is
+       deleted the moment a day completes, and expires at midnight. So a day
+       whose work was safely saved but whose record had gone — or had never been
+       written, because bankMove only opened one for a FINISHED move — came back
+       here as `owed = []` with `allDone` falling through to `!isPartial`, and
+       the card offered "Finish remaining moves" for a workout the engine would
+       then assemble from move one.
+
+       It is the training log's question and the log answers it: the day's ask
+       under the light it was trained at, minus every instance the merged ledger
+       can prove she finished. The same two inputs the XP price is computed from
+       — which is why "+360 XP earned" can no longer sit above "Still open:
+       Main Circuit". See dayPlanState in js/engine.js. */
+    /* WHAT THE RUNNER WOULD ACTUALLY RUN, asked of the runner's own function —
+       the card must never name work the engine will not offer, nor stay silent
+       about work it will. planResume now starts from the log and uses the
+       day-progress record only to subtract a sitting the log has not seen, so
+       the two cannot drift.
+
+       And only for TODAY. A partial never carries into a new day (the No-Debt
+       rule, js/store.js), so yesterday's leftovers are not resumable however
+       much the log remembers about them. This used to be left to the progress
+       record quietly expiring, which is why a day whose record went missing
+       EARLY was offered a resume that then opened the whole workout. It is
+       stated here instead. */
+    const isToday = selectedKey === todayKey;
+    const resumeCircuits = isToday
+      ? planResume(selectedKey, planState.light).circuits.filter(c => c.block !== "prep")
+      : [];
+    const remaining = [...new Set(resumeCircuits.map(c => c.name))];
     /* The MOVES she has left, not just the blocks they live in: "Still open:
        Warm-Up" reads like another whole session, while "Still to do: Wall
        Slides, Dead Bug" reads like the ten minutes it actually is. Taken from
        the circuits the resume would run, capped so the line stays a line. */
-    const owedMoves = [...new Set(owed.flatMap(c => c.exercises.map(e => e.name)))];
+    const owedMoves = [...new Set(resumeCircuits.flatMap(c => c.exercises.map(e => e.name)))];
     const skippedLabel = owedMoves.length && owedMoves.length <= 3 ? owedMoves.join(", ") : "";
-    // An ended-early day whose per-block record has aged out (day progress only
-    // survives the calendar day it was written) is never "all done" either.
-    const allDone = dayProg ? remaining.length === 0 : !isPartial;
+    /* The headline's question — is the plan finished — read off the log, so it
+       is still answerable tomorrow when nothing is resumable any more. */
+    const allDone = planState.hasRecord
+      ? planState.owed.filter(o => o.block !== "prep").length === 0
+      : !isPartial;
+    /* WHETHER THERE IS ANYTHING TO COME BACK TO decides the button, and it is a
+       question about the DAY, not about the copy. `allDone` above still reads
+       "is the plan finished" for the headline; this reads "would GO have
+       anything to run", and the two part company on a day whose leftovers are
+       no longer today's to finish — the No-Debt rule. Offering a resume there
+       was the bug: the label promised ten minutes and opened the whole
+       workout. */
+    const resumable = resumeCircuits.length > 0;
     const remainingLabel = remaining.join(", ");
     // Read what the session ACTUALLY earned instead of recomputing it here.
     // This line used to carry its own copy of the XP formula (moves × 10 + 40),
@@ -390,6 +515,11 @@ export function buildTodayVM(state) {
     // while the journey banked 360.
     const dayFragments = currentWeekSessions()
       .filter(s => s.dayKey === selectedKey && countsAsTrained(s));
+    /* Minutes she actually trained, beside the minutes the day asked for. Both
+       numbers have been on every saved record all along — `durationSecs` and
+       `plannedSecs` — and neither has ever been shown to her. */
+    const actualMins = Math.round(
+      dayFragments.reduce((a, f) => a + (Number(f.durationSecs) || 0), 0) / 60);
     const dayRecord = dayFragments[dayFragments.length - 1];
     /* XP is the DAY's, SETTLED — not the last sitting's, and not the sittings
        added up. Showing only the second understated a day trained in two goes;
@@ -417,13 +547,56 @@ export function buildTodayVM(state) {
     const streakEarned = dayInstance
       ? dayInstance.outcome.countsForStreak
       : !!(dayRecord && outcomeOf(dayRecord).countsForStreak);
-    const shortBy = dayInstance && Number.isFinite(dayInstance.outcome.workRatio)
-      ? Math.max(0, Math.round((0.75 - dayInstance.outcome.workRatio) * 100))
+    /* SAID IN MOVES, NOT IN PERCENTAGE POINTS OF A PLAN. A ten-year-old has no
+       unit for "21% more of the plan"; she has a unit for a move. The outcome
+       now reports what the ratio was measured against, so this can convert. */
+    const dayAsk = dayInstance && Number(dayInstance.outcome.expectedWork);
+    const movesShort = dayInstance && Number.isFinite(dayInstance.outcome.workRatio) && dayAsk > 0
+      ? Math.max(1, Math.ceil((STREAK_WORK_FRACTION - dayInstance.outcome.workRatio) * dayAsk - 1e-9))
       : 0;
+
+    /* WHAT THE XP ACTUALLY BOUGHT. "+360 XP earned" reads as "everything is
+       done" to anyone who has not read the XP rules, which is everyone, and it
+       sat directly above a line saying nothing was. It is the price of the main
+       ROUNDS she finished — say so, and the two sentences stop fighting. */
+    const dayRounds = dayInstance ? dayInstance.outcome.mainRoundsDone : 0;
+    const xpNote = (!earnedXp || isSpaDay) ? ""
+      : dayRounds > 0
+        ? "+" + earnedXp + " XP is for the " + plural(dayRounds, "main round") + " you finished."
+        : "+" + earnedXp + " XP for showing up.";
+
+    /* HOW WELL IT WAS HELD, as opposed to how much of it there was. Reported
+       from the merged day, never from one sitting. */
+    const dayPace = dayInstance ? dayInstance.outcome.pace : planState.pace;
+    const paceShort = (dayPace && dayPace.shortCount) || 0;
+    const paceWorst = dayPace && dayPace.worst;
+    const paceNote = !paceShort ? ""
+      : plural(paceShort, "move") + " came in short today"
+        + (paceWorst && paceWorst.name && Number.isFinite(paceWorst.ratio)
+            ? " — " + paceWorst.name + " at " + Math.round(paceWorst.ratio * 100) + "% of its hold." : ".");
+    const timeLabel = showActuals && actualMins
+      ? actualMins + " of " + stats.mins + " min"
+      : stats.mins + " min";
     dayView = {
       badgeLabel: shortU + (isPartial ? " · PARTLY DONE ✓" : " · COMPLETED ✓"),
-      title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"),
+      title: fullDay.title,
+      mins: stats.mins, minsLabel: timeLabel,
+      /* DISTINCT MOVEMENTS, and the word says so. This printed a bare "17
+         moves" beside a minute total that counted all three main rounds, so the
+         two numbers could not both be about the same thing — and the panel
+         below, which was missing Prep entirely, agreed with neither. */
+      /* Movements she was THERE for, not only the ones that cleared the 80%
+         floor. A day walked all the way through a beat early on every move read
+         "0 of 19 movements" beside a flame it had earned — the one number on
+         the card that called her a liar. What fell short is said by the pace
+         line underneath, in the words for it. */
+      movesLabel: (showActuals
+        ? planState.movementsPerformed + " of " + planState.movements + " movements"
+        : plural(planState.movements, "distinct movement")),
       earnedXpLabel: isSpaDay || !earnedXp ? "" : "+" + earnedXp + " XP earned",
+      xpNote,
+      paceBand: (dayPace && dayPace.band) || "",
+      paceNote,
       showChips: true, isDone: true,
       doneHeadline: isSpaDay ? "Nice reset — recovery complete!"
         : isPartial ? "You showed up — that counts!"
@@ -433,22 +606,27 @@ export function buildTodayVM(state) {
         // name what's left only when we actually still know.
         : isPartial ? ((streakEarned
             ? "This day counts toward your streak."
-            : "Your work is saved" + (shortBy ? " — about " + shortBy + "% more of the plan earns the streak." : ", but this one didn't earn a streak day."))
+            : "Your work is saved" + (movesShort
+                ? " — " + plural(movesShort, "more finished move") + " would have earned the streak."
+                : ", but this one didn't earn a streak day."))
           /* WHAT IS LEFT, BY NAME, and only while it is still today's to
              finish. A skipped move is never banked, so it comes back the
              moment she does — but only for the rest of the training day (the
              No-Debt rule, js/store.js), which is why this line is written off
              the day's live progress record rather than off the session log. */
-          + (skippedLabel ? " Still to do: " + skippedLabel + " — finish today and it's a full day."
+          + (!resumable ? ""
+             : skippedLabel ? " Still to do: " + skippedLabel + " — finish today and it's a full day."
              : remainingLabel ? " Still open: " + remainingLabel + " — finish today and it's a full day."
-             : (dayProg ? " Every block for today's light is done." : "")))
-        : (allDone ? "Every block is checked off. Want extra reps?" : ("You skipped " + remainingLabel + " — finish up for XP.")),
+             : " Every block for today's light is done."))
+        : (allDone ? "Every block is checked off. Want extra reps?"
+           : resumable ? ("You skipped " + remainingLabel + " — finish up for XP.")
+           : "Every round you finished is banked."),
       showCta: true,
-      ctaLabel: isSpaDay ? "Do it again" : (allDone ? "Look at the moves" : "Finish remaining moves"),
-      ctaIcon: isSpaDay ? "🧘" : (allDone ? "🧪" : "▶️"),
-      ctaVariant: (isSpaDay || allDone) ? "secondary" : "primary",
-      ctaSubtext: isSpaDay ? "Doesn't change progress" : (allDone ? "The workout screen, nothing counting down, nothing recorded" : ""),
-      ctaAction: (isSpaDay || allDone) ? "goExplore" : "goSession",
+      ctaLabel: isSpaDay ? "Do it again" : (resumable ? "Finish remaining moves" : "Look at the moves"),
+      ctaIcon: isSpaDay ? "🧘" : (resumable ? "▶️" : "🧪"),
+      ctaVariant: (isSpaDay || !resumable) ? "secondary" : "primary",
+      ctaSubtext: isSpaDay ? "Doesn't change progress" : (resumable ? "" : "The workout screen, nothing counting down, nothing recorded"),
+      ctaAction: (isSpaDay || !resumable) ? "goExplore" : "goSession",
       showSettings: false
     };
   } else if (status === "missed") {
@@ -460,7 +638,7 @@ export function buildTodayVM(state) {
       .filter(s => s.dayKey === selectedKey && edmontonISO(s.isoDate) === missedIso).pop();
     const warmupDone = !!(missedRecord && (missedRecord.ledger || [])
       .some(l => l && l.block === "warmup" && l.status === "done"));
-    dayView = { badgeLabel: shortU + " · CATCH UP", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"), showChips: true, isMissed: true, showCta: true, ctaLabel: "Catch Up Now", ctaIcon: "↺", showSettings: false, ctaAction: "goSession",
+    dayView = { badgeLabel: shortU + " · CATCH UP", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "distinct movement"), showChips: true, isMissed: true, showCta: true, ctaLabel: "Catch Up Now", ctaIcon: "↺", showSettings: false, ctaAction: "goSession",
       missedSub: warmupDone
         ? "You still got the warm-up in — every streak has bumps."
         : "Every streak has bumps. Pick it back up whenever you're ready." };
@@ -468,7 +646,7 @@ export function buildTodayVM(state) {
     const recov = (fullDay && fullDay.recovery) || [];
     dayView = {
       badgeLabel: shortU + " · RECOVERY DAY", title: fullDay.title,
-      mins: stats.mins, movesLabel: plural(stats.moves, "move"),
+      mins: stats.mins, movesLabel: plural(stats.moves, "distinct movement"),
       showChips: true, isRest: true, showCta: true,
       ctaLabel: "Start Recovery", ctaIcon: "🧘", ctaAction: "goSession",
       showSettings: false,
@@ -478,7 +656,7 @@ export function buildTodayVM(state) {
     const hasPlan = stats.moves > 0;
     if (hasPlan) {
       dayView = {
-        badgeLabel: shortU + " · UPCOMING", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"),
+        badgeLabel: shortU + " · UPCOMING", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "distinct movement"),
         showChips: true, isPreview: true, showCta: true, ctaVariant: "secondary",
         ctaLabel: "Start Early", ctaIcon: "▶️",
         ctaSubtext: "Can’t wait? Starting now still counts for " + DAY_LONG[selectedKey] + ".",

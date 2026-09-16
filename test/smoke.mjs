@@ -1596,8 +1596,31 @@ ok(store.xpForSession(doseRow(timedPartial(15, 3, 30), 20)) > 0,
 /* Enough dose still earns it, whether it arrives whole or in parts. */
 ok(store.countsForStreak(doseRow(timedPartial(20, 24, 30), 20)) === true,
    "twenty moves at four fifths of the dose clears the bar on dose alone");
-ok(store.countsForStreak(doseRow(timedPartial(20, 21, 30), 20)) === false,
-   "and seventy percent of every dose does not");
+
+/* --- SHE FINISHED THE PLAN, SO THE DAY COUNTS -----------------------------
+   This used to assert the opposite: seventy percent of every dose earned
+   nothing, so a girl who walked through the whole workout a beat early on each
+   move scored 0.70, was shown PARTLY DONE, was paid her XP, and watched the
+   flame refuse to move. There was no way to explain that to her, because from
+   where she stood she had done the entire session.
+
+   Reaching the end of the plan is now the second way to earn the day: every
+   move the plan asked for present, none SKIPPED, and none below half its dose.
+   The floor is what keeps the old hole shut — see the assertions below it. */
+ok(store.countsForStreak(doseRow(timedPartial(20, 21, 30), 20)) === true,
+   "seventy percent of every dose, with nothing skipped and nothing missing, IS a training day");
+ok(store.countsForStreak(doseRow(timedPartial(20, 16, 30), 20)) === true,
+   "so is just over half of every dose — she was there for all of it");
+ok(store.countsForStreak(doseRow(timedPartial(20, 12, 30), 20)) === false,
+   "but forty percent of every move is under the floor and earns nothing");
+ok(store.countsForStreak(doseRow(timedPartial(15, 21, 30), 20)) === false,
+   "and fifteen moves of a twenty-move plan is not the plan, however well they went");
+const oneSkipped = timedPartial(20, 21, 30);
+oneSkipped[0] = { ...oneSkipped[0], status: "skipped" };
+ok(store.countsForStreak(doseRow(oneSkipped, 20)) === false,
+   "one skipped move is not a finished plan — a skip is not a short move");
+ok(outcome.outcomeOf(doseRow(timedPartial(20, 21, 30), 20)).wholePlanAttempted === true,
+   "and the outcome says WHICH door the day came through, so a screen can say so");
 
 /* A dose we cannot prove is not a dose we pay for. */
 ok(outcome.streakCredit({ status: "partial", driver: "time", actualSecs: 10, plannedSecs: 0 }) === 0,
@@ -4388,6 +4411,156 @@ store.setOnlineForTest(true);
   localStorage.clear(); store.migrate();
   store.saveSession(frag("w-open", [w("A", "done"), w("B", "skipped")]));
   ok(tvm.weekStatuses()[day] === "partial", "a day left unfinished still reads partly done");
+  localStorage.clear(); store.migrate();
+}
+
+/* =====================================================================
+   THE WEEK CHIP IS HONEST ABOUT WHICH DAYS HAVE HAPPENED
+
+   Reported as "this week says 3/7 and today is Tuesday". Two separate leaks,
+   and the first one is visible with no history at all: weekStatuses hands a spa
+   day the word "rest" whether it is behind her or ahead of her, and this chip
+   counted "rest" as achieved — so an EMPTY week read 1/7 from Monday morning,
+   because Sunday is the only spa day. Train Monday and Tuesday and it reads
+   3/7. The second leak: the recovery lookup ran over the whole history, so one
+   Wednesday recovery pass six weeks ago added a Wednesday to every week after.
+   ===================================================================== */
+{
+  const unpin = pinClock("2026-09-15T18:00:00Z");     // a Tuesday, noon Edmonton
+  localStorage.clear(); store.migrate();
+  const chip = () => tvm.buildTodayVM({ selectedDay: "tuesday", expanded: {}, isWide: true })
+    .statChips.find(c => c.label === "this week").value;
+  ok(chip() === "0/7",
+     "an empty week reads 0/7 on a Tuesday — Sunday used to pay the chip from Monday morning");
+
+  const full = (dayKey, iso) => {
+    const circuits = engine.assembleCircuits(dayKey, "green");
+    const ledger = [];
+    circuits.forEach(c => { for (let r = 1; r <= c.rounds; r++) c.exercises.forEach(e => {
+      if (e.rounds && r > e.rounds) return;
+      ledger.push({ name: e.name, block: c.block, round: (c.roundBase ? c.roundBase + r - 1 : r),
+        status: "done", driver: "time", actualSecs: 30, plannedSecs: 30 });
+    }); });
+    return { app: "swimming", dayKey, isoDate: iso, dayIso: iso.slice(0, 10),
+      workoutInstanceId: "w-" + dayKey, xpVersion: store.XP_VERSION,
+      outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main", lightResult: "green",
+      roundsDone: 3, roundsPlanned: 3, dayRoundsPlanned: 3,
+      expectedWork: engine.countExpectedWork(circuits),
+      expectedByRound: engine.countExpectedByRound(circuits),
+      completedFully: true, durationSecs: 1500, plannedSecs: 1620, ledger };
+  };
+  store.saveSession(full("monday", "2026-09-14T18:00:00.000Z"));
+  store.saveSession(full("tuesday", "2026-09-15T18:00:00.000Z"));
+  ok(chip() === "2/7", "a Monday and a Tuesday trained read 2/7, not 3/7");
+  ok(store.currentStreakOf(store.loadSessions()) === 2,
+     "and two days running is a streak of two");
+
+  /* A recovery pass from another week is not this week's. */
+  store.saveSession({ ...full("wednesday", "2026-08-12T18:00:00.000Z"),
+    workoutInstanceId: "old-rec", sessionType: "recovery" });
+  ok(chip() === "2/7",
+     "a Wednesday recovery pass from a month ago adds nothing to this week — it used to, permanently");
+  unpin();
+  localStorage.clear(); store.migrate();
+}
+
+/* A FINISHED RECOVERY DAY STILL COUNTS — the intent the old line was written
+   for, which the fix must not throw out with the bathwater. */
+{
+  const unpin = pinClock("2026-09-20T18:00:00Z");     // a Sunday, noon Edmonton
+  localStorage.clear(); store.migrate();
+  const chip = () => tvm.buildTodayVM({ selectedDay: "sunday", expanded: {}, isWide: true })
+    .statChips.find(c => c.label === "this week").value;
+  ok(chip() === "0/7", "Sunday morning with nothing done is 0/7, not 1/7");
+  const menu = engine.assembleCircuits("sunday", "recovery");
+  const recLedger = [];
+  menu.forEach(c => c.exercises.forEach(e => recLedger.push({
+    name: e.name, block: c.block, round: 1, status: "done",
+    driver: "time", actualSecs: 60, plannedSecs: 60 })));
+  store.saveSession({ app: "swimming", dayKey: "sunday", isoDate: new Date().toISOString(),
+    dayIso: "2026-09-20", workoutInstanceId: "sun-rec", xpVersion: store.XP_VERSION,
+    outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "recovery", lightResult: "recovery",
+    roundsDone: 0, roundsPlanned: 0, expectedWork: recLedger.length,
+    completedFully: true, durationSecs: 600, plannedSecs: 600, ledger: recLedger });
+  ok(chip() === "1/7",
+     "and a FINISHED recovery day counts — the chip could never read 7/7 while the honest answer to a sore body was the one that did not count");
+  unpin();
+  localStorage.clear(); store.migrate();
+}
+
+/* =====================================================================
+   COMING BACK BEFORE MIDNIGHT STILL EARNS THE WHOLE DAY
+
+   The budget lives in the training log, not in the day-progress record the card
+   stopped reading — so demoting that record must not cost her the catch-up.
+   Asserted here rather than reasoned about.
+   ===================================================================== */
+{
+  const unpin = pinClock("2026-09-15T18:00:00Z");
+  localStorage.clear(); store.migrate();
+  const circuits = engine.assembleCircuits("tuesday", "green");
+  const rowsFor = (blocks, rounds) => {
+    const out = [];
+    circuits.forEach(c => {
+      if (!blocks.includes(c.block)) return;
+      for (let r = 1; r <= c.rounds; r++) {
+        if (c.block === "main" && !rounds.includes(r)) continue;
+        c.exercises.forEach(e => {
+          if (e.rounds && r > e.rounds) return;
+          out.push({ name: e.name, block: c.block, round: (c.roundBase ? c.roundBase + r - 1 : r),
+            status: "done", driver: "time", actualSecs: 30, plannedSecs: 30 });
+        });
+      }
+    });
+    return out;
+  };
+  const frag = (iso, ledger, roundsDone, done) => ({
+    app: "swimming", dayKey: "tuesday", isoDate: iso, dayIso: "2026-09-15",
+    workoutInstanceId: "w-split", xpVersion: store.XP_VERSION,
+    outcomeVersion: outcome.OUTCOME_VERSION, sessionType: "main", lightResult: "green",
+    roundsDone, roundsPlanned: 3, dayRoundsPlanned: 3,
+    expectedWork: engine.countExpectedWork(circuits),
+    expectedByRound: engine.countExpectedByRound(circuits),
+    completedFully: done, endedEarly: !done, durationSecs: 800, plannedSecs: 1620, ledger });
+
+  const morning = frag("2026-09-15T14:00:00.000Z", rowsFor(["warmup", "coordination", "main"], [1]), 1, false);
+  store.saveSession(morning);
+  const paid1 = store.claimSessionXp(morning);
+  store.patchSession(store.sessionKey(morning), { xpEarned: paid1 });
+  ok(paid1 === 180, "one main round in the morning is paid 180");
+
+  const evening = frag("2026-09-15T23:00:00.000Z", rowsFor(["main", "prep", "finisher", store.SKILL_BLOCK || "swimskill"], [2, 3]), 2, true);
+  store.saveSession(evening);
+  const paid2 = store.claimSessionXp(evening);
+  store.patchSession(store.sessionKey(evening), { xpEarned: paid2 });
+  ok(paid2 === 180,
+     "the evening sitting finishes the other two rounds and is paid the REMAINDER, not its own 270 — a day pays for a day");
+  ok(store.settledXpByDate(store.loadSessions()).get("2026-09-15") === 360,
+     "so the date settles on exactly one full green day");
+  const day = outcome.workoutInstances(store.loadSessions())[0];
+  ok(day.outcome.mainRoundsDone === 3, "three main rounds, counted across both sittings");
+  ok(day.outcome.countsForStreak === true, "and the day earns the flame");
+  unpin();
+  localStorage.clear(); store.migrate();
+}
+
+/* =====================================================================
+   THE WEEK, DAY BY DAY — seven columns, one per weekday, and a day that
+   has not happened says so rather than showing a row of zeros.
+   ===================================================================== */
+{
+  const unpin = pinClock("2026-09-15T18:00:00Z");
+  localStorage.clear(); store.migrate();
+  const w = pvm.buildProgressVM({ progressScope: "4w", logScope: "week" }).weekDays;
+  ok(w.length === 7, "one column per weekday");
+  ok(w[0].key === "monday" && w[6].key === "sunday", "Monday first, Sunday last — the calendar week");
+  ok(w[1].isToday === true, "and Tuesday is marked as today");
+  ok(w.every(d => !d.hasWork), "with no history, no day claims any work");
+  ok(w[4].plannedLabel === "—" && w[4].movesLabel === "—",
+     "a Friday that has not happened shows a dash, not a zero — it has not failed anything");
+  ok(pscreen.progressScreen(pvm.buildProgressVM({ progressScope: "4w", logScope: "week" })).includes("DAY STREAK"),
+     "and the screen still renders with the streak in the corner of the table");
+  unpin();
   localStorage.clear(); store.migrate();
 }
 

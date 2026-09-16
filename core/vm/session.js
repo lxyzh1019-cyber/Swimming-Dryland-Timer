@@ -8,7 +8,7 @@ import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, S
 import { SKILL_BLOCK, COPY } from "../sport.js";
 import { fmtMMSS, exercisePhotoUrl, photoSources, plural } from "../util.js";
 import { loadSessions } from "../store.js";
-import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION } from "../outcome.js";
+import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION, paceBand } from "../outcome.js";
 
 /* What changes at the end of this segment — named before she gets there, so the
    switch is never a surprise she hears about only if the voice is on. */
@@ -138,6 +138,24 @@ export function buildSessionVM(state) {
       : `You got ${donePercent}% of today done${skippedPhrase ? ", and " + skippedPhrase : ""}. Everything you DID do is saved — the moves, the minutes and the XP for them. Today didn't reach the streak${Number.isFinite(streakShortBy) && streakShortBy > 0 ? ` — about ${plural(streakShortBy, "more move")} would do it` : ""}. Come back later today and finish the rest; it still counts for today. 💛`;
   const completionNote = completionState === "partial" ? partialNote : null;
 
+  /* HOW WELL SHE HELD IT, which is a different question from how much of it
+     there was, and one the finish screen has never asked. A thirty-second hold
+     let go at twelve seconds and one held the whole way both left the screen
+     saying "done". The bands come off the same ledger everything else here
+     reads — see paceReport in js/outcome.js — and they change no XP and no
+     streak day: this is a coaching line, not a verdict. */
+  const pace = liveOutcome.pace || null;
+  const paceCounts = pace ? pace.counts : null;
+  const paceNote = !pace || !pace.graded ? null
+    : pace.shortCount === 0
+      ? (paceCounts.amber
+          ? `Every move was there. ${plural(paceCounts.green, "hold")} full, ${paceCounts.amber} nearly — good, steady work.`
+          : "Every move held its full time. That's the whole dose. 💪")
+      : `${plural(pace.shortCount, "move")} came in short today`
+        + (pace.worst && pace.worst.name && Number.isFinite(pace.worst.ratio)
+            ? ` — ${pace.worst.name} at ${Math.round(pace.worst.ratio * 100)}% of its hold.` : ".")
+        + " Holding the whole time is what makes it count in the water.";
+
   /* A DAY SHE CAME BACK AND FINISHED reads differently from one done in a
      single go, and should: coming back is the harder thing. bankedCredit is
      only ever above zero on a resumed sitting. */
@@ -248,6 +266,25 @@ export function buildSessionVM(state) {
 
   // Exercise timeline (left pane list)
   const BLOCK_COLORS = { warmup: "var(--coral)", coordination: "var(--sun-ink)", main: "var(--sea)", prep: "var(--grape)", finisher: "var(--mint-ink)", [SKILL_BLOCK]: "var(--aqua-ink)", recovery: "var(--grape)" };
+  /* HOW WELL EACH FINISHED MOVE WAS HELD, on the list she is already looking at.
+
+     The timeline showed a tick for every move that ended, and a twelve-second
+     version of a thirty-second hold got the same tick as the real thing. The
+     ledger has always known the difference. The dot beside the tick is that
+     difference, in the same four colours the finish screen and the Grown-up
+     Zone use, so nobody has to learn a second vocabulary. Nothing here changes
+     a status: a `done` move is still done, still paid, still a streak unit.
+     Only the colour says how close it was. */
+  const PACE_DOT = { green: "var(--mint)", amber: "var(--sun)", yellow: "var(--coral)", red: "var(--stop)" };
+  const paceByRow = new Map();
+  (sess.ledger || []).forEach(l => {
+    if (!l || l.status === "skipped") return;
+    const band = paceBand(l);
+    if (!band) return;
+    const key = l.ci + "-" + l.ei;
+    // The move she is standing on is the one worth showing: latest wins.
+    paceByRow.set(key, band);
+  });
   const sessionExList = [];
   circuits.forEach((c, ci) => {
     sessionExList.push({ isHeader: true, name: c.name + (c.rounds > 1 ? ` ×${c.rounds}` : ""), color: BLOCK_COLORS[c.block] || "var(--ink-soft)" });
@@ -262,6 +299,13 @@ export function buildSessionVM(state) {
           + (st === "done" ? "background:var(--mint);color:#fff;" : isCur ? "background:var(--aqua);color:#fff;" : "background:var(--surface-2);color:var(--ink-soft);"),
         nameStyle: "flex:1;min-width:0;font-weight:800;color:" + (st === "done" ? "var(--ink-faint);text-decoration:line-through;" : isCur ? "var(--ink);" : "var(--ink-soft);"),
         statusIcon: st === "done" ? "✓" : st === "skipped" ? "⏭" : isCur ? "▶" : "",
+        paceDotStyle: paceByRow.has(ci + "-" + ei)
+          ? "width:8px;height:8px;border-radius:50%;flex-shrink:0;background:" + PACE_DOT[paceByRow.get(ci + "-" + ei)] + ";"
+          : "",
+        paceTitle: paceByRow.has(ci + "-" + ei)
+          ? { green: "Held the full time", amber: "Almost the full time",
+              yellow: "Short of the full time", red: "Well short of the full time" }[paceByRow.get(ci + "-" + ei)]
+          : "",
         secColor: st === "done" ? "var(--mint)" : isCur ? "var(--aqua)" : "var(--ink-faint)"
       });
     });
@@ -347,6 +391,9 @@ export function buildSessionVM(state) {
 
     sessionDayTitle: day.title || "",
     elapsedDisplay: fmtMMSS(sess.elapsed),
+    paceNote,
+    paceBand: (pace && pace.band) || "",
+    paceCounts,
     sessionPlannedDisplay: Math.max(1, Math.round(sess.plannedSecs / 60)) + " min",
     sessionTimePct, roundLine, roundDots,
     progressLabel, progressValue: Math.min(doneCount, Math.max(1, totalExCount)), progressMax: Math.max(1, totalExCount),
