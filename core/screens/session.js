@@ -360,7 +360,7 @@ function completeScreen(vm) {
         ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:44px;height:44px;object-fit:contain;flex-shrink:0;" alt=""`)}
         <div>
           <div style="font-family:var(--font-display);font-weight:600;font-size:18px;color:var(--ink);">Coach's Quiz 🧠</div>
-          <div style="font-size:12px;font-weight:800;color:var(--ink-soft);">${COPY.sessionQuizIntro}</div>
+          <div style="font-size:12px;font-weight:800;color:var(--ink-soft);">${vm.quizIntro || COPY.sessionQuizIntro}</div>
         </div>
       </div>
       <div style="font-weight:800;font-size:16px;color:var(--ink);line-height:1.4;">${vm.quizQuestion}</div>

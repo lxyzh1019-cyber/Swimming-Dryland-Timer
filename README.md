@@ -66,9 +66,9 @@ the **Splash — Kids Swim Training** design system.
   Quiz at the end of a session prices off the same ledger. The bank asks about
   every move three ways (cue / watch-out / fix), **about every ocean rank she
   has unlocked two ways** — what that rank taught her, and its one true marine
-  fact — and **about training itself**: attitude, efficiency, and why results
-  come from repeating the same movement rather than a similar one. So the pool
-  grows as she climbs. Locked ranks are never asked: that
+  fact — and **about training itself**: eighteen questions on attitude,
+  efficiency, and why results come from repeating the same movement rather than
+  a similar one. So the pool grows as she climbs. Locked ranks are never asked: that
   would spoil the mystery card and quiz her on a chapter she has not been shown.
   The bank is finite, so lifetime quiz XP is capped — the Grown-up Zone's Analytics tab
   shows how much of that budget is spent.
@@ -84,6 +84,15 @@ the **Splash — Kids Swim Training** design system.
   it stays closed until the tier-1 question it builds on is mastered. Nothing to
   configure; it moves at her pace. The whole bank still counts toward the mastery
   total and the lifetime ceiling, so neither number moves when a tier opens.
+- **The training principles reach her, rather than waiting to be found.** Left
+  to the draw they were four entries in a bank of eighty-nine — about one card
+  in twenty — so the thing the app most wants her to understand was the thing
+  she was least likely to be asked. One Quiz Deck slot is now reserved for one,
+  and they are in the end-of-session rotation too, which is the card she sees
+  whether or not she opens the deck: roughly two of them a training week, with
+  the first inside three sessions. A principle keeps the SAME ledger key in both
+  places — one question, one key, wherever it is asked — so it can never be paid
+  for twice or counted twice toward mastery.
 - **One card is about today.** Each deck opens with a question built from the
   session she just trained — a move she herself graded wobbly, the light her own
   Body Check produced, the word she picked after round one. It renews daily, so

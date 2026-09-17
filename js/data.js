@@ -1125,6 +1125,78 @@ export const TRAINING_QS = [
       { t: "Yes — same muscles means the same result", ok: false },
       { t: "Yes, as long as the new one is harder", ok: false } ] },
 
+  { id: "comeback", kind: "attitude", tier: 1,
+    q: "You missed two sessions because you were sick. What happens now?",
+    why: "Missed days are gone, not owed. Picking up at the day your body is on today is what gets you back fastest — doubling up just buys a worse week.",
+    opts: [
+      { t: "Pick up at the day Coach gives me today", ok: true },
+      { t: "Add the two I missed on top of this week", ok: false },
+      { t: "Start the whole plan again from week one", ok: false } ] },
+
+  { id: "helpask", kind: "attitude", tier: 2, after: "honest",
+    q: "Something hurts and you can't tell whether it's the bad kind. What's the rule?",
+    why: "Sore that settles in a minute is training. Anything that changes how you move is a grown-up's call, not yours — that's the whole point of the Body Check.",
+    opts: [
+      { t: "Tell a grown-up before I train it — they decide, not me", ok: true },
+      { t: "Train around it and see whether it goes away", ok: false },
+      { t: "Stop training altogether until it's completely gone", ok: false } ] },
+
+  { id: "compare", kind: "attitude", tier: 1,
+    q: "Someone in your squad is faster than you this month. What should that change about your training?",
+    why: "Your plan is built on what your body can do now. Copying someone else's week is how you end up doing their training badly instead of yours well.",
+    opts: [
+      { t: "Nothing — my plan is built on what my body can do now", ok: true },
+      { t: "I should copy whatever they're doing", ok: false },
+      { t: "I should push harder than my plan says", ok: false } ] },
+
+  { id: "warmup", kind: "efficiency", tier: 1,
+    q: "Why does every session start with the same warm-up?",
+    why: "The warm-up isn't filler before the real work — it's what makes the real work worth doing. Cold, your shapes are worse, so you'd be practising worse shapes.",
+    opts: [
+      { t: "It gets me ready to make good shapes, so the main set counts", ok: true },
+      { t: "It uses up time before the hard part starts", ok: false },
+      { t: "It's the part that actually makes me stronger", ok: false } ] },
+
+  { id: "halfrange", kind: "efficiency", tier: 2, after: "clean6",
+    q: "You can do a move properly for 6 reps, but the plan says 10. What do you do?",
+    why: "Quality sets the number. Four rough reps on the end don't add four reps of training — they add four reps of the wrong shape.",
+    opts: [
+      { t: "Do the ones I can do properly and say so honestly", ok: true },
+      { t: "Do all 10, however they come out", ok: false },
+      { t: "Do 6 and tell the app it was 10", ok: false } ] },
+
+  { id: "tempo", kind: "efficiency", tier: 2, after: "clean6",
+    q: "Why does Coach count the seconds instead of letting you go at your own speed?",
+    why: "The speed IS part of the movement. A slow lower and a fast lower are two different exercises, so rushing it means practising something the plan never asked for.",
+    opts: [
+      { t: "The speed is part of the exercise — faster is a different exercise", ok: true },
+      { t: "So the session always finishes at the same time", ok: false },
+      { t: "To make it harder than it really needs to be", ok: false } ] },
+
+  { id: "missweek", kind: "results", tier: 1,
+    q: "You skip a whole week. What does that actually cost?",
+    why: "A movement fades when you stop repeating it. Missing one rep costs a rep; missing a week costs some of what the weeks before it built.",
+    opts: [
+      { t: "Some of what the repeating had already built", ok: true },
+      { t: "Nothing, as long as I train twice as hard afterwards", ok: false },
+      { t: "Only the XP I would have earned that week", ok: false } ] },
+
+  { id: "automatic", kind: "results", tier: 2, after: "sameagain",
+    q: "How do you know a movement has actually become automatic?",
+    why: "Automatic is about attention, not effort. When the shape holds while you're thinking about something else, it's yours.",
+    opts: [
+      { t: "I can do it right without thinking about the cue", ok: true },
+      { t: "It doesn't feel hard any more", ok: false },
+      { t: "I can do more reps than I used to", ok: false } ] },
+
+  { id: "harder", kind: "results", tier: 2, after: "sameagain",
+    q: "You want to make a move harder. Which one is still the SAME movement?",
+    why: "Same shape, more challenge — that's progress. Change the shape and you haven't made it harder, you've started a different skill.",
+    opts: [
+      { t: "The same shape, done slower and with more weight", ok: true },
+      { t: "A new exercise that works the same muscles", ok: false },
+      { t: "The same muscles, but on a machine instead", ok: false } ] },
+
   { id: "gotboring", kind: "results", tier: 2, after: "sameagain",
     q: "Six weeks of Glute Bridge March and it feels easy now. What should change?",
     why: "Same movement, more challenge — slower, longer, heavier. Trading it for a new exercise throws away six weeks of learning and starts a different skill from zero.",

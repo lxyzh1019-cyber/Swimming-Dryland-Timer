@@ -183,11 +183,29 @@ export function buildQuizDeck(n = 8) {
   bank.forEach(entry => {
     (led[quizQuestionKey(entry[0].name, entry[1])] || {}).mastered ? known.push(entry) : fresh.push(entry);
   });
+  // One slot is RESERVED for a training principle. Left to the draw they were
+  // four entries in a bank of eighty-nine — about one card in twenty — so the
+  // thing the app most wants her to understand (results come from repeating the
+  // same movement, not a similar one) was the thing she was least likely to be
+  // asked. Unmastered first, same rule as the rest of the deck.
+  const principles = bank.filter(([, k]) => k === "principle");
+  const freshPrinciples = principles.filter(([m, k]) =>
+    !(led[quizQuestionKey(m.name, k)] || {}).mastered);
+  const principleEntry = shuffle(freshPrinciples.length ? freshPrinciples : principles)[0] || null;
+
   // The card about today goes first and is never crowded out by the draw.
   const todayQ = makeSessionQ(pool);
-  const room = Math.max(1, n - (todayQ ? 1 : 0));
-  const picked = [...shuffle(fresh), ...shuffle(known)].slice(0, room);
-  const qs = shuffle(picked).map(([m, k]) => makeQ(m, k, (k === "story" || k === "fact") ? ranks : pool));
+  const reserved = (todayQ ? 1 : 0) + (principleEntry ? 1 : 0);
+  const drawn = [...shuffle(fresh), ...shuffle(known)]
+    .filter(e => !(principleEntry && e[0].name === principleEntry[0].name && e[1] === principleEntry[1]))
+    .slice(0, Math.max(1, n - reserved));
+  const qs = shuffle(drawn).map(([m, k]) => makeQ(m, k, (k === "story" || k === "fact") ? ranks : pool));
+  // The principle sits in the body of the deck rather than at the front, so the
+  // deck still opens on her own session.
+  if (principleEntry) {
+    qs.splice(Math.min(qs.length, 1 + Math.floor(Math.random() * Math.max(1, qs.length - 1))), 0,
+              makeQ(principleEntry[0], principleEntry[1], pool));
+  }
   return {
     qs: todayQ ? [todayQ, ...qs] : qs,
     idx: 0, picks: [], done: false, scored: false,

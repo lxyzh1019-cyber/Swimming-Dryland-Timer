@@ -5,7 +5,7 @@
 
 import { sess, refTime, screenRepsDetail, pausedByBackground, canGoBack } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, SESSION_QUIZ,
-         REFLECT_WELL, REFLECT_NEXT, exWork, videoSearchUrl } from "../data.js";
+         TRAINING_QS, REFLECT_WELL, REFLECT_NEXT, exWork, videoSearchUrl } from "../data.js";
 import { SKILL_BLOCK, COPY } from "../sport.js";
 import { fmtMMSS, exercisePhotoUrl, photoSources, plural } from "../util.js";
 import { loadSessions, loadQuiz, quizQuestionKey } from "../store.js";
@@ -38,17 +38,52 @@ const MOOD_ACK = {
    loud". They come from each app's own data.js now. */
 
 
-/* The Coach's Quiz questions she can be asked today: every tier-1 question, plus
-   the tier-2 ones whose `after` question she has already mastered. A tier-2 card
-   asks what to CHANGE when something felt wrong, which is not a fair question
-   until she knows what it was supposed to feel like. Falls back to the whole
-   bank if a data edit ever leaves nothing unlocked — a session must always have
-   a question to end on. */
+/* Subtitles for the training-principle cards — the move subtitle in sport.js
+   asks how today's work helps her sport, which is not what a principle card is
+   asking. */
+const QUIZ_INTRO_PRINCIPLE = {
+  attitude:   "How you train matters as much as what you train.",
+  efficiency: "Getting more out of the same half hour.",
+  results:    "Why the training works — and what breaks it."
+};
+
+/* Everything the end-of-session card can ask: the Coach's Quiz about the moves,
+   AND the training principles — attitude, efficiency, and why results come from
+   repeating the same movement rather than a similar one.
+
+   The principles used to live only in the Quiz Deck, which she has to choose to
+   open, and came up on roughly one card in twenty. So the one thing the app most
+   wanted her to understand was the thing she was least likely to be asked. They
+   are in the automatic rotation now.
+
+   Each carries the ledger key it is priced by, and a principle keeps the SAME
+   key here as in the Quiz Deck — one question, one key, wherever it is asked, so
+   it can never be paid for twice or counted twice toward mastery. */
+export function coachQuizPool() {
+  const moves = SESSION_QUIZ.map(q => ({
+    ...q, topic: "move",
+    ledgerKey: quizQuestionKey("coach", q.id),
+    prereqKey: q.after ? quizQuestionKey("coach", q.after) : null
+  }));
+  const principles = (TRAINING_QS || []).map(q => ({
+    ...q, topic: "principle",
+    ledgerKey: quizQuestionKey("Principle: " + q.id, "principle"),
+    prereqKey: q.after ? quizQuestionKey("Principle: " + q.after, "principle") : null
+  }));
+  return [...moves, ...principles];
+}
+
+/* The questions she can be asked today: every tier-1 question, plus the tier-2
+   ones whose prerequisite she has already mastered. A tier-2 card asks what to
+   CHANGE when something felt wrong, which is not a fair question until she knows
+   what it was supposed to feel like. Falls back to the whole pool if a data edit
+   ever leaves nothing unlocked — a session must always have a question to end
+   on. */
 export function unlockedSessionQuiz(quiz) {
   const led = (quiz || loadQuiz()).qLedger || {};
-  const open = SESSION_QUIZ.filter(q =>
-    !q.after || (led[quizQuestionKey("coach", q.after)] || {}).mastered);
-  return open.length ? open : SESSION_QUIZ;
+  const all = coachQuizPool();
+  const open = all.filter(q => !q.prereqKey || (led[q.prereqKey] || {}).mastered);
+  return open.length ? open : all;
 }
 
 /* The day's Coach's Quiz question. Asks something she has NOT mastered yet
@@ -63,7 +98,7 @@ export function unlockedSessionQuiz(quiz) {
 export function sessionQuizFor(dayKey) {
   const open = unlockedSessionQuiz();
   const led = loadQuiz().qLedger || {};
-  const fresh = open.filter(q => !(led[quizQuestionKey("coach", q.id)] || {}).mastered);
+  const fresh = open.filter(q => !(led[q.ledgerKey] || {}).mastered);
   const bank = fresh.length ? fresh : open;
   const n = (dayKey ? String(dayKey).length : 0) + loadSessions().length;
   return bank[n % bank.length];
@@ -652,6 +687,11 @@ export function buildSessionVM(state) {
     showReflection: sessionDone && completionState !== "save-failed" && !!sess.mood,
     reflectWellOpts, reflectNextOpts,
     quizQuestion: QZ.q, quizOpts, quizAnswered, quizWhy: QZ.why,
+    /* The card's subtitle follows the question. "How does today's work help you
+       swim?" is right for a move, and wrong over "Why do the same moves keep
+       coming back every week?" */
+    quizIntro: QZ.topic === "principle" ? QUIZ_INTRO_PRINCIPLE[QZ.kind] || COPY.sessionQuizIntro
+                                        : COPY.sessionQuizIntro,
     quizFeedback,
     quizFeedbackColor: quizCorrect ? "var(--mint-ink)" : "var(--coral)"
   };
