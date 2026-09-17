@@ -286,9 +286,29 @@ export const TOP7 = [
   "Superman", "Single-Leg Balance Reach", "Pallof Press", "Drop-and-Stick"
 ];
 
-export const MICRO_LOOP = { q: "Where did the power start?", a: "the hips" };
+/* The one question the coach asks out loud at the end of the skill block. The
+   options live HERE, beside the answer, because they used to be hardcoded in
+   shared core/ — where they could only ever match one sport, and silently did
+   not match the other. `a` must be one of `opts`; the smoke test enforces it. */
+export const MICRO_LOOP = {
+  q: "Where did the power start?",
+  a: "the hips",
+  opts: ["the hips", "the arms", "the knees"],
+  yes: "Yes — the hips!",
+  no: "It starts at the hips."
+};
 export const BREATH_REHEARSAL =
   "Side-lying head-turn: exhale face-down (hum), rotate, quick sip, rotate back.";
+/* Same rehearsal, written to be heard rather than read. The engine used to
+   speak a swim line in both apps; each app now says its own. */
+export const BREATH_SAY =
+  "Breath rehearsal. Exhale face down, hum, turn, quick sip, turn back.";
+
+/* The two reflection chip sets on the finish screen. These lived in shared
+   core/ with swimming words in them, which the skating app then offered to its
+   skater; sport words belong to the app. */
+export const REFLECT_WELL = ["My breathing", "Strong holds", "Clean form", "Staying focused"];
+export const REFLECT_NEXT = ["Slow down", "Breathe out loud", "Point my toes", "Keep core tight"];
 
 /* Shared finisher + swim-skill block builders */
 const FINISHER = () => [
@@ -919,11 +939,6 @@ export function rankForLevel(level) {
   for (const r of LADDER) if (level >= r.level) rank = r;
   return rank;
 }
-
-export const COACH_VOICE_ITEMS = [
-  "Count your time", "Tell you the next exercise", "Remind you to breathe",
-  "Warn about common mistakes", "Prompt a self-check"
-];
 
 /* ------------------------------------------------------------
    READINESS CHECK (4-Q + body map) — from the Assessment prototype.

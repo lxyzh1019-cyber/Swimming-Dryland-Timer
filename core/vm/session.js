@@ -4,7 +4,8 @@
    ============================================================ */
 
 import { sess, refTime, screenRepsDetail, pausedByBackground, canGoBack } from "../engine.js";
-import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, SESSION_QUIZ, exWork, videoSearchUrl } from "../data.js";
+import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, SESSION_QUIZ,
+         REFLECT_WELL, REFLECT_NEXT, exWork, videoSearchUrl } from "../data.js";
 import { SKILL_BLOCK, COPY } from "../sport.js";
 import { fmtMMSS, exercisePhotoUrl, photoSources, plural } from "../util.js";
 import { loadSessions } from "../store.js";
@@ -32,8 +33,9 @@ const MOOD_ACK = {
   okay:  "Showing up on an okay day still counts. Nice.",
   tired: "Thanks for telling me — tired is real. Rest well, drink water, and tell a grown-up if it sticks around. 💙"
 };
-const REFLECT_WELL = ["My breathing", "Strong holds", "Clean form", "Staying focused"];
-const REFLECT_NEXT = ["Slow down", "Breathe out loud", "Point my toes", "Keep core tight"];
+/* REFLECT_WELL and REFLECT_NEXT used to be hardcoded here, in shared core, with
+   swimming words — so the skater was offered "Point my toes" and "Breathe out
+   loud". They come from each app's own data.js now. */
 
 
 /* The day's Coach's Quiz question. Rotates as the training log grows (not fixed
@@ -565,7 +567,7 @@ export function buildSessionVM(state) {
       : "✓ Done — Next",
 
     // prompts
-    intentWords: INTENT_WORDS, microQ: MICRO_LOOP.q, microOpts: ["the hips", "the arms", "the knees"],
+    intentWords: INTENT_WORDS, microQ: MICRO_LOOP.q, microOpts: MICRO_LOOP.opts,
     microAnswered: !!sess.microLoop, microCorrectAnswer: MICRO_LOOP.a,
     microPicked: sess.microLoop ? sess.microLoop.answer : null,
     breathText: BREATH_REHEARSAL,

@@ -10,7 +10,7 @@
 
 import { deriveSessionOutcome, mainRoundsFromLedger, mainRoundReport, OUTCOME_VERSION,
          mergeLedgerRows, logicalRowId, workoutDate, paceReport } from "./outcome.js";
-import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, MANTRA,
+import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BREATH_SAY, MANTRA,
          exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
          needsSetup, SETUP_SECONDS,
          VALGUS_FLOOR, VALGUS_PROGRESSIONS } from "./data.js";
@@ -1319,7 +1319,7 @@ function microLoopPrompt() {
       if (answer == null) { resolve(); return; }   // dismissed without answering
       const ok = answer === MICRO_LOOP.a;
       sess.microLoop = { answer, correct: ok };
-      speakIfIdle(ok ? "Yes — the hips!" : "It's the hips.");
+      speakIfIdle(ok ? MICRO_LOOP.yes : MICRO_LOOP.no);
       notify("phase");
       setTimeout(resolve, 900);
     };
@@ -2136,7 +2136,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     await microLoopPrompt();
     if (sess.abort) return finalize(false);
     setPhase("breath");
-    await speakAndWait("Breath rehearsal. Exhale face down, hum, turn, quick sip, turn back.");
+    await speakAndWait(BREATH_SAY);
     await sleep(1500);
     if (sess.abort) return finalize(false);
   }

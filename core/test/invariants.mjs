@@ -20,7 +20,7 @@
    Run by `npm test`.
    ============================================================ */
 
-import { util, store, engine, outcome, svm, tvm, pvm, gvm, gscreen,
+import { data, util, store, engine, outcome, svm, tvm, pvm, gvm, gscreen,
          runSession, answerChecks } from "./harness.mjs";
 
 let passed = 0;
@@ -511,6 +511,36 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
   ok(list.every(x => !x.paceDotStyle || x.paceTitle),
     "and every dot carries words, so it is not colour-only");
   localStorage.clear(); store.migrate();
+}
+
+/* ============================================================
+   N. THE QUESTIONS THIS APP ASKS ARE ANSWERABLE IN THIS APP
+
+   These run in BOTH apps, which is the point. The micro-loop's three options
+   were hardcoded in shared core as the swimmer's three, so the skater was
+   asked "Where does a clean landing freeze?" and offered "the hips / the arms
+   / the knees" — her right answer was never on screen and every attempt scored
+   wrong. And the pain question, moved last in one app so the other three
+   always get asked, was still first in the other. Both are properties of a
+   question set, so both are asserted here rather than in one app's smoke file.
+   ============================================================ */
+{
+  const ml = data.MICRO_LOOP;
+  ok(Array.isArray(ml.opts) && ml.opts.length >= 2, "the micro-loop offers options to choose from");
+  ok(ml.opts.includes(ml.a), "the micro-loop's correct answer is one of the options it offers");
+  ok(ml.opts.filter(o => o === ml.a).length === 1, "and it appears exactly once, so there is one right answer");
+  ok(!!ml.yes && !!ml.no && ml.yes !== ml.no, "the coach has a distinct reply for right and for wrong");
+  ok(ml.no.toLowerCase().includes(String(ml.a).toLowerCase().split(" ").slice(-1)[0]),
+    "and the wrong-answer reply names THIS app's answer, not the other app's");
+
+  const qs = data.READINESS_QS;
+  ok(qs[qs.length - 1].id === "q_pain",
+    "the pain question is asked LAST, so the other three always get asked");
+  ok(qs.filter(q => q.isPain).length === 1, "exactly one question routes to the body map");
+  ok(qs.filter(q => !q.isPain).length === 3, "and three general questions remain to score the light");
+
+  const vm = svm.buildSessionVM({ detailEx: {}, isWide: true });
+  ok((vm.microOpts || []).includes(ml.a), "the session screen offers the answer the engine grades against");
 }
 
 console.log("✓ invariants passed (" + passed + " assertions)");
