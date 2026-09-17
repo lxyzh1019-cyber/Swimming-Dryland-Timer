@@ -837,8 +837,10 @@ const playPerfect = () => {
 localStorage.removeItem(store.LS_QUIZ);
 localStorage.removeItem(store.LS_JOURNEY);
 const bank0 = store.quizBankStatus();
-const BANK = store.questionBank().length;      // 83 move questions + the unlocked ranks
-ok(BANK === 83 + store.rankPool().length * 2, "the bank is the moves plus the unlocked ocean chapters");
+const BANK = store.questionBank().length;      // moves + unlocked ranks + training principles
+const MOVE_QS = store.movePool().reduce((n, m) => n + (m.cue ? 1 : 0) + (m.watch ? 1 : 0) + (m.fix ? 1 : 0), 0);
+ok(BANK === MOVE_QS + store.rankPool().length * 2 + store.principlePool().length,
+   "the bank is the moves, the unlocked ocean chapters and the training principles");
 ok(bank0.total === BANK && bank0.mastered === 0, "nothing is mastered on a fresh device");
 ok(bank0.xpTotal === BANK * (store.QXP_ATTEMPT + store.QXP_CORRECT), "lifetime quiz XP budget is bank x question value");
 

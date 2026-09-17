@@ -4,10 +4,11 @@
    ============================================================ */
 
 import { sess, refTime, screenRepsDetail, pausedByBackground, canGoBack } from "../engine.js";
-import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, SESSION_QUIZ, exWork, videoSearchUrl } from "../data.js";
+import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, SESSION_QUIZ,
+         TRAINING_QS, REFLECT_WELL, REFLECT_NEXT, exWork, videoSearchUrl } from "../data.js";
 import { SKILL_BLOCK, COPY } from "../sport.js";
 import { fmtMMSS, exercisePhotoUrl, photoSources, plural } from "../util.js";
-import { loadSessions } from "../store.js";
+import { loadSessions, loadQuiz, quizQuestionKey } from "../store.js";
 import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION, paceBand } from "../outcome.js";
 
 /* What changes at the end of this segment — named before she gets there, so the
@@ -32,17 +33,75 @@ const MOOD_ACK = {
   okay:  "Showing up on an okay day still counts. Nice.",
   tired: "Thanks for telling me — tired is real. Rest well, drink water, and tell a grown-up if it sticks around. 💙"
 };
-const REFLECT_WELL = ["My breathing", "Strong holds", "Clean form", "Staying focused"];
-const REFLECT_NEXT = ["Slow down", "Breathe out loud", "Point my toes", "Keep core tight"];
+/* REFLECT_WELL and REFLECT_NEXT used to be hardcoded here, in shared core, with
+   swimming words — so the skater was offered "Point my toes" and "Breathe out
+   loud". They come from each app's own data.js now. */
 
 
-/* The day's Coach's Quiz question. Rotates as the training log grows (not fixed
-   per weekday), so the completion quiz stays fresh instead of repeating. Both
-   this VM and main.js call it with the same dayKey during the done screen, so
-   the displayed question and the XP-awarding question always match. */
+/* Subtitles for the training-principle cards — the move subtitle in sport.js
+   asks how today's work helps her sport, which is not what a principle card is
+   asking. */
+const QUIZ_INTRO_PRINCIPLE = {
+  attitude:   "How you train matters as much as what you train.",
+  efficiency: "Getting more out of the same half hour.",
+  results:    "Why the training works — and what breaks it."
+};
+
+/* Everything the end-of-session card can ask: the Coach's Quiz about the moves,
+   AND the training principles — attitude, efficiency, and why results come from
+   repeating the same movement rather than a similar one.
+
+   The principles used to live only in the Quiz Deck, which she has to choose to
+   open, and came up on roughly one card in twenty. So the one thing the app most
+   wanted her to understand was the thing she was least likely to be asked. They
+   are in the automatic rotation now.
+
+   Each carries the ledger key it is priced by, and a principle keeps the SAME
+   key here as in the Quiz Deck — one question, one key, wherever it is asked, so
+   it can never be paid for twice or counted twice toward mastery. */
+export function coachQuizPool() {
+  const moves = SESSION_QUIZ.map(q => ({
+    ...q, topic: "move",
+    ledgerKey: quizQuestionKey("coach", q.id),
+    prereqKey: q.after ? quizQuestionKey("coach", q.after) : null
+  }));
+  const principles = (TRAINING_QS || []).map(q => ({
+    ...q, topic: "principle",
+    ledgerKey: quizQuestionKey("Principle: " + q.id, "principle"),
+    prereqKey: q.after ? quizQuestionKey("Principle: " + q.after, "principle") : null
+  }));
+  return [...moves, ...principles];
+}
+
+/* The questions she can be asked today: every tier-1 question, plus the tier-2
+   ones whose prerequisite she has already mastered. A tier-2 card asks what to
+   CHANGE when something felt wrong, which is not a fair question until she knows
+   what it was supposed to feel like. Falls back to the whole pool if a data edit
+   ever leaves nothing unlocked — a session must always have a question to end
+   on. */
+export function unlockedSessionQuiz(quiz) {
+  const led = (quiz || loadQuiz()).qLedger || {};
+  const all = coachQuizPool();
+  const open = all.filter(q => !q.prereqKey || (led[q.prereqKey] || {}).mastered);
+  return open.length ? open : all;
+}
+
+/* The day's Coach's Quiz question. Asks something she has NOT mastered yet
+   whenever one is left, the same rule the Quiz Deck deals by, and only falls
+   back to rotating the mastered ones once she knows them all.
+
+   Rotating the whole bank by session count was never enough on its own: the
+   index moves by one per session, so a question she got right on Tuesday came
+   back within the week while a dozen she had never seen waited. Both this VM
+   and main.js call it with the same dayKey during the done screen, so the
+   displayed question and the XP-awarding question always match. */
 export function sessionQuizFor(dayKey) {
+  const open = unlockedSessionQuiz();
+  const led = loadQuiz().qLedger || {};
+  const fresh = open.filter(q => !(led[q.ledgerKey] || {}).mastered);
+  const bank = fresh.length ? fresh : open;
   const n = (dayKey ? String(dayKey).length : 0) + loadSessions().length;
-  return SESSION_QUIZ[n % SESSION_QUIZ.length];
+  return bank[n % bank.length];
 }
 
 export function buildSessionVM(state) {
@@ -565,7 +624,7 @@ export function buildSessionVM(state) {
       : "✓ Done — Next",
 
     // prompts
-    intentWords: INTENT_WORDS, microQ: MICRO_LOOP.q, microOpts: ["the hips", "the arms", "the knees"],
+    intentWords: INTENT_WORDS, microQ: MICRO_LOOP.q, microOpts: MICRO_LOOP.opts,
     microAnswered: !!sess.microLoop, microCorrectAnswer: MICRO_LOOP.a,
     microPicked: sess.microLoop ? sess.microLoop.answer : null,
     breathText: BREATH_REHEARSAL,
@@ -628,6 +687,11 @@ export function buildSessionVM(state) {
     showReflection: sessionDone && completionState !== "save-failed" && !!sess.mood,
     reflectWellOpts, reflectNextOpts,
     quizQuestion: QZ.q, quizOpts, quizAnswered, quizWhy: QZ.why,
+    /* The card's subtitle follows the question. "How does today's work help you
+       swim?" is right for a move, and wrong over "Why do the same moves keep
+       coming back every week?" */
+    quizIntro: QZ.topic === "principle" ? QUIZ_INTRO_PRINCIPLE[QZ.kind] || COPY.sessionQuizIntro
+                                        : COPY.sessionQuizIntro,
     quizFeedback,
     quizFeedbackColor: quizCorrect ? "var(--mint-ink)" : "var(--coral)"
   };

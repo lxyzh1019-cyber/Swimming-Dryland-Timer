@@ -591,7 +591,11 @@ Object.assign(RAW, {
     if (first && engine.sess.savedEntry) {
       const q = sessionQuizFor(engine.sess.dayKey);
       const correct = !!(q.opts[i] && q.opts[i].ok);
-      const { xp, capped } = payQuizQuestion(quizQuestionKey("coach", q.id), correct);
+      // The question's OWN key, not always "coach". A training principle is
+      // asked both here and in the Quiz Deck; keying it by where it was asked
+      // would pay for the same understanding twice and count it twice toward
+      // mastery.
+      const { xp, capped } = payQuizQuestion(q.ledgerKey || quizQuestionKey("coach", q.id), correct);
       engine.sess.quizXp = xp;    // the done screen quotes what was actually banked
       engine.sess.quizCapped = capped;
       if (xp > 0) {

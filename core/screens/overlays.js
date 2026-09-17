@@ -7,8 +7,8 @@
 import { PRIZE_POOL } from "../data.js";
 import { COPY, IMAGES, EMOJI } from "../sport.js";
 import { settings, loadQuiz, saveQuiz, logEvent, addXp, addPrize, pendingDrawCount, drawIsWaitingOnSync,
-         movePool, rankPool, questionBank, quizPaidToday, quizBankStatus,
-         quizQuestionKey, payQuizQuestion } from "../store.js";
+         movePool, rankPool, questionBank, unlockedBank, quizPaidToday, quizBankStatus,
+         quizQuestionKey, payQuizQuestion, payTodayQuestion, loadSessions } from "../store.js";
 import { todayISODate, escapeHtml, imgWithFallbacks, photoSources } from "../util.js";
 
 /* ---- quiz engine (port of _movePool/_makeQ/_buildQuizDeck) ----
@@ -36,12 +36,46 @@ function makeRankQ(rank, kind, ranks) {
   };
 }
 
+/* Two answers that say the same thing make a coin flip, not a question. The
+   fix texts in particular were written one move at a time — "Smaller range.",
+   "Reach shorter, slow down.", "Slow down, reduce reach." — and drawing two of
+   them beside the third produced a card no one could answer by knowing
+   anything, and sometimes marked a right answer wrong. Compare on the content
+   words, so "Slow down, level the pelvis" and "Slow down, reduce reach" are
+   recognised as the same advice. */
+const CONTENT_STOP = /^(the|a|an|and|or|to|of|in|on|at|it|is|your|you|my|keep|stay)$/;
+function answerShape(t) {
+  return String(t || "").toLowerCase().replace(/[^a-z ]/g, " ")
+    .split(/\s+/).filter(w => w.length > 2 && !CONTENT_STOP.test(w)).sort().join(" ");
+}
+function tooCloseTo(correct, candidate) {
+  const a = answerShape(correct), b = answerShape(candidate);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  // Same opening advice ("slow down …" twice) reads as the same answer to a kid.
+  const lead = t => String(t || "").toLowerCase().split(/[,.\/;:]/)[0].trim();
+  if (lead(correct) && lead(correct) === lead(candidate)) return true;
+  const aw = new Set(a.split(" ")), bw = b.split(" ");
+  const shared = bw.filter(w => aw.has(w)).length;
+  return shared >= Math.max(2, Math.ceil(Math.min(aw.size, bw.length) * 0.6));
+}
+
 function makeQ(move, kind, pool) {
   if (kind === "story" || kind === "fact") return makeRankQ(move, kind, pool);
+  if (kind === "principle") return makePrincipleQ(move);
   const field = kind === "cue" ? "cue" : kind === "watch" ? "watch" : "fix";
-  const others = pool.filter(m => m.name !== move.name && m[field]);
-  const distractors = shuffle(others).slice(0, 2).map(m => m[field]);
   const correct = move[field];
+  const others = pool.filter(m => m.name !== move.name && m[field] && !tooCloseTo(correct, m[field]));
+  // Never let two near-identical answers share a card. If the pool cannot offer
+  // two clearly different wrong answers, offer one — a two-option card she can
+  // actually reason about beats a three-option coin flip.
+  const picked = [];
+  shuffle(others).forEach(m => {
+    if (picked.length >= 2) return;
+    if (picked.some(p => tooCloseTo(p, m[field]))) return;
+    picked.push(m[field]);
+  });
+  const distractors = picked;
   const opts = shuffle([{ t: correct, ok: true }, ...distractors.map(d => ({ t: d, ok: false }))]);
   const prompt = kind === "cue" ? ("What’s the key coaching cue for “" + move.name + "”?")
     : kind === "watch" ? ("When you do “" + move.name + "”, what should you watch out for?")
@@ -50,12 +84,97 @@ function makeQ(move, kind, pool) {
   return { move: move.name, block: move.block, kind, tag, prompt, opts,
     why: (kind === "cue" ? "Cue · " : kind === "watch" ? "👀 Watch for · " : "Fix · ") + correct };
 }
+/* A training principle. Authored rather than generated: attitude, efficiency
+   and "the same movement, not a similar one" have no sibling move to borrow a
+   wrong answer from, so each entry ships its own options and every one of them
+   is a thing a real 11-year-old actually believes. */
+function makePrincipleQ(topic) {
+  const e = topic.authored || {};
+  const TAGS = { attitude: "ATTITUDE", efficiency: "HOW TO TRAIN", results: "WHY IT WORKS" };
+  return {
+    move: topic.name, label: "Training", block: "principle", kind: "principle",
+    tag: TAGS[e.kind] || "TRAINING",
+    prompt: e.q,
+    opts: shuffle((e.opts || []).map(o => ({ t: o.t, ok: !!o.ok }))),
+    why: e.why
+  };
+}
+
+/* The one card that is about TODAY. Every other question in the deck is a fact
+   about the plan, true whether or not she trained — which is exactly why the
+   whole set read as general. This one is built from the session she just
+   finished: a move she herself graded wobbly, the light her own Body Check
+   produced, the word she picked after round one. It cannot be mastered and
+   never pays from the ledger; see payTodayQuestion. */
+function makeSessionQ(pool) {
+  const last = loadSessions().slice(-1)[0];
+  if (!last) return null;
+  const named = m => pool.find(x => x.name === m);
+
+  // 1. A move she said was wobbly, asked with that move's own cue.
+  const wobbly = (last.formChecks || []).filter(f => f && f.clean === false && named(f.name) && named(f.name).cue);
+  if (wobbly.length) {
+    const move = named(wobbly[wobbly.length - 1].name);
+    const others = pool.filter(m => m.name !== move.name && m.cue && !tooCloseTo(move.cue, m.cue));
+    const opts = shuffle([{ t: move.cue, ok: true },
+      ...shuffle(others).slice(0, 2).map(m => ({ t: m.cue, ok: false }))]);
+    return { move: "Today", label: "Your session", block: "today", kind: "today", tag: "TODAY",
+      prompt: "You marked “" + move.name + "” wobbly today. Which cue gets it clean?",
+      opts, why: "Cue · " + move.cue };
+  }
+
+  // 2. The light her own body check produced, and the rounds it set.
+  const light = last.lightResult || last.light;
+  if (light && light !== "green" && last.roundsPlanned) {
+    const WORD = { yellow: "Yellow", red: "Red", recovery: "Recovery" };
+    return { move: "Today", label: "Your session", block: "today", kind: "today", tag: "TODAY",
+      prompt: "Your Body Check came out " + (WORD[light] || light) + " today, so Coach gave you "
+        + last.roundsPlanned + (last.roundsPlanned === 1 ? " round" : " rounds") + ". Why?",
+      opts: shuffle([
+        { t: "My own answers said my body needed a smaller day", ok: true },
+        { t: "The app gives a different number every day", ok: false },
+        { t: "I was being punished for saying I was sore", ok: false }
+      ]),
+      why: "You set that light yourself. A smaller day you finish properly beats a big one you can't." };
+  }
+
+  // 3. The word she chose after round one.
+  if (last.intentWord) {
+    return { move: "Today", label: "Your session", block: "today", kind: "today", tag: "TODAY",
+      prompt: "After round one today you picked “" + last.intentWord + "”. What was that word for?",
+      opts: shuffle([
+        { t: "To fix what I felt in round one and carry it into the next rounds", ok: true },
+        { t: "To show Coach how hard I was working", ok: false },
+        { t: "To pick which exercise came next", ok: false }
+      ]),
+      why: "One word, said out loud, is what turns a round you felt into a round you change." };
+  }
+
+  // 4. What she actually trained.
+  if (last.roundsDone > 0) {
+    return { move: "Today", label: "Your session", block: "today", kind: "today", tag: "TODAY",
+      prompt: "You trained " + last.roundsDone + " of " + (last.roundsPlanned || last.roundsDone)
+        + " main rounds today. What makes that count?",
+      opts: shuffle([
+        { t: "The rounds I did properly — they count whether or not I finished them all", ok: true },
+        { t: "Only a session where I finish every round", ok: false },
+        { t: "How tired I was at the end", ok: false }
+      ]),
+      why: "Work done properly counts. The app pays the rounds you trained, not the ones you planned." };
+  }
+  return null;
+}
+
 export function buildQuizDeck(n = 8) {
   const pool = movePool();
   const ranks = rankPool();
-  const bank = questionBank();
   const quiz = loadQuiz();
   const led = quiz.qLedger || {};
+  // Only what she has unlocked. A tier-2 question ("this felt wrong — what do
+  // you change?") waits until the tier-1 question it builds on is mastered, so
+  // the step up is paced by what she has shown she knows rather than by a
+  // setting somebody has to remember to move.
+  const bank = unlockedBank(questionBank(), quiz);
   // Deal unlearned questions FIRST, then already-mastered ones as filler. The
   // deck therefore teaches what the kid doesn't know yet, and — since only one
   // deck a day pays — that day's XP isn't lost to a random draw of questions
@@ -64,9 +183,31 @@ export function buildQuizDeck(n = 8) {
   bank.forEach(entry => {
     (led[quizQuestionKey(entry[0].name, entry[1])] || {}).mastered ? known.push(entry) : fresh.push(entry);
   });
-  const picked = [...shuffle(fresh), ...shuffle(known)].slice(0, n);
+  // One slot is RESERVED for a training principle. Left to the draw they were
+  // four entries in a bank of eighty-nine — about one card in twenty — so the
+  // thing the app most wants her to understand (results come from repeating the
+  // same movement, not a similar one) was the thing she was least likely to be
+  // asked. Unmastered first, same rule as the rest of the deck.
+  const principles = bank.filter(([, k]) => k === "principle");
+  const freshPrinciples = principles.filter(([m, k]) =>
+    !(led[quizQuestionKey(m.name, k)] || {}).mastered);
+  const principleEntry = shuffle(freshPrinciples.length ? freshPrinciples : principles)[0] || null;
+
+  // The card about today goes first and is never crowded out by the draw.
+  const todayQ = makeSessionQ(pool);
+  const reserved = (todayQ ? 1 : 0) + (principleEntry ? 1 : 0);
+  const drawn = [...shuffle(fresh), ...shuffle(known)]
+    .filter(e => !(principleEntry && e[0].name === principleEntry[0].name && e[1] === principleEntry[1]))
+    .slice(0, Math.max(1, n - reserved));
+  const qs = shuffle(drawn).map(([m, k]) => makeQ(m, k, (k === "story" || k === "fact") ? ranks : pool));
+  // The principle sits in the body of the deck rather than at the front, so the
+  // deck still opens on her own session.
+  if (principleEntry) {
+    qs.splice(Math.min(qs.length, 1 + Math.floor(Math.random() * Math.max(1, qs.length - 1))), 0,
+              makeQ(principleEntry[0], principleEntry[1], pool));
+  }
   return {
-    qs: shuffle(picked).map(([m, k]) => makeQ(m, k, (k === "story" || k === "fact") ? ranks : pool)),
+    qs: todayQ ? [todayQ, ...qs] : qs,
     idx: 0, picks: [], done: false, scored: false,
     // Preview only — the day is actually claimed in finishQuizDeck, so
     // abandoning a deck never burns the paying round.
@@ -79,6 +220,9 @@ export function answerQuizDeck(qd, i) {
   qd.picks[qd.idx] = i;
   const q = qd.qs[qd.idx];
   const ok = !!(q.opts[i] && q.opts[i].ok);
+  // The TODAY card is not a move, so it gets no per-move mastery row — it would
+  // otherwise file itself under a move called "Today" that nobody trains.
+  if (q.kind === "today") return;
   // per-move mastery record (the quiz record)
   const quiz = loadQuiz();
   const item = quiz.items[q.move] || { right: 0, wrong: 0, seen: 0 };
@@ -102,8 +246,11 @@ export function finishQuizDeck(qd) {
     qd.qs.forEach((q, ix) => {
       const pick = qd.picks[ix];
       if (pick == null) return;                       // unanswered pays nothing
-      const res = payQuizQuestion(quizQuestionKey(q.move, q.kind),
-                                  !!(q.opts[pick] && q.opts[pick].ok), quiz);
+      const correct = !!(q.opts[pick] && q.opts[pick].ok);
+      // The TODAY card renews every day, so it is priced by the day, not by the
+      // lifetime ledger — otherwise "quiz XP is finite" stops being true.
+      const res = q.kind === "today" ? payTodayQuestion(correct, quiz)
+                                     : payQuizQuestion(quizQuestionKey(q.move, q.kind), correct, quiz);
       xp += res.xp;
       if (res.firstSeen) firstSeen++;
       if (res.newlyMastered) newlyMastered++;
@@ -142,14 +289,14 @@ export function quizDeckHtml(qd) {
     // told it's a free practice round keeps playing for the right reason.
     const noteBox = (bg, ink, text) => `<div style="width:100%;background:${bg};border-radius:14px;padding:11px 14px;box-sizing:border-box;font-size:13px;font-weight:800;color:${ink};line-height:1.4;text-align:left;">${text}</div>`;
     const capNote = qd.hitDailyCap
-      ? noteBox("var(--grape-wash,#EFE9FB)", "var(--grape-ink,#4B3A78)", "🎯 <b>That’s today’s quiz XP maxed out.</b> The other new moves in this deck kept their full value — come back tomorrow and they’ll pay in full.")
+      ? noteBox("var(--grape-wash,#EFE9FB)", "var(--grape-ink,#4B3A78)", "🎯 <b>That’s today’s quiz XP maxed out.</b> The other new questions in this deck kept their full value — come back tomorrow and they’ll pay in full.")
       : "";
     const xpNote = qd.xpEarned || qd.hitDailyCap ? ""
       : !qd.wasPaidRound
         ? noteBox("var(--aqua-wash)", "var(--aqua-ink)", "🧠 <b>Practice round — no XP.</b> You already earned today’s quiz XP. Play as many rounds as you like to get sharper, and the next paying round unlocks tomorrow.")
         : qd.bank && !qd.bank.left
-          ? noteBox("var(--mint-wash)", "var(--mint-ink)", "🧠 <b>You already know every move in here.</b> Quiz XP is for learning something new, so there’s none left to earn — but your training XP has no limit.")
-          : noteBox("var(--sun-wash)", "var(--sun-ink)", "🧠 <b>No XP this round</b> — these were all moves you’d already mastered. Tomorrow’s round will bring you new ones.");
+          ? noteBox("var(--mint-wash)", "var(--mint-ink)", "🧠 <b>You already know every question in here.</b> Quiz XP is for learning something new, so there’s none left to earn — but your training XP has no limit.")
+          : noteBox("var(--sun-wash)", "var(--sun-ink)", "🧠 <b>No XP this round</b> — these were all questions you’d already mastered. Tomorrow’s round will bring you new ones.");
 
     // Honest button label: don't invite a replay that looks like it pays.
     const againLabel = quizPaidToday() ? "🔁 Practice again · no XP" : "🔁 Play again";
@@ -173,8 +320,8 @@ export function quizDeckHtml(qd) {
               <div style="width:${Math.round((qd.bank.mastered / qd.bank.total) * 100)}%;height:100%;background:var(--aqua);border-radius:10px;transition:width 0.4s;"></div>
             </div>
             <div style="font-size:12px;font-weight:700;color:var(--ink-faint);margin-top:7px;line-height:1.35;">${qd.bank.left
-              ? qd.bank.left + " move" + (qd.bank.left === 1 ? "" : "s") + " left to learn. Each one pays XP the first time you get it right — after that it’s yours for keeps."
-              : "You’ve mastered every move in the book. 🧠 Nothing left to learn here — the water is where the XP lives now."}</div>
+              ? qd.bank.left + " question" + (qd.bank.left === 1 ? "" : "s") + " left to learn. Each one pays XP the first time you get it right — after that it’s yours for keeps."
+              : "You’ve mastered every question in the book. 🧠 Nothing left to learn here — the water is where the XP lives now."}</div>
           </div>` : ""}
           ${qd.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="min-height:52px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:0 24px;font-family:var(--font-display);font-weight:600;font-size:18px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
           <div style="width:100%;display:flex;flex-direction:column;gap:8px;margin-top:6px;text-align:left;">
@@ -218,7 +365,7 @@ export function quizDeckHtml(qd) {
       <div style="background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-lift);padding:24px;display:flex;flex-direction:column;gap:16px;">
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:11px;font-weight:900;letter-spacing:0.06em;background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);padding:5px 12px;">${cur.tag}</span>
-          <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${cur.move}</span>
+          <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${cur.label || cur.move}</span>
         </div>
         <div style="font-family:var(--font-display);font-weight:600;font-size:23px;color:var(--ink);line-height:1.25;">${cur.prompt}</div>
         <div style="display:flex;flex-direction:column;gap:10px;">

@@ -10,7 +10,7 @@ import { redeemedPrizesForReview } from "../store.js";
 import { ATHLETE_DEFAULT, CSV_FILE_PREFIX } from "../sport.js";
 import { gateUnlocked, GATE_REASON } from "../gate.js";
 import { passkeySupported, hasPasskey } from "../passkey.js";
-import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, GATE_MOVE, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal, outcomeOf,
+import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, GATE_MOVE, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, QXP_TODAY, lastWalletTrim, loadJourney, levelFromXp, countsAsTrained as countsAsTrainedLocal, outcomeOf,
          sessionRounds as sessionRoundsDone, sessionRoundsPlanned, plannedRoundsAcrossDays,
          monthKeyOf, formVerdicts, latestFormVerdicts, loadReadinessLog,
          settledXpInRange } from "../store.js";
@@ -552,6 +552,8 @@ export function buildGrownupVM(state) {
     note: "Quiz XP is capped at " + fmtXp(qBank.xpTotal) + " for the whole program (" + qBank.total
       + " questions, paid once each), at " + QXP_DAILY_CAP + " XP a day (one new question), and at one paying deck per day. "
       + "Replays are free practice worth 0 XP. "
+      + "One card a day is drawn from the session she just trained; it pays " + QXP_TODAY
+      + " XP at most, inside the same daily cap, and is not part of the fixed bank. "
       + (qBank.left ? qBank.left + " questions still hold XP." : "All questions are mastered — the quiz pays nothing further.")
   };
 

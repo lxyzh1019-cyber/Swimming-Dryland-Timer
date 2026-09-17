@@ -64,12 +64,40 @@ the **Splash — Kids Swim Training** design system.
   Questions are paid whole or not at all, so one the cap skipped is still worth
   full value tomorrow. Replays are free practice worth 0 XP, and the Coach's
   Quiz at the end of a session prices off the same ledger. The bank asks about
-  every move three ways (cue / watch-out / fix) **and about every ocean rank she
+  every move three ways (cue / watch-out / fix), **about every ocean rank she
   has unlocked two ways** — what that rank taught her, and its one true marine
-  fact — so the pool grows as she climbs. Locked ranks are never asked: that
+  fact — and **about training itself**: eighteen questions on attitude,
+  efficiency, and why results come from repeating the same movement rather than
+  a similar one. So the pool grows as she climbs. Locked ranks are never asked: that
   would spoil the mystery card and quiz her on a chapter she has not been shown.
   The bank is finite, so lifetime quiz XP is capped — the Grown-up Zone's Analytics tab
   shows how much of that budget is spent.
+- **A wrong answer is never the silly one.** Every distractor is either true of
+  a different move or something a swimmer her age actually believes, so a card
+  can only be answered by knowing which one applies. The generator refuses to
+  put two answers that say the same thing on one card, and refuses to let the
+  right answer give itself away by being the longest — both were real failures,
+  and both are asserted in `core/test/invariants.mjs` against generated cards
+  rather than against any one function.
+- **Two tiers, paced by her.** Tier 1 is recognition (which cue belongs to this
+  move). Tier 2 is application (that felt wrong — so what do you change?), and
+  it stays closed until the tier-1 question it builds on is mastered. Nothing to
+  configure; it moves at her pace. The whole bank still counts toward the mastery
+  total and the lifetime ceiling, so neither number moves when a tier opens.
+- **The training principles reach her, rather than waiting to be found.** Left
+  to the draw they were four entries in a bank of eighty-nine — about one card
+  in twenty — so the thing the app most wants her to understand was the thing
+  she was least likely to be asked. One Quiz Deck slot is now reserved for one,
+  and they are in the end-of-session rotation too, which is the card she sees
+  whether or not she opens the deck: roughly two of them a training week, with
+  the first inside three sessions. A principle keeps the SAME ledger key in both
+  places — one question, one key, wherever it is asked — so it can never be paid
+  for twice or counted twice toward mastery.
+- **One card is about today.** Each deck opens with a question built from the
+  session she just trained — a move she herself graded wobbly, the light her own
+  Body Check produced, the word she picked after round one. It renews daily, so
+  it can never be mastered and never pays from the finite ledger: a flat +5, once
+  a day, inside the same 30 XP ceiling.
 - **The rank ladder runs to level 50** (Seahorse → Ocean Legend). Rank
   thresholds and `levelCost()` are frozen: re-pricing a level would silently
   move a level that has already been earned.
@@ -87,7 +115,8 @@ What makes this app *this* app is three files it owns:
   the mascot and body-map images, and the twenty lines of copy that mention
   water. The core reads them through `core/sport.js` and never names a sport.
 - `js/data.js` — its content: the plan, the ranks and lore, the prizes, the
-  readiness copy, the Coach's Quiz. Built with the mechanism in `core/plan.js`.
+  readiness copy, the Coach's Quiz, the training principles and the kid-facing
+  watch-out/fix wording. Built with the mechanism in `core/plan.js`.
 - `css/tokens/*`, `css/fonts.css`, `assets/`, `index.html`, `manifest.webmanifest`
   and the two-line `sw.js` that configures the shared worker — the design
   system and the shell.
