@@ -8,7 +8,7 @@ import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, S
          REFLECT_WELL, REFLECT_NEXT, exWork, videoSearchUrl } from "../data.js";
 import { SKILL_BLOCK, COPY } from "../sport.js";
 import { fmtMMSS, exercisePhotoUrl, photoSources, plural } from "../util.js";
-import { loadSessions } from "../store.js";
+import { loadSessions, loadQuiz, quizQuestionKey } from "../store.js";
 import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION, paceBand } from "../outcome.js";
 
 /* What changes at the end of this segment — named before she gets there, so the
@@ -38,13 +38,35 @@ const MOOD_ACK = {
    loud". They come from each app's own data.js now. */
 
 
-/* The day's Coach's Quiz question. Rotates as the training log grows (not fixed
-   per weekday), so the completion quiz stays fresh instead of repeating. Both
-   this VM and main.js call it with the same dayKey during the done screen, so
-   the displayed question and the XP-awarding question always match. */
+/* The Coach's Quiz questions she can be asked today: every tier-1 question, plus
+   the tier-2 ones whose `after` question she has already mastered. A tier-2 card
+   asks what to CHANGE when something felt wrong, which is not a fair question
+   until she knows what it was supposed to feel like. Falls back to the whole
+   bank if a data edit ever leaves nothing unlocked — a session must always have
+   a question to end on. */
+export function unlockedSessionQuiz(quiz) {
+  const led = (quiz || loadQuiz()).qLedger || {};
+  const open = SESSION_QUIZ.filter(q =>
+    !q.after || (led[quizQuestionKey("coach", q.after)] || {}).mastered);
+  return open.length ? open : SESSION_QUIZ;
+}
+
+/* The day's Coach's Quiz question. Asks something she has NOT mastered yet
+   whenever one is left, the same rule the Quiz Deck deals by, and only falls
+   back to rotating the mastered ones once she knows them all.
+
+   Rotating the whole bank by session count was never enough on its own: the
+   index moves by one per session, so a question she got right on Tuesday came
+   back within the week while a dozen she had never seen waited. Both this VM
+   and main.js call it with the same dayKey during the done screen, so the
+   displayed question and the XP-awarding question always match. */
 export function sessionQuizFor(dayKey) {
+  const open = unlockedSessionQuiz();
+  const led = loadQuiz().qLedger || {};
+  const fresh = open.filter(q => !(led[quizQuestionKey("coach", q.id)] || {}).mastered);
+  const bank = fresh.length ? fresh : open;
   const n = (dayKey ? String(dayKey).length : 0) + loadSessions().length;
-  return SESSION_QUIZ[n % SESSION_QUIZ.length];
+  return bank[n % bank.length];
 }
 
 export function buildSessionVM(state) {

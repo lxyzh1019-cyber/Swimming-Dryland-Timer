@@ -7,7 +7,7 @@
 import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
 import { STORAGE_KEYS as K, ATHLETE_DEFAULT, LEGACY_ATHLETE, BACKUP_APP, LORE_TRANSFER_FIELD, COPY } from "./sport.js";
 export { LEGACY_ATHLETE, BACKUP_APP };
-import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE, VALGUS_FLOOR } from "./data.js";
+import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE, VALGUS_FLOOR, TRAINING_QS, KID_COACHING } from "./data.js";
 import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION, roundPayCredit, workoutDate,
          streakDatesOf, freezeDatesOf } from "./outcome.js";
 
@@ -798,6 +798,7 @@ export function loadQuiz() {
     streak: q.streak || 0,
     qLedger: q.qLedger || {},
     lastPaidISO: q.lastPaidISO || null,
+    todayPaidISO: q.todayPaidISO || null,
     dayISO: q.dayISO || null,
     dayXp: q.dayXp || 0
   };
@@ -840,6 +841,12 @@ export const QXP_CORRECT = 25;   // once per question, first time correct
    those are the days a kid is most tempted to tap through a quiz instead of
    training, and they must still be worth far more than it. */
 export const QXP_DAILY_CAP = 30;
+/* The one card drawn from the session she just trained. It is regenerated every
+   day from her own numbers, so it can never be "mastered" and must never be
+   priced through the ledger — that ledger is what makes lifetime quiz XP finite,
+   and a question that renews daily would quietly make it infinite. A flat +5,
+   once a day, inside the same ceiling. */
+export const QXP_TODAY = 5;
 
 export function quizQuestionKey(move, kind) { return move + "|" + kind; }
 
@@ -861,7 +868,23 @@ export function movePool() {
     const blocks = day.blocks || {}; const rec = day.recovery || [];
     [].concat(...Object.values(blocks), day.prepMenu || [], rec).forEach(ex => {
       if (!ex || !ex.name || seen[ex.name]) return; seen[ex.name] = true;
-      pool.push({ name: ex.name, cue: ex.cue || "", watch: ex.parentWatch || "", fix: ex.redFlag || "", block: ex.block || "" });
+      /* KID_COACHING first. `parentWatch` and `redFlag` are written for a
+         grown-up watching from the side, and asked to the kid they produced
+         answers like "Smaller range.", "Reach shorter, slow down." and "Slow
+         down, reduce reach." on three different moves at once — a coin flip,
+         not a question. The kid wording names the move's own body part, so no
+         two of them can be mistaken for each other. The grown-up text stays as
+         the fallback, so a move with no kid wording yet is still askable. */
+      const kid = KID_COACHING[ex.name] || {};
+      /* A few cues carry programming and safety notes as well as the cue —
+         "Dizzy >30-45s -> STOP", "[free/back/fly]", "Post-session only". On the
+         session screen that is exactly right. On a quiz card it is a paragraph
+         sitting next to two short phrases, and length alone gives the answer
+         away. KID_COACHING.cue is the short form for the card; the screen and
+         the coach's voice still use the full one. */
+      pool.push({ name: ex.name, cue: kid.cue || ex.cue || "",
+                  watch: kid.watch || ex.parentWatch || "",
+                  fix: kid.fix || ex.redFlag || "", block: ex.block || "" });
     });
   });
   _movePoolCache = pool; return pool;
@@ -885,8 +908,22 @@ export function rankPool(level) {
   });
 }
 
+/* The training principles, as quiz topics: attitude, efficiency, and why
+   results come from repeating the SAME movement rather than a similar one.
+   Authored rather than generated — a principle has no sibling move to borrow a
+   wrong answer from — so each entry carries its own options. Its own key space,
+   like ranks, so the XP ledger never collides with a move called the same. */
+export function principlePool() {
+  return (TRAINING_QS || []).map(entry => ({
+    name: "Principle: " + entry.id, block: "principle", authored: entry
+  }));
+}
+
 /* Every askable question: one per (topic, kind) that actually has content —
-   the moves asked three ways, plus the unlocked rank chapters asked two. */
+   the moves asked three ways, the unlocked rank chapters asked two, and the
+   training principles. This is the WHOLE bank at every tier, which is what
+   keeps the mastery count and the lifetime-XP ceiling stable; what the kid is
+   dealt today is the unlocked subset below. */
 export function questionBank(level) {
   const bank = [];
   movePool().forEach(m => {
@@ -898,7 +935,49 @@ export function questionBank(level) {
     if (r.skill) bank.push([r, "story"]);
     if (r.fact) bank.push([r, "fact"]);
   });
+  principlePool().forEach(p => bank.push([p, "principle"]));
   return bank;
+}
+
+/* ---- the two tiers ----------------------------------------------------------
+   Both athletes are the same age, so age cannot separate an easier question
+   from a harder one; what she has already shown she knows can.
+
+   Tier 1 is recognition — which cue belongs to this move, what this rank
+   taught her. Tier 2 is application — you felt this, so what do you change.
+   A tier-2 question unlocks only once the tier-1 question it builds on is
+   mastered, per topic, so the step up is paced by her and needs no setting.
+
+   The prerequisite is a ledger key, or null for a question that is open from
+   the start. */
+export function questionTier(topic, kind) {
+  if (kind === "fix") return 2;
+  if (kind === "principle") return (topic.authored || {}).tier || 1;
+  return 1;
+}
+export function questionPrereq(topic, kind) {
+  // "If this feels wrong, what's the fix?" only makes sense once she knows what
+  // the move is supposed to feel like — but only if that cue question exists.
+  // A prerequisite that is not itself in the bank can never be mastered, which
+  // would lock its question away for good while still counting its XP as
+  // earnable. No move is in that state today; this keeps a data edit from
+  // putting one there.
+  if (kind === "fix") return topic.cue ? quizQuestionKey(topic.name, "cue") : null;
+  if (kind === "principle") {
+    const after = (topic.authored || {}).after;
+    return after ? quizQuestionKey("Principle: " + after, "principle") : null;
+  }
+  return null;
+}
+
+/* The subset of the bank she can be asked today: every tier-1 question, plus
+   the tier-2 questions whose prerequisite she has already mastered. */
+export function unlockedBank(bank, quiz) {
+  const led = (quiz || loadQuiz()).qLedger || {};
+  return (bank || questionBank()).filter(([topic, kind]) => {
+    const prereq = questionPrereq(topic, kind);
+    return !prereq || (led[prereq] || {}).mastered;
+  });
 }
 
 /* Has today's one paying deck already been completed? */
@@ -930,6 +1009,21 @@ export function payQuizQuestion(key, correct, quiz) {
   q.dayXp = spentToday + wouldPay;
   if (!quiz) saveQuiz(q);        // caller-owned blobs are saved by the caller
   return { xp: wouldPay, firstSeen, newlyMastered, capped: false };
+}
+
+/* Price the TODAY card. Pays only for a correct answer, only once a day, and
+   only within the day's remaining ceiling — so it can never outpay a question
+   that taught her something lasting. */
+export function payTodayQuestion(correct, quiz) {
+  const q = quiz || loadQuiz();
+  if (!correct || q.todayPaidISO === todayISODate()) return { xp: 0, capped: false };
+  if (QXP_TODAY > quizXpLeftToday(q)) return { xp: 0, capped: true };
+  const spentToday = quizXpToday(q);   // read BEFORE rolling dayISO to today
+  q.todayPaidISO = todayISODate();
+  q.dayISO = todayISODate();
+  q.dayXp = spentToday + QXP_TODAY;
+  if (!quiz) saveQuiz(q);              // caller-owned blobs are saved by the caller
+  return { xp: QXP_TODAY, capped: false };
 }
 
 /* Mastery + remaining-XP snapshot over the whole bank. Feeds the kid's

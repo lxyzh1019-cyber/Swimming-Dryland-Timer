@@ -941,6 +941,200 @@ export function rankForLevel(level) {
 }
 
 /* ------------------------------------------------------------
+   KID COACHING — the watch-out and the fix, in her words.
+
+   The Quiz Deck asks "what should you watch out for?" and "if this feels wrong,
+   what's the fix?" and used to answer from `parentWatch` and `redFlag` — notes
+   written for a grown-up watching from the side. Two problems came out of that.
+
+   The wrong answers on a card are drawn from OTHER moves' text, and the grown-up
+   fixes are nearly all the same sentence: "Smaller range.", "Reach shorter, slow
+   down.", "Slow down, reduce reach.", "Slow down, level the pelvis." Three of
+   those on one card is a coin flip, not a question — and since more than one is
+   genuinely right, a right answer could be marked wrong.
+
+   Every line here names the move's OWN body part and shape, so no two of them
+   can be mistaken for each other, and reads as something a coach would say to an
+   eleven-year-old rather than about her. `parentWatch` / `redFlag` stay exactly
+   as they are for the grown-up's Form Check tab — this is the kid-facing pair.
+   ------------------------------------------------------------ */
+export const KID_COACHING = {
+  "Hollow Tuck Flutter": { watch: "Your ribs popping up off the floor while your legs are going",
+                           fix: "Breathe out loud and press your low back flat before the legs move" },
+  "Clean Pull-Ups":      { watch: "Your legs swinging to help your arms get you up",
+                           fix: "The set is over the moment a swing starts — hang still, try again next round" },
+  "Dead Bug":            { watch: "Your low back peeling up off the floor as you reach out",
+                           fix: "Reach a shorter way out, until your low back stays glued down" },
+  "Glute Bridge March":  { watch: "One hip dropping every time the other knee lifts",
+                           fix: "Lift a smaller knee and keep both hip bones exactly level" },
+  "Single-Leg Balance Reach": { cue: "Quiet foot, knee over toe.",
+                           watch: "Your standing knee sliding inward toward your big toe",
+                           fix: "Reach a shorter way and push that knee back out over your toe" },
+  "Band Row":            { watch: "Your shoulders climbing up toward your ears",
+                           fix: "Start the pull by sliding your shoulder blades together, then bend your elbows" },
+  "Bird Dog":            { watch: "Your hips rolling open toward the leg you lifted",
+                           fix: "Keep both hip bones pointing at the floor and reach less far" },
+  "Hip Hinge":           { watch: "Your back rounding over as your hips travel back",
+                           fix: "Send your hips further back and keep your chest flat like a tabletop" },
+  "Pallof Press":        { watch: "Your body turning toward the band as your arms press out",
+                           fix: "Use less band and keep both hips facing straight ahead" },
+  "Side Plank Reach":    { watch: "Your bottom hip sagging down toward the floor",
+                           fix: "Push your bottom hip up to the ceiling and reach less far" },
+  "Superman":            { watch: "Your neck craning up and your arms flapping fast",
+                           fix: "Lift lower, look at the floor, and hold the shape still" },
+  "Drop-and-Stick":      { watch: "Both knees falling in toward each other when you land",
+                           fix: "Stop, set your feet hip-width, and land slower with each knee over its toe" },
+  "Single-Arm Band Row": { watch: "Your chest turning to follow the arm that's pulling",
+                           fix: "Use less band and widen your feet so your chest stays square" },
+  "Band External Rotation": { watch: "Your elbow floating away from your ribs",
+                           fix: "Pin your elbow to your ribs and turn slower" },
+  "Side-Lying ER":       { watch: "Rushing the turn, or using a weight you have to throw",
+                           fix: "Go lighter and take two whole seconds each way" },
+  "Partner Ball Toss":   { watch: "Throwing with all arms, so your hips never load",
+                           fix: "Sink into your hip first, then throw from the legs up" },
+  "Half-Kneeling Chop/Lift": { watch: "Twisting from your low back instead of your hips",
+                           fix: "Turn from your hip and ribs, and slow the whole path down" },
+
+  /* Moves the grown-up notes never covered, so the deck could never ask about
+     them. A watch-out and a fix each is what makes them askable at all. */
+  /* Short cue forms for the quiz card only — see movePool in core/store.js. */
+  "Side-Lying Breath Rehearsal": { cue: "Hum face-down, rotate, quick sip." },
+  "A-Skip":              { cue: "Same as A-March, with a skip rhythm." },
+
+  "Streamline Hold":     { watch: "Your ribs flaring and your arms drifting apart above your head",
+                           fix: "Squeeze your arms behind your ears and pull your ribs down" },
+  "Scap Pull-Up + Dead Hang": { watch: "Bending your elbows instead of sliding your shoulders down",
+                           fix: "Keep your arms dead straight and move only your shoulder blades" },
+  "Chair High-Elbow Catch": { cue: "Forearm turns IN, elbow stays HIGH.",
+                           watch: "Your elbow dropping so the whole arm pulls straight back",
+                           fix: "Turn your forearm in first and keep your elbow high and still" },
+  "Wall Slides":         { watch: "Your low back arching off the wall as your arms go up",
+                           fix: "Press your ribs to the wall and go only as high as they stay there" },
+  "Knee-to-Wall Ankle":  { watch: "Your heel lifting as your knee reaches for the wall",
+                           fix: "Move closer only while your heel stays stuck to the floor" },
+  "Short-Foot":          { watch: "Curling your toes under instead of lifting your arch",
+                           fix: "Keep your toes long and flat and draw the ball of your foot toward your heel" },
+  "Forearm Plank Dolphin Undulation": { watch: "The wave starting at your knees instead of your middle",
+                           fix: "Start the wave at your ribs and keep your legs long" },
+  "Long-Axis Rotation Roll": { cue: "Roll as one unit, driven from the hip.",
+                           watch: "Your head rolling along with your body",
+                           fix: "Keep your head still and roll from your hips and ribs" },
+  "Jump Rope":           { watch: "Loud, flat landings on your whole foot",
+                           fix: "Stay on the balls of your feet and make every landing quiet" },
+  "Cat-Camel":           { watch: "Moving your whole back at once instead of bit by bit",
+                           fix: "Move one part of your spine at a time, slowly" },
+  "Band Pass-Through":   { watch: "Your shoulders shrugging up to get the band over",
+                           fix: "Widen your hands and keep your shoulders down the whole way round" },
+  "90/90 Hip Switch":    { watch: "Slumping backwards as your knees swap over",
+                           fix: "Sit tall, lean on your hands less, and let your knees lead the switch" },
+  "A-March":             { watch: "Your foot landing out in front of your body",
+                           fix: "Put your foot down underneath your hip, toe pulled up" },
+  "Carioca":             { watch: "Your shoulders turning along with your hips",
+                           fix: "Keep your chest facing forward and turn only your hips" },
+  "Breaststroke Kick Shape": { watch: "Your knees swinging wide apart",
+                           fix: "Keep your knees inside your hips and turn your feet out instead" },
+  "Towel-Band Catch Pull": { watch: "Your elbow leading the pull instead of your hand anchoring it",
+                           fix: "Hold the elbow high and pull your body past your hand" },
+  "Open-Book / T-Rotation": { watch: "Your knees falling apart as your top arm opens",
+                           fix: "Keep your knees stacked and stop where they start to lift" }
+};
+
+/* ------------------------------------------------------------
+   TRAINING PRINCIPLES — attitude, efficiency, and why it works.
+
+   Everything else the app asks about is a move or a rank: what a cue is, which
+   chapter taught what. Nothing ever asked her about training itself — whether a
+   bad-sleep day is worth training, whether ten sloppy reps beat six clean ones,
+   or why the same moves keep coming back week after week.
+
+   That last one is the point of this set. Results come from repeating the SAME
+   movement, not a similar one. A different exercise that works the same muscles
+   builds a different skill, and swapping it in restarts the learning — which is
+   the single thing a kid bored of week six most needs to hear, and the single
+   thing she is most likely to get wrong on her own.
+
+   Authored, not generated: a principle has no sibling move to borrow a wrong
+   answer from. Every wrong option here is something an eleven-year-old actually
+   believes, so the card cannot be solved by spotting the silly one.
+
+   `tier: 2` waits until the `after` question is mastered — see questionPrereq
+   in core/store.js.
+   ------------------------------------------------------------ */
+export const TRAINING_QS = [
+  { id: "honest", kind: "attitude", tier: 1,
+    q: "You slept badly and you feel flat. What does the Body Check want to hear?",
+    why: "Honest answers are the only thing Coach can pick a day from. A smaller day done properly still builds you — a big day faked doesn't.",
+    opts: [
+      { t: "The truth — then train the day Coach gives me", ok: true },
+      { t: "That I feel great, so I still get the full session", ok: false },
+      { t: "Nothing — skip today and do double tomorrow", ok: false } ] },
+
+  { id: "wrongrep", kind: "attitude", tier: 2, after: "honest",
+    q: "You marked a set wobbly and the app wrote it down. What is that worth?",
+    why: "A rep you got wrong and noticed is worth more than one you got right by luck — it tells you exactly what to fix next time.",
+    opts: [
+      { t: "It tells me which part to fix next time", ok: true },
+      { t: "Nothing — wobbly sets don't count", ok: false },
+      { t: "It cancels out the sets I did clean", ok: false } ] },
+
+  { id: "showup", kind: "attitude", tier: 1,
+    q: "Which week makes a faster swimmer?",
+    why: "Four ordinary sessions beat one heroic one. Your body changes from what you do most weeks, not from your best day.",
+    opts: [
+      { t: "Four ordinary sessions I actually finished", ok: true },
+      { t: "One huge session and three days off", ok: false },
+      { t: "Whichever week felt hardest", ok: false } ] },
+
+  { id: "clean6", kind: "efficiency", tier: 1,
+    q: "Ten sloppy reps or six clean ones — which one makes you faster?",
+    why: "Your body learns the shape you repeat. Sloppy reps are still practice; they just teach the sloppy shape.",
+    opts: [
+      { t: "Six clean ones", ok: true },
+      { t: "Ten sloppy ones — more reps is more work", ok: false },
+      { t: "Neither — only swimming makes you faster", ok: false } ] },
+
+  { id: "rest", kind: "efficiency", tier: 2, after: "clean6",
+    q: "Why is the rest between rounds part of the workout?",
+    why: "Rest is what buys the next round its quality. Skip it and round three teaches your body a tired, messy shape.",
+    opts: [
+      { t: "It's what lets the next round be as clean as the first", ok: true },
+      { t: "It's a break so the session isn't boring", ok: false },
+      { t: "It's there to stretch the session out to 30 minutes", ok: false } ] },
+
+  { id: "rushing", kind: "efficiency", tier: 2, after: "clean6",
+    q: "You're racing the timer to squeeze the last reps in. What does that cost you?",
+    why: "The timer is a fence, not a race. Reps crammed in at the end are the ones your body remembers worst.",
+    opts: [
+      { t: "The last reps are the sloppiest, so they teach the worst shape", ok: true },
+      { t: "Nothing — finishing the set is what matters", ok: false },
+      { t: "Only time, and I get to finish sooner", ok: false } ] },
+
+  { id: "sameagain", kind: "results", tier: 1,
+    q: "Why do the same moves keep coming back every week?",
+    why: "A movement only becomes automatic when you repeat THE SAME movement. Variety feels fun; repetition is what actually changes you.",
+    opts: [
+      { t: "Repeating the same movement is what makes it automatic", ok: true },
+      { t: "So the app doesn't have to think up new ones", ok: false },
+      { t: "Because they're the easiest ones to set up at home", ok: false } ] },
+
+  { id: "swapit", kind: "results", tier: 2, after: "sameagain",
+    q: "A different exercise works the same muscles. Can you swap it in?",
+    why: "Your body learns the exact movement you practise, not the muscle group. A similar exercise builds a similar skill — not the same one — and the swap starts the learning over.",
+    opts: [
+      { t: "No — a similar movement builds a similar skill, not the same one", ok: true },
+      { t: "Yes — same muscles means the same result", ok: false },
+      { t: "Yes, as long as the new one is harder", ok: false } ] },
+
+  { id: "gotboring", kind: "results", tier: 2, after: "sameagain",
+    q: "Six weeks of Glute Bridge March and it feels easy now. What should change?",
+    why: "Same movement, more challenge — slower, longer, heavier. Trading it for a new exercise throws away six weeks of learning and starts a different skill from zero.",
+    opts: [
+      { t: "Keep the same move and make it harder — slower, longer, more load", ok: true },
+      { t: "Swap it for a new exercise so it stays interesting", ok: false },
+      { t: "Drop it — easy means I've finished learning it", ok: false } ] }
+];
+
+/* ------------------------------------------------------------
    READINESS CHECK (4-Q + body map) — from the Assessment prototype.
    ------------------------------------------------------------ */
 /* The pain question is LAST, and that ordering is load-bearing.
@@ -1020,29 +1214,113 @@ export const POSES = {
 
 /* Coach's Quiz — the questions the finish screen asks, connecting today's
    land work to the sport. Rotated by core/vm/session.js sessionQuizFor(). */
+/* ------------------------------------------------------------
+   THE COACH'S QUIZ — one card at the end of every session.
+
+   This bank had six questions and every wrong answer was a joke: "Comfier
+   goggles", "Louder splashing", "It keeps your socks on". The right answer was
+   always the only real coaching sentence, so she could score six out of six
+   knowing nothing at all — which is exactly why the quiz stopped meaning
+   anything to her. A wrong answer here is now something TRUE of a different
+   move, or something a swimmer her age genuinely believes. You have to know
+   which one applies.
+
+   Eighteen of them now, not six, so the end-of-session card stops coming back
+   round every few days.
+
+   `tier: 2` questions are application — you felt this, so what do you change —
+   and stay closed until the `after` question is mastered. Ids are the XP ledger
+   keys ("coach|<id>"), so the original six keep theirs and nothing she has
+   already learned gets charged for twice.
+   ------------------------------------------------------------ */
 export const SESSION_QUIZ = [
-  { id: "superman", q: "Why do we practice Superman holds on land?", why: "A strong Superman hold = a strong streamline off every wall.", opts: [
-    { t: "To get better at flying", ok: false },
+  { id: "superman", tier: 1, q: "Why do we practise Superman holds on land?", why: "A strong Superman hold = a strong streamline off every wall.", opts: [
     { t: "To build a long, tight streamline for push-offs", ok: true },
-    { t: "To make our arms tired", ok: false } ] },
-  { id: "squat", q: "Squats make your legs stronger. Where does that power show up in the pool?", why: "Every start and turn is a jump — leg power is pool speed.", opts: [
+    { t: "To make the catch at the front of the stroke stronger", ok: false },
+    { t: "To keep the hips level while one leg is working", ok: false } ] },
+
+  { id: "squat", tier: 1, q: "Squats make your legs stronger. Where does that power show up in the pool?", why: "Every start and turn is a jump — leg power is pool speed.", opts: [
     { t: "Faster starts and turns off the block and wall", ok: true },
-    { t: "Comfier goggles", ok: false },
-    { t: "Louder splashing", ok: false } ] },
-  { id: "clean", q: "Why does Coach say “slow and clean beats fast and sloppy”?", why: "Your body learns the shape you practice — so practice the good one.", opts: [
-    { t: "Because slow is easier", ok: false },
+    { t: "A longer, straighter body line down the pool", ok: false },
+    { t: "More push per kick from the ankles", ok: false } ] },
+
+  { id: "clean", tier: 1, q: "Why does Coach say \u201cslow and clean beats fast and sloppy\u201d?", why: "Your body learns the shape you practise — so practise the good one.", opts: [
     { t: "Clean shapes on land become clean strokes in the water", ok: true },
-    { t: "So the timer lasts longer", ok: false } ] },
-  { id: "core", q: "Why do we brace our core (like a strong tube) during land work?", why: "A braced core stops your middle from bending, so your push and pull don't leak power.", opts: [
-    { t: "So you can hold your breath longer", ok: false },
+    { t: "Slow reps use up more energy, so they count for more", ok: false },
+    { t: "Going slowly is how you avoid getting out of breath", ok: false } ] },
+
+  { id: "core", tier: 1, q: "Why do we brace our core (like a strong tube) during land work?", why: "A braced core stops your middle from bending, so your push and pull don't leak power.", opts: [
     { t: "A stiff middle sends leg and arm power straight down the pool", ok: true },
-    { t: "To look tough", ok: false } ] },
-  { id: "balance", q: "Balance moves (like Single-Leg Balance) — what do they build for swimming?", why: "Steady hips and ankles keep your body straight and long instead of wobbling and slowing down.", opts: [
+    { t: "It opens the shoulders so the catch can go deeper", ok: false },
+    { t: "It trains you to hold your breath longer underwater", ok: false } ] },
+
+  { id: "balance", tier: 1, q: "Balance moves (like Single-Leg Balance) — what do they build for swimming?", why: "Steady hips and ankles keep your body straight and long instead of wobbling and slowing down.", opts: [
     { t: "A stable, straight body line that glides instead of wobbles", ok: true },
-    { t: "Bigger splashes", ok: false },
-    { t: "Faster blinking", ok: false } ] },
-  { id: "toes", q: "Why do we point our toes in kicking-shape drills on land?", why: "Pointed toes make your foot a longer paddle, so each kick pushes more water.", opts: [
-    { t: "It looks like ballet", ok: false },
+    { t: "More power off the wall on every turn", ok: false },
+    { t: "A higher elbow at the front of the stroke", ok: false } ] },
+
+  { id: "toes", tier: 1, q: "Why do we point our toes in kicking-shape drills on land?", why: "Pointed toes make your foot a longer paddle, so each kick pushes more water.", opts: [
     { t: "Pointed feet act like paddles — more push per kick", ok: true },
-    { t: "It keeps your socks on", ok: false } ] }
+    { t: "It stops the knees bending too much in the kick", ok: false },
+    { t: "It keeps your ankles from getting sore", ok: false } ] },
+
+  { id: "hollow", tier: 1, q: "Hollow Tuck Flutter — ribs down, low back glued to the floor. What is that teaching?", why: "A flutter kick only travels if the middle stays still. Ribs down is the shape you kick from.", opts: [
+    { t: "To hold one straight line while the legs move underneath", ok: true },
+    { t: "To breathe out slowly while your legs are working", ok: false },
+    { t: "To make your stomach muscles bigger", ok: false } ] },
+
+  { id: "deadhang", tier: 1, q: "Scap Pull-Up + Dead Hang — the shoulders slide DOWN before anything bends. Why?", why: "Your shoulder blades set the position every pull starts from. Bend first and the pull starts from nowhere.", opts: [
+    { t: "Your shoulder blades set the position every pull starts from", ok: true },
+    { t: "It's a stretch, so it loosens the shoulders before you swim", ok: false },
+    { t: "Hanging makes your arms longer so you reach further", ok: false } ] },
+
+  { id: "pullups", tier: 1, q: "Clean Pull-Ups — no swinging, no kipping. What does the \u201cclean\u201d part build?", why: "A pull you control is a pull that travels. A swing borrows from your legs and teaches your arms nothing.", opts: [
+    { t: "The pulling shape your stroke actually starts from", ok: true },
+    { t: "Grip strength for holding on to the wall", ok: false },
+    { t: "Bigger arms, so the pull is stronger", ok: false } ] },
+
+  { id: "pallof", tier: 1, q: "Pallof Press — the band tries to twist you and you don't let it. What is that for?", why: "One arm pulls at a time. Anti-twist is what stops your whole body snaking after it.", opts: [
+    { t: "Staying straight in the water while one arm pulls", ok: true },
+    { t: "Making your flip turn spin faster", ok: false },
+    { t: "Making one side of your arms stronger than the other", ok: false } ] },
+
+  { id: "jumprope", tier: 1, q: "Jump Rope — off the toes, quiet, tall. Why does Coach want it QUIET?", why: "Quiet is springy. A loud landing is a leg absorbing the jump instead of returning it.", opts: [
+    { t: "Quiet means the ankles are springing, not crashing", ok: true },
+    { t: "Quiet means you're landing flat, so your legs get a rest", ok: false },
+    { t: "Quiet means you're going slowly enough to stay in control", ok: false } ] },
+
+  { id: "hinge", tier: 1, q: "Hip Hinge — flat back, hips travel backwards. What is that protecting?", why: "The hips are built to bend under load. The lower back is not.", opts: [
+    { t: "Your lower back — the hips do the bending, not the spine", ok: true },
+    { t: "Your knees, by keeping them completely straight", ok: false },
+    { t: "Your shoulders, by keeping them pulled down", ok: false } ] },
+
+  { id: "fixstreamline", tier: 2, after: "superman", q: "Your streamline keeps coming apart off the wall. Which land move goes after that?", why: "Fix the shape where you can hold it still, then take it to the wall.", opts: [
+    { t: "Superman holds — the very same long, tight shape", ok: true },
+    { t: "Squats — you need a harder push off the wall", ok: false },
+    { t: "Band Pass-Through — looser shoulders would help", ok: false } ] },
+
+  { id: "busykick", tier: 2, after: "toes", q: "Your kick feels busy but you aren't going anywhere. What's the most likely reason?", why: "A kick from the knee with a loose ankle is a lot of splashing and no push. It starts at the hip and finishes through a long, pointed foot.", opts: [
+    { t: "It's coming from the knee, with the ankle flopping", ok: true },
+    { t: "You simply aren't kicking hard enough yet", ok: false },
+    { t: "Your arms are pulling too early in the stroke", ok: false } ] },
+
+  { id: "roundthree", tier: 2, after: "clean", q: "Round three, and your form has gone. What's the right call?", why: "The shape is the point of the round. A round trained sloppy is practice at being sloppy.", opts: [
+    { t: "Slow down and hold the shape — a clean round is what counts", ok: true },
+    { t: "Push harder, the last round is where the gains are", ok: false },
+    { t: "Skip ahead and come back to it at the end", ok: false } ] },
+
+  { id: "ankletalk", tier: 2, after: "balance", q: "You feel Single-Leg Balance mostly in your ankle, not your hip. What does that tell you?", why: "A busy ankle means the hip has stopped doing its job. Shorten the reach until the hip takes it back.", opts: [
+    { t: "The foot is fighting for balance — reach shorter and slow down", ok: true },
+    { t: "It's working exactly right; ankles are what balance is for", ok: false },
+    { t: "You're ready for the harder eyes-closed version", ok: false } ] },
+
+  { id: "bracewhen", tier: 2, after: "core", q: "Why brace your middle BEFORE the hard part, not during it?", why: "A middle braced late has already bent, and the power leaked out through the bend.", opts: [
+    { t: "Brace late and it has already bent — the power leaked", ok: true },
+    { t: "Bracing after means you get one more breath in first", ok: false },
+    { t: "It makes no difference as long as you brace at some point", ok: false } ] },
+
+  { id: "deadbugback", tier: 2, after: "hollow", q: "Dead Bug — your low back keeps lifting off the floor. What do you change?", why: "Shorten the reach until the back stays down. The range you can hold is the range that's training you.", opts: [
+    { t: "Make the reach smaller until the back stays glued down", ok: true },
+    { t: "Press harder into the floor with your arms", ok: false },
+    { t: "Speed up, so the back has no time to lift", ok: false } ] }
 ];

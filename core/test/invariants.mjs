@@ -20,7 +20,7 @@
    Run by `npm test`.
    ============================================================ */
 
-import { data, util, store, engine, outcome, svm, tvm, pvm, gvm, gscreen,
+import { data, util, store, engine, outcome, svm, tvm, pvm, gvm, gscreen, overlays,
          runSession, answerChecks } from "./harness.mjs";
 
 let passed = 0;
@@ -541,6 +541,214 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
 
   const vm = svm.buildSessionVM({ detailEx: {}, isWide: true });
   ok((vm.microOpts || []).includes(ml.a), "the session screen offers the answer the engine grades against");
+}
+
+/* ============================================================
+   N+1. A QUESTION HAS EXACTLY ONE ANSWER SHE COULD PICK
+
+   The kids' verdict on the questions was that they were too general. Two
+   separate causes, and both are properties of a generated card rather than of
+   any one function:
+
+   Wrong answers on a Quiz Deck card are drawn from OTHER moves' text, and that
+   text was the grown-up's — nearly all of it the same sentence. "Smaller
+   range.", "Reach shorter, slow down.", "Slow down, reduce reach." Three of
+   those on one card is a coin flip; worse, more than one is genuinely right, so
+   the app could mark a right answer wrong. Four skating moves shared a
+   watch-out word for word.
+
+   And on the Coach's Quiz every wrong answer was a joke — "Comfier goggles",
+   "Louder toe picks" — so the only real sentence was always the right one and
+   the card could be solved without knowing anything.
+
+   So: generate a lot of cards and assert the properties. This is the check that
+   found both problems, run for keeps.
+   ============================================================ */
+{
+  const shape = t => String(t || "").toLowerCase().replace(/[^a-z ]/g, " ")
+    .split(/\s+/).filter(w => w.length > 2).sort().join(" ");
+  const lead = t => String(t || "").toLowerCase().split(/[,.\/;:]/)[0].trim();
+
+  localStorage.clear(); store.migrate();
+  let cards = 0, sameText = 0, sameLead = 0, noAnswer = 0, twoAnswers = 0, lengthTell = 0;
+  for (let i = 0; i < 60; i++) {
+    overlays.buildQuizDeck(8).qs.forEach(q => {
+      cards++;
+      const right = q.opts.filter(o => o.ok);
+      if (!right.length) noAnswer++;
+      if (right.length > 1) twoAnswers++;
+      if (!right.length) return;
+      const correct = right[0].t;
+      q.opts.filter(o => !o.ok).forEach(o => {
+        if (shape(correct) === shape(o.t)) sameText++;
+        if (lead(correct) && lead(correct) === lead(o.t)) sameLead++;
+      });
+    });
+  }
+  ok(cards > 100, "the deck generates cards to check (" + cards + ")");
+  same(noAnswer, 0, "every card has an answer that is right");
+  same(twoAnswers, 0, "and only one of them");
+  same(sameText, 0, "no card offers the same answer twice in different words");
+  same(sameLead, 0, "and no card offers two answers that open with the same advice");
+
+  // Length is a tell. A few cues carry programming and safety notes as well as
+  // the cue — "Dizzy >30-45s -> STOP", "[free/back/fly]" — and next to two short
+  // phrases the long one is obviously the real answer. KID_COACHING.cue is the
+  // short form for the card; this keeps a future edit from undoing it.
+  const longCue = store.movePool().filter(m => m.cue && m.cue.length > 60);
+  same(longCue.length, 0,
+    "no quiz cue is long enough to give itself away" +
+    (longCue.length ? " (" + longCue.map(m => m.name).join(", ") + ")" : ""));
+  const longAnswer = store.movePool().filter(m => m.watch && m.watch.length > 80)
+    .concat(store.movePool().filter(m => m.fix && m.fix.length > 80));
+  same(longAnswer.length, 0, "and no watch-out or fix is either");
+
+  // The Coach's Quiz and the training principles are authored, so check the
+  // authored shape directly: one right answer, no dangling prerequisite, and no
+  // wrong answer so much shorter than the right one that length gives it away.
+  const authored = [...data.SESSION_QUIZ, ...data.TRAINING_QS];
+  const ids = new Set(data.SESSION_QUIZ.map(q => q.id));
+  const pids = new Set(data.TRAINING_QS.map(q => q.id));
+  authored.forEach(q => {
+    ok(q.opts.filter(o => o.ok).length === 1, "“" + q.q + "” has exactly one right answer");
+    ok(q.opts.length >= 3, "“" + q.q + "” offers a real choice");
+    const right = q.opts.find(o => o.ok).t;
+    q.opts.filter(o => !o.ok).forEach(o => {
+      if (o.t.length * 2 < right.length) lengthTell++;
+    });
+  });
+  same(lengthTell, 0, "no wrong answer is so much shorter than the right one that length gives it away");
+  data.SESSION_QUIZ.forEach(q => ok(!q.after || ids.has(q.after),
+    "every Coach's Quiz prerequisite names a question that exists"));
+  data.TRAINING_QS.forEach(q => ok(!q.after || pids.has(q.after),
+    "every training-principle prerequisite names a question that exists"));
+  ok(new Set(data.SESSION_QUIZ.map(q => q.id)).size === data.SESSION_QUIZ.length,
+    "Coach's Quiz ids are unique, so the XP ledger can key on them");
+  ok(data.SESSION_QUIZ.length >= 12,
+    "the Coach's Quiz is big enough not to come round again within a fortnight");
+
+  // ...and it must actually not come round again. Rotating the whole bank by
+  // session count moved the index by one per session, so a question she had
+  // already got right came back within the week while a dozen she had never
+  // seen waited their turn.
+  localStorage.clear(); store.migrate();
+  const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  const asked = [];
+  for (let i = 0; i < 12; i++) {
+    const q = svm.sessionQuizFor(days[i % 7]);
+    asked.push(q.id);
+    const z = store.loadQuiz();
+    z.qLedger[store.quizQuestionKey("coach", q.id)] = { attempted: true, mastered: true };
+    store.saveQuiz(z);
+    store.saveSession({ app: "x", isoDate: new Date().toISOString(), dayKey: days[i % 7], ledger: [] });
+  }
+  same(new Set(asked).size, asked.length,
+    "the Coach's Quiz asks something new every session until she has learned them all");
+  localStorage.clear(); store.migrate();
+
+  // Coverage. Before the kid wording existed only 17 of 55 moves carried a
+  // watch-out or a fix at all, so an 8-card deck was nearly all "which cue
+  // belongs to which move" — name-matching, not understanding.
+  const pool = store.movePool();
+  const withWatch = pool.filter(m => m.watch).length;
+  const withFix = pool.filter(m => m.fix).length;
+  ok(withWatch >= pool.length * 0.6,
+    "most moves carry a watch-out (" + withWatch + " of " + pool.length + ")");
+  ok(withFix >= pool.length * 0.6,
+    "and most carry a fix (" + withFix + " of " + pool.length + ")");
+}
+
+/* ============================================================
+   N+2. THE HARDER TIER WAITS UNTIL SHE HAS EARNED IT
+
+   Both athletes are the same age, so age cannot separate an easier question
+   from a harder one — what she has already shown she knows can. A tier-2
+   question ("that felt wrong, so what do you change?") is unfair before the
+   tier-1 question it builds on is mastered, and stays out of the bank until it
+   is. Nothing to configure, and it moves at her pace.
+   ============================================================ */
+{
+  localStorage.clear(); store.migrate();
+  const bank = store.questionBank();
+  const locked = store.unlockedBank(bank, store.loadQuiz());
+  ok(locked.length < bank.length, "on a fresh device the harder tier is not dealt yet");
+  ok(locked.every(([topic, kind]) => store.questionTier(topic, kind) === 1
+      || !store.questionPrereq(topic, kind)),
+    "and nothing dealt has an unmet prerequisite");
+
+  const gated = bank.find(([t, k]) => store.questionPrereq(t, k));
+  ok(!!gated, "there is a question that waits on another");
+  const quiz = store.loadQuiz();
+  quiz.qLedger[store.questionPrereq(gated[0], gated[1])] = { attempted: true, mastered: true };
+  store.saveQuiz(quiz);
+  const after = store.unlockedBank(bank, store.loadQuiz());
+  ok(after.length > locked.length, "mastering the tier-1 question opens the tier-2 one");
+  ok(after.some(([t, k]) => t.name === gated[0].name && k === gated[1]),
+    "and the one it opens is the one that was waiting");
+
+  // Nothing may be locked behind a prerequisite that is not itself askable —
+  // it could never be mastered, so the question would be unreachable for good
+  // while its XP still counted toward the ceiling the grown-up screen shows.
+  const keys = new Set(bank.map(([t, k]) => store.quizQuestionKey(t.name, k)));
+  const unreachable = bank.filter(([t, k]) => {
+    const pre = store.questionPrereq(t, k);
+    return pre && !keys.has(pre);
+  });
+  same(unreachable.length, 0, "every question can eventually be unlocked");
+
+  // The whole bank is still the whole bank: the mastery count and the lifetime
+  // XP ceiling are promises that must not move when a tier unlocks.
+  same(store.questionBank().length, bank.length, "the bank itself does not grow when a tier opens");
+  localStorage.clear(); store.migrate();
+}
+
+/* ============================================================
+   N+3. ONE CARD IS ABOUT TODAY
+
+   Every other question in the deck is a fact about the plan, true whether or
+   not she trained — which is the whole reason the set read as general. This one
+   is built from the session she just finished, and it pays by the day rather
+   than through the lifetime ledger, because a question that renews daily would
+   otherwise make "quiz XP is finite" untrue.
+   ============================================================ */
+{
+  localStorage.clear(); store.migrate();
+  ok(!overlays.buildQuizDeck(8).qs.some(q => q.kind === "today"),
+    "with nothing trained there is nothing to ask about today");
+
+  await runSession({ dayKey: "tuesday", light: "yellow", gateUnlocked: true }, {
+    onTick: (ms, sess) => { if (sess.phase === "formcheck") engine.pickWobbly(); }
+  });
+
+  const deck = overlays.buildQuizDeck(8);
+  const todayCard = deck.qs.find(q => q.kind === "today");
+  ok(!!todayCard, "after a session the deck opens with a card about that session");
+  same(deck.qs[0].kind, "today", "and it is dealt first, so it is never crowded out");
+  ok(todayCard.opts.filter(o => o.ok).length === 1, "the today card has exactly one right answer");
+
+  const last = store.loadSessions().slice(-1)[0];
+  const namesToday = todayCard.prompt.includes("wobbly")
+    || todayCard.prompt.includes(String(last.roundsPlanned))
+    || todayCard.prompt.includes(String(last.roundsDone))
+    || (last.intentWord && todayCard.prompt.includes(last.intentWord));
+  ok(namesToday, "and it names something from the session she actually trained");
+
+  // It is not a move, so it must not file itself under one, and it must not be
+  // priced through the ledger that makes lifetime quiz XP finite.
+  const before = store.quizBankStatus();
+  const qd = overlays.buildQuizDeck(8);
+  qd.qs.forEach((qq, i) => { qd.idx = i; overlays.answerQuizDeck(qd, qq.opts.findIndex(o => o.ok)); });
+  overlays.finishQuizDeck(qd);
+  ok(!(store.loadQuiz().items || {}).Today, "the today card files no mastery row under a move nobody trains");
+  same(store.quizBankStatus().total, before.total, "and it never joins the finite bank");
+
+  // A second deck the same day pays nothing for it, so it cannot be farmed.
+  const q2 = store.loadQuiz();
+  const xpBefore = q2.dayXp || 0;
+  const res = store.payTodayQuestion(true);
+  same(res.xp, 0, "today's card pays once a day and no more");
+  same(store.loadQuiz().dayXp || 0, xpBefore, "and a repeat costs the day's ceiling nothing");
+  localStorage.clear(); store.migrate();
 }
 
 console.log("✓ invariants passed (" + passed + " assertions)");
