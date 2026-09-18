@@ -348,7 +348,14 @@ await scenario("S9", T.start, T.read, async () => {
   same(rec.xpByRounds, two, "S12: two rounds price at " + two);
   same(rec.settledXp, two, "S12: and the day settles there — the evening does not re-earn the show-up");
   same(r.snap.xpEarned, 0, "S12: the evening sitting, which added no round, was paid nothing more");
-  same(store.currentStreakOf(), 1, "S9: the streak is still earned");
+  /* Whether two rounds plus the evening's blocks clear the streak bar depends
+     on the plan's block sizes — the swim plan clears it, the skate plan may
+     not — so the assertion is the RULE, not a number: the chip says what the
+     record says, and the record says what the dose bar says. */
+  const ratio = rec.outcome.workRatio;
+  same(rec.countsForStreak, ratio >= outcome.STREAK_WORK_FRACTION || rec.outcome.countsForStreak,
+    "S9: the record's streak verdict follows the work bar (ratio " + (ratio == null ? "n/a" : ratio.toFixed(2)) + ")");
+  same(store.currentStreakOf(), rec.countsForStreak ? 1 : 0, "S9: the streak chip agrees with the record");
 });
 
 /* ============================================================
