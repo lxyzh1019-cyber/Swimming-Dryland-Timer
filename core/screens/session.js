@@ -324,10 +324,26 @@ function completeScreen(vm) {
       <span>${escapeHtml(vm.paceNote)}</span>
     </div>` : ""}
     ${vm.sessionMantra && c.mantra ? `<div style="font-family:var(--font-hand);font-size:26px;font-weight:700;color:var(--aqua-ink);line-height:1.2;">${vm.sessionMantra}</div>` : ""}
-    <div style="font-size:16px;font-weight:700;color:var(--ink-soft);">${vm.sessionDayTitle}${vm.explore ? "" : ` · ${vm.sessionMinutes} min`}${vm.showRoundsLine ? ` · ${vm.roundsLine}` : ""}${vm.xpEarned ? ` · ⭐ +${vm.xpEarned} XP` : ""}</div>
+    <div style="font-size:16px;font-weight:700;color:var(--ink-soft);">${vm.sessionDayTitle}${vm.explore ? "" : ` · ${vm.sessionMinutes} min`}${vm.showRoundsLine ? ` · ${vm.roundsLine}` : ""}${vm.xpLine ? ` · ⭐ ${escapeHtml(vm.xpLine)}` : ""}</div>
     ${vm.showRoundsLine && (vm.roundShortNotes || []).length ? `
     <div style="font-size:14px;font-weight:700;color:var(--ink-soft);max-width:480px;line-height:1.5;">
       ${vm.roundShortNotes.map(n => `<div>${n}</div>`).join("")}
+    </div>` : ""}
+    ${(vm.moveReview || []).length ? `
+    <div style="max-width:520px;width:100%;box-sizing:border-box;text-align:left;">
+      <button type="button" data-action="toggleMoveReview" aria-expanded="${vm.moveReviewOpen ? "true" : "false"}" style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:2px solid var(--hairline);border-radius:var(--radius-pill);padding:9px 16px;cursor:pointer;font-weight:900;font-size:14px;color:var(--ink);font-family:inherit;min-height:44px;">See every move ${vm.moveReviewOpen ? "▴" : "▾"}</button>
+      ${vm.moveReviewOpen ? `
+      <div style="margin-top:10px;background:var(--surface);border-radius:16px;padding:12px 14px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:2px;" data-move-review-list="1">
+        <div style="font-size:11px;font-weight:800;color:var(--ink-soft);line-height:1.35;padding-bottom:6px;border-bottom:1px solid var(--hairline);margin-bottom:4px;">${escapeHtml(vm.moveReviewLegend)}</div>
+        ${vm.moveReview.map(r => `
+        <div style="display:flex;align-items:flex-start;gap:9px;padding:5px 0;font-size:13px;font-weight:700;color:var(--ink);" data-move-review="${escapeHtml(r.status)}">
+          <span style="${r.pillStyle}" aria-label="${escapeHtml(r.status)}">${r.icon}</span>
+          <span style="flex:1;min-width:0;">
+            <span>${r.roundLabel ? `<span style="color:var(--ink-faint);font-size:11px;font-weight:900;margin-right:5px;">${r.roundLabel}</span>` : ""}${escapeHtml(r.name)}${r.doseLabel ? ` <span style="color:var(--ink-soft);font-weight:800;">· ${escapeHtml(r.doseLabel)}</span>` : ""}</span>
+            ${r.reason ? `<span style="display:block;font-size:12px;font-weight:700;color:var(--ink-soft);line-height:1.35;">${escapeHtml(r.reason)}</span>` : ""}
+          </span>
+        </div>`).join("")}
+      </div>` : ""}
     </div>` : ""}
     ${vm.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="display:flex;align-items:center;gap:10px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:14px 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
     ${vm.saveFailed ? `

@@ -9,7 +9,8 @@
    ============================================================ */
 
 import { deriveSessionOutcome, mainRoundsFromLedger, mainRoundReport, OUTCOME_VERSION,
-         mergeLedgerRows, logicalRowId, workoutDate, paceReport } from "./outcome.js";
+         mergeLedgerRows, logicalRowId, workoutDate, paceReport,
+         moveReviewReason, moveReviewDose } from "./outcome.js";
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BREATH_SAY, MANTRA,
          exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
          needsSetup, SETUP_SECONDS,
@@ -1575,6 +1576,10 @@ export function dayPlanState(dayKey, opts = {}) {
 
   const blocks = [];
   const owed = [];
+  /* ONE ROW PER PLANNED PERFORMANCE, with its verdict and the reason for it —
+     the per-move review the day card and the finish screen both show. Built
+     here, beside the counts, so the list and the numbers cannot disagree. */
+  const moves = [];
   let planned = 0, done = 0, performed = 0;
   const seen = new Set(), didMove = new Set(), touched = new Set();
   circuits.forEach(c => {
@@ -1588,6 +1593,18 @@ export function dayPlanState(dayKey, opts = {}) {
         const row = byId.get(id);
         planned++; bPlanned++; bSecs += refTime(ex);
         seen.add(ex.name);
+        const status = !row ? "missing"
+          : row.banked ? "banked"
+          : row.status === "done" ? "done"
+          : row.status === "partial" ? "partial"
+          : "skipped";
+        const dose = moveReviewDose(row);
+        moves.push({
+          block: c.block, circuit: c.name, round, name: ex.name,
+          dose: ex.dose || ex.repsDetail || "",
+          status, got: dose.got, planned: dose.planned, driver: dose.driver,
+          reason: moveReviewReason(row, status)
+        });
         /* PERFORMED is not the same question as DONE, and the card needs both.
            `done` is the engine's verdict against its 80% floor and is what the
            resume and the round rule turn on. `performed` is simply "she was
@@ -1612,7 +1629,7 @@ export function dayPlanState(dayKey, opts = {}) {
   });
 
   return {
-    light, circuits, blocks, owed, rows,
+    light, circuits, blocks, owed, rows, moves,
     planned, done, performed,
     movements: seen.size,
     movementsDone: didMove.size,

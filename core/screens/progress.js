@@ -87,7 +87,11 @@ function weekTable(vm) {
       </thead>
       <tbody>
         ${row("Planned", d => escapeHtml(d.plannedLabel))}
-        ${row("Movements", d => escapeHtml(d.movesLabel))}
+        <!-- Two units, two names. One row called "Movements" used to hold a
+             performance count while the day card called distinct moves by
+             the same word. -->
+        ${row("Performances", d => escapeHtml(d.performancesLabel))}
+        ${row("Movements", d => escapeHtml(d.movementsLabel) + (d.forLabel ? `<div style="font-size:9px;font-weight:800;color:var(--ink-faint);">${escapeHtml(d.forLabel)}</div>` : ""))}
         ${row("Skipped", d => escapeHtml(d.skippedLabel))}
         ${row("Main rounds", d => escapeHtml(d.roundsLabel))}
         ${row("Ended early", d => escapeHtml(d.earlyLabel))}
@@ -120,6 +124,8 @@ export function progressScreen(vm) {
         </div>
         <div style="flex:1;min-width:220px;background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-xl);padding:16px 18px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;">
           <div style="font-weight:900;font-size:12px;letter-spacing:0.05em;color:var(--sun-ink);text-transform:uppercase;">My prizes 🎁</div>
+          ${vm.pendingDraws > 0 ? `
+          <button type="button" data-action="openPrizeDraw" style="width:100%;min-height:48px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:10px 16px;font-family:var(--font-display);font-weight:600;font-size:17px;cursor:pointer;box-shadow:0 4px 0 var(--sun-deep);">${escapeHtml(vm.pendingDrawLabel)}</button>` : ""}
           ${vm.hasPrizes ? `
           <div class="list-wrap" style="--fade-to:var(--sun-wash);">
             <div data-list="1" style="max-height:260px;display:flex;flex-direction:column;gap:8px;padding-bottom:8px;">
@@ -190,7 +196,8 @@ export function progressScreen(vm) {
                   <span style="${hi.lightChipStyle}">${escapeHtml(hi.lightLabel)}</span>
                 </div>
                 <div style="font-weight:900;font-size:14px;color:var(--ink);line-height:1.25;">${escapeHtml(hi.dayTitle)}</div>
-                <div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${escapeHtml(hi.dateStr)} · ${escapeHtml(hi.duration)}</div>
+                <div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${escapeHtml(hi.dateStr)} · ${escapeHtml(hi.duration)}${hi.sittingsLabel ? ` · ${escapeHtml(hi.sittingsLabel)}` : ""}</div>
+                ${hi.painNote ? `<div style="font-size:11px;font-weight:800;color:var(--stop);">🛑 ${escapeHtml(hi.painNote)}</div>` : ""}
                 ${hi.note ? `<div style="font-size:12px;font-weight:700;color:var(--sun-ink);line-height:1.35;">${escapeHtml(hi.note)}</div>` : ""}
               </div>`).join("")
             : `<div style="padding:14px;font-size:14px;font-weight:700;color:var(--ink-soft);">No sessions yet — your first one lands here. ${EMOJI.world}</div>`}

@@ -42,19 +42,36 @@ the **Splash — Kids Swim Training** design system.
   finished, which is what "half for one ended early" used to approximate badly.
   An easy day is worth half a full one, and the number no longer wobbles with
   the move count of that weekday. Sessions logged before this rule keep the
-  value they were awarded.
+  value they were awarded. **From outcome version 6 the day is priced once, not
+  each sitting**: showing up is paid once per day, each main round that counts
+  is paid once off the merged ledger, and the total is capped by the day's ask.
+  A pain stop followed by coming back and finishing pays the rounds she
+  finished; a second sitting never re-earns the show-up. Days written before
+  version 6 keep their per-sitting settlement.
 - **A day pays for a day.** The ceiling is the day's, not the sitting's, so a
   green day trained in two goes pays 360 in total rather than 360 twice. A move
   she skipped is never banked, so it is offered again the same day: come back
   before the day is out, finish what is left, and the day reads **complete**
-  everywhere — the week strip, the day card, the streak and the day's XP all ask
-  the merged workout rather than each sitting. That window is the training day
+  everywhere. **Complete is one field** (`dayComplete` on the day record): every
+  move the plan asked for was attempted, nothing was skipped, no move came in
+  under half its dose, and every planned main round counted — the same door that
+  earns the streak and pays the full day, so the week strip, the day card, the
+  training log, the Grown-up boards and the finish screen cannot disagree. A move
+  itself counts (✓) at 80% of its time or all of its reps, reads ½ when short of
+  that, and ⏭ when skipped or under 3 seconds; the day card and the finish screen
+  show that verdict per move with the reason, and a one-line legend says the rule. That window is the training day
   only (plus a 6-hour grace past midnight for a session that crossed it): a
   partial never carries into a new day, which is the No-Debt rule. Since
   two devices offline at once cannot see each other's budget, the total is
   settled per calendar date when the log is rebuilt — and a prize draw waits
   while a device is offline with a mirror it has previously reached, because
   prizes are drawn off a total that is not final until both devices have met.
+- **The streak follows the plan's schedule** (from 2026-09-18). A scheduled
+  training weekday with neither a counting day nor a finished recovery pass
+  breaks it; Sunday is never a gap; today untrained is not yet a gap; a
+  finished-recovery day holds the run and counts in its length. Days before the
+  cutover keep the old two-day-gap reading, so nothing she was standing on that
+  night dropped.
 - **Quiz XP pays for learning, not repetition.** Only the day's first completed
   deck pays at all; each question pays at most once *ever* (+5 the first time it
   is attempted, +25 the first time it is answered right — a question missed the
@@ -145,7 +162,8 @@ failure — the chained `&&` it replaced stopped at the first one, so a
 Monday-only assertion hid four green suites for a day a week. The suites:
 the core's action-layer, invariants, integrity, landing-rule and offline-shell
 suites (`core/test/`, shared with the skate app and run there against its
-content too), the session-safety suite, and this app's `test/smoke.mjs`. No
+content too), the session-safety suite, the day-record suite, and this app's
+`test/smoke.mjs`. No
 install needed; the `package.json` exists only for this script. On a pull
 request CI also runs `core/tools/release-check.mjs`: a precached shell file
 that changed without a bump of `version` in `sw.js` fails the build.
@@ -161,26 +179,34 @@ that changed without a bump of `version` in `sw.js` fails the build.
   workout — bump `version` in `sw.js` on every release. Nothing from the mirror is ever cached: it carries body-map
   notes and readiness answers, and a stale copy of current data is worse than
   none.
-- **A workout has an identity, and one answer.** A day trained in two goes
-  writes two session records carrying the same `workoutInstanceId` (minted when
-  the plan starts, carried on the day's progress record so a resume keeps it).
-  Every screen that answers for a day — the finish screen, Today, Progress and
-  the Grown-up Zone — aggregates on it before counting, so resuming a day does
-  not turn it into two sessions with half the duration each. Its main rounds are
-  numbered from what is already banked, so the second sitting's rows cannot
-  collide with the first's; its rows are merged per planned move, keeping the
-  best credit anything proved, so a move attempted twice is paid once; and its
-  XP is the *settled* day total, never the sum of the sittings' stamps.
-  `test/invariants.mjs` asserts those numbers agree ACROSS screens rather than
-  inside one module — the class of defect that outlives a per-module test.
+- **One day record, and every screen a view of it.** `dayRecords()` in
+  `core/outcome.js` settles each training day once: its sittings are grouped by
+  the weekday the day was for and the date it began (a session that crosses
+  midnight, or a Monday caught up on Wednesday, is one day everywhere), never by
+  a device-local id — so a morning on the iPad and an afternoon on the phone are
+  one workout. Its rows are the merged log plus any work banked live but never
+  saved (see below); its ask is what the day was started under, lowered only by
+  a jump-landing tier drop; its minutes are summed in seconds and rounded once;
+  its movements are reported in both units, distinct moves and performances; a
+  pain stop is a sitting's fact, not the day's verdict when she comes back and
+  finishes; the override flag is set only when an adult changed the light. The
+  finish screen, Today, Progress, the Grown-up Zone, the Body Check result and
+  the CSV all read that record and nothing else — `core/test/invariants.mjs`
+  asserts that no screen file computes a day-level fact on its own, and
+  `core/test/dayrecords.mjs` drives fourteen days through the real engine
+  (two devices, midnight, catch-up, crash, pain stop, start over, tier drop).
 - **A workout keeps the light it started under.** A later body check may lower
   it — a body with more to say shortens what is left of the day — but never
   raise it. A bigger plan is a different workout, started deliberately, with its
   own identity and its own completion denominator.
 - **Only saved history syncs, not an unfinished workout.** The day's progress
   record (completed moves, banked rounds, the resume position, the locked light)
-  is local to the device. A workout is finished on the device it was started on;
-  what crosses devices is the log, the journey and the readiness checks, below.
+  is local to the device, and it now keeps each finished move by name with its
+  seconds, refreshed by a thirty-second heartbeat. When the next sitting saves,
+  that proof is stamped on the row (`bankedRows`, `bankedSecs`) so a sitting the
+  iPad lost mid-way still counts by name, never by a guess; "I need to start
+  over" clears the record so the restart really starts over. What crosses
+  devices is the log, the journey and the readiness checks, below.
 - **The mirror syncs both ways on every boot** (`core/sync.js`), all of it
   additive — nothing is overwritten or deleted on either side:
   1. *pull* — any session this browser is missing is merged into the local log,

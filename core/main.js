@@ -60,6 +60,7 @@ export const state = {
   prizeDraw: null,
   detailOverlay: false,
   detailEx: null,
+  moveReviewOpen: false,        // the finish screen's "See every move" list
   weather: null,                // { icon, temp, caption } once fetched
   backupNote: "", backupNoteOk: false,   // result line under Backup & restore
   walletRepairNote: "",         // result line under the prize wallet repair
@@ -579,6 +580,8 @@ Object.assign(RAW, {
   resumeFromStop() { engine.resumeFromStop(); },
   endFromStop(arg) { engine.endFromStop(arg || "pain"); },
   toggleWatch() { state.watchOpen = !state.watchOpen; render(); },
+  // "See every move" on the finish screen — the per-move review, collapsed by default.
+  toggleMoveReview() { state.moveReviewOpen = !state.moveReviewOpen; render(); },
   toggleRail() { state.railOpen = state.railOpen === false; render(); },
   askRestart() { engine.sess.confirmRestart = true; render(); },
   cancelRestart() { engine.sess.confirmRestart = false; render(); },

@@ -158,6 +158,7 @@ function dayPane(vm, wide) {
     <div style="display:flex;gap:${wide ? 10 : 8}px;margin-bottom:14px;flex-wrap:wrap;">
       <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>⏱</span> ${dv.minsLabel || (dv.mins + " min")}</span>
       <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>⚡</span> ${dv.movesLabel}</span>
+      ${dv.roundsLabel ? `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>🔁</span> ${escapeHtml(dv.roundsLabel)}</span>` : ""}
       ${vm.gearLabel ? `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>🎒</span> ${vm.gearLabel}</span>` : ""}
       ${dv.earnedXpLabel ? `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.28);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>⭐</span> ${dv.earnedXpLabel}</span>` : ""}
     </div>` : "";
@@ -223,7 +224,20 @@ function dayPane(vm, wide) {
             <span style="font-size:13px;transition:transform 0.2s;transform:rotate(${b.rot}deg);">▾</span>
           </button>
           <div style="${b.bodyStyle}">
-            ${b.moves.map(m => `
+            ${(b.review || []).length ? `
+              <!-- THE PER-MOVE REVIEW: what counted and why, one line each,
+                   with the rule stated once at the top. Factual, never
+                   scolding — see moveReviewReason in js/outcome.js. -->
+              <div style="font-size:11px;font-weight:800;opacity:0.85;line-height:1.35;padding:4px 0 6px;">${escapeHtml(vm.reviewLegend || "")}</div>
+              ${b.review.map(r => `
+              <div style="display:flex;align-items:flex-start;gap:9px;padding:5px 0;font-size:${wide ? 14 : 13}px;font-weight:700;" data-move-review="${escapeHtml(r.status)}">
+                <span style="${r.pillStyle}" aria-label="${escapeHtml(r.status)}">${r.icon}</span>
+                <span style="flex:1;min-width:0;">
+                  <span>${r.roundLabel ? `<span style="opacity:0.7;font-size:11px;font-weight:900;margin-right:5px;">${r.roundLabel}</span>` : ""}${escapeHtml(r.name)}${r.doseLabel ? ` <span style="opacity:0.85;font-weight:800;">· ${escapeHtml(r.doseLabel)}</span>` : ""}</span>
+                  ${r.reason ? `<span style="display:block;font-size:12px;font-weight:700;opacity:0.85;line-height:1.35;">${escapeHtml(r.reason)}</span>` : ""}
+                </span>
+              </div>`).join("")}`
+            : b.moves.map(m => `
               <div style="padding:6px 0;">
                 <div style="display:flex;align-items:flex-start;gap:9px;font-size:${wide ? 15 : 14}px;font-weight:700;">
                   <span style="opacity:0.7;flex-shrink:0;">•</span><span style="flex:1;min-width:0;">${m.text}</span>

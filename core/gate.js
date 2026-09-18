@@ -70,7 +70,7 @@ export const UNGATED_ACTIONS = [
   "askEnd", "cancelEnd", "confirmEndEarly",
   "askSkip", "cancelSkip", "confirmSkipEx", "pickIntent", "answerMicro", "answerRepCheck",
   "pickClean", "pickWobbly", "skipFormCheck", "pickMood", "reflectWell",
-  "reflectNext", "quizPick", "exitSession",
+  "reflectNext", "quizPick", "exitSession", "toggleMoveReview",
   "openDetail", "openDetailCur", "openDetailAt", "watchVideo", "closeDetail", "resumeFromDetail",
   // her body check (the two adult decisions inside it are gated by name)
   "rAnswer", "rPickZone", "rSetZoneSev", "rClosePopup",

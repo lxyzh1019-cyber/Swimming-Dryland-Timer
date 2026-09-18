@@ -155,6 +155,19 @@ await scenario("S2", T.start, T.read, () => drive({ dayKey: DAY, light: "green" 
   expectFullDay(rec, "S2");
   same(rec.outcome.wholePlanAttempted, true, "S2: the day came in through the whole-plan door");
   same(rec.minutes, loggedMinutes(), "S2: minutes are the logged seconds");
+  /* The per-move review rides on the record's plan: one row per planned
+     performance, its verdict and the reason in her own units. */
+  const moves = rec.plan.moves;
+  same(moves.length, rec.performances.planned, "S2: one review row per planned performance");
+  ok(moves.every(m => ["done", "partial", "skipped", "banked", "missing"].includes(m.status)), "S2: every row has one of the five verdicts");
+  same(moves.filter(m => m.status === "partial").length, rec.rows.filter(l => l.status === "partial").length, "S2: the ½ rows are the ledger's partial rows");
+  ok(moves.filter(m => m.status === "partial" && m.driver === "time").every(m =>
+      m.got !== null && m.planned !== null && m.reason === m.got + "s of " + m.planned + "s — needs " + Math.ceil(m.planned * engine.DONE_WORK_FRACTION) + "s (80%) to count"),
+    "S2: a timed ½ row quotes the 80% floor: " + JSON.stringify((moves.find(m => m.status === "partial" && m.driver === "time") || {}).reason));
+  ok(moves.filter(m => m.status === "partial" && m.driver === "reps").every(m =>
+      m.reason === m.got + " of " + m.planned + " reps — all " + m.planned + " to count"),
+    "S2: a rep ½ row asks for all the reps: " + JSON.stringify((moves.find(m => m.status === "partial" && m.driver === "reps") || {}).reason));
+  ok(moves.filter(m => m.status === "done").every(m => m.reason === ""), "S2: a finished move needs no reason");
 });
 
 /* ============================================================
@@ -173,6 +186,10 @@ await scenario("S3", T.start, T.read, async () => {
   const rec = recordFor(), plan = greenPlan();
   same(rec.dayComplete, false, "S3: a skipped main move is not a complete day");
   same(rec.mainRoundsDone, FULL_ROUNDS - 1, "S3: round two does not count");
+  const skippedRow = rec.plan.moves.find(m => m.status === "skipped");
+  ok(skippedRow && skippedRow.round === 2 && skippedRow.block === "main", "S3: the review names the skipped main move in round two");
+  ok(skippedRow.reason === "skipped" || skippedRow.reason === "under " + engine.MIN_EXERCISE_SECS + "s — counted as skipped",
+    "S3: with a plain reason — Skip, or a tap under the floor (" + JSON.stringify(skippedRow.reason) + ")");
   same(rec.roundsPlanned, FULL_ROUNDS, "S3: of the three asked");
   same(rec.performances.performed, plan.planned - 1, "S3: one performance short");
   same(rec.movements.planned, plan.movements, "S3: the movement denominator is the plan's");
@@ -210,6 +227,10 @@ await scenario("S4", T.start, T.read, async () => {
   same(before.performances.performed, bankedCount, "S4: showing the moves she did");
   ok(before.performances.performed >= warmupSize(), "S4: the whole warm-up among them");
   ok(before.rows.every(l => l.banked && l.source === "record"), "S4: marked as banked from the record");
+  const bankedReview = before.plan.moves.filter(m => m.status === "banked");
+  same(bankedReview.length, bankedCount, "S4: the review shows the banked rows as ✓ (banked)");
+  ok(bankedReview.every(m => m.reason === "done earlier today"), "S4: each saying it was done earlier today");
+  ok(before.plan.moves.filter(m => m.status === "missing").every(m => m.reason === "not reached"), "S4: and the rest as not reached");
   same(before.xpByRounds, 0, "S4: and priced at nothing — a record is not a row");
   clock.set("2026-09-14T21:30:00Z");                 // she comes back 30 min later
   const r2 = await drive({ dayKey: DAY, light: "green" }, honest);

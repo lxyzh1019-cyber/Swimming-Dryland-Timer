@@ -7,7 +7,7 @@
 import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
 import { STORAGE_KEYS as K, ATHLETE_DEFAULT, LEGACY_ATHLETE, BACKUP_APP, LORE_TRANSFER_FIELD, COPY } from "./sport.js";
 export { LEGACY_ATHLETE, BACKUP_APP };
-import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE, VALGUS_FLOOR, TRAINING_QS, KID_COACHING } from "./data.js";
+import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE, VALGUS_FLOOR, TRAINING_QS, KID_COACHING, SESSION_QUIZ } from "./data.js";
 import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION, roundPayCredit, workoutDate,
          dayRecords, scheduleStreak, longestScheduleStreak } from "./outcome.js";
 
@@ -1030,19 +1030,33 @@ export function payTodayQuestion(correct, quiz) {
   return { xp: QXP_TODAY, capped: false };
 }
 
-/* Mastery + remaining-XP snapshot over the whole bank. Feeds the kid's
-   "moves mastered" line and the grown-up's quiz card. */
+/* The Coach's Quiz's own questions, by the ledger key the finish screen pays
+   them under (see coachQuizPool in vm/session.js: `coach|<id>`). They are
+   priced through the same ledger as the deck, so they belong to the same
+   finite bank — the budget used to leave them out, and the README's cap
+   promise was at least a dozen questions short of what the code paid. The
+   training principles are already in the bank under their own key, shared
+   by both places. */
+export function coachQuizKeys() {
+  return (SESSION_QUIZ || []).map(q => quizQuestionKey("coach", q.id));
+}
+
+/* Mastery + remaining-XP snapshot over the whole bank — every key the ledger
+   can pay: the deck's questions and the Coach's Quiz's. Feeds the kid's
+   "questions mastered" line and the grown-up's quiz card, and is what makes
+   `quizXpFromLedger() <= quizBankStatus().xpTotal` always true. */
 export function quizBankStatus(quiz) {
   const led = (quiz || loadQuiz()).qLedger || {};
   const bank = questionBank();   // unlocked ranks only, so this grows with her
+  const keys = bank.map(([m, k]) => quizQuestionKey(m.name, k)).concat(coachQuizKeys());
   let mastered = 0, xpLeft = 0;
-  bank.forEach(([m, k]) => {
-    const rec = led[quizQuestionKey(m.name, k)] || {};
+  keys.forEach(key => {
+    const rec = led[key] || {};
     if (rec.mastered) mastered++; else xpLeft += QXP_CORRECT;
     if (!rec.attempted) xpLeft += QXP_ATTEMPT;
   });
-  return { total: bank.length, mastered, left: bank.length - mastered, xpLeft,
-           xpTotal: bank.length * (QXP_ATTEMPT + QXP_CORRECT) };
+  return { total: keys.length, mastered, left: keys.length - mastered, xpLeft,
+           xpTotal: keys.length * (QXP_ATTEMPT + QXP_CORRECT) };
 }
 
 /* ---- PR log ---- */

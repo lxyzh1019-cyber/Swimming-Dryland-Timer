@@ -71,7 +71,7 @@
 import { edmontonISO, todayISODate, DAY_MS } from "./util.js";
 import { DAYS } from "./data.js";
 import { roundsForLight, assembleCircuits, lockedLightFromLog, dayPlanState,
-         countExpectedWork, countExpectedByRound } from "./engine.js";
+         countExpectedWork, countExpectedByRound, DONE_WORK_FRACTION, MIN_EXERCISE_SECS } from "./engine.js";
 import { loadSessions, loadEvents, loadDayProgress, dayRoundsPlanned, settledXpByDate,
          XP_SHOWED_UP, XP_PER_ROUND } from "./store.js";
 
@@ -355,6 +355,60 @@ function worstRow(rs) {
     got: l.driver === "reps" ? l.repsCounted : l.actualSecs,
     planned: l.driver === "reps" ? l.repsPlanned : l.plannedSecs
   };
+}
+
+/* ---- WHY A MOVE COUNTED, OR DIDN'T, IN HER OWN UNITS -----------------------
+
+   Nothing ever showed, move by move, what counted and why: the day card listed
+   moves with dose and cue, the finish screen named short rounds but not moves,
+   and a kid tapping Done a beat early learned nothing from a "½". These are the
+   rules already stated in this file and in the engine, quoted back one move at
+   a time — DONE_WORK_FRACTION for the clock, the whole rep count for reps,
+   MIN_EXERCISE_SECS for an instant tap — so the sentence beside a move can
+   never disagree with the verdict on it. Factual, never scolding: what she
+   did, what was asked, what "counting" means.
+
+   `status` is one of done | partial | skipped | banked | missing — the last
+   two for a row the log cannot grade (proved earlier today, or never reached). */
+/* A function, not a constant: the engine's numbers are read inside it, after
+   both modules have loaded, which is what the import cycle above requires. */
+export function moveReviewLegend() {
+  return "✓ counts: " + Math.round(DONE_WORK_FRACTION * 100)
+    + "% of the time or all reps · ½ short · ⏭ skipped (under " + MIN_EXERCISE_SECS + "s or Skip)";
+}
+
+export function moveReviewReason(row, status) {
+  if (status === "banked") return "done earlier today";
+  if (status === "missing") return "not reached";
+  if (!row) return "";
+  const driver = row.driver || (Number(row.repsPlanned) > 0 ? "reps" : "time");
+  const got = driver === "reps" ? Math.round(Number(row.repsCounted) || 0) : Math.round(Number(row.actualSecs) || 0);
+  const planned = driver === "reps" ? Math.round(Number(row.repsPlanned) || 0) : Math.round(Number(row.plannedSecs) || 0);
+  if (status === "skipped") {
+    return (Number(row.actualSecs) || 0) >= MIN_EXERCISE_SECS
+      ? "skipped"
+      : "under " + MIN_EXERCISE_SECS + "s — counted as skipped";
+  }
+  if (status === "partial") {
+    if (driver === "reps") return got + " of " + planned + " reps — all " + planned + " to count";
+    if (planned > 0) {
+      const need = Math.ceil(planned * DONE_WORK_FRACTION);
+      return got + "s of " + planned + "s — needs " + need + "s (" + Math.round(DONE_WORK_FRACTION * 100) + "%) to count";
+    }
+    return "cut short";
+  }
+  return "";
+}
+
+/* The two numbers the review prints beside the reason, or nulls for a row
+   with nothing measurable on it (a banked row, a legacy row). */
+export function moveReviewDose(row) {
+  if (!row || row.banked) return { got: null, planned: null, driver: row && row.driver ? row.driver : null };
+  const driver = row.driver || (Number(row.repsPlanned) > 0 ? "reps" : "time");
+  const got = driver === "reps" ? Number(row.repsCounted) : Number(row.actualSecs);
+  const planned = driver === "reps" ? Number(row.repsPlanned) : Number(row.plannedSecs);
+  if (!Number.isFinite(planned) || planned <= 0) return { got: null, planned: null, driver };
+  return { got: Math.round(Math.max(0, Number(got) || 0)), planned: Math.round(planned), driver };
 }
 
 export function mainRoundsFromLedger(ledger, expectedByRound = null, outcomeVersion = null) {
@@ -1102,7 +1156,14 @@ export function dayRecords(opts = {}) {
     const planned = plannedFor(dayKey, light, roundsPlanned);
     const rows = logRows.concat(bankedRowsFor(planned, logRows, liveProg, frags, ebr, version));
     const mainRounds = mainRoundReport(rows, ebr, version);
-    const roundsCounted = mainRounds.filter(r => r.counts).length;
+    /* A record with no main rows at all — a row written before the ledger, or
+       restored from a cloud that never had one — keeps the engine's bare count,
+       the way outcomeOf has always read it. Only where there are NO rows: the
+       moment the ledger can speak, it is the authority. */
+    const legacyRounds = frags.reduce((m, f) => Math.max(m, Number(f.roundsDone) || 0), 0);
+    const roundsCounted = rows.some(r => r.block === "main")
+      ? mainRounds.filter(r => r.counts).length
+      : Math.min(legacyRounds, Number.isFinite(roundsPlanned) ? roundsPlanned : legacyRounds);
     const hadPainStop = frags.some(painRow);
     const safetyStop = !!(last && painRow(last));
     const oc = deriveSessionOutcome({
@@ -1128,8 +1189,14 @@ export function dayRecords(opts = {}) {
       hadPainStop, safetyStop, overridden,
       countsForStreak: oc.countsForStreak,
       streakFreeze,
-      dayComplete: oc.countsAsTraining && oc.wholePlanAttempted && roundsCounted === roundsPlanned
-        && mainRounds.every(r => r.counts),
+      /* A row with no expected size was written before the day carried one,
+         so "every move the plan asked for" cannot be asked of it. It keeps the
+         reading it was always given — the outcome's own complete flag — rather
+         than being re-scored as unfinished forever. */
+      dayComplete: expectedWork === null
+        ? oc.completedFully
+        : (oc.countsAsTraining && oc.wholePlanAttempted && roundsCounted === roundsPlanned
+           && mainRounds.every(r => r.counts)),
       unsaved: !first,
       xpByRounds: dayPrice({ frags, careFrags, rows, safetyStop, expectedByRound: ebr, version, roundsPlanned }),
       settledXp: 0,

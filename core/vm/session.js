@@ -9,7 +9,8 @@ import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, S
 import { SKILL_BLOCK, COPY } from "../sport.js";
 import { fmtMMSS, exercisePhotoUrl, photoSources, plural } from "../util.js";
 import { loadSessions, loadQuiz, quizQuestionKey } from "../store.js";
-import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION, paceBand } from "../outcome.js";
+import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION, paceBand,
+         dayRecordFor, moveReviewLegend } from "../outcome.js";
 
 /* What changes at the end of this segment — named before she gets there, so the
    switch is never a surprise she hears about only if the voice is on. */
@@ -141,22 +142,46 @@ export function buildSessionVM(state) {
         completedFully: !sess.endedEarly
       });
 
+  /* THE DAY RECORD, once this sitting is saved.
+
+     The finish screen judged THIS SITTING — its own ledger plus a banked count
+     — and the strip, the card, the streak and the reports judged the day. On a
+     day trained in two goes, or finished after a pain stop, the two disagreed:
+     "complete, 3 of 3, streak earned" here and "partly done, 2 rounds, no
+     streak" on the strip she looked at next. So once the row is saved, every
+     day-level fact below is read off dayRecordFor — the same record every
+     other screen reads — and the live ledger is only asked while the session
+     is still running, or for a care pass (whose record is the day's care, not
+     its training). */
+  const dayRec = (sessionDone && sess.savedEntry && !explore && liveOutcome.state !== "recovery")
+    ? dayRecordFor(sess.dayKey, sess.dayIso || null) : null;
+  const useRec = !!(dayRec && !dayRec.care && dayRec.outcome);
+
   /* The one value the finish screen switches on. Six states, in priority order:
      a failed save outranks everything (nothing was recorded, so nothing may be
-     claimed), then safety, then care, then what the ledger can actually prove. */
-  const completionState = explore ? "explore" : sess.saveFailed ? "save-failed" : liveOutcome.state;
+     claimed), then safety, then care, then what the day record says: complete
+     ⇔ the record's own `dayComplete`, which is the same fact the week strip
+     ticks and the log labels. */
+  const completionState = explore ? "explore" : sess.saveFailed ? "save-failed"
+    : useRec
+      ? (dayRec.safetyStop ? "safety-stop"
+         : !dayRec.outcome.countsAsTraining ? "none"
+         : dayRec.dayComplete ? "complete" : "partial")
+      : liveOutcome.state;
 
   /* A partial is not one outcome, it is two: the day that cleared the streak
      bar and the day that did not. Both were shown the same words — "part of the
      way, and it counts" — which is true of the work and silent about the thing
      she actually wants to know. The numbers to say which have been computed all
      along (js/outcome.js surfaces workRatio precisely so a screen can say how
-     far short it fell) and were read by nobody. */
-  const streakEarned = !!liveOutcome.countsForStreak;
+     far short it fell) and were read by nobody. The streak note is the DAY's:
+     `countsForStreak` on the record, never this sitting's alone. */
+  const streakEarned = useRec ? !!dayRec.countsForStreak : !!liveOutcome.countsForStreak;
   const streakFrozen = !!liveOutcome.streakFreeze;
-  const ratio = Number(liveOutcome.workRatio);
+  const ratio = Number(useRec ? dayRec.outcome.workRatio : liveOutcome.workRatio);
+  const askSize = useRec ? (Number(dayRec.expectedWork) || 0) : (sess.expectedWork || 0);
   const streakShortBy = Number.isFinite(ratio)
-    ? Math.max(1, Math.round((STREAK_WORK_FRACTION - ratio) * (sess.expectedWork || 0)))
+    ? Math.max(1, Math.round((STREAK_WORK_FRACTION - ratio) * askSize))
     : null;
   const completionKey = explore ? "explore" : completionState === "partial"
     ? (streakEarned ? "partial-streak" : "partial-short")
@@ -173,7 +198,7 @@ export function buildSessionVM(state) {
      moves short and a day half done. */
   const donePercent = Number.isFinite(ratio)
     ? Math.max(0, Math.min(100, Math.round(ratio * 100))) : null;
-  const skippedRows = (sess.ledger || []).filter(l => l && l.status === "skipped");
+  const skippedRows = (useRec ? dayRec.rows : (sess.ledger || [])).filter(l => l && l.status === "skipped");
   const skippedCount = skippedRows.length;
   const skippedNames = [...new Set(skippedRows.map(l => l.name).filter(Boolean))];
   const skippedPhrase = skippedCount
@@ -234,14 +259,49 @@ export function buildSessionVM(state) {
      startSession), so the line can say what every other number here is saying.
      On a first sitting bankedRounds is 0 and dayRoundsPlanned IS roundsPlanned,
      which is why nothing about a single-sitting day moves. */
-  const dayRoundsDone = Math.max(0, Number(sess.bankedRounds) || 0) + roundsDone;
-  const dayRoundsAsked = Math.max(0, Number(sess.dayRoundsPlanned) || 0);
+  const dayRoundsDone = useRec ? Math.max(0, Number(dayRec.mainRoundsDone) || 0)
+    : Math.max(0, Number(sess.bankedRounds) || 0) + roundsDone;
+  const dayRoundsAsked = useRec ? Math.max(0, Number(dayRec.roundsPlanned) || 0)
+    : Math.max(0, Number(sess.dayRoundsPlanned) || 0);
+
+  /* WHAT THIS SITTING WAS PAID, with the day's settled total beside it when
+     the two differ. `xpEarned` is already the day-delta (see claimSessionXp),
+     so a resume that added one round reads "+90 XP this time · 360 today"
+     rather than a bare +90 that looks like the whole day was worth 90. */
+  const settledToday = useRec ? (Number(dayRec.settledXp) || 0) : null;
+  const xpLine = !sess.xpEarned ? ""
+    : (settledToday != null && settledToday !== sess.xpEarned)
+      ? "+" + sess.xpEarned + " XP this time · " + settledToday + " today"
+      : "+" + sess.xpEarned + " XP";
+
+  /* THE PER-MOVE REVIEW — every planned performance of the day with its
+     verdict and the reason, off the record's plan (see dayPlanState and
+     moveReviewReason). Collapsed by default; the screen offers "See every
+     move". Same rows as the day card's expanded blocks. */
+  const REVIEW_PILL = {
+    done:    { icon: "✓", bg: "var(--mint)",      ink: "#fff" },
+    banked:  { icon: "✓", bg: "var(--mint)",      ink: "#fff" },
+    partial: { icon: "½", bg: "var(--sun)",       ink: "var(--sun-ink)" },
+    skipped: { icon: "⏭", bg: "var(--coral)",     ink: "#fff" },
+    missing: { icon: "—", bg: "var(--surface-2)", ink: "var(--ink-soft)" }
+  };
+  const moveReview = useRec && dayRec.plan ? (dayRec.plan.moves || []).map(m => {
+    const pill = REVIEW_PILL[m.status] || REVIEW_PILL.missing;
+    return {
+      name: m.name, circuit: m.circuit, round: m.round, status: m.status, icon: pill.icon,
+      roundLabel: (dayRec.plan.blocks.find(b => b.block === m.block && b.name === m.circuit) || {}).rounds > 1 ? "R" + m.round : "",
+      doseLabel: m.got === null || m.planned === null ? ""
+        : m.driver === "reps" ? m.got + " of " + m.planned + " reps" : m.got + "s of " + m.planned + "s",
+      reason: m.reason || "",
+      pillStyle: "width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;background:" + pill.bg + ";color:" + pill.ink + ";"
+    };
+  }) : [];
 
   /* One line per main round that did not count, naming the move that cost it.
      Deliberately factual and never scolding: she is told what happened and what
      "counting" means, not that she failed. A round short of ROWS is a round she
      did not reach, which is a different sentence from a round she trained short. */
-  const roundShortNotes = (liveOutcome.roundReport || [])
+  const roundShortNotes = ((useRec ? dayRec.mainRounds : liveOutcome.roundReport) || [])
     .filter(r => !r.counts)
     .map(r => {
       if (r.skipped.length) return `Round ${r.round} wasn't a full round — ${r.skipped[0]} got skipped.`;
@@ -709,6 +769,10 @@ export function buildSessionVM(state) {
        short the whole time and simply never said. */
     roundShortNotes,
     xpEarned: sess.xpEarned, leveledUp: sess.leveledUp,
+    xpLine,
+    // The per-move review, and whether she has opened it.
+    moveReview, moveReviewOpen: !!state.moveReviewOpen,
+    moveReviewLegend: moveReview.length ? moveReviewLegend() : "",
     /* MOOD, REFLECTION AND THE QUIZ ONLY EXIST IF THERE IS A RECORD TO PUT
        THEM ON.
 
