@@ -20,7 +20,7 @@
    Run by `npm test`.
    ============================================================ */
 
-import { data, util, store, engine, outcome, svm, tvm, pvm, gvm, gscreen, overlays,
+import { data, util, store, engine, outcome, svm, tvm, pvm, gvm, gscreen, sscreen, overlays,
          runSession, answerChecks } from "./harness.mjs";
 
 let passed = 0;
@@ -771,6 +771,46 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
   const res = store.payTodayQuestion(true);
   same(res.xp, 0, "today's card pays once a day and no more");
   same(store.loadQuiz().dayXp || 0, xpBefore, "and a repeat costs the day's ceiling nothing");
+  localStorage.clear(); store.migrate();
+}
+
+/* ============================================================
+   N+4. THE COACH'S QUIZ TAKES ONE ANSWER
+
+   Every tap on the end-of-session card re-selected. The XP was guarded — only
+   the first pick was priced — but the screen was not: a wrong first answer
+   followed by a tap on the green one read "Nailed it!", and the ledger
+   remembered the truth. The Quiz Deck was already locked; this is the same
+   rule on the same kind of card.
+   ============================================================ */
+{
+  localStorage.clear(); store.migrate();
+  /* A real finished session, so the finish screen has a saved row to stand on. */
+  await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, answerChecks());
+  ok(engine.sess.phase === "done" && !!engine.sess.savedEntry, "the session finished and saved");
+  const q = svm.sessionQuizFor(engine.sess.dayKey);
+  const wrong = q.opts.findIndex(o => !o.ok), right = q.opts.findIndex(o => o.ok);
+  ok(wrong >= 0 && right >= 0, "the day's question has a right and a wrong answer to pick between");
+
+  engine.setQuizPick(wrong);
+  const ledgerBefore = JSON.stringify(store.loadQuiz().qLedger || {});
+  const vmBefore = svm.buildSessionVM({ isWide: true, detailEx: null });
+  same(engine.sess.quizPick, wrong, "the first tap is recorded");
+  ok(/Good try/.test(vmBefore.quizFeedback), "and a wrong first answer reads as a good try");
+
+  engine.setQuizPick(right);
+  same(engine.sess.quizPick, wrong, "a second tap on the right answer changes nothing");
+  const vmAfter = svm.buildSessionVM({ isWide: true, detailEx: null });
+  same(vmAfter.quizFeedback, vmBefore.quizFeedback, "so the verdict on screen is the one she earned");
+  ok(!/Nailed it/.test(vmAfter.quizFeedback), "and never turns into \"Nailed it!\"");
+  same(JSON.stringify(store.loadQuiz().qLedger || {}), ledgerBefore, "and the quiz ledger is untouched by it");
+
+  /* The options go dead after the reveal, so the second tap cannot even be made. */
+  ok(vmAfter.quizOpts.every(o => o.disabled), "every option is disabled once she has answered");
+  const html = sscreen.sessionScreen(vmAfter);
+  const dead = (html.match(/data-action="quizPick"[^>]*\sdisabled/g) || []).length;
+  same(dead, q.opts.length, "and the rendered buttons carry `disabled`");
+  engine.exitSession();
   localStorage.clear(); store.migrate();
 }
 

@@ -256,7 +256,10 @@ export function buildSessionVM(state) {
     });
 
   const isResting = phase === "rest" || phase === "roundRest" || phase === "sectionRest";
-  const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath" || phase === "formcheck";
+  const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath" || phase === "formcheck" || phase === "repcheck";
+  // "Did you get all N?" — asked when Done lands before the coach's count
+  // finishes. See repCheckPrompt in js/engine.js.
+  const isRepCheck = phase === "repcheck";
   // The clean-check is asked ABOUT a move, so the move stays on screen — the
   // photo and the ring's spot hold the question, not the breath card.
   const isFormCheck = phase === "formcheck";
@@ -307,7 +310,6 @@ export function buildSessionVM(state) {
   const curPlanned = refTime(ex);
   const curActual = timerIsReps ? sess.exElapsed : Math.max(0, (sess.timerMax || 0) - (sess.timerSecs || 0));
   const exOver = curActual > curPlanned + 2;
-  const paceColor = exOver ? "var(--sun-ink)" : "var(--aqua)";
 
   // Per-section progress + whole-session pacing. exDone counts every
   // completed exercise in every round, so the bar actually reaches 100%
@@ -323,9 +325,30 @@ export function buildSessionVM(state) {
   const secNames = { warmup: "Warm-Up", coordination: "Coordination", main: "Main", prep: "Prep", finisher: "Finisher", [SKILL_BLOCK]: COPY.skillBlockLabel, recovery: "Recovery" };
   const progressLabel = (secNames[circuit.block] || "") + " · " + Math.min(sess.ei + 1, circuit.exercises.length) + " of " + circuit.exercises.length;
   const sessionTimePct = Math.min(100, Math.round(sess.elapsed / Math.max(1, sess.plannedSecs) * 100));
-  const roundLine = (roundsShown || 1) > 1 ? ((circuit.name || "") + " · Round " + sess.round + " of " + roundsShown) : "";
-  const roundDots = (roundsShown || 1) > 1 ? Array.from({ length: roundsShown }, (_, i) => ({
-    style: "width:10px;height:10px;border-radius:50%;flex-shrink:0;" + (i < sess.round - 1 ? "background:var(--mint);" : (i === sess.round - 1 ? "background:var(--aqua);" : "background:var(--surface-2);border:1.5px solid var(--hairline);box-sizing:border-box;"))
+  /* THE DOTS SHOW ROUNDS THAT COUNTED, in the colour the finish screen will
+     use for them. They used to be drawn off the round NUMBER: every round
+     before the current one green whether or not it counted, the current one
+     always in the accent, and once the main block ended the finisher's own
+     "round 1" reset the line to one accent dot — so after three of three she
+     saw one green at most, and never three. Green is now the day's counted
+     rounds — the banked ones plus the ones this sitting's ledger proves, the
+     same `dayRoundsDone` the finish screen prints — the accent is the round
+     she is in, and the rest are hollow. The line is only about the main
+     block: shown while she is in it, and kept, with its verdict, once she has
+     come out the other side. */
+  const mainIdx = circuits.map((c, i) => c.block === "main" ? i : -1).filter(i => i >= 0);
+  const inMain = circuit.block === "main";
+  const mainFinished = !inMain && mainIdx.length > 0 && mainIdx.every(i => i < sess.ci);
+  const showRoundLine = (inMain || mainFinished) && (roundsShown || 1) > 1;
+  const roundsCounted = Math.min(roundsShown, dayRoundsDone);
+  const roundLine = !showRoundLine ? ""
+    : mainFinished ? "Main · " + roundsCounted + " of " + roundsShown + " done"
+    : (circuit.name || "") + " · Round " + sess.round + " of " + roundsShown;
+  const roundDots = showRoundLine ? Array.from({ length: roundsShown }, (_, i) => ({
+    style: "width:10px;height:10px;border-radius:50%;flex-shrink:0;"
+      + (i < roundsCounted ? "background:var(--mint);"
+        : (inMain && i === sess.round - 1) ? "background:var(--aqua);"
+        : "background:var(--surface-2);border:1.5px solid var(--hairline);box-sizing:border-box;")
   })) : [];
 
   // Exercise timeline (left pane list)
@@ -475,8 +498,11 @@ export function buildSessionVM(state) {
   const quizAnswered = sess.quizPick != null;
   const quizOpts = QZ.opts.map((o, i) => ({
     label: o.t, idx: i,
+    // One answer per question: the options go grey and dead after the reveal.
+    disabled: quizAnswered,
     prefix: quizAnswered ? (o.ok ? "✓" : (sess.quizPick === i ? "✕" : "")) : String.fromCharCode(65 + i),
-    style: "display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px 16px;border-radius:16px;border:3px solid;cursor:pointer;font-weight:800;font-size:15px;font-family:inherit;box-sizing:border-box;"
+    style: "display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px 16px;border-radius:16px;border:3px solid;font-weight:800;font-size:15px;font-family:inherit;box-sizing:border-box;"
+      + (quizAnswered ? "cursor:default;" : "cursor:pointer;")
       + (!quizAnswered ? "border-color:var(--hairline);background:var(--surface);color:var(--ink);"
         : o.ok ? "border-color:var(--mint);background:var(--mint-wash);color:var(--mint-ink);"
         : sess.quizPick === i ? "border-color:var(--coral);background:color-mix(in srgb, var(--coral) 12%, #fff);color:var(--coral);"
@@ -579,9 +605,8 @@ export function buildSessionVM(state) {
     curExTransfer: ex.transfer || "",
     curExPhotoUrl: exercisePhotoUrl(ex.name || "rest", "Timer"),
     curExPhotoSources: photoSources(exercisePhotoUrl(ex.name || "rest", "Timer")),
-    exActualDisplay: fmtMMSS(curActual), exPlannedDisplay: fmtMMSS(curPlanned),
-    exPacePct: Math.round((curPlanned > 0 ? Math.min(1, curActual / curPlanned) : 0) * 100),
-    paceColor, overNudge: !!(exOver && timerIsReps),
+    exActualDisplay: fmtMMSS(curActual),
+    overNudge: !!(exOver && timerIsReps),
     upNextName: sess.upNextName, upNextDose: sess.upNextDose,
 
     /* ---- live coach state -------------------------------------------------
@@ -620,6 +645,10 @@ export function buildSessionVM(state) {
     doneLabel: explore ? "Next move ▶"
       : isResting ? "⏭ Skip Rest"
       : isFormCheck ? "Move on →"
+      // On the rep question, Done means "the coach's count is fine" — the
+      // card's own buttons are the answers, and the label must not read as
+      // a fourth one that means "all of them".
+      : isRepCheck ? "Keep coach's count →"
       : sess.announceResolver ? "▶ Go"
       : "✓ Done — Next",
 
@@ -628,6 +657,16 @@ export function buildSessionVM(state) {
     microAnswered: !!sess.microLoop, microCorrectAnswer: MICRO_LOOP.a,
     microPicked: sess.microLoop ? sess.microLoop.answer : null,
     breathText: BREATH_REHEARSAL,
+    /* The rep question. Three answers and the rule in one line — a kid who
+       finished before the coach did is being asked, not told off. */
+    isRepCheck,
+    repCheckQuestion: "Did you get all " + (sess.repsTarget || 0) + "?",
+    repCheckRule: "All " + (sess.repsTarget || 0) + " counts the move.",
+    repCheckOpts: [
+      { arg: "all",    label: "All of them", bg: "var(--mint)",    ink: "#fff",           edge: "var(--mint-deep)" },
+      { arg: "almost", label: "Almost",      bg: "var(--sun)",     ink: "var(--sun-ink)", edge: "var(--sun-deep)" },
+      { arg: "some",   label: "Some",        bg: "var(--surface)", ink: "var(--ink)",     edge: "var(--hairline)" }
+    ],
 
     // complete screen
     endedEarly: sess.endedEarly, painFlag: sess.painFlag,

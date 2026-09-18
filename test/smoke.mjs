@@ -1334,7 +1334,10 @@ localStorage.clear();
 store.migrate();
 /* The ledger has to SHOW the rounds the row claims: XP is priced off the rows
    now, not off `roundsDone`, precisely so a counter written at the wrong moment
-   cannot pay a full session the show-up credit alone. */
+   cannot pay a full session the show-up credit alone. And since outcome v6 the
+   DAY is priced once, by the rounds its merged ledger proves, so the resumed
+   row has to prove the whole green day for the day to be worth one — two
+   proven rounds are worth 270, however many sittings claimed them. */
 const mainRound = (r, n = 2) => Array.from({ length: n }, (_, i) => ({
   name: "m" + r + "-" + i, block: "main", round: r, status: "done" }));
 const partial = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
@@ -1342,8 +1345,8 @@ const partial = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOSt
   outcomeVersion: store.OUTCOME_VERSION,
   completedFully: false, endedEarly: true, ledger: mainRound(1) };
 const firstPay = store.claimSessionXp(partial);
-const resumed = { ...partial, roundsDone: 2, completedFully: true, endedEarly: false,
-  ledger: [...mainRound(1), ...mainRound(2)] };
+const resumed = { ...partial, roundsDone: 3, completedFully: true, endedEarly: false,
+  ledger: [...mainRound(1), ...mainRound(2), ...mainRound(3)] };
 const secondPay = store.claimSessionXp(resumed);
 ok(firstPay === 180, "the partial pays for the one round it finished");
 ok(firstPay + secondPay === 360, "and the resume tops it up to exactly one full day, never 540");
@@ -2185,13 +2188,18 @@ ok(pvm.logEntryView(shared).lightLabel === "ENDED EARLY", "the log reports the s
 
 /* --- regression: the one-full-day XP cap still holds over partial + resume --- */
 localStorage.clear(); store.migrate();
+/* Each row proves the rounds it claims: since v6 the day is priced off the
+   merged ledger, once, so a "resume" that proves no more rounds than the
+   partial did is worth nothing more — a second show-up credit is exactly
+   what this rule stopped paying. */
+const roundRows = n => Array.from({ length: n }, (_, r) => ({ name: "x", block: "main", round: r + 1, status: "done" }));
 const capBase = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
-  xpVersion: store.XP_VERSION, outcomeVersion: OV, sessionType: "main", roundsPlanned: 3,
-  ledger: [{ name: "x", block: "main", round: 1, status: "done" }] };
-const payA = store.claimSessionXp({ ...capBase, roundsDone: 1 });
-const payB = store.claimSessionXp({ ...capBase, roundsDone: 2 });
+  xpVersion: store.XP_VERSION, outcomeVersion: OV, sessionType: "main", roundsPlanned: 3 };
+const payA = store.claimSessionXp({ ...capBase, roundsDone: 1, ledger: roundRows(1) });
+const payB = store.claimSessionXp({ ...capBase, roundsDone: 3, ledger: roundRows(3) });
+ok(payA === 180, "the partial pays for the one round it finished");
 ok(payA + payB === 360, "partial then resume still tops out at exactly one full day");
-ok(store.claimSessionXp({ ...capBase, roundsDone: 3 }) === 0, "and a third attempt pays nothing");
+ok(store.claimSessionXp({ ...capBase, roundsDone: 3, ledger: roundRows(3) }) === 0, "and a third attempt pays nothing");
 
 /* --- regression: a pain stop is still zero XP and zero streak --- */
 ok(store.xpForSession({ ...capBase, roundsDone: 3, safetyStop: true }) === 0, "a pain stop still pays no XP");

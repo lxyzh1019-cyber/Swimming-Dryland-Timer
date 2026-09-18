@@ -553,6 +553,153 @@ ok(gate.gateUnlocked() === true, "choosing it unlocks");
 ok(gate.answerPin("7788") === true, "and the new PIN is the one that works from now on");
 resetGateState();
 
+/* ---- THE RESTORED DEVICE: history, no PIN, no passkey ----------------------
+   The PIN and the passkey are device-local by design, so a second iPad, a
+   reinstall or cleared browser data restores the family's history from the
+   cloud and has neither. The gate then went to "passkey" mode and, with no
+   passkey to confirm with, drew advice that cannot be followed (a passkey
+   cannot be set up "on a device that already has a grown-up unlocked" — it
+   does not travel) and a single Cancel button. The way through is to enrol a
+   passkey right there: the platform demands Face ID / Touch ID / the passcode
+   to create it, the same adult proof the ceremony gives. */
+{
+  /* The gate is painted over the page with insertAdjacentHTML, which the DOM
+     stub drops; catch it so the card can be read back like the rest. */
+  const realInsert = testRoot.insertAdjacentHTML;
+  testRoot.insertAdjacentHTML = (_pos, html) => { testRoot.innerHTML += html; };
+  const bootstrapBefore = gate.bootstrapState();
+  if (store.loadSessions().length === 0) {
+    ok(store.mergeSessions([{ isoDate: "2026-09-14T17:00:00.000Z", dayKey: "monday", durationSecs: 1200,
+      xpEarned: 120, roundsDone: 3, roundsPlanned: 3, ledger: [], perExercise: [] }]) === 1,
+       "a session restored from the cloud gives the device history");
+  }
+  store.clearGrownupPin(); passkey.forgetPasskey();
+  gate.lockGate(); resetGateState();
+  gate.setBootstrapState("restored");
+  setPasskeySupport(true);
+  globalThis.passkeyStub.mode = "ok";
+  ok(!gate.hasGrownupPin() && !passkey.hasPasskey() && !gate.isFreshDevice(),
+     "history present, no PIN, no passkey — a device restored from the cloud");
+
+  // (a) the card offers enrolment, and nothing to type
+  main.actions.toggleGate();
+  ok(main.state.gateAsk === "toggleGate", "a gated tap raises the challenge");
+  ok(gate.gateMode(main.state.gateWantsNewPin) === "passkey", "the gate is in passkey mode");
+  main.render();
+  let card = testRoot.innerHTML;
+  ok(card.includes('data-action="enrollPasskey"'), "the card offers to set up a passkey on this device");
+  ok(card.includes("Set up a passkey on this device"), "with that label");
+  ok(!card.includes('data-action="submitGate"'), "and nothing to type or submit — there is no PIN yet");
+  ok(!card.includes('data-action="unlockWithPasskey"'), "and no ceremony to run — there is no passkey yet");
+  ok(card.includes("no grown-up PIN has been set on it yet") && card.includes("Face ID, Touch ID or the device passcode"),
+     "the copy says why, and what confirming will prove");
+  ok(!card.includes("device that already has a grown-up unlocked"), "the impossible advice is gone");
+  ok(card.includes('data-action="cancelGate"'), "Cancel is still there");
+
+  // (b) a successful enrolment flips the card to choosing a PIN
+  const creates = globalThis.passkeyStub.creates;
+  fireEvent("click", clickTarget("enrollPasskey"));
+  ok(main.state.gateBusy === true, "a real tap on the button starts the ceremony");
+  await new Promise(r => setTimeout(r, 0));
+  ok(globalThis.passkeyStub.creates === creates + 1, "and the platform was asked to create the credential");
+  ok(passkey.hasPasskey() === true, "the passkey is enrolled on this device");
+  ok(main.state.gateAsk === "toggleGate" && main.state.gateBusy === false, "the challenge is still up, no longer busy");
+  ok(gate.gateMode(main.state.gateWantsNewPin) === "setPin", "and the grown-up it just proved may choose a PIN");
+  main.render();
+  card = testRoot.innerHTML;
+  ok(card.includes("Choose a grown-up PIN") && card.includes('data-action="submitGate"') && card.includes(">Set PIN<"),
+     "the card now offers Set PIN");
+  ok(card.includes("Now choose a PIN"), "with a note that says what to do next");
+  main.actions.answerGate("2468");
+  ok(gate.gateUnlocked() === true && main.state.gateAsk === null, "choosing it unlocks and closes the challenge");
+  ok(gate.answerPin("2468") === true, "and the PIN chosen on the restored device is the one that works from now on");
+
+  // a dismissed enrolment earns nothing
+  store.clearGrownupPin(); passkey.forgetPasskey();
+  gate.lockGate(); resetGateState();
+  main.actions.toggleGate();
+  globalThis.passkeyStub.mode = "cancel";
+  main.actions.enrollPasskey();
+  await new Promise(r => setTimeout(r, 0));
+  ok(gate.gateMode(main.state.gateWantsNewPin) === "passkey" && !passkey.hasPasskey(),
+     "a dismissed prompt enrols nothing and grants nothing");
+  main.render();
+  ok(testRoot.innerHTML.includes("set up a passkey. Try again, or open the app in Safari or Chrome") && !testRoot.innerHTML.includes("The PIN still works"),
+     "the failure note is honest about there being no PIN yet");
+  globalThis.passkeyStub.mode = "ok";
+
+  // (c) no WebAuthn at all: no button that cannot work, and honest copy
+  setPasskeySupport(false);
+  main.render();
+  card = testRoot.innerHTML;
+  ok(!card.includes('data-action="enrollPasskey"'), "a browser without passkeys is not offered one");
+  ok(!card.includes('data-action="submitGate"') && !card.includes('data-action="unlockWithPasskey"'),
+     "and there is genuinely no way to unlock here");
+  ok(card.includes("Safari or Chrome on this device") && card.includes("restore on a device that has one"),
+     "so the card says what to do instead");
+  ok(!card.includes("device that already has a grown-up unlocked"), "and never the impossible advice");
+  setPasskeySupport(true);
+
+  // "Forgot the PIN?" on a device that has a PIN but no passkey is the same
+  // dead end, and the same enrolment is the way through
+  resetGateState(); gate.lockGate();
+  gate.allowPinChoice(); ok(gate.choosePin("1357") === true, "a PIN exists");
+  gate.lockGate(); resetGateState();
+  main.actions.toggleGate();
+  main.actions.forgotPin();
+  ok(gate.gateMode(main.state.gateWantsNewPin) === "passkey", "forgot-PIN asks for the passkey");
+  main.render();
+  ok(testRoot.innerHTML.includes('data-action="enrollPasskey"') && testRoot.innerHTML.includes("pick a new PIN"),
+     "and with none enrolled, offers to enrol one");
+  main.actions.enrollPasskey();
+  await new Promise(r => setTimeout(r, 0));
+  ok(gate.gateMode(main.state.gateWantsNewPin) === "setPin", "enrolling flips it to choosing a new PIN");
+  ok(gate.answerPin("1357") === true, "the old PIN survives until a new one replaces it");
+  main.actions.answerGate("9753");
+  ok(gate.gateUnlocked() === true && gate.answerPin("9753") === true && gate.answerPin("1357") === false,
+     "and the new PIN replaces it");
+
+  resetGateState(); gate.lockGate();
+  gate.setBootstrapState(bootstrapBefore);
+  testRoot.insertAdjacentHTML = realInsert;
+}
+
+/* ---- "CHECKING…" CAN NEVER STICK ------------------------------------------
+   The gate's bootstrap state was only ever set inside restoreFromCloud().then;
+   a rejected restore left it on "checking", and the card on "Checking for this
+   family's history…" with only Cancel, for the rest of the launch. */
+{
+  const bootstrapBefore = gate.bootstrapState();
+  const sessionsBefore = store.loadSessions();
+  // An empty device: the case where "checking" stuck and nothing could be decided.
+  store.writeStorage(store.LS_SESSIONS, []);
+  store.clearGrownupPin(); gate.lockGate(); resetGateState();
+  gate.setBootstrapState("checking");
+  ok(gate.gateMode() === "checking", "while checking, nothing is decided");
+  await main.settleBootstrap(Promise.reject(new Error("firestore exploded")));
+  ok(gate.bootstrapState() === "offline-unverified",
+     "a rejected restore resolves to offline-unverified, never stays on checking");
+  ok(gate.cloudHistoryResolved() === true && gate.gateMode() !== "checking", "so the gate can go on");
+  gate.lockGate();
+  gate.setBootstrapState("checking");
+  await main.settleBootstrap(Promise.resolve({ reachedCloud: false }));
+  ok(gate.bootstrapState() === "offline-unverified", "a restore that could not reach the mirror says so");
+  gate.setBootstrapState("checking");
+  await main.settleBootstrap(undefined);
+  ok(gate.bootstrapState() === "offline-unverified", "a restore that returned nothing at all still resolves");
+  gate.setBootstrapState("checking");
+  await main.settleBootstrap(Promise.resolve({ reachedCloud: true }));
+  ok(gate.bootstrapState() === "empty", "a restore that reached the mirror and found nothing says the family is new");
+  // A device that holds history: whatever the cloud did, it is not a new family.
+  store.writeStorage(store.LS_SESSIONS, sessionsBefore);
+  ok(store.loadSessions().length > 0, "the restored history is back on the device");
+  gate.setBootstrapState("checking");
+  await main.settleBootstrap(Promise.reject(new Error("firestore exploded")));
+  ok(gate.bootstrapState() === "restored", "a rejected restore on a device with history resolves to restored");
+  gate.setBootstrapState(bootstrapBefore);
+  gate.lockGate(); resetGateState();
+}
+
 /* Leaving the Grown-up Zone drops the unlock — she cannot walk out, hand the
    phone back, and have the next tap on 🧑 still be authorized. */
 await unlockGrownup();
