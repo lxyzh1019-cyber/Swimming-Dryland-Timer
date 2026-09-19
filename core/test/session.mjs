@@ -917,7 +917,12 @@ const stopInRoundTwo = (reason) => ({
   const RETIRED = [
     [/\bCircuit\b/, "Circuit — the repeating unit is a Round, and the block is Main"],
     [/\bSection\b/i, "Section — the coach says Block, so the screen says Block"],
-    [/LEFT SIDE|RIGHT SIDE/, "LEFT/RIGHT SIDE — the app only knows first and second"],
+    /* The coach strip may not INVENT a side — it does not know which one she
+       started on. Content that names a side (a physio said the right ankle is
+       the stiff one) is a different thing and is allowed; this bans the strip's
+       uppercase form only. */
+    [/(?:SET|REP) \d+ OF \d+[^<]*(?:LEFT|RIGHT) SIDE|>\s*(?:LEFT|RIGHT) SIDE\s*</,
+     "an uppercase LEFT/RIGHT SIDE on the coach strip — the runner only knows first and second"],
     [/TIMED SET/, "TIMED SET — a set is the prescription unit, counted elsewhere"],
     [/\bworkout\b/i, "workout — this is a session"],
     [/\bexercises?\b/i, "exercise — the kid-facing word is move"],
@@ -927,6 +932,10 @@ const stopInRoundTwo = (reason) => ({
        snapshot happens to include that move. */
     [/\bpress\b/i, "press — every other instruction says tap"],
     [/½ cut short/, "two legends for one glyph"],
+    /* Two units with near-identical names, printed one line apart. They are
+       now "moves" and "times done" — both facts, neither in jargon. */
+    [/\bmovements?\b/i, "movement — the unit she reads is a move"],
+    [/\bperformances?\b/i, "performance — the unit she reads is \"times done\""],
   ];
   /* A status enum rendered raw into something she can read. `moveReview` used
      to fall through to it, so an aria-label read "Round 2 — partial". */
@@ -1052,6 +1061,42 @@ const stopInRoundTwo = (reason) => ({
   ok(rock.totalReps === 18, "eight on one side and ten on the other is eighteen, not sixteen");
   ok(plan.prescriptionSegments(rock).map(g => g.reps).join(",") === "8,10",
      "and the runner counts to each of them in turn");
+
+  /* NAMED SIDES SURVIVE. The runner never invents a side, but where the
+     content states one -- a physio found the right ankle stiffer -- the
+     screen, the coach and the running order must all say so. */
+  const named = plan.normalizePrescription({ reps: 8, sideReps: [8, 10], sides: 2, sideNames: ["left", "right"] });
+  const namedEx = { byReps: true, prescription: named };
+  ok(plan.doseLines(namedEx).big === "8 left, 10 right", "a named side is on the ring: " + plan.doseLines(namedEx).big);
+  ok(/left/.test(plan.spokenDose(namedEx)) && /right/.test(plan.spokenDose(namedEx)),
+     "and the coach says it too: " + plan.spokenDose(namedEx));
+  ok(plan.prescriptionSegments(named).map(g => g.label).join(" -> ").includes("left side"),
+     "and she does the stated side first");
+
+  /* THE SWEEP THAT A SPOT-CHECK MISSED. Deriving the dose from the structure
+     once dropped every approximation marker in both apps -- "at most 5 a
+     side" silently became "do 5" on a landing drill. Assert it over the whole
+     plan, not over a chosen row. */
+  const MARK = /[~\u2264]|\d\s*\+/;
+  let swept = 0;
+  for (const day of Object.values(data.DAYS)) {
+    const moves = Object.values(day.blocks || {}).flat().concat(day.prepMenu || [], day.recovery || []);
+    for (const e of moves) {
+      if (!e || !e.byReps) continue;
+      /* Either place the marker can live: still in the authored string, or
+         moved into the structure as `approx`. Both must reach the ring. */
+      const written = e.repsDetail || e.dose || "";
+      const structural = (plan.exPrescription(e) || {}).approx || "";
+      const wantedMark = structural
+        || (/\u2264/.test(written) ? "\u2264" : /~/.test(written) ? "~" : MARK.test(written) ? "+" : "");
+      if (!wantedMark) continue;
+      swept++;
+      const big = plan.doseLines(e).big;
+      ok(big.includes(wantedMark),
+         e.name + ": the dose keeps its " + wantedMark + ", got \"" + big + "\"");
+    }
+  }
+  ok(swept > 0, "the sweep found approximate doses to check (" + swept + ")");
 }
 
 console.log("✓ session safety passed (" + passed + " assertions)");

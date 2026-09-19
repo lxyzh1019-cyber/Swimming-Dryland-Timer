@@ -497,7 +497,7 @@ export function buildTodayVM(state) {
   if (status === "today") {
     const base = {
       badgeLabel: "TODAY" + (tag ? " · " + tag : ""), title: fullDay.title,
-      mins: stats.mins, movesLabel: plural(stats.moves, "distinct movement"),
+      mins: stats.mins, movesLabel: plural(stats.moves, "move"),
       showChips: true, isActive: true, showCta: true, showSettings: true, ctaAction: "goSession"
     };
     dayView = { ...base, ctaLabel: isSpaDay ? "Start Recovery" : "Let's go!", ctaIcon: isSpaDay ? "🧘" : "▶️" };
@@ -611,13 +611,15 @@ export function buildTodayVM(state) {
       badgeLabel: shortU + (isPartial ? " · PARTLY DONE ✓" : " · COMPLETED ✓"),
       title: fullDay.title,
       mins: stats.mins, minsLabel: timeLabel,
-      /* BOTH UNITS, EACH NAMED. "Movements" are distinct moves, counted once
-         however many rounds they run; "performances" are every planned
+      /* BOTH FACTS, IN PLAIN WORDS. "Moves" are distinct moves, counted once
+         however many rounds they run; "times done" counts every planned
          instance, a main move once per round. The card printed one of them
          beside a Progress row that printed the other under the same word. */
       movesLabel: (showActuals
-        ? mv.performed + " of " + mv.planned + " movements · " + pf.performed + " of " + pf.planned + " performances"
-        : plural(planState.movements, "distinct movement")),
+        ? mv.performed + " of " + mv.planned + " moves · "
+          + (pf.performed === pf.planned ? pf.performed + " times done"
+                                         : pf.performed + " of " + pf.planned + " times done")
+        : plural(planState.movements, "move")),
       roundsLabel: (showActuals && !isSpaDay && roundsAsked > 0)
         ? dayRounds + " of " + plural(roundsAsked, "main round") : "",
       earnedXpLabel: isSpaDay || !earnedXp ? "" : "+" + earnedXp + " XP earned",
@@ -662,7 +664,7 @@ export function buildTodayVM(state) {
     // worse than none: it tells her the app isn't really watching.
     const warmupDone = !!(record && (record.rows || [])
       .some(l => l && l.block === "warmup" && l.status === "done"));
-    dayView = { badgeLabel: shortU + " · CATCH UP", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "distinct movement"), showChips: true, isMissed: true, showCta: true, ctaLabel: "Catch Up Now", ctaIcon: "↺", showSettings: false, ctaAction: "goSession",
+    dayView = { badgeLabel: shortU + " · CATCH UP", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"), showChips: true, isMissed: true, showCta: true, ctaLabel: "Catch Up Now", ctaIcon: "↺", showSettings: false, ctaAction: "goSession",
       missedSub: warmupDone
         ? "You still got the warm-up in — every streak has bumps."
         : "Every streak has bumps. Pick it back up whenever you're ready." };
@@ -670,7 +672,7 @@ export function buildTodayVM(state) {
     const recov = (fullDay && fullDay.recovery) || [];
     dayView = {
       badgeLabel: shortU + " · RECOVERY DAY", title: fullDay.title,
-      mins: stats.mins, movesLabel: plural(stats.moves, "distinct movement"),
+      mins: stats.mins, movesLabel: plural(stats.moves, "move"),
       showChips: true, isRest: true, showCta: true,
       ctaLabel: "Start Recovery", ctaIcon: "🧘", ctaAction: "goSession",
       showSettings: false,
@@ -680,7 +682,7 @@ export function buildTodayVM(state) {
     const hasPlan = stats.moves > 0;
     if (hasPlan) {
       dayView = {
-        badgeLabel: shortU + " · UPCOMING", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "distinct movement"),
+        badgeLabel: shortU + " · UPCOMING", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"),
         showChips: true, isPreview: true, showCta: true, ctaVariant: "secondary",
         ctaLabel: "Start Early", ctaIcon: "▶️",
         ctaSubtext: "Can’t wait? Starting now still counts for " + DAY_LONG[selectedKey] + ".",

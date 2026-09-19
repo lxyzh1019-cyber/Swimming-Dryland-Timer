@@ -116,11 +116,17 @@ export function parsePrescription(detail) {
   const setsM = body.match(/^(\d+)\s*[×x]\s*/i);
   if (setsM) { sets = parseInt(setsM[1], 10); body = body.slice(setsM[0].length); }
 
-  // rep count, optionally a range ("8-10") or an approximation ("~24")
-  const repsM = body.match(/^~?\s*(\d+)\s*(?:-\s*(\d+))?/);
+  /* Rep count, optionally a range ("8-10") — and the MARKER in front of or
+     behind it, which is not decoration. "<=6" on a jump-landing drill is a
+     ceiling: no more than six, because the seventh is the sloppy one. "10+"
+     is a floor. "~24" is an estimate. The old regex ate "~" and could not see
+     the other two at all, so deriving the dose turned every one of them into a
+     flat number — and a ceiling silently became a target. */
+  const repsM = body.match(/^([~\u2264]?)\s*(\d+)\s*(\+?)\s*(?:-\s*(\d+))?/);
   if (!repsM) fail(detail, "no rep count");
-  const reps = parseInt(repsM[1], 10);
-  const repsHigh = repsM[2] ? parseInt(repsM[2], 10) : null;
+  const approx = repsM[1] || (repsM[3] ? "+" : null);
+  const reps = parseInt(repsM[2], 10);
+  const repsHigh = repsM[4] ? parseInt(repsM[4], 10) : null;
   if (repsHigh != null && repsHigh < reps) fail(detail, "rep range runs backwards");
 
   // whatever follows the number says how the reps are divided up
@@ -146,6 +152,7 @@ export function parsePrescription(detail) {
   if (eat(/\beach\b/))   sides = 2;        // "3/dir each" — each direction, each arm
   if (eat(/\bcycles?\b/)) unit = "cycles";
   if (eat(/\bsteps?\b/))  unit = "steps";
+  if (eat(/\brotations?\b/)) unit = "rotations";
   eat(/\bclean\b/); eat(/\breps?\b/); eat(/\balternating\b/);
   tail = tail.replace(/[()\s]+/g, " ").trim();
   if (tail) fail(detail, `unrecognised "${tail}"`);
@@ -162,7 +169,7 @@ export function parsePrescription(detail) {
   left = left.replace(/\btempo\b/g, " ").replace(/[()\s]+/g, " ").trim();
   if (left) fail(detail, `unrecognised modifier "${left}"`);
 
-  return normalizePrescription({ sets, reps, repsHigh, sides, dirs, tempo, holdSeconds, unit, sideWord });
+  return normalizePrescription({ sets, reps, repsHigh, sides, dirs, tempo, holdSeconds, unit, sideWord, approx });
 }
 
 /* Fill in the defaults and derive the totals every consumer wants. */
@@ -197,6 +204,19 @@ export function normalizePrescription(p) {
        word means the screen can say "each leg" instead of the vaguer "each
        side" — without the app ever claiming to know which leg she began on. */
     sideWord: ["side", "leg", "arm"].includes(p.sideWord) ? p.sideWord : "side",
+    /* NAMED SIDES — only where the PLAN names them.
+
+       Two different questions were being confused. The RUNNER cannot know
+       which side she started on: nothing records it, and the coach only ever
+       says first and second — which is why "LEFT SIDE" came off the coach
+       strip. But the PLAN sometimes does know, because a physio said so: the
+       right ankle is the stiff one, the left knee is the one that caves. That
+       is a fact about her body, not a guess about the timer, and dropping it
+       would lose the reason the two sides differ at all.
+
+       So a side is named here or nowhere. */
+    sideNames: Array.isArray(p.sideNames) && p.sideNames.length === sides
+      ? p.sideNames.map(String) : null,
     segments, totalReps
   };
 }
@@ -220,7 +240,7 @@ export function prescriptionSegments(p) {
       for (let dir = 1; dir <= p.dirs; dir++) {
         const bits = [];
         if (p.sets  > 1) bits.push(`set ${ORDINAL[set] || set}`);
-        if (p.sides > 1) bits.push(`${ORDINAL[side] || side} side`);
+        if (p.sides > 1) bits.push(p.sideNames ? `${p.sideNames[side - 1]} side` : `${ORDINAL[side] || side} side`);
         if (p.dirs  > 1) bits.push(`${ORDINAL[dir] || dir} direction`);
         const prev = out[out.length - 1];
         out.push({
@@ -343,8 +363,10 @@ export function describeDose(p) {
      low number is the one the runner counts (see offerExtraReps), and the high
      one is the offer, so hiding it would make the screen stricter than the plan. */
   const count = p.sideReps
-    ? p.sideReps.join(" then ")
-    : marker + p.reps + (p.repsHigh ? "\u2013" + p.repsHigh : "");
+    ? (p.sideNames ? p.sideReps.map((n, i) => n + " " + p.sideNames[i]).join(", ") : p.sideReps.join(" then "))
+    : marker === "+"
+      ? p.reps + "+"
+      : marker + p.reps + (p.repsHigh ? "\u2013" + p.repsHigh : "");
   /* How that stretch is repeated. Named in the order she meets them. */
   const divisors = [];
   if (p.dirs  > 1) divisors.push({ kind: "dirs",  n: p.dirs,  short: "\u00d7 " + p.dirs + " ways", long: p.dirs + " ways" });
@@ -356,7 +378,8 @@ export function describeDose(p) {
   const totalLow = p.totalReps;
   const totalHigh = p.repsHigh ? p.totalReps + (p.repsHigh - p.reps) * p.segments : null;
   const total = p.segments > 1
-    ? marker + totalLow + (totalHigh ? "\u2013" + totalHigh : "") : "";
+    ? (marker === "+" ? totalLow + "+" : marker + totalLow + (totalHigh ? "\u2013" + totalHigh : ""))
+    : "";
   const cadence = p.holdSeconds ? p.holdSeconds + "s hold"
     : p.tempo ? p.tempo.join("-") + " tempo" : "";
   return { count, unit, divisors, total, cadence, segments: p.segments, totalReps: p.totalReps };
@@ -369,16 +392,25 @@ export function describeDose(p) {
 export function doseLines(ex) {
   const p = exPrescription(ex);
   if (!p) {
+    /* Timed moves have no prescription, but they can still carry a note — the
+       target a clock cannot say ("about 3 slides of 20-30s each side"). It
+       belongs on the long line, the same place a prescription's note goes. */
     const written = (ex && (ex.dose || ex.repsDetail)) || "";
-    return { big: written, sub: "", full: written, short: written };
+    const plainNote = (ex && ex.note) || "";
+    const longWritten = [written, plainNote].filter(Boolean).join(" \u00b7 ");
+    return { big: written, sub: "", full: longWritten, short: written };
   }
   const d = describeDose(p);
   const note = (ex && ex.note) || "";
   const sideways = p.sideReps ? "" : d.divisors.map(x => x.short).filter(Boolean).join(", ");
   const big = [d.count, d.unit !== "reps" ? d.unit : "", sideways].filter(Boolean).join(" ").trim();
   const sub = d.total ? d.total + " " + d.unit + " in total" : "";
+  /* When the counts already name the sides ("8 left, 10 right") the side
+     divisor has been said — repeating it gives "8 left, 10 right reps each
+     side", which is nobody's sentence. */
+  const longDivisors = d.divisors.filter(x => !(p.sideReps && x.kind === "sides")).map(x => x.long);
   const full = [
-    [d.count, d.unit].join(" ") + (d.divisors.length ? " " + d.divisors.map(x => x.long).join(", ") : ""),
+    [d.count, d.unit].join(" ") + (longDivisors.length ? " " + longDivisors.join(", ") : ""),
     d.total ? d.total + " " + d.unit + " in total" : "",
     d.cadence, note
   ].filter(Boolean).join(" \u00b7 ");
@@ -399,11 +431,16 @@ export function spokenDose(ex) {
   if (p) {
     const d = describeDose(p);
     const unit = d.unit === "reps" ? plural(p.reps, "rep") : d.unit;
+    /* A marker is a symbol on screen and a WORD out loud: "at most six" is the
+       whole point of writing "<=6", and "six" is a different instruction. */
+    const lead = p.approx === "\u2264" ? "at most " : p.approx === "+" ? "at least " : p.approx === "~" ? "about " : "";
     let said = p.sideReps
-      ? `${p.sideReps[0]} on the first side and ${p.sideReps[1]} on the second`
+      ? (p.sideNames
+          ? `${p.sideReps[0]} on the ${p.sideNames[0]} and ${p.sideReps[1]} on the ${p.sideNames[1]}`
+          : `${p.sideReps[0]} on the first side and ${p.sideReps[1]} on the second`)
       : p.sets > 1
-        ? `${p.sets} sets of ${p.repsHigh ? p.reps + " to " + p.repsHigh : p.reps}`
-        : `${p.repsHigh ? p.reps + " to " + p.repsHigh : p.reps} ${unit}`;
+        ? `${p.sets} sets of ${lead}${p.repsHigh ? p.reps + " to " + p.repsHigh : p.reps}`
+        : `${lead}${p.repsHigh ? p.reps + " to " + p.repsHigh : p.reps} ${unit}`;
     if (p.sides > 1 && !p.sideReps) said += " per side";
     if (p.dirs > 1) said += ` in each of ${p.dirs} directions`;
     /* The total is only worth saying when the segments make it surprising —

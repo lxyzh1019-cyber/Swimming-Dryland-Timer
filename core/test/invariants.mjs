@@ -919,9 +919,11 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
     same(tv.dayView.earnedXpLabel, "+" + rec.settledXp + " XP earned", label + ": the day card's XP is the record's settled XP");
     same(tv.dayView.roundsLabel, roundsText, label + ": the day card's rounds are the record's");
     same(tv.dayView.minsLabel.split(" of ")[0], String(rec.minutes), label + ": the day card's minutes are the record's");
-    same(tv.dayView.movesLabel, rec.movements.performed + " of " + rec.movements.planned + " movements · "
-      + rec.performances.performed + " of " + rec.performances.planned + " performances",
-      label + ": the day card says both movement units, each by name");
+    same(tv.dayView.movesLabel, rec.movements.performed + " of " + rec.movements.planned + " moves · "
+      + (rec.performances.performed === rec.performances.planned
+           ? rec.performances.performed + " times done"
+           : rec.performances.performed + " of " + rec.performances.planned + " times done"),
+      label + ": the day card says both facts in plain words");
     same(/counts toward your streak/.test(tv.dayView.doneSub), !rec.dayComplete && rec.countsForStreak,
       label + ": the card's streak note is the record's countsForStreak (a complete day needs no note)");
     same(tv.statChips[0].value, String(outcome.scheduleStreak(outcome.dayRecords(), util.todayISODate())),
