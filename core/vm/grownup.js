@@ -16,7 +16,7 @@
    skipped moves) are still read off the sittings the record carries.
    ============================================================ */
 
-import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, BODY_ZONES, videoSearchUrl, fmtXp } from "../data.js";
+import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, BODY_ZONES, videoSearchUrl, fmtXp, doseLines } from "../data.js";
 import { redeemedPrizesForReview } from "../store.js";
 import { ATHLETE_DEFAULT, CSV_FILE_PREFIX } from "../sport.js";
 import { gateUnlocked, GATE_REASON } from "../gate.js";
@@ -745,7 +745,7 @@ export function buildGrownupVM(state) {
     Object.values(day.blocks || {}).flat().concat(day.prepMenu || [], day.recovery || []).forEach(ex => {
       if (!ex || !ex.name || seen[ex.name]) return; seen[ex.name] = true;
       libraryList.push({
-        name: ex.name, dose: ex.dose || "", cue: ex.cue || "",
+        name: ex.name, dose: ex.byReps ? doseLines(ex).full : (ex.dose || ""), cue: ex.cue || "",
         parentWatch: ex.parentWatch || "", fix: ex.redFlag || "", transfer: ex.transfer || "",
         photoUrl: exercisePhotoUrl(ex.name, "Demo"),
         /* Not one "- Demo Image" file exists in either app, and this card had

@@ -919,9 +919,11 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
     same(tv.dayView.earnedXpLabel, "+" + rec.settledXp + " XP earned", label + ": the day card's XP is the record's settled XP");
     same(tv.dayView.roundsLabel, roundsText, label + ": the day card's rounds are the record's");
     same(tv.dayView.minsLabel.split(" of ")[0], String(rec.minutes), label + ": the day card's minutes are the record's");
-    same(tv.dayView.movesLabel, rec.movements.performed + " of " + rec.movements.planned + " movements · "
-      + rec.performances.performed + " of " + rec.performances.planned + " performances",
-      label + ": the day card says both movement units, each by name");
+    same(tv.dayView.movesLabel, rec.movements.performed + " of " + rec.movements.planned + " moves · "
+      + (rec.performances.performed === rec.performances.planned
+           ? rec.performances.performed + " times done"
+           : rec.performances.performed + " of " + rec.performances.planned + " times done"),
+      label + ": the day card says both facts in plain words");
     same(/counts toward your streak/.test(tv.dayView.doneSub), !rec.dayComplete && rec.countsForStreak,
       label + ": the card's streak note is the record's countsForStreak (a complete day needs no note)");
     same(tv.statChips[0].value, String(outcome.scheduleStreak(outcome.dayRecords(), util.todayISODate())),
@@ -968,8 +970,13 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
     same(fv.streakEarned, rec.countsForStreak, label + ": the finish screen's streak note is the record's countsForStreak");
     same(fv.roundsLine, roundsText, label + ": the finish screen's rounds line is the record's");
     ok(new RegExp("(^\\+|· )" + rec.settledXp + " (XP|today)").test(fv.xpLine), label + ": the finish screen names the day's settled XP (" + fv.xpLine + ")");
-    same(fv.moveReview.length, rec.plan.moves.length, label + ": the finish screen's per-move review is the record's plan, one row per performance");
-    same(fv.moveReview.length, rec.performances.planned, label + ": which is every planned performance");
+    /* The finish screen is an EXCEPTION list, not a receipt: one row per move
+       that has a round left undone, and nothing at all when there are none. */
+    const owed = [...outcome.shortRoundsByMoveFromPlan(rec.plan.moves).values()].filter(g => g.short.length);
+    same(fv.notFull.length, owed.length, label + ": the finish screen lists exactly the moves with a round left undone");
+    same(fv.allInFull, owed.length === 0, label + ": and says every move was done in full only when that is true");
+    ok(fv.notFull.every(r => r.label && !/\bof\b/.test(r.label)),
+       label + ": naming the rounds rather than counting them (" + JSON.stringify(fv.notFull.map(r => r.label).slice(0, 2)) + ")");
     return { rec, tv, pv, gv, fv };
   };
 
@@ -989,8 +996,20 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
     ok(partials.length > 0, "S2: so the review holds ½ rows");
     ok(partials.every(m => /needs \d+s \(80%\) to count$|all \d+ to count$/.test(m.reason)),
       "S2: and every ½ row says, in her units, what would have counted: " + JSON.stringify(partials.slice(0, 2).map(m => m.reason)));
-    ok(fv.moveReview.some(r => r.icon === "½"), "S2: the finish screen's review shows the ½ pill");
-    ok(tv.blocks.some(b => b.review.some(r => r.icon === "½")), "S2: and so does the day card's expanded block");
+    ok(fv.notFull.length > 0 && fv.notFull.some(r => /short/.test(r.label)),
+       "S2: the finish screen names the moves she came up short on: " + JSON.stringify(fv.notFull.slice(0, 2)));
+    /* The day card draws one row per MOVE with one icon per ROUND, in round
+       order — so position is the round, and a short round is visible without
+       reading a number. */
+    ok(tv.blocks.some(b => b.review.some(r => r.slots.some(sl => sl.icon === "½"))),
+       "S2: and the day card shows the ½ in the round slot that earned it");
+    tv.blocks.forEach(b => b.review.forEach(r => {
+      ok(r.slots.length >= 1, "S2: every move row has a slot per round");
+      ok(r.slots.every((sl, i) => sl.slot === i + 1), "S2: and the slots are numbered in round order");
+      ok(!/round/i.test(r.name), "S2: while the name itself never names a round");
+    }));
+    const multi = tv.blocks.flatMap(b => b.review).find(r => r.multiRound);
+    ok(multi && multi.slots.length > 1, "S2: a multi-round block draws one slot per round: " + (multi ? multi.slots.length : 0));
     same(tv.reviewLegend, outcome.moveReviewLegend(), "S2: the card carries the one-line legend");
     ok(/80% of the time or all reps/.test(tv.reviewLegend), "S2: which states the rule");
     const html = tscreen.todayWide({ ...tv, blocks: tv.blocks.map(b => ({ ...b, bodyStyle: "" })) });

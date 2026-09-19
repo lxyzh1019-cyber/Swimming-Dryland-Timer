@@ -38,7 +38,7 @@ function repRing(vm, size, capVh) {
   return `
   <div data-action="advance" title="Tap the ring when you're done" style="cursor:pointer;flex:0 1 ${size}px;max-width:${capVh ? `min(${size}px, ${capVh}vh)` : `${size}px`};min-width:${size >= 300 ? 220 : 160}px;aspect-ratio:1;border-radius:50%;background:var(--grape-wash);border:${border}px solid var(--grape);display:flex;flex-direction:column;align-items:center;justify-content:center;box-sizing:border-box;padding:${size >= 300 ? 26 : 14}px;">
     <div style="font-weight:900;font-size:${size >= 300 ? 15 : 11}px;letter-spacing:0.1em;color:var(--grape-deep);">BY REPS</div>
-    <div style="font-family:var(--font-display);font-size:${size >= 300 ? 50 : 32}px;font-weight:600;color:var(--grape);text-align:center;line-height:1.05;margin:${size >= 300 ? 8 : 4}px 0;">${vm.curExDose}</div>
+    <div style="font-family:var(--font-display);font-size:${(String(vm.curExDose || "").length > 6 ? (size >= 300 ? 26 : 20) : (size >= 300 ? 50 : 32))}px;font-weight:600;color:var(--grape);text-align:center;line-height:1.05;margin:${size >= 300 ? 8 : 4}px 0;">${vm.curExDose}</div>
     ${vm.showClock ? `<div style="font-weight:900;font-size:${size >= 300 ? 20 : 14}px;color:var(--grape-deep);">⏱ <span id="s-timer-text">${vm.exActualDisplay}</span></div>` : ""}
     <div style="font-size:12px;font-weight:800;color:var(--grape-deep);opacity:0.8;margin-top:6px;">${vm.explore ? "No clock here — tap Next when you've had a look" : "Tap the ring when you're done"}</div>
   </div>`;
@@ -145,16 +145,16 @@ function stopOverlay(vm) {
    about to be worth the same again. */
 function restartWarning(vm) {
   const n = vm.restartExercises;
-  const did = n === 1 ? "1 exercise" : n + " exercises";
+  const did = n === 1 ? "1 move" : n + " moves";
   return `
   <div style="position:absolute;inset:0;z-index:20;background:var(--sun-wash);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px;text-align:center;">
     <span style="font-size:56px;" aria-hidden="true">🔄</span>
-    <div style="font-family:var(--font-display);font-weight:600;font-size:32px;color:var(--ink);">Start this workout over?</div>
+    <div style="font-family:var(--font-display);font-weight:600;font-size:32px;color:var(--ink);">Start this session over?</div>
     <div style="font-size:18px;font-weight:700;color:var(--ink);line-height:1.5;max-width:520px;">
       The ${did} you've already done ${n === 1 ? "is" : "are"} erased, and so is the XP for them — this attempt won't be saved at all.
     </div>
     <div style="font-size:16px;font-weight:700;color:var(--sun-ink);line-height:1.5;max-width:520px;">
-      You can earn all of it back: the same workout starts again from the top, worth exactly the same. 💛
+      You can earn all of it back: the same session starts again from the top, worth exactly the same. 💛
     </div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:8px;">
       <button type="button" data-action="cancelRestart" style="min-height:56px;border:none;border-radius:var(--radius-pill);padding:0 26px;background:var(--mint);color:#fff;font-weight:900;font-size:16px;cursor:pointer;font-family:inherit;box-shadow:0 4px 0 var(--mint-deep);">Keep what I've done</button>
@@ -217,8 +217,8 @@ export function detailOverlayHtml(vm) {
         </div>` : ""}
         ${vm.detailShowResume ? `
         <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch;border-top:1.5px solid var(--hairline);padding-top:14px;">
-          <div style="font-size:13px;font-weight:800;color:var(--ink-soft);text-align:center;">⏸ Your workout is paused while you read.</div>
-          <button type="button" data-action="resumeFromDetail" style="width:100%;min-height:54px;border:none;border-radius:var(--radius-pill);background:var(--mint);color:#fff;font-family:var(--font-display);font-weight:600;font-size:20px;cursor:pointer;box-shadow:0 5px 0 var(--mint-deep);">▶ Resume my workout</button>
+          <div style="font-size:13px;font-weight:800;color:var(--ink-soft);text-align:center;">⏸ Your session is paused while you read.</div>
+          <button type="button" data-action="resumeFromDetail" style="width:100%;min-height:54px;border:none;border-radius:var(--radius-pill);background:var(--mint);color:#fff;font-family:var(--font-display);font-weight:600;font-size:20px;cursor:pointer;box-shadow:0 5px 0 var(--mint-deep);">▶ Resume my session</button>
         </div>` : ""}
       </div>
     </div>
@@ -263,7 +263,7 @@ const COMPLETION = {
     bg: "var(--aqua-wash)", ink: "var(--aqua-ink)", pose: "breath", poseH: 200,
     title: "Recovery done. That was care.", mantra: false,
     noteStyle: "color:var(--aqua-ink);background:var(--aqua-wash);",
-    note: "Recovery isn't a workout, so it doesn't add a training day or a streak day — and it isn't supposed to. It holds your streak right where it is. Listening to your body is the whole point, and you did it. ❄️"
+    note: "Recovery isn't a session, so it doesn't add a training day or a streak day — and it isn't supposed to. It holds your streak right where it is. Listening to your body is the whole point, and you did it. ❄️"
   },
   "recovery-short": {
     bg: "var(--aqua-wash)", ink: "var(--aqua-ink)", pose: "breath", poseH: 200,
@@ -289,7 +289,7 @@ const COMPLETION = {
     bg: "var(--aqua-wash)", ink: "var(--aqua-ink)", pose: "seeyou", poseH: 170,
     title: "That's every move.", mantra: false,
     noteStyle: "color:var(--aqua-ink);background:var(--aqua-wash);",
-    note: "Nothing was recorded — this was just a look. When you're ready to train for real, go back and press GO. 🧪"
+    note: "Nothing was recorded — this was just a look. When you're ready to train for real, go back and tap GO. 🧪"
   },
   "save-failed": {
     bg: "var(--stop-wash)", ink: "var(--stop-ink)", pose: "seeyou", poseH: 170,
@@ -329,22 +329,18 @@ function completeScreen(vm) {
     <div style="font-size:14px;font-weight:700;color:var(--ink-soft);max-width:480px;line-height:1.5;">
       ${vm.roundShortNotes.map(n => `<div>${n}</div>`).join("")}
     </div>` : ""}
-    ${(vm.moveReview || []).length ? `
-    <div style="max-width:520px;width:100%;box-sizing:border-box;text-align:left;">
-      <button type="button" data-action="toggleMoveReview" aria-expanded="${vm.moveReviewOpen ? "true" : "false"}" style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:2px solid var(--hairline);border-radius:var(--radius-pill);padding:9px 16px;cursor:pointer;font-weight:900;font-size:14px;color:var(--ink);font-family:inherit;min-height:44px;">See every move ${vm.moveReviewOpen ? "▴" : "▾"}</button>
-      ${vm.moveReviewOpen ? `
-      <div style="margin-top:10px;background:var(--surface);border-radius:16px;padding:12px 14px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:2px;" data-move-review-list="1">
-        <div style="font-size:11px;font-weight:800;color:var(--ink-soft);line-height:1.35;padding-bottom:6px;border-bottom:1px solid var(--hairline);margin-bottom:4px;">${escapeHtml(vm.moveReviewLegend)}</div>
-        ${vm.moveReview.map(r => `
-        <div style="display:flex;align-items:flex-start;gap:9px;padding:5px 0;font-size:13px;font-weight:700;color:var(--ink);" data-move-review="${escapeHtml(r.status)}">
-          <span style="${r.pillStyle}" aria-label="${escapeHtml(r.status)}">${r.icon}</span>
-          <span style="flex:1;min-width:0;">
-            <span>${r.roundLabel ? `<span style="color:var(--ink-faint);font-size:11px;font-weight:900;margin-right:5px;">${r.roundLabel}</span>` : ""}${escapeHtml(r.name)}${r.doseLabel ? ` <span style="color:var(--ink-soft);font-weight:800;">· ${escapeHtml(r.doseLabel)}</span>` : ""}</span>
-            ${r.reason ? `<span style="display:block;font-size:12px;font-weight:700;color:var(--ink-soft);line-height:1.35;">${escapeHtml(r.reason)}</span>` : ""}
-          </span>
-        </div>`).join("")}
-      </div>` : ""}
+    ${vm.notFull && vm.notFull.length ? `
+    <div style="max-width:520px;width:100%;box-sizing:border-box;text-align:left;background:var(--surface);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;" data-not-full-list="1">
+      <div style="font-family:var(--font-display);font-weight:600;font-size:17px;color:var(--ink);">Not done in full</div>
+      ${vm.notFull.map(r => `
+      <div style="display:flex;align-items:baseline;gap:10px;font-size:14px;font-weight:800;color:var(--ink);" data-not-full="${escapeHtml(r.name)}">
+        <span style="flex:1;min-width:0;">${escapeHtml(r.name)}</span>
+        <span style="font-weight:800;color:${r.anySkipped ? "var(--coral)" : "var(--sun-ink)"};white-space:nowrap;">${escapeHtml(r.label)}</span>
+      </div>`).join("")}
+      <button type="button" data-action="goSessionRedo" data-arg="${escapeHtml(vm.redoDayKey)}" style="align-self:flex-start;margin-top:4px;background:var(--aqua);color:#fff;border:none;border-radius:var(--radius-pill);padding:11px 20px;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;min-height:44px;box-shadow:0 4px 0 var(--aqua-ink,var(--sea));">Redo these</button>
     </div>` : ""}
+    ${vm.allInFull ? `
+    <div style="font-size:14px;font-weight:800;color:var(--ink-soft);max-width:480px;line-height:1.5;">Every move was done in full.</div>` : ""}
     ${vm.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="display:flex;align-items:center;gap:10px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:14px 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
     ${vm.saveFailed ? `
     <div style="display:flex;flex-direction:column;gap:10px;background:var(--stop-wash, var(--surface));border:2px solid var(--stop);border-radius:20px;padding:18px 22px;max-width:600px;width:100%;box-sizing:border-box;text-align:left;">
@@ -426,7 +422,7 @@ function nameHeadline(vm, wide, tablet) {
   <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;flex-shrink:0;text-align:center;">
     <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;">
       ${badge(vm.blockBadgeVariant, vm.blockLabel)}
-      ${vm.roundLabelText ? `<span style="font-size:12px;font-weight:900;color:var(--ink-soft);background:var(--surface-2);border-radius:var(--radius-pill);padding:3px 10px;">${vm.roundLabelText}</span>` : ""}
+      ${vm.roundShort ? `<span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:900;color:var(--ink-soft);background:var(--surface-2);border-radius:var(--radius-pill);padding:4px 11px;">${vm.roundShort}${(vm.roundDots || []).length ? `<span style="display:inline-flex;gap:4px;">${vm.roundDots.map(rd => `<span style="${rd.style}"></span>`).join("")}</span>` : ""}</span>` : ""}
     </div>
     ${vm.canOpenDetail ? `
     <button type="button" data-action="openDetailCur" title="See instructions &amp; video" style="display:flex;align-items:center;justify-content:center;gap:10px;background:none;border:none;padding:2px 6px;margin:0;cursor:pointer;font-family:inherit;min-height:44px;max-width:100%;">
@@ -519,7 +515,7 @@ function centerStack(vm, wide, tablet) {
     ${coachStrip(vm, wide)}
     <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;text-align:center;">
       ${vm.overNudge ? `<div style="font-family:var(--font-hand);font-size:17px;font-weight:700;color:var(--sun-ink);line-height:1.2;">Past the planned time — that's okay. Finish clean, then rest 💛</div>` : ""}
-      ${vm.notResting ? `<div style="font-family:var(--font-hand);font-size:${wide ? 16 : 15}px;color:var(--aqua-ink);font-style:italic;line-height:1.2;">${vm.curExDose}</div>` : ""}
+      ${vm.notResting && vm.curExDoseSub ? `<div style="font-family:var(--font-hand);font-size:${wide ? 16 : 15}px;color:var(--aqua-ink);font-style:italic;line-height:1.2;">${vm.curExDoseSub}</div>` : ""}
     </div>
   </div>`;
 
@@ -599,12 +595,12 @@ function controls(vm, wide) {
       ? `<button type="button" data-action="pauseTimer" style="flex:1;min-height:${wide ? 44 : 46}px;border-radius:var(--radius-md);border:2px solid var(--sun-deep);font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--sun-wash);color:var(--sun-ink);font-family:inherit;">❚❚ Pause</button>`
       : `<button type="button" data-action="pauseTimer" style="flex:1;min-height:${wide ? 44 : 46}px;border-radius:var(--radius-md);border:2px solid var(--mint-deep);font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--mint-wash);color:var(--mint-ink);font-family:inherit;">▶ Resume</button>`}
     ${vm.canSkipExercise
-      ? `<button type="button" data-action="askSkip" style="flex:1;min-height:${wide ? 44 : 46}px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:${wide ? 14 : 12}px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">⏭ Skip${wide ? " this exercise" : ""}</button>`
+      ? `<button type="button" data-action="askSkip" style="flex:1;min-height:${wide ? 44 : 46}px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:${wide ? 14 : 12}px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">⏭ Skip${wide ? " this move" : ""}</button>`
       : ""}
   </div>
   ${vm.confirmSkip ? `
   <div style="display:flex;${wide ? "align-items:center;gap:12px;" : "flex-direction:column;gap:8px;"}background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-md);padding:10px 14px;box-sizing:border-box;">
-    <span style="${wide ? "flex:1;" : ""}font-weight:800;font-size:${wide ? 15 : 14}px;color:var(--sun-ink);">Skip this exercise? It won't count.</span>
+    <span style="${wide ? "flex:1;" : ""}font-weight:800;font-size:${wide ? 15 : 14}px;color:var(--sun-ink);">Skip this move? It won&#39;t count.</span>
     <div style="display:flex;gap:8px;flex-shrink:0;">
       <button type="button" data-action="cancelSkip" style="${wide ? "" : "flex:1;"}min-height:44px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;padding:0 18px;background:var(--mint);color:#fff;box-shadow:0 3px 0 var(--mint-deep);font-family:inherit;">Keep going</button>
       <button type="button" data-action="confirmSkipEx" style="${wide ? "" : "flex:1;"}min-height:44px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;padding:0 16px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">⏭ Skip it</button>
@@ -630,6 +626,7 @@ function exList(vm, wide, tablet) {
     <div style="display:flex;align-items:center;gap:8px;padding:${wide ? "12px 0 4px" : "10px 0 4px"};">
       <span style="width:${wide ? 10 : 9}px;height:${wide ? 10 : 9}px;border-radius:50%;background:${sitem.color};flex-shrink:0;"></span>
       <span style="font-weight:900;font-size:12px;letter-spacing:0.05em;text-transform:uppercase;color:${sitem.color};">${sitem.name}</span>
+      ${(sitem.roundDots || []).length ? `<div style="display:flex;gap:4px;margin-left:auto;">${sitem.roundDots.map(rd => `<span style="${rd.style}"></span>`).join("")}</div>` : ""}
     </div>` : `
     <div ${sitem.isCur ? 'data-ex-cur="1" ' : ""}style="${sitem.cardStyle}">
       ${sitem.jumpAction ? `<button type="button" data-action="goToMove" data-arg="${sitem.ci}|${sitem.ei}" title="Jump to this move" style="${jumpOpen}">` : ""}
@@ -637,7 +634,6 @@ function exList(vm, wide, tablet) {
       <span style="${sitem.nameStyle}font-size:${nameSize}px;">${sitem.name}</span>
       ${sitem.jumpAction ? "</button>" : ""}
       <button type="button" data-action="openDetailAt" data-arg="${sitem.ci}|${sitem.ei}" title="See detail photo &amp; video" style="flex-shrink:0;width:${iconSize}px;height:${iconSize}px;border-radius:50%;border:none;background:var(--surface-2);color:var(--ink-soft);font-size:${tablet ? 13 : wide ? 14 : 13}px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">ⓘ</button>
-      ${sitem.paceDotStyle ? `<span title="${sitem.paceTitle}" aria-label="${sitem.paceTitle}" style="${sitem.paceDotStyle}"></span>` : ""}
       <span style="font-size:${nameSize}px;flex-shrink:0;width:${wide ? 18 : 16}px;text-align:center;color:${sitem.secColor};">${sitem.statusIcon}</span>
     </div>`).join("");
 }
@@ -659,10 +655,10 @@ function tipsSafety(vm) {
    she put it. */
 function railToggle(collapsed) {
   return `<button type="button" data-action="toggleRail"
-    aria-expanded="${!collapsed}" title="${collapsed ? "Show today's exercises" : "Hide this panel"}"
+    aria-expanded="${!collapsed}" title="${collapsed ? "Show today’s moves" : "Hide this panel"}"
     style="flex-shrink:0;width:32px;height:32px;border-radius:50%;border:1.5px solid var(--hairline);background:var(--surface);color:var(--ink-soft);font-size:14px;font-weight:900;line-height:1;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;padding:0;">
     <span aria-hidden="true">${collapsed ? "›" : "‹"}</span>
-    <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">${collapsed ? "Show today's exercises" : "Hide today's exercises"}</span>
+    <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">${collapsed ? "Show today’s moves" : "Hide today’s moves"}</span>
   </button>`;
 }
 
@@ -707,7 +703,7 @@ export function sessionScreen(vm) {
             <span style="font-weight:900;font-size:12px;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;">${vm.sessionDayTitle}${vm.explore ? " · Explore" : ` · <span id="s-elapsed">${vm.elapsedDisplay}</span>`}</span>
             ${railToggle(false)}
           </div>
-          <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:900;color:var(--ink-soft);margin-bottom:4px;"><span>EXERCISES</span><span>${vm.progressLabel}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:900;color:var(--ink-soft);margin-bottom:4px;"><span>MOVES</span><span>${vm.progressLabel}</span></div>
           <div style="height:8px;background:var(--surface);border:1px solid var(--hairline);border-radius:8px;overflow:hidden;">
             <div style="width:${Math.round(vm.progressValue / vm.progressMax * 100)}%;height:100%;background:var(--mint);border-radius:8px;"></div>
           </div>
@@ -722,15 +718,10 @@ export function sessionScreen(vm) {
           <div style="height:8px;background:var(--surface-2);border-radius:8px;overflow:hidden;">
             <div id="s-sess-fill" style="width:${vm.sessionTimePct}%;height:100%;background:var(--aqua);border-radius:8px;transition:width 0.4s;"></div>
           </div>
-          ${vm.roundLine ? `
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-            <span style="font-size:12px;font-weight:900;color:var(--ink-soft);">${vm.roundLine}</span>
-            <div style="display:flex;gap:5px;">${vm.roundDots.map(rd => `<span style="${rd.style}"></span>`).join("")}</div>
-          </div>` : ""}
         </div>` : ""}
 
         <div style="flex:1 1 auto;min-height:220px;display:flex;flex-direction:column;background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-lg);box-shadow:var(--shadow-soft);box-sizing:border-box;padding:14px 16px;">
-          <div style="font-weight:900;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;flex-shrink:0;">Today's exercises</div>
+          <div style="font-weight:900;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;flex-shrink:0;">Today's moves</div>
           <div data-ex-list style="flex:1;min-height:0;overflow-y:auto;">${exList(vm, true, tablet)}</div>
         </div>
 
@@ -762,7 +753,6 @@ export function sessionScreen(vm) {
         <div style="height:8px;background:var(--surface-2);border-radius:8px;overflow:hidden;">
           <div id="s-sess-fill" style="width:${vm.explore ? Math.round(vm.progressValue / vm.progressMax * 100) : vm.sessionTimePct}%;height:100%;background:var(--aqua);border-radius:8px;"></div>
         </div>
-        ${vm.roundLine ? `<div style="font-size:12px;font-weight:900;color:var(--ink-soft);padding-top:6px;">${vm.roundLine}</div>` : ""}
       </div>
 
       <div style="padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px;flex-shrink:0;">
@@ -776,7 +766,7 @@ export function sessionScreen(vm) {
       <div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:10px;">
         ${tipsSafety(vm)}
         <div class="list-wrap" style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-lg);padding:12px 14px;--fade-to:var(--surface);">
-          <div style="font-weight:900;font-size:11px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;">Today's exercises</div>
+          <div style="font-weight:900;font-size:11px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;">Today's moves</div>
           <div data-list data-ex-list style="max-height:46vh;">${exList(vm, false, false)}</div>
         </div>
       </div>

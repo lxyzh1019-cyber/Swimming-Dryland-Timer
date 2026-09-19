@@ -87,11 +87,11 @@ function weekTable(vm) {
       </thead>
       <tbody>
         ${row("Planned", d => escapeHtml(d.plannedLabel))}
-        <!-- Two units, two names. One row called "Movements" used to hold a
-             performance count while the day card called distinct moves by
+        <!-- Two facts, two plain names. One row called "Movements" used to hold a
+             times-done count while the day card called distinct moves by
              the same word. -->
-        ${row("Performances", d => escapeHtml(d.performancesLabel))}
-        ${row("Movements", d => escapeHtml(d.movementsLabel) + (d.forLabel ? `<div style="font-size:9px;font-weight:800;color:var(--ink-faint);">${escapeHtml(d.forLabel)}</div>` : ""))}
+        ${row("Times done", d => escapeHtml(d.performancesLabel))}
+        ${row("Moves", d => escapeHtml(d.movementsLabel) + (d.forLabel ? `<div style="font-size:9px;font-weight:800;color:var(--ink-faint);">${escapeHtml(d.forLabel)}</div>` : ""))}
         ${row("Skipped", d => escapeHtml(d.skippedLabel))}
         ${row("Main rounds", d => escapeHtml(d.roundsLabel))}
         ${row("Ended early", d => escapeHtml(d.earlyLabel))}

@@ -387,7 +387,7 @@ function analyticsTab(vm) {
     <div style="${vm.grid2}">
       ${card(`
         ${secTitle("Skipped moves · " + vm.scopeLabel)}
-        <div style="font-size:13px;color:var(--ink-faint);margin:4px 0 14px;line-height:1.3;">The exact exercises she tapped past — a recurring skip is a move to scale or move earlier.</div>
+        <div style="font-size:13px;color:var(--ink-faint);margin:4px 0 14px;line-height:1.3;">The exact moves she tapped past — a recurring skip is a move to scale or move earlier.</div>
         ${a.hasSkippedMoves ? `
         <div style="display:flex;flex-direction:column;gap:11px;">
           ${a.skippedMoves.map(sm => `
@@ -399,7 +399,7 @@ function analyticsTab(vm) {
               <div style="${sm.barStyle}"></div>
               <span style="font-size:13px;font-weight:900;color:var(--grape-ink);flex-shrink:0;width:24px;text-align:right;">×${sm.count}</span>
             </div>`).join("")}
-        </div>` : `<div style="font-size:14px;font-weight:800;color:var(--mint-ink);">No moves skipped — every exercise got done. ✓</div>`}`)}
+        </div>` : `<div style="font-size:14px;font-weight:800;color:var(--mint-ink);">No moves skipped — every one got done. ✓</div>`}`)}
       ${card(`
         ${secTitle("Skips by block")}
         <div style="font-size:13px;color:var(--ink-faint);margin:4px 0 14px;line-height:1.3;">Which block gets cut when time runs short.</div>
@@ -630,7 +630,7 @@ function settingsTab(vm) {
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">How fast the coach talks, separate from how she sounds. Slow gives her time to hear the move before the timer starts.</div>
     </div>
-    ${[["Rest between exercises", "exerciseRestSeconds", vm.settingsExRest, 1, 3, 15],
+    ${[["Rest between moves", "exerciseRestSeconds", vm.settingsExRest, 1, 3, 15],
        ["Rest between rounds", "roundRestSeconds", vm.settingsRndRest, 5, 10, 90],
        ["Rest between sections", "sectionRestSeconds", vm.settingsSecRest, 5, 10, 90]].map(([label, key, val, step, min, max]) => `
     <div>

@@ -331,7 +331,7 @@ const SWIMSKILL_A = () => [
   X({ name: "Side-Lying Breath Rehearsal", block: "swimskill", driver: "reps", repsDetail: "2×6/side", dose: "2×6/side",
       cue: "Exhale/hum face-down, rotate (one ear in water), quick sip, neutral.",
       swimTransfer: "Breath timing", searchableName: "side lying breathing drill swimming" }),
-  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "20s each side",
       cue: "Ribs down, long body, hum the breath.",
       swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
 ];
@@ -342,10 +342,10 @@ const SWIMSKILL_B = () => [
   X({ name: "Forearm Plank Dolphin Undulation", block: "swimskill", driver: "reps", repsDetail: "~24", dose: "~24",
       cue: "Wave from chest/hip, not the knees.",
       swimTransfer: "Stroke patterning", searchableName: "forearm plank dolphin undulation" }),
-  X({ name: "Breaststroke Kick Shape", block: "swimskill", driver: "reps", repsDetail: "~20", dose: "~20 (kick only)",
+  X({ name: "Breaststroke Kick Shape", block: "swimskill", driver: "reps", repsDetail: "~20", note: "kick only, no arms",
       cue: "Heels to seat, sweep, snap together — kick only, no arms.",
       swimTransfer: "Breaststroke kick", searchableName: "breaststroke kick technique on land" }),
-  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "20s each side",
       cue: "Ribs down, long body, hum the breath.",
       swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
 ];
@@ -353,7 +353,7 @@ const SWIMSKILL_SAT = () => [
   X({ name: "Chair High-Elbow Catch", setup: true, block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
       cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm. [free/back/fly]",
       swimTransfer: "High-elbow catch", searchableName: "high elbow catch drill chair" }),
-  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "2×20s",
+  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "20s each side",
       cue: "Ribs down, long body, hum the breath.",
       swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
 ];
@@ -384,19 +384,20 @@ export const DAYS = {
         X({ name: "Band Pass-Through", block: "warmup", driver: "reps", repsDetail: "8–10", dose: "8–10", cue: "Wide, slow, no shrug." }),
         X({ name: "Cat-Camel", block: "warmup", driver: "reps", repsDetail: "8 cycles", dose: "8 cycles", cue: "Move segment by segment." }),
         X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Knees lead, sit tall." }),
-        X({ name: "Leg Swings", block: "warmup", driver: "reps", repsDetail: "8/dir/leg", dose: "8/dir/leg", cue: "Relaxed, build range." })
+        X({ name: "Leg Swings", block: "warmup", driver: "reps", cue: "Relaxed, build range.",
+            prescription: { reps: 8, sides: 2, dirs: 2, sideWord: "leg" } })
       ],
       coordination: [
-        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
-        X({ name: "A-Skip", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Same pattern with rhythm." })
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "A-Skip", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m", cue: "Same pattern with rhythm." })
       ],
       main: [
-        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s", note: "Parent Echo — count out loud",
             parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
             swimTransfer: "Body line + kick" }),
-        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", dose: "2–3 clean",
+        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", note: "clean reps only",
             reset: "Shoulders sink first.", cue: "Shoulders sink first, THEN bend.",
             parentWatch: "Kipping / swinging", fix: "One swing = set over.",
             swimTransfer: "Catch with the lats" }),
@@ -440,16 +441,16 @@ export const DAYS = {
         X({ name: "Short-Foot", block: "warmup", driver: "time", work: 20, dose: "20s", cue: "Spread toes, dome the arch." })
       ],
       coordination: [
-        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
-        X({ name: "Carioca", block: "coordination", driver: "time", work: 60, dose: "10m/side", cue: "Hip over hip — trunk-hip separation." })
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "Carioca", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m each way", cue: "Hip over hip — trunk-hip separation." })
       ],
       main: [
-        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s", note: "Parent Echo — count out loud",
             parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
             swimTransfer: "Body line + kick" }),
-        X({ name: "Band Row", block: "main", driver: "reps", repsDetail: "12 · 2-1-2 tempo", dose: "12 · 2-1-2",
+        X({ name: "Band Row", prescription: { reps: 12, tempo: [2, 1, 2] }, block: "main", driver: "reps",
             reset: "Blades first.", cue: "Drive elbows back, squeeze the blades.",
             parentWatch: "Shrugging / arms-only", fix: "Reset, blades first.",
             swimTransfer: "Freestyle pull" }),
@@ -457,7 +458,7 @@ export const DAYS = {
             reset: "Flat back.", cue: "Flat back, no hip rotation.",
             parentWatch: "Hips rotate", fix: "Slow down, reduce reach.",
             swimTransfer: "Posterior body line" }),
-        X({ name: "Hip Hinge", setup: true, block: "main", driver: "reps", repsDetail: "8 · 2-1-2", dose: "8 · 2-1-2 (dowel)",
+        X({ name: "Hip Hinge", setup: true, block: "main", driver: "reps", repsDetail: "8 · 2-1-2", note: "dowel on the back",
             reset: "Hips load back.", cue: "Hips load back, dowel touches 3 points.",
             parentWatch: "Rounding the back", fix: "Hinge from the hip, flat back.",
             swimTransfer: "Hip drive for the start" }),
@@ -502,21 +503,21 @@ export const DAYS = {
         X({ name: "Knee-to-Wall Ankle", block: "warmup", driver: "reps", repsDetail: "8/side", dose: "8/side", cue: "Heel flat, knee past toes." })
       ],
       coordination: [
-        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
-        X({ name: "A-Skip", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Same pattern with rhythm." }),
-        X({ name: "Carioca", block: "coordination", driver: "time", work: 60, dose: "10m/side", cue: "Hip over hip — trunk-hip separation." })
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "A-Skip", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m", cue: "Same pattern with rhythm." }),
+        X({ name: "Carioca", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m each way", cue: "Hip over hip — trunk-hip separation." })
       ],
       main: [
-        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s", note: "Parent Echo — count out loud",
             parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
             swimTransfer: "Body line + kick" }),
-        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", dose: "2–3 clean",
+        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", note: "clean reps only",
             reset: "Shoulders sink first.", cue: "Shoulders sink first, THEN bend.",
             parentWatch: "Kipping / swinging", fix: "One swing = set over.",
             swimTransfer: "Catch with the lats" }),
-        X({ name: "Superman", block: "main", driver: "time", work: 30, dose: "3 × 8–10s hold",
+        X({ name: "Superman", block: "main", driver: "time", work: 30, dose: "30s", note: "3 holds of 8–10s",
             reset: "Lift into streamline.", cue: "Lift arms+legs into streamline, hold.",
             parentWatch: "Neck strains / fast pumping", fix: "Lower the lift, hold the shape.",
             swimTransfer: "Dry-land streamline" }),
@@ -555,19 +556,22 @@ export const DAYS = {
     blocks: {
       warmup: [
         X({ name: "Band Pass-Through", block: "warmup", driver: "reps", repsDetail: "8–10", dose: "8–10", cue: "Wide, slow, no shrug." }),
-        X({ name: "Shoulder CARs", block: "warmup", driver: "reps", repsDetail: "3/dir each", dose: "3/dir each", cue: "Slow full circle, control the range." }),
-        X({ name: "Hip Circles", block: "warmup", driver: "reps", repsDetail: "8/dir", dose: "8/dir", cue: "Big slow circles." }),
-        X({ name: "Band Ankle 4-Way", block: "warmup", driver: "reps", repsDetail: "8/dir", dose: "8/dir", cue: "Slow, full range each direction.",
+        X({ name: "Shoulder CARs", block: "warmup", driver: "reps", cue: "Slow full circle, control the range.",
+            prescription: { reps: 3, sides: 2, dirs: 2, sideWord: "arm" } }),
+        X({ name: "Hip Circles", block: "warmup", driver: "reps", cue: "Big slow circles.",
+            prescription: { reps: 8, dirs: 2 } }),
+        X({ name: "Band Ankle 4-Way", block: "warmup", driver: "reps", cue: "Slow, full range each direction.",
             prescription: { reps: 8, dirs: 4 } }),
-        X({ name: "Leg Swings", block: "warmup", driver: "reps", repsDetail: "8/dir/leg", dose: "8/dir/leg", cue: "Relaxed, build range." })
+        X({ name: "Leg Swings", block: "warmup", driver: "reps", cue: "Relaxed, build range.",
+            prescription: { reps: 8, sides: 2, dirs: 2, sideWord: "leg" } })
       ],
       coordination: [
-        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m", cue: "Knee up, toe up, foot down under hip." }),
         X({ name: "Butt Kicks", block: "coordination", driver: "time", work: 60, dose: "15s", cue: "Heels recover fast under the butt." }),
         X({ name: "Ankle Dribbles", block: "coordination", driver: "time", work: 60, dose: "15s", cue: "Low, fast, stiff ankle." })
       ],
       main: [
-        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s", note: "Parent Echo — count out loud",
             parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
@@ -620,22 +624,23 @@ export const DAYS = {
       warmup: [
         X({ name: "Jump Rope", block: "warmup", driver: "time", work: 75, dose: "60–90s", cue: "Off the toes, quiet, tall." }),
         X({ name: "Wall Slides", block: "warmup", driver: "reps", repsDetail: "8", dose: "8", cue: "Back on wall, ribs down — no arching." }),
-        X({ name: "Shoulder CARs", block: "warmup", driver: "reps", repsDetail: "3/dir each", dose: "3/dir each", cue: "Slow full circle, control the range." }),
+        X({ name: "Shoulder CARs", block: "warmup", driver: "reps", cue: "Slow full circle, control the range.",
+            prescription: { reps: 3, sides: 2, dirs: 2, sideWord: "arm" } }),
         X({ name: "World's Greatest Stretch", block: "warmup", driver: "reps", repsDetail: "4/side", dose: "4/side", cue: "Lunge, reach, rotate — whole body opens." }),
         X({ name: "Short-Foot", block: "warmup", driver: "time", work: 20, dose: "20s", cue: "Spread toes, dome the arch." })
       ],
       coordination: [
-        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Knee up, toe up, foot down under hip." }),
-        X({ name: "C-Skip", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Paw the ground back under the hip." }),
-        X({ name: "Fast Leg", block: "coordination", driver: "time", work: 60, dose: "4/side", cue: "One sharp snap leg in a march." })
+        X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m", cue: "Knee up, toe up, foot down under hip." }),
+        X({ name: "C-Skip", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m", cue: "Paw the ground back under the hip." }),
+        X({ name: "Fast Leg", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 4 per side", cue: "One sharp snap leg in a march." })
       ],
       main: [
-        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s", note: "Parent Echo — count out loud",
             parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
             swimTransfer: "Body line + kick" }),
-        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", dose: "2–3 clean",
+        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", note: "clean reps only",
             reset: "Shoulders sink first.", cue: "Shoulders sink first, THEN bend.",
             parentWatch: "Kipping / swinging", fix: "One swing = set over.",
             swimTransfer: "Catch with the lats" }),
@@ -643,7 +648,7 @@ export const DAYS = {
             reset: "Flat back.", cue: "Flat back, no hip rotation.",
             parentWatch: "Hips rotate", fix: "Slow down, reduce reach.",
             swimTransfer: "Posterior body line" }),
-        X({ name: "Hip Hinge", setup: true, block: "main", driver: "reps", repsDetail: "8 · 2-1-2", dose: "8 · 2-1-2 (dowel)",
+        X({ name: "Hip Hinge", setup: true, block: "main", driver: "reps", repsDetail: "8 · 2-1-2", note: "dowel on the back",
             reset: "Hips load back.", cue: "Hips load back, dowel touches 3 points.",
             parentWatch: "Rounding the back", fix: "Hinge from the hip, flat back.",
             swimTransfer: "Hip drive for the start" }),
@@ -685,28 +690,28 @@ export const DAYS = {
         X({ name: "World's Greatest Stretch", block: "warmup", driver: "reps", repsDetail: "4/side", dose: "4/side", cue: "Lunge, reach, rotate — whole body opens." }),
         X({ name: "Open-Book / T-Rotation", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Hips stacked, rotate from the spine." }),
         X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Knees lead, sit tall." }),
-        X({ name: "Band Ankle 4-Way", block: "warmup", driver: "reps", repsDetail: "8/dir", dose: "8/dir", cue: "Slow, full range each direction.",
+        X({ name: "Band Ankle 4-Way", block: "warmup", driver: "reps", cue: "Slow, full range each direction.",
             prescription: { reps: 8, dirs: 4 } })
       ],
       coordination: [
-        X({ name: "C-Skip", block: "coordination", driver: "time", work: 60, dose: "10m", cue: "Paw the ground back under the hip." }),
-        X({ name: "Fast Leg", block: "coordination", driver: "time", work: 60, dose: "4/side", cue: "One sharp snap leg in a march." }),
-        X({ name: "Straight-Leg Bound", block: "coordination", driver: "time", work: 60, dose: "6 reps", cue: "Stiff-leg drive, active foot strike." }),
-        X({ name: "Wall Drive", block: "coordination", driver: "time", work: 60, dose: "6/side", cue: "Lean on wall, drive knee, hold line." }),
-        X({ name: "Falling Start → 3m", block: "coordination", driver: "time", work: 60, dose: "3 reps", cue: "Lean, fall, catch with 3 strides." }),
-        X({ name: "Lateral Shuffle", block: "coordination", driver: "time", work: 60, dose: "10m/side", cue: "Stay low, don't cross your feet." })
+        X({ name: "C-Skip", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m", cue: "Paw the ground back under the hip." }),
+        X({ name: "Fast Leg", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 4 per side", cue: "One sharp snap leg in a march." }),
+        X({ name: "Straight-Leg Bound", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 6 bounds", cue: "Stiff-leg drive, active foot strike." }),
+        X({ name: "Wall Drive", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 6 per side", cue: "Lean on wall, drive knee, hold line." }),
+        X({ name: "Falling Start → 3m", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 3 starts", cue: "Lean, fall, catch with 3 strides." }),
+        X({ name: "Lateral Shuffle", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m each way", cue: "Stay low, don't cross your feet." })
       ],
       main: [
-        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s", note: "Parent Echo — count out loud",
             parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
             swimTransfer: "Body line + kick" }),
-        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", dose: "2–3 clean",
+        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", note: "clean reps only",
             reset: "Shoulders sink first.", cue: "Shoulders sink first, THEN bend.",
             parentWatch: "Kipping / swinging", fix: "One swing = set over.",
             swimTransfer: "Catch with the lats" }),
-        X({ name: "Superman", block: "main", driver: "time", work: 30, dose: "3 × 8–10s hold",
+        X({ name: "Superman", block: "main", driver: "time", work: 30, dose: "30s", note: "3 holds of 8–10s",
             reset: "Lift into streamline.", cue: "Lift arms+legs into streamline, hold.",
             parentWatch: "Neck strains / fast pumping", fix: "Lower the lift, hold the shape.",
             swimTransfer: "Dry-land streamline" }),
@@ -753,8 +758,8 @@ export const DAYS = {
     equipment: ["Foam roller", "Massage gun (parent-operated)", "Mat"],
     safety: "Roller slow (2–3 cm/sec), pause 20s on tender spots. NEVER roll the lower-back spine or neck. Massage gun is PARENT-OPERATED only, lowest speed, big muscles only — never on bones, joints, spine, neck, or growth plates.",
     recovery: [
-      { name: "Calves — foam roller", dose: "60s/side", why: "Kick + rope volume lands here." },
-      { name: "Quads — roller or gun", dose: "60s/side", why: "Jump days (Wed/Sat)." },
+      { name: "Calves — foam roller", dose: "60s/side", why: "Kick + jump rope volume lands here." },
+      { name: "Quads — roller or gun", dose: "60s/side", why: "Power days (Wed/Sat)." },
       { name: "Lats / upper back — roller, arms overhead", dose: "60s", why: "Pull work + overhead range." },
       { name: "Glutes — foam roller", dose: "45s/side", why: "Bridge + landing absorption." },
       { name: "Touch-up — massage gun (parent)", dose: "30–45s/muscle", why: "Lowest speed, comfort not pain." },
@@ -798,7 +803,7 @@ export const DAY_LONG = {
 
 export const BLOCK_ORDER = ["warmup", "coordination", "main", "finisher", "swimskill"];
 export const BLOCK_LABEL = {
-  warmup: "Warm-up", coordination: "Coordination", main: "Main Circuit",
+  warmup: "Warm-up", coordination: "Coordination", main: "Main",
   prep: "Prep Pair", finisher: "Finisher", swimskill: "Swim-Skill", recovery: "Recovery"
 };
 /* Per-block emoji + Splash token color so the kid always knows which part she's in. */
@@ -1249,7 +1254,7 @@ export const BODY_ZONES = [
 
 export const SEVERITY_LEVELS = [
   { level: 1, emoji: "🙂", label: "OK",                   color: "var(--mint)",  desc: "Moved normally. Both sides feel similar." },
-  { level: 2, emoji: "😐", label: "Tired but controlled", color: "var(--sun)",   desc: "Tired or shaky, but still controlled. Better after 1–2 minutes rest." },
+  { level: 2, emoji: "😐", label: "Tired but controlled", color: "var(--sun)",   desc: "Tired or shaky, but still controlled. Better after 1–2 min rest." },
   { level: 3, emoji: "😟", label: "Changed movement",     color: "var(--coral)", desc: "Limp, lean, twist, shake, or less range. Tell coach or parent." },
   { level: 4, emoji: "🥺", label: "Pain / Stop",          color: "var(--stop)",  desc: "Pain, sharp pain, swelling, numbness, tingling, or affects normal activity. Stop now." }
 ];
@@ -1259,16 +1264,16 @@ export const SEVERITY_LEVELS = [
 // shows a warm caution button, not the same yellow as a green day — so the
 // safety signal survives all the way to the action.
 export const LIGHT_META = {
-  green:    { emoji: "🟢", color: "var(--mint)",  btnColor: "var(--mint)",  btnDeep: "var(--mint-deep)",  btnText: "#fff",           btnIcon: "💪", label: "Green Light — Full power!",  btnLabel: "Start Training!", desc: "You're good to go! Full 3 rounds. Focus on quality." },
-  yellow:   { emoji: "🟡", color: "var(--sun)",   btnColor: "var(--sun)",   btnDeep: "var(--sun-deep)",   btnText: "var(--sun-ink)", btnIcon: "🌊", label: "Yellow Light — Go easy",     btnLabel: "Start Training!", desc: "2 rounds, and we skip the extras. Listen to your body — clean form over effort." },
-  red:      { emoji: "🔴", color: "var(--stop)",  btnColor: "var(--coral)", btnDeep: "var(--coral-deep)", btnText: "#fff",           btnIcon: "💙", label: "Red Light — Light day",      btnLabel: "Start easy day",  desc: "1 round, warm-up and swim skill only. Something feels off — take it easy today." },
-  recovery: { emoji: "🟣", color: "var(--grape)", btnColor: "var(--grape)", btnDeep: "var(--grape-deep)", btnText: "#fff",           btnIcon: "🧊", label: "Recovery — Rest is training", btnLabel: "Start Recovery",  desc: "Rest day. Tell a grown-up, then stretch and hydrate." }
+  green:    { emoji: "🟢", color: "var(--mint)",  btnColor: "var(--mint)",  btnDeep: "var(--mint-deep)",  btnText: "#fff",           btnIcon: "💪", label: "Green Light — Full power!",  btnLabel: "Start training", desc: "You're good to go! Full 3 rounds. Focus on quality." },
+  yellow:   { emoji: "🟡", color: "var(--sun)",   btnColor: "var(--sun)",   btnDeep: "var(--sun-deep)",   btnText: "var(--sun-ink)", btnIcon: "🌊", label: "Yellow Light — Go easy",     btnLabel: "Start training", desc: "2 rounds max, and we skip the extras. Listen to your body — clean form over effort." },
+  red:      { emoji: "🔴", color: "var(--stop)",  btnColor: "var(--coral)", btnDeep: "var(--coral-deep)", btnText: "#fff",           btnIcon: "💙", label: "Red Light — Light day",      btnLabel: "Start easy day",  desc: "1 round, warm-up and Swim-Skill only. Something feels off — take it easy today." },
+  recovery: { emoji: "🟣", color: "var(--grape)", btnColor: "var(--grape)", btnDeep: "var(--grape-deep)", btnText: "#fff",           btnIcon: "🧊", label: "Recovery — Rest is training", btnLabel: "Start recovery",  desc: "Rest day. Tell a grown-up, then stretch and hydrate." }
 };
 
 export const BODY_RESULTS = {
-  1: { emoji: "✅", color: "var(--mint)",  desc: "You are OK. Keep moving with control.",          cta: "Continue to Training",    ctaIcon: "💪", ctaColor: "var(--mint)", ctaDeep: "var(--mint-deep)", ctaText: "#fff", action: "continue" },
-  2: { emoji: "⏱️", color: "var(--sun)",   desc: "Take 1–2 minutes rest, then go easy — 2 rounds max, clean form.", cta: "Start easy — Yellow light", ctaIcon: "💛", ctaColor: "var(--sun)", ctaDeep: "var(--sun-deep)", ctaText: "var(--sun-ink)", action: "continue", secondary: "retry", secondaryLabel: "Rest 1–2 min, then re-check" },
-  3: { emoji: "🗣️", color: "var(--coral)", desc: "Tell your coach or parent first. If they say OK — light day only, 1 easy round.", cta: "Start light day — Red light", ctaIcon: "💙", ctaColor: "var(--coral)", ctaDeep: "var(--coral-deep)", ctaText: "#fff", action: "continue", secondary: "back", secondaryLabel: "Stop — back to Today", needsGrownup: true },
+  1: { emoji: "✅", color: "var(--mint)",  desc: "You are OK. Keep moving with control.",          cta: "Start training",    ctaIcon: "💪", ctaColor: "var(--mint)", ctaDeep: "var(--mint-deep)", ctaText: "#fff", action: "continue" },
+  2: { emoji: "⏱️", color: "var(--sun)",   desc: "Take 1–2 min rest, then go easy — 2 rounds max, clean form.", cta: "Start easy — yellow light", ctaIcon: "💛", ctaColor: "var(--sun)", ctaDeep: "var(--sun-deep)", ctaText: "var(--sun-ink)", action: "continue", secondary: "retry", secondaryLabel: "Rest 1–2 min, then re-check" },
+  3: { emoji: "🗣️", color: "var(--coral)", desc: "Tell your coach or parent first. If they say OK — light day only, 1 easy round.", cta: "Start light day — red light", ctaIcon: "💙", ctaColor: "var(--coral)", ctaDeep: "var(--coral-deep)", ctaText: "#fff", action: "continue", secondary: "back", secondaryLabel: "Stop — back to Today", needsGrownup: true },
   4: { emoji: "🛑", color: "var(--stop)",  desc: "Stop now. Tell your coach or parent right away.",   cta: "Stop — back to Today",    ctaIcon: "🛑", ctaColor: "var(--stop)", ctaDeep: "var(--stop-deep)", ctaText: "#fff", action: "back" }
 };
 

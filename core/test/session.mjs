@@ -8,6 +8,7 @@ import { engine, store, sport, data, util, tvm, gvm, svm, sscreen, tscreen, runS
 const base   = new URL("../", import.meta.url).href;
 const layout = await import(base + "layout.js");
 const plan   = await import(base + "plan.js");
+const outcome = await import(base + "outcome.js");
 
 /* RegExp.escape is not in Node 18, and a cue contains "." and "/" */
 const escapeForRe = (t) => String(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -390,7 +391,7 @@ const stopInRoundTwo = (reason) => ({
     /* End session was a strict subset of STOP and is gone; Skip took its slot. */
     ok(!/data-action="askEnd"/.test(html) && !/data-action="confirmEndEarly"/.test(html),
        name + ": the screen no longer offers End session, which STOP already did");
-    ok(/data-action="askSkip"/.test(html), name + ": and offers Skip this exercise in its place");
+    ok(/data-action="askSkip"/.test(html), name + ": and offers Skip this move in its place");
     /* The pain rule moved out of the far-left rail to under the buttons — in
        BOTH trees, which is the half that is easy to forget. */
     ok(/Sharp pain, pinching, or numbness/.test(html), name + ": the pain rule is on screen");
@@ -418,7 +419,8 @@ const stopInRoundTwo = (reason) => ({
      "but both still offer the ⓘ, which is where the photo went");
 
   /* The ring says which KIND of effort, and the rail can be collapsed. */
-  ok(/TIMED SET|BY REPS/.test(roomy), "the ring names the kind of effort, not just 'not a rest'");
+  ok(/\bTIMED\b|BY REPS/.test(roomy), "the ring names the kind of effort, not just 'not a rest'");
+  ok(!/TIMED SET/.test(roomy), "and does not call it a SET — a set is the prescription unit, counted in the coach strip");
   ok(/data-action="toggleRail"/.test(roomy) && !/data-action="toggleRail"/.test(narrow),
      "the rail collapses where there is a rail, and not on a phone");
 }
@@ -651,8 +653,13 @@ const stopInRoundTwo = (reason) => ({
   ok(all.tapped && all.tapped.coach < all.tapped.target,
      "Done was tapped at " + all.tapped.coach + " of " + all.tapped.target + " on " + all.tapped.name);
   ok(all.asked && all.card && all.card.isRepCheck, "and the question came up in the ring's place");
-  ok(all.card.repCheckQuestion === "Did you get all " + all.tapped.target + "?",
-     "asking about the whole set: " + all.card.repCheckQuestion);
+  /* Both numbers, not just the target: the ring never showed her the total,
+     so a bare "Did you get all 32?" arrived out of nowhere at the one moment
+     it decides what is recorded. */
+  ok(/^You counted \d+ of \d+\. Did you finish the rest\?$/.test(all.card.repCheckQuestion),
+     "asking with the count she is at AND the one she is aiming for: " + all.card.repCheckQuestion);
+  ok(all.card.repCheckQuestion.includes(" of " + all.tapped.target + "."),
+     "and the target is the move's whole dose: " + all.card.repCheckQuestion);
   ok(all.card.repCheckRule === "All " + all.tapped.target + " counts the move.",
      "with the rule in one line: " + all.card.repCheckRule);
   ok((all.html.match(/data-action="answerRepCheck"/g) || []).length === 3
@@ -660,7 +667,8 @@ const stopInRoundTwo = (reason) => ({
      "three answers, and no others");
   ok(!/id="s-timer-text"/.test(all.html), "the count is paused — the rep ring is gone while she answers");
   ok(!/data-action="askSkip"/.test(all.html), "and Skip is not offered over a question, as on any prompt");
-  ok(all.said.some(t => /Did you get them all\?/.test(t)), "the coach asks it out loud, in one line, when the voice is on");
+  ok(all.said.some(t => /You counted \d+ of \d+\. Did you finish the rest\?/.test(t)),
+     "the coach asks it out loud with both numbers, the way the card does");
   ok(all.row && all.row.status === "done" && all.row.repsCounted === all.tapped.target,
      "\"All of them\" records the full count and the move reads done (" + all.row.repsCounted + " of " + all.row.repsPlanned + ")");
 
@@ -761,6 +769,435 @@ const stopInRoundTwo = (reason) => ({
   ok(paint(after.roundDots).join(",") === "mint,mint,mint",
      "with every counted round green: " + paint(after.roundDots).join(","));
   engine.exitSession();
+}
+
+/* ---- THE LIST IS THIS ROUND, AND THE ROUND IS THE TITLE'S ------------------
+
+   The bug this is here for: a main move finished PERFECTLY in round 1 of 3
+   showed a ½ — the list was grading every move across all its rounds, so
+   "1 of 3 rounds done" came out as "cut short", under a legend that says
+   exactly that, for the whole of rounds 1 and 2. Beside it sat a second mark,
+   a pace dot, which read the same row as 100% and painted itself green. One
+   row, two marks, disagreeing, and neither one true.
+
+   A move row answers one question now — how did THIS move go in THIS round —
+   and the round belongs to the block title. */
+{
+  const seenPerRound = new Map();
+  const mainNames = ((data.DAYS[repsDay].blocks || {}).main || []).map(e => e.name);
+  let midRoundOne = null, roundTwoOpening = null, html = null;
+  await runSession({ dayKey: repsDay, light: "green", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      if (answerChecks(sess)) return;
+      if (!sess.currentEx || sess.currentEx.block !== "main") return;
+      const vm = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+      const rows = (vm.sessionExList || []).filter(r => r.isEx);
+      const done = sess.ledger.filter(l => l.block === "main" && l.round === sess.round);
+      /* The first look INSIDE each round, before anything in it has been done.
+         Counted over the MAIN moves only: a finished warm-up keeps its ticks,
+         because it is not the block whose rounds are turning over. */
+      if (!seenPerRound.has(sess.round) && !done.length) {
+        seenPerRound.set(sess.round, rows.filter(r => !r.isCur && r.statusIcon && mainNames.includes(r.name)).length);
+      }
+      if (!midRoundOne && sess.round === 1 && done.length >= 3) midRoundOne = { vm, rows, done };
+      if (!roundTwoOpening && sess.round === 2) roundTwoOpening = { vm, rows };
+      if (!html && sess.round === 2) html = sscreen.sessionScreen(vm);
+    }
+  });
+
+  ok(midRoundOne, "the run got several moves into round one of main");
+  /* A row is written the instant a move ends, while she is still standing on
+     it — and standing on a move outranks its history, by design. So the check
+     is on the moves she has moved PAST. */
+  const curName = (midRoundOne.rows.find(r => r.isCur) || {}).name;
+  const ledgerDone = midRoundOne.done.filter(l => l.status === "done" && l.name !== curName).map(l => l.name);
+  ok(ledgerDone.length >= 2, "and the ledger really did record them done: " + ledgerDone.length);
+  ledgerDone.forEach(name => {
+    const row = midRoundOne.rows.find(r => r.name === name && !r.isCur);
+    ok(row && row.statusIcon === "✓",
+       "a move done in full in round one reads done, not cut short: " + name + " -> " + (row && row.statusIcon));
+  });
+  ok(midRoundOne.rows.every(r => r.paceDotStyle === undefined),
+     "there is no second mark on the row to disagree with the first");
+
+  ok(roundTwoOpening, "the run reached round two");
+  ok(seenPerRound.get(2) === 0,
+     "and round two opens with every mark cleared, because a round is a fresh one: "
+     + seenPerRound.get(2) + " marks left over");
+
+  /* THE RULE, AS A TEST. Round is a block-title word; nothing on a move row
+     may say it, and nothing may quietly count rounds at her either. */
+  ok(html, "the session screen rendered mid-round");
+  ok((html.match(/Round 2 of 3/g) || []).length === 1,
+     "the round is named exactly once on the whole screen, not three times over");
+  ok(!/\bx3\b|×3/.test(html), "and no static round figure is left sitting on the list");
+  const moveRows = (roundTwoOpening.rows || []);
+  ok(moveRows.length > 0 && moveRows.every(r => !/round/i.test(r.name) && !/\d+\s*of\s*\d+/.test(r.name)),
+     "no move row names a round or counts them");
+  engine.exitSession();
+}
+
+/* ---- WHAT IS OWED IS ONE LIST, AND REDOING IT CLEARS IT --------------------
+
+   "+ Add them back" re-ran the move but filed it under the NEXT unbanked round
+   number, so the redo never matched the row it was meant to improve: rows are
+   keyed block|round|name, and the ½ stood for ever however many times she went
+   back for it. The end report and the redo read the same merged rows now, so
+   what the report offers is what the redo runs — and once it is run, the offer
+   stops being made. */
+{
+  /* Named off the plan, never off one app's content: this core runs under both. */
+  const mainOf = (k) => ((data.DAYS[k].blocks || {}).main || []);
+  const redoDay = Object.keys(data.DAYS).find(k => !data.DAYS[k].spa
+    && mainOf(k).some(e => !e.byReps && Number(e.work) >= 20));
+  ok(redoDay, "the plan has a day with a timed main move long enough to cut short");
+  const MOVE = mainOf(redoDay).find(e => !e.byReps && Number(e.work) >= 20).name;
+  const lastSettled = () => {
+    const recs = outcome.dayRecords();
+    return recs.length ? recs[recs.length - 1].settledXp : null;
+  };
+  const answerOnly = { onTick: (ms, sess) => { answerChecks(sess); } };
+
+  // What the day pays when it is trained straight through, for comparison.
+  await runSession({ dayKey: redoDay, light: "green", gateUnlocked: true }, answerOnly);
+  const cleanXp = lastSettled();
+  ok(cleanXp > 0, "a clean run of the day pays something to compare against: " + cleanXp);
+  engine.exitSession();
+
+  const short = (sess) => sess.phase === "work" && sess.currentEx && sess.currentEx.name === MOVE
+    && sess.round === 1 && sess.timerMax - sess.timerSecs >= 5 && sess.timerSecs > 10;
+  await runSession({ dayKey: redoDay, light: "green", gateUnlocked: true }, {
+    onTick: (ms, sess) => { if (answerChecks(sess)) return; if (short(sess)) engine.advance(); }
+  });
+  const rowsAfterOne = store.loadSessions().flatMap(r => r.ledger || []);
+  const owed = outcome.shortRoundsFor(rowsAfterOne, "main", MOVE);
+  ok(owed.length === 1 && owed[0].round === 1 && owed[0].status === "partial",
+     "round one is what is owed, and it is named: " + JSON.stringify(owed));
+  const fvOwed = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+  ok(!fvOwed.allInFull && fvOwed.notFull.some(r => r.name === MOVE && /round 1 short/.test(r.label)),
+     "the finish screen says so in the same words: " + JSON.stringify(fvOwed.notFull));
+  ok(fvOwed.notFull.length < mainOf(redoDay).length,
+     "and lists nothing she finished — it is an exception list, not a receipt");
+
+  const offeredAs = [];
+  await runSession({ dayKey: redoDay, light: "green", gateUnlocked: true, wipe: false, redoPartials: true }, {
+    onTick: (ms, sess) => {
+      if (answerChecks(sess)) return;
+      if (sess.currentEx && sess.currentEx.name === MOVE && !offeredAs.includes(sess.round)) offeredAs.push(sess.round);
+    }
+  });
+  ok(offeredAs.length === 1 && offeredAs[0] === 1,
+     "the redo offers ROUND ONE back, under its own number, not the next free one: " + JSON.stringify(offeredAs));
+  const rowsAfterRedo = store.loadSessions().flatMap(r => r.ledger || []);
+  ok(outcome.shortRoundsFor(rowsAfterRedo, "main", MOVE).length === 0,
+     "so the merged record upgrades it and nothing is owed any more");
+  const fvClear = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+  ok(fvClear.allInFull && fvClear.notFull.length === 0,
+     "and the finish screen has nothing left to list");
+  ok(lastSettled() === cleanXp,
+     "the day pays what a day trained straight through pays — a redone round is not paid twice: "
+     + lastSettled() + " vs " + cleanXp);
+  engine.exitSession();
+}
+
+/* ---- ONE WORD PER THING, AND THE SCREEN PROVES IT ------------------------
+
+   The app called the same thing two names in a dozen places, and two of them
+   contradicted each other at the same second: the coach SAID "Block done!"
+   while the screen said "Section Done!"; the badge said "Main Circuit" while
+   the progress label under it said "Main"; the list legend said "½ cut short"
+   while the move review's legend said "½ short"; and the coach strip claimed
+   "LEFT SIDE" when nothing in the app knows which side she started on.
+
+   The root of it was duplicated label maps — a second copy of a name is a
+   second answer waiting to disagree. This guard is the point of the whole
+   exercise: it fails the moment a retired word comes back, so the audit stays
+   done instead of being re-derived the next time two screens drift. */
+{
+  const RETIRED = [
+    [/\bCircuit\b/, "Circuit — the repeating unit is a Round, and the block is Main"],
+    [/\bSection\b/i, "Section — the coach says Block, so the screen says Block"],
+    /* The coach strip may not INVENT a side — it does not know which one she
+       started on. Content that names a side (a physio said the right ankle is
+       the stiff one) is a different thing and is allowed; this bans the strip's
+       uppercase form only. */
+    [/(?:SET|REP) \d+ OF \d+[^<]*(?:LEFT|RIGHT) SIDE|>\s*(?:LEFT|RIGHT) SIDE\s*</,
+     "an uppercase LEFT/RIGHT SIDE on the coach strip — the runner only knows first and second"],
+    [/TIMED SET/, "TIMED SET — a set is the prescription unit, counted elsewhere"],
+    [/\bworkout\b/i, "workout — this is a session"],
+    [/\bexercises?\b/i, "exercise — the kid-facing word is move"],
+    /* "press" is an instruction word, but Pallof Press is a MOVE. Move names
+       come from the plan and are not ours to police, so they are struck out
+       before matching — otherwise this guard fails on content the moment a
+       snapshot happens to include that move. */
+    [/\bpress\b/i, "press — every other instruction says tap"],
+    [/½ cut short/, "two legends for one glyph"],
+    /* Two units with near-identical names, printed one line apart. They are
+       now "moves" and "times done" — both facts, neither in jargon. */
+    [/\bmovements?\b/i, "movement — the unit she reads is a move"],
+    [/\bperformances?\b/i, "performance — the unit she reads is \"times done\""],
+  ];
+  /* A status enum rendered raw into something she can read. `moveReview` used
+     to fall through to it, so an aria-label read "Round 2 — partial". */
+  const ENUM_IN_LABEL = /(?:title|aria-label)="[^"]*\b(?:partial|banked|missing)\b[^"]*"/;
+
+  /* Asset paths are not copy: assets/exercises/<name>.webp is a filename on
+     disk, not a word she reads. Strip src/href before matching. */
+  const moveNames = Object.values(data.DAYS)
+    .flatMap(d => Object.values(d.blocks || {}).flat().concat(d.prepMenu || [], d.recovery || []))
+    .map(e => e && e.name).filter(Boolean);
+  const copyOnly = (html) => moveNames.reduce(
+    (t, n) => t.split(n).join(" "),
+    String(html).replace(/(?:src|href|data-fallback)="[^"]*"/g, ""));
+  const screens = [];
+  await runSession({ dayKey: repsDay, light: "green", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      if (answerChecks(sess)) return;
+      if (ms % 30000) return;
+      const vm = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+      screens.push(["session", copyOnly(sscreen.sessionScreen(vm))]);
+    }
+  });
+  const fin = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+  screens.push(["finish", copyOnly(sscreen.sessionScreen(fin))]);
+  const tv = tvm.buildTodayVM({ selectedDay: repsDay, expanded: { main: true, warmup: true } });
+  screens.push(["today", copyOnly(tscreen.todayWide({ ...tv, blocks: tv.blocks.map(b => ({ ...b, bodyStyle: "" })) }))]);
+
+  ok(screens.length > 3, "rendered the session, the finish screen and the day card (" + screens.length + " snapshots)");
+  RETIRED.forEach(([re, why]) => {
+    const hit = screens.find(([, html]) => re.test(html));
+    ok(!hit, "no screen says " + why + (hit ? " — found on the " + hit[0] + " screen" : ""));
+  });
+  const leak = screens.find(([, html]) => ENUM_IN_LABEL.test(html));
+  ok(!leak, "no title or aria-label renders a raw status enum"
+     + (leak ? " — on the " + leak[0] + " screen: " + (leak[1].match(ENUM_IN_LABEL) || [])[0] : ""));
+
+  /* And the round is named where it cannot be hidden. The exercise list is a
+     rail she can collapse; a round that only said its name there went with it. */
+  const anyVm = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+  const railless = sscreen.sessionScreen({ ...anyVm, sessionExList: [], railOpen: false, isWide: true });
+  ok(!/Round \d+ of \d+/.test(sscreen.sessionScreen({ ...anyVm, sessionExList: [] }))
+     || /Round \d+ of \d+/.test(railless),
+     "the round survives with no exercise list at all — it lives beside the timer");
+  engine.exitSession();
+}
+
+/* ---- ONE DOSE, SAID THE SAME WAY BY THE SCREEN AND THE COACH ---------------
+
+   Band Ankle 4-Way is {reps:8, dirs:4} — thirty-two reps. The ring showed the
+   string somebody typed, "8/dir"; the coach read a different string and said
+   "8 reps"; and the count the runner walked was a third thing neither of them
+   consulted. A kid who did eight and tapped Done was then asked "Did you get
+   all 32?" — a number she had never been shown — and answering yes banked
+   thirty-two of thirty-two for a quarter of the move.
+
+   The prescription is described once now, and both voices format those parts.
+   These assertions are about the two of them agreeing, not about wording for
+   its own sake. */
+{
+  const P = (pr) => ({ byReps: true, prescription: plan.normalizePrescription(pr) });
+  const rows = [
+    [{ reps: 8, dirs: 4 },                          "8 × 4 ways",            "32 reps in total"],
+    [{ reps: 8, dirs: 2 },                          "8 × 2 ways",            "16 reps in total"],
+    [{ reps: 3, sides: 2, dirs: 2, sideWord: "arm" }, "3 × 2 ways, each arm", "12 reps in total"],
+    [{ reps: 8, sides: 2, dirs: 2, sideWord: "leg" }, "8 × 2 ways, each leg", "32 reps in total"],
+    [{ sets: 2, reps: 8, sides: 2 },                "8 each side",           "32 reps in total"],
+    [{ reps: 8, repsHigh: 10, sides: 2 },           "8–10 each side",        "16–20 reps in total"],
+    [{ reps: 8, sideReps: [8, 10], sides: 2 },      "8 then 10",             "18 reps in total"],
+    [{ reps: 2, repsHigh: 3 },                      "2–3",                   ""],
+    [{ reps: 12 },                                  "12",                    ""]
+  ];
+  rows.forEach(([pr, big, sub]) => {
+    const d = plan.doseLines(P(pr));
+    ok(d.big === big, "the ring says " + JSON.stringify(big) + ", got " + JSON.stringify(d.big));
+    ok(d.sub === sub, "and the line under it says " + JSON.stringify(sub) + ", got " + JSON.stringify(d.sub));
+  });
+
+  /* The ring is a fixed circle. A dose that needs a sentence gets one BELOW
+     it, never inside it. */
+  rows.forEach(([pr]) => ok(plan.doseLines(P(pr)).big.length <= 22,
+    "no ring string is longer than the ring: " + plan.doseLines(P(pr)).big));
+
+  /* THE WHOLE POINT: the screen and the coach must not name different numbers. */
+  rows.forEach(([pr]) => {
+    const ex = P(pr), d = plan.doseLines(ex), said = plan.spokenDose(ex);
+    const total = String(ex.prescription.totalReps);
+    if (ex.prescription.segments > 1 && d.sub.includes(total)) {
+      ok(said.includes(total) || !/in total/.test(said),
+         "the coach does not contradict the screen's total (" + total + "): " + said);
+    }
+    ok(!/\d+\s*\/\s*(dir|side|leg|arm)/.test(d.big + d.sub + d.full),
+       "and no derived string still carries a raw /dir or /side: " + d.short);
+  });
+
+  const bandAnkle = P({ reps: 8, dirs: 4 });
+  ok(plan.spokenDose(bandAnkle) === "8 reps in each of 4 directions, 32 in total",
+     "the coach says the whole dose for a four-way move: " + plan.spokenDose(bandAnkle));
+
+  /* A note is for reading. It must reach the sentence and nothing else — not
+     the ring, not a list row, and never the coach. */
+  const noted = { ...P({ reps: 8 }), note: "dowel on the back" };
+  const nd = plan.doseLines(noted);
+  ok(nd.full.includes("dowel on the back"), "a note reaches the long form: " + nd.full);
+  ok(!nd.big.includes("dowel") && !nd.short.includes("dowel"), "but not the ring or a list row");
+  ok(!plan.spokenDose(noted).includes("dowel"), "and the coach never reads it out");
+
+  /* The four oldest fixtures carry no prescription at all. They still get the
+     reading they always had — content exists whose repsDetail is prose and
+     could never be parsed, and it must keep working. */
+  ok(plan.spokenDose({ byReps: true, repsDetail: "8/side" }) === "8 reps per side", "legacy: reps per side");
+  ok(plan.spokenDose({ byReps: true, repsDetail: "2×8/side" }) === "2 sets of 8 per side", "legacy: sets per side");
+  ok(plan.spokenDose({ byReps: true, repsDetail: "10" }) === "10 reps", "legacy: plain reps");
+  ok(plan.spokenDose({ byReps: true, repsDetail: "" }) === "", "legacy: an unreadable dose stays silent");
+
+  /* A DIRECTION COUNT MUST BE STATED. */
+  let threw = "";
+  try { plan.parsePrescription("8/dir"); } catch (e) { threw = e.message; }
+  ok(/does not say how many directions/.test(threw), "a bare /dir fails at load: " + threw);
+  ok(plan.parsePrescription("8/4-way").dirs === 4, "and a stated count is read: 8/4-way is four");
+
+  /* An asymmetric dose is walked, not averaged. */
+  const rock = plan.normalizePrescription({ reps: 8, sideReps: [8, 10], sides: 2 });
+  ok(rock.totalReps === 18, "eight on one side and ten on the other is eighteen, not sixteen");
+  ok(plan.prescriptionSegments(rock).map(g => g.reps).join(",") === "8,10",
+     "and the runner counts to each of them in turn");
+
+  /* NAMED SIDES SURVIVE. The runner never invents a side, but where the
+     content states one -- a physio found the right ankle stiffer -- the
+     screen, the coach and the running order must all say so. */
+  const named = plan.normalizePrescription({ reps: 8, sideReps: [8, 10], sides: 2, sideNames: ["left", "right"] });
+  const namedEx = { byReps: true, prescription: named };
+  ok(plan.doseLines(namedEx).big === "8 left, 10 right", "a named side is on the ring: " + plan.doseLines(namedEx).big);
+  ok(/left/.test(plan.spokenDose(namedEx)) && /right/.test(plan.spokenDose(namedEx)),
+     "and the coach says it too: " + plan.spokenDose(namedEx));
+  ok(plan.prescriptionSegments(named).map(g => g.label).join(" -> ").includes("left side"),
+     "and she does the stated side first");
+
+  /* THE SWEEP THAT A SPOT-CHECK MISSED. Deriving the dose from the structure
+     once dropped every approximation marker in both apps -- "at most 5 a
+     side" silently became "do 5" on a landing drill. Assert it over the whole
+     plan, not over a chosen row. */
+  const MARK = /[~\u2264]|\d\s*\+/;
+  let swept = 0;
+  for (const day of Object.values(data.DAYS)) {
+    const moves = Object.values(day.blocks || {}).flat().concat(day.prepMenu || [], day.recovery || []);
+    for (const e of moves) {
+      if (!e || !e.byReps) continue;
+      /* Either place the marker can live: still in the authored string, or
+         moved into the structure as `approx`. Both must reach the ring. */
+      const written = e.repsDetail || e.dose || "";
+      const structural = (plan.exPrescription(e) || {}).approx || "";
+      const wantedMark = structural
+        || (/\u2264/.test(written) ? "\u2264" : /~/.test(written) ? "~" : MARK.test(written) ? "+" : "");
+      if (!wantedMark) continue;
+      swept++;
+      const big = plan.doseLines(e).big;
+      ok(big.includes(wantedMark),
+         e.name + ": the dose keeps its " + wantedMark + ", got \"" + big + "\"");
+    }
+  }
+  ok(swept > 0, "the sweep found approximate doses to check (" + swept + ")");
+
+  /* ONE OWNER FOR HOW LONG A REP TAKES. refTime used to re-derive this inline
+     while the session estimate called repSeconds, so the same move could be
+     priced two ways. Assert they agree across the whole plan. */
+  ok(plan.repSeconds(plan.normalizePrescription({ reps: 6, secondsPerRep: 8 })) === 8,
+     "a move that states its own per-rep seconds is paced by them");
+  ok(plan.repSeconds(plan.normalizePrescription({ reps: 6 })) === 3,
+     "and one that does not falls back to the setting");
+  for (const day of Object.values(data.DAYS)) {
+    for (const e of Object.values(day.blocks || {}).flat()) {
+      if (!e || !e.byReps) continue;
+      const q = plan.exPrescription(e);
+      const byEngine = q.totalReps * plan.repSeconds(q, 3)
+        + Math.max(0, q.segments - 1) * util.SIDE_SWITCH_BUFFER + (q.keepGoingSeconds || 0);
+      ok(util.refTime(e) === byEngine,
+         e.name + ": the plan estimate and the session estimate price it the same (" + util.refTime(e) + " vs " + byEngine + ")");
+    }
+  }
+
+  /* NO ORPHANED estSecs. It was wired once, the core migration dropped the
+     reader, and 49 values stayed in the data where nothing could read them. */
+  const stray = [];
+  for (const day of Object.values(data.DAYS))
+    for (const e of Object.values(day.blocks || {}).flat())
+      if (e && e.estSecs != null) stray.push(e.name);
+  ok(stray.length === 0, "no move carries a time nothing reads (" + stray.slice(0, 3).join(", ") + ")");
+}
+
+/* ---- Open-ended reps: "3, then as many clean as you can" ----------------
+   The heavy pull-up is three slow lowers and then max clean reps. Written as
+   three SETS of one it became five seconds of rep ring, five seconds of
+   switch countdown, three times over -- which is why it read as a timed set.
+   Written as one set of three with a keep-going window it is one unbroken rep
+   ring, and the tail the count cannot hold is actually offered. */
+{
+  const openEnded = (e) => e && e.byReps && (plan.exPrescription(e) || {}).keepGoingSeconds;
+  const findOpen = () => {
+    for (const [key, day] of Object.entries(data.DAYS)) {
+      if (day.spa) continue;
+      for (const e of Object.values(day.blocks || {}).flat()) if (openEnded(e)) return { key, e };
+    }
+    return null;
+  };
+  const found = findOpen();
+  if (found) {
+    const { key, e } = found;
+    /* Green, not red: a red light drops whole blocks, and this move lives in
+       the finisher — under red it never runs and every assertion below would
+       pass by never happening. */
+    const q = plan.exPrescription(e);
+    const lines = plan.doseLines(e);
+
+    /* THE REPORTED SYMPTOM, AS A TEST. One segment means no switch ring. */
+    ok(q.segments === 1, e.name + ": it is ONE set, so no switch clock interrupts it (" + q.segments + " segments)");
+    ok(lines.big === String(q.reps), "the ring shows the target, not a placeholder (" + lines.big + ")");
+    ok(!lines.sub, "and it prints no total, because the target IS the total");
+
+    /* The tail is said the same way in both places. */
+    ok(/as many clean reps as you can/.test(lines.full), "the long line offers the extra reps: " + lines.full);
+    ok(/as many clean reps as you can/.test(plan.spokenDose(e)), "and so does the coach: " + plan.spokenDose(e));
+    ok(!/as many clean/.test(lines.short), "the short form stays short");
+
+    /* Left alone, the offer actually happens. */
+    let sawSwitch = false, secsOnIt = 0, phasesSeen = new Set();
+    const s1 = await runSession({ dayKey: key, light: "green", gateUnlocked: true, seed: voiceOn }, {
+      onTick: (ms, sess) => {
+        if (answerChecks(sess)) return;
+        if (sess.currentEx && sess.currentEx.name === e.name) {
+          secsOnIt += 1;
+          phasesSeen.add(sess.phase);
+          if (sess.phase === "sideswitch") sawSwitch = true;
+        }
+      }
+    });
+    const row1 = s1.ledger.find(l => l.name === e.name);
+    ok(!sawSwitch, "no switch countdown ever ran inside it — it is a rep set end to end");
+    ok(phasesSeen.has("reps"), "and the phase it ran in was reps (" + [...phasesSeen].join(", ") + ")");
+    ok(row1 && row1.repsCounted === q.totalReps && row1.status === "done",
+       "left alone it counts the target and reads done (" + (row1 || {}).repsCounted + " of " + q.totalReps + ")");
+    ok(secsOnIt >= q.keepGoingSeconds,
+       "and it waited out the keep-going window rather than moving on at the third rep (" + secsOnIt + "s)");
+
+    /* Done during the window ends it at once, and still counts in full. */
+    let tapped = false, secsAfterTap = 0;
+    const s2 = await runSession({ dayKey: key, light: "green", gateUnlocked: true, seed: voiceOn }, {
+      onTick: (ms, sess) => {
+        if (answerChecks(sess)) return;
+        const onIt = sess.currentEx && sess.currentEx.name === e.name;
+        if (onIt && !tapped && sess.repsCounted >= q.totalReps && sess.byRepsResolver) {
+          tapped = true; engine.advance(); return;
+        }
+        if (tapped && onIt) secsAfterTap += 1;
+      }
+    });
+    const row2 = s2.ledger.find(l => l.name === e.name);
+    ok(tapped, "Done was tapped during the keep-going window");
+    ok(secsAfterTap < q.keepGoingSeconds,
+       "the move ended on the tap instead of waiting the window out (" + secsAfterTap + "s of " + q.keepGoingSeconds + "s)");
+    ok(row2 && row2.status === "done" && row2.repsCounted === q.totalReps,
+       "and stopping when she chose still counts as done in full (" + (row2 || {}).repsCounted + " of " + q.totalReps + ")");
+  }
 }
 
 console.log("✓ session safety passed (" + passed + " assertions)");

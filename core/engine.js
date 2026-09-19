@@ -10,9 +10,9 @@
 
 import { deriveSessionOutcome, mainRoundsFromLedger, mainRoundReport, OUTCOME_VERSION,
          mergeLedgerRows, logicalRowId, workoutDate, paceReport,
-         moveReviewReason, moveReviewDose } from "./outcome.js";
+         moveReviewReason, moveReviewDose, roundIsShort } from "./outcome.js";
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BREATH_SAY, MANTRA,
-         exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
+         exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds, doseLines,
          needsSetup, SETUP_SECONDS,
          VALGUS_FLOOR, VALGUS_PROGRESSIONS } from "./data.js";
 import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent,
@@ -100,7 +100,7 @@ function blankSession() {
     workoutInstanceId: null,
     savedOutcome: null,
     blocksCompleted: 0, expectedByRound: {},
-    repsCounted: 0, repsTarget: 0, repNow: 0, segmentsDone: 0, segmentsPlanned: 0,
+    repsCounted: 0, repsTarget: 0, repNow: 0, repsReachedCap: 0, segmentsDone: 0, segmentsPlanned: 0,
     sideLabel: "", segmentLabel: "",
     /* Live coach state. The engine has always known all of this; it just never
        said it out loud anywhere she could see. Speech may announce it, but the
@@ -255,6 +255,15 @@ export function assembleCircuits(dayKey, light, opts = {}) {
      than a shorter block, so it is handled separately below. */
   const skipMoves = opts.skipMoves || {};
   const mainPartial = opts.mainPartialRound || [];
+  /* ROUNDS SHE ASKED FOR BACK, each under the round number it already has.
+
+     "+ Add them back" used to hand a cut-short move to the NEXT unbanked round
+     number, so the redo wrote a fresh row instead of a better attempt at the
+     one that was short: rows are keyed block|round|name, the new row never
+     matched the old, and the ½ stood for ever however many times she went back
+     for it. Re-offering round one AS round one is what lets mergeLedgerRows
+     see the two as attempts at the same unit and keep the better of them. */
+  const mainRedo = (opts.mainRedo || []).filter(r => r && r.round > 0 && (r.names || []).length);
   /* HOW MANY MAIN ROUNDS OF THE DAY ARE ALREADY BEHIND US.
 
      A resume's rounds are rounds 2 and 3 of the day, not rounds 1 and 2 of a
@@ -305,7 +314,7 @@ export function assembleCircuits(dayKey, light, opts = {}) {
       exs = exs.filter(ex => !banked.includes(ex.name));
     }
     if (!exs.length) return;
-    if (bk === "main" && rounds <= 0 && !mainPartial.length) return;   // nothing owed
+    if (bk === "main" && rounds <= 0 && !mainPartial.length && !mainRedo.length) return;   // nothing owed
     if (bk === "main") {
       /* THE RAGGED ROUND.
 
@@ -321,6 +330,18 @@ export function assembleCircuits(dayKey, light, opts = {}) {
          remainder circuit declares its OWN expected size, so finishing those
          moves credits the interrupted round exactly once — and a remainder
          round cut short again still cannot pass for a finished one. */
+      /* Asked-for rounds come first and keep their own numbers; only the moves
+         that were short or skipped in that round are re-run, because the rest
+         of it is already finished work and asking for it again is not a second
+         chance, it is a punishment. */
+      mainRedo.forEach(r => {
+        const again = exs.filter(ex => (r.names || []).includes(ex.name));
+        if (again.length) {
+          circuits.push({ name: BLOCK_LABEL[bk], block: bk, rounds: 1,
+                          roundBase: r.round, partialRound: true, redo: true,
+                          exercises: again });
+        }
+      });
       const remainder = exs.filter(ex => !mainPartial.includes(ex.name));
       const ragged = !!(mainPartial.length && remainder.length);
       /* The interrupted round is ONE OF THE ROUNDS STILL OWED, not an extra one
@@ -328,7 +349,12 @@ export function assembleCircuits(dayKey, light, opts = {}) {
          the day's plan, and finishing the ragged round finishes the first of
          them — so the full rounds that follow are one fewer. Counting it as
          extra ran a green day for four main rounds and printed "4 of 3". */
-      const fullRounds = Math.max(0, rounds - (ragged ? 1 : 0));
+      /* A round she asked back is one of the rounds still owed, not an extra
+         one after them — the same arithmetic the ragged round above needs. A
+         round that was short is exactly why the day owes another, so counting
+         the redo separately would run the day for one round too many and hand
+         her back work she had already finished. */
+      const fullRounds = Math.max(0, rounds - (ragged ? 1 : 0) - mainRedo.length);
       // Both numbered from where the day actually is.
       const base = roundOffset + (ragged ? 2 : 1);
       if (ragged) {
@@ -458,7 +484,8 @@ export function estimateSessionSecs(circuits) {
           // display string with the same regex that never matched.
           const p = exPrescription(ex);
           total += p.totalReps * repSeconds(p, settings.secondsPerRep || 3)
-                 + Math.max(0, p.segments - 1) * SIDE_SWITCH_BUFFER;
+                 + Math.max(0, p.segments - 1) * SIDE_SWITCH_BUFFER
+                 + (p.keepGoingSeconds || 0);
         } else {
           total += exWork(ex) + (ex.eachSide ? SIDE_SWITCH_BUFFER : 0);
         }
@@ -542,24 +569,11 @@ function sleep(ms) {
   });
 }
 
-/* ---- reps: a real state machine over the structured prescription ----------
-   This used to read the DISPLAY string with a regex that never matched, so
-   every rep exercise counted to 10 once and none of them ever switched sides.
-   The count, the cadence, the sets and the sides now all come from
-   ex.prescription (parsed in data.js), and the exercise is walked as an
-   ordered list of segments — one per set × side × direction — with a reset
-   between each.
-
-   Done at any point ENDS THE EXERCISE. Whether that counts as finished is not
-   decided here: the caller compares repsCounted against the target. */
-
-const CADENCE_PATTERN = /\d+s\s+(?:up|open|raise)/i;
-export function screenRepsDetail(ex) {
-  const detail = exRepsDetail(ex) || ex.dose;
-  if (!(ex.byReps && CADENCE_PATTERN.test(ex.repsDetail || ""))) return detail;
-  const m = detail.match(/^(\d+\s+reps?)/i);
-  return m ? m[1] : detail.replace(/·.*$/, "").trim();
-}
+/* The ring's dose is derived from the prescription now (see doseLines in
+   plan.js), so there is no hand-written string left to trim. `screenRepsDetail`
+   and its cadence regex existed only to cut a long authored label down to
+   something that would fit — a workaround for the display and the count being
+   two different things. */
 
 /* Wait `ms` of UNPAUSED time, bailing the moment the exercise is over. */
 function repSleep(ms, stopped) {
@@ -650,6 +664,14 @@ async function segmentBreak(seg) {
    the reps she can always make cleanly — and then offers the extra rather
    than demanding it. She takes them and taps Done, or the offer times out. */
 async function offerExtraReps(p, stopped) {
+  /* Open-ended: there is no ceiling to name, so the offer names the STANDARD
+     instead. She ends it by tapping Done -- which sets `stopped`, so the
+     window is a cap on waiting, never a cap on her. */
+  if (p.keepGoingSeconds) {
+    if (voiceOn()) await speakAndWait(`That's ${p.reps}. As many more as you can while they're still clean — then tap Done.`);
+    await repSleep(p.keepGoingSeconds * 1000, stopped);
+    return;
+  }
   const extra = p.repsHigh - p.reps;
   if (extra <= 0) return;
   if (voiceOn()) await speakAndWait(`That's ${p.reps}. ${extra === 1 ? "One more" : `Up to ${extra} more`} if they're still clean — then tap Done.`);
@@ -688,7 +710,7 @@ function repCheckWanted() {
 function repCheckPrompt() {
   return new Promise(resolve => {
     setPhase("repcheck");
-    speakIfIdle("Did you get them all?");
+    speakIfIdle(`You counted ${sess.repsCounted} of ${sess.repsTarget}. Did you finish the rest?`);
     const settle = (answer) => {
       clearInterval(watchdog); clearTimeout(timeout);
       sess.repCheckResolver = null;
@@ -703,7 +725,16 @@ function repCheckPrompt() {
 }
 function applyRepCheck(answer) {
   const c = sess.repsCounted, t = sess.repsTarget;
-  if (answer === "all") sess.repsCounted = t;
+  /* "ALL OF THEM" MEANS THE STRETCH SHE WAS ON, NOT THE WHOLE MOVE.
+
+     Tapping Done at direction one of four and answering "all" used to bank
+     thirty-two of thirty-two: three directions she never did, certified by a
+     button. She can only vouch for the reps the coach was counting, so the
+     credit stops at the end of the segment she had reached. */
+  if (answer === "all") {
+    const reached = Number.isFinite(sess.repsReachedCap) ? sess.repsReachedCap : t;
+    sess.repsCounted = Math.max(c, Math.min(t, reached));
+  }
   else if (answer === "almost") sess.repsCounted = Math.min(t, Math.max(c + 1, c + Math.floor((t - c) / 2)));
   // "some", a dismissal or a timeout: the coach's count stands.
   notify("tick");
@@ -769,7 +800,7 @@ async function runPrescribedReps(ex) {
       sess.segmentsDone += 1;
     }
     if (stopped) return;
-    if (p.repsHigh) await offerExtraReps(p, isStopped);
+    if (p.repsHigh || p.keepGoingSeconds) await offerExtraReps(p, isStopped);
     // Ran to the end under its own power.
     if (!stopped && sess.byRepsResolver) sess.byRepsResolver("complete");
   })();
@@ -782,6 +813,16 @@ async function runPrescribedReps(ex) {
   sess.currentSet = 0; sess.totalSets = 0;
   sess.currentSide = 0; sess.totalSides = 0;
   sess.currentDirection = 0; sess.totalDirections = 0;
+  /* HOW FAR SHE ACTUALLY GOT, CAPTURED BEFORE THE STATE IS CLEARED.
+
+     The rep-check card is asked below, AFTER these resets — so by the time
+     "All of them" is answered there is nothing left on `sess` to say which
+     segment she had reached, and the answer could only ever mean "the whole
+     move". That is how a Done tap at direction one of four banked thirty-two
+     of thirty-two. The cap is taken here, while it is still knowable. */
+  sess.repsReachedCap = sess.repsInSegment > 0
+    ? Math.min(sess.repsTarget, (sess.segmentsDone || 0) * sess.repsInSegment + sess.repsInSegment)
+    : sess.repsTarget;
   sess.repInSegment = 0; sess.repsInSegment = 0;
   sess.currentSegment = 0; sess.totalSegments = 0;
   // Done before the count finished: the count is stopped, and she is asked.
@@ -867,7 +908,7 @@ function stopElapsed() {
 /* ---- helpers ---- */
 function setPhase(phase) {
   sess.phase = phase;
-  // A pending "Skip this exercise?" ask belongs to the phase it was raised in.
+  // A pending "Skip this move?" ask belongs to the phase it was raised in.
   // Left standing, a countdown that expires mid-ask would point the confirm at
   // whatever came next — so every transition clears it.
   sess.confirmSkip = false;
@@ -918,7 +959,7 @@ async function announce(msg) {
 function setUpNext(nextStep) {
   const nx = nextStep ? nextStep.ex : null;
   sess.upNextName = nx ? nx.name : "";
-  sess.upNextDose = nx ? (nx.dose || "") : "";
+  sess.upNextDose = nx ? (nx.byReps ? doseLines(nx).short : (nx.dose || "")) : "";
 }
 
 /* ---- the completion ledger -------------------------------------------------
@@ -984,7 +1025,7 @@ function recordExercise(ex, circuit, ci, ei, r, wasSkipped) {
     block: circuit.block,
     ci, ei, round: r,
     driver: ex.driver || (ex.byReps ? "reps" : "time"),
-    dose: ex.dose || ex.repsDetail || "",
+    dose: ex.byReps ? doseLines(ex).short : (ex.dose || ""),
     gate: ex.gate || null,
     plannedSecs, actualSecs,
     repsPlanned: ex.byReps ? sess.repsTarget : 0,
@@ -1601,7 +1642,7 @@ export function dayPlanState(dayKey, opts = {}) {
         const dose = moveReviewDose(row);
         moves.push({
           block: c.block, circuit: c.name, round, name: ex.name,
-          dose: ex.dose || ex.repsDetail || "",
+          dose: ex.byReps ? doseLines(ex).short : (ex.dose || ""),
           status, got: dose.got, planned: dose.planned, driver: dose.driver,
           reason: moveReviewReason(row, status)
         });
@@ -1680,6 +1721,23 @@ export function planResume(dayKey, light = "green", opts = {}) {
   const logBankable = redoPartials ? logDone : logRows.filter(r => r &&
     (r.status === "done" || (r.status === "partial" && r.block !== "main")));
   const logRounds = care ? 0 : mainRoundsFromLedger(logRows, null, OUTCOME_VERSION);
+  /* The main rounds she is asking back, grouped by the round they belong to.
+     `logRows` is already merged, which is the whole point: once she has redone
+     round one it no longer reads short, so the offer stops being made instead
+     of repeating for ever. Same predicate as the end report's list, so the two
+     cannot differ about what is owed. */
+  const mainRedo = [];
+  if (redoPartials && !care) {
+    const byRound = new Map();
+    logRows.forEach(r => {
+      if (!r || r.block !== "main" || !r.name || !roundIsShort(r.status)) return;
+      const rd = Number(r.round) || 1;
+      if (!byRound.has(rd)) byRound.set(rd, []);
+      const names = byRound.get(rd);
+      if (!names.includes(r.name)) names.push(r.name);
+    });
+    [...byRound.entries()].sort((a, b) => a[0] - b[0]).forEach(([round, names]) => mainRedo.push({ round, names }));
+  }
 
   const lockedLight = lowerOrNull(prog && prog.lockedLight, lockedLightFromLog(logFrags));
   const finalLight = lockedLight ? lowerLight(lockedLight, resolvedLight) : resolvedLight;
@@ -1735,6 +1793,7 @@ export function planResume(dayKey, light = "green", opts = {}) {
         mainRounds: mainOwed,
         skipMoves: bankedMoves,
         mainPartialRound: bankedMoves.main || [],
+        mainRedo,
         // Rounds already on disk, so this sitting's rows are numbered as rounds
         // OF THE DAY and cannot collide with the earlier sitting's.
         roundOffset: bankedRounds

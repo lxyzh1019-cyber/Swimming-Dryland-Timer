@@ -3,14 +3,16 @@
    values from the engine's `sess` view-state.
    ============================================================ */
 
-import { sess, refTime, screenRepsDetail, pausedByBackground, canGoBack } from "../engine.js";
-import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, SESSION_QUIZ,
-         TRAINING_QS, REFLECT_WELL, REFLECT_NEXT, exWork, videoSearchUrl } from "../data.js";
+import { sess, refTime, pausedByBackground, canGoBack } from "../engine.js";
+import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, BLOCK_LABEL, SESSION_QUIZ,
+         TRAINING_QS, REFLECT_WELL, REFLECT_NEXT, exWork, doseLines, videoSearchUrl } from "../data.js";
 import { SKILL_BLOCK, COPY } from "../sport.js";
 import { fmtMMSS, exercisePhotoUrl, photoSources, plural } from "../util.js";
 import { loadSessions, loadQuiz, quizQuestionKey } from "../store.js";
 import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION, paceBand,
-         dayRecordFor, moveReviewLegend } from "../outcome.js";
+         dayRecordFor,
+         roundHistoryByMove, roundStatusOf, shortRoundsFrom,
+         shortRoundsByMoveFromPlan, shortRoundsLabel } from "../outcome.js";
 
 /* What changes at the end of this segment — named before she gets there, so the
    switch is never a surprise she hears about only if the voice is on. */
@@ -274,28 +276,31 @@ export function buildSessionVM(state) {
       ? "+" + sess.xpEarned + " XP this time · " + settledToday + " today"
       : "+" + sess.xpEarned + " XP";
 
-  /* THE PER-MOVE REVIEW — every planned performance of the day with its
-     verdict and the reason, off the record's plan (see dayPlanState and
-     moveReviewReason). Collapsed by default; the screen offers "See every
-     move". Same rows as the day card's expanded blocks. */
-  const REVIEW_PILL = {
-    done:    { icon: "✓", bg: "var(--mint)",      ink: "#fff" },
-    banked:  { icon: "✓", bg: "var(--mint)",      ink: "#fff" },
-    partial: { icon: "½", bg: "var(--sun)",       ink: "var(--sun-ink)" },
-    skipped: { icon: "⏭", bg: "var(--coral)",     ink: "#fff" },
-    missing: { icon: "—", bg: "var(--surface-2)", ink: "var(--ink-soft)" }
-  };
-  const moveReview = useRec && dayRec.plan ? (dayRec.plan.moves || []).map(m => {
-    const pill = REVIEW_PILL[m.status] || REVIEW_PILL.missing;
-    return {
-      name: m.name, circuit: m.circuit, round: m.round, status: m.status, icon: pill.icon,
-      roundLabel: (dayRec.plan.blocks.find(b => b.block === m.block && b.name === m.circuit) || {}).rounds > 1 ? "R" + m.round : "",
-      doseLabel: m.got === null || m.planned === null ? ""
-        : m.driver === "reps" ? m.got + " of " + m.planned + " reps" : m.got + "s of " + m.planned + "s",
-      reason: m.reason || "",
-      pillStyle: "width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;background:" + pill.bg + ";color:" + pill.ink + ";"
-    };
-  }) : [];
+  /* WHAT IS STILL OWED — and nothing else.
+
+     This printed every planned performance of the day: on a green day, every
+     move three times, each with a tick. A wall of ticks is not a report, it is
+     a receipt, and the one thing she needs off this screen — what did I not
+     finish, and can I go back for it — was buried in it.
+
+     So it is an exception list now. A move appears only if a round of it came
+     up short or got skipped, and the rounds are NAMED, in the same order the
+     Today list draws its per-round icons, so the two line up. Everything done
+     in full is one closing line. On a clean day this list is empty and the
+     screen says so in a sentence.
+
+     A round she never reached is `missing`, not short (see roundIsShort): it
+     is not something she left undone, and offering it back would be a
+     different promise from the one this list makes. */
+  const notFullGroups = useRec && dayRec.plan
+    ? [...shortRoundsByMoveFromPlan(dayRec.plan.moves || []).values()].filter(g => g.short.length)
+    : [];
+  const notFull = notFullGroups.map(g => ({
+    name: g.name,
+    circuit: g.circuit || "",
+    label: shortRoundsLabel(g.short, g.rounds.length),
+    anySkipped: g.short.some(r => r.status === "skipped")
+  }));
 
   /* One line per main round that did not count, naming the move that cost it.
      Deliberately factual and never scolding: she is told what happened and what
@@ -324,7 +329,7 @@ export function buildSessionVM(state) {
   // photo and the ring's spot hold the question, not the breath card.
   const isFormCheck = phase === "formcheck";
   // A move is only skippable while it is underway. Elsewhere Done already says
-  // "skip rest", and a "Skip this exercise? It won't count." over a breather
+  // "skip rest", and a "Skip this move? It won't count." over a breather
   // was a question about a move that had already been recorded.
   const canSkipExercise = phase === "work" || phase === "reps" || phase === "sideswitch";
   const isBigRest = phase === "roundRest" || phase === "sectionRest";
@@ -339,14 +344,29 @@ export function buildSessionVM(state) {
      finish. The rep ring says BY REPS, so the timed one says TIMED SET —
      "session" is already the whole workout here (Session time, End session)
      and would collide. */
-  const timerZone = ({ work: "TIMED SET", rest: "REST", roundRest: "ROUND REST", sectionRest: "SECTION REST",
-    sideswitch: "SWITCH", getready: "READY", greeting: "READY", breath: "BREATHE" })[phase] || "TIMED SET";
+  /* BLOCK, not section: the coach SPEAKS "Block done!" at this exact moment
+     (see engine.js), and every other screen says block too. And TIMED, not
+     TIMED SET: "set" already means a prescription set here — SET 1 OF 2 sits
+     in the coach strip a few lines down, counting something else entirely. */
+  const timerZone = ({ work: "TIMED", rest: "REST", roundRest: "ROUND REST", sectionRest: "BLOCK REST",
+    sideswitch: "SWITCH", getready: "READY", greeting: "READY", breath: "BREATHE" })[phase] || "TIMED";
   const timerUrgent = sess.urgent && phase !== "roundRest" && phase !== "sectionRest";
 
   const bvMap = { warmup: "sun", coordination: "sun", main: "aqua", prep: "grape", finisher: "mint", [SKILL_BLOCK]: "sea", recovery: "grape" };
   const blockBadgeVariant = bvMap[circuit.block] || "aqua";
-  const blockLabel = ({ warmup: "Warm-Up 🔥", coordination: "Coordination ⚡", main: "Main Circuit 💪",
-    prep: "Prep Pair 🎯", finisher: "Finisher 🏁", [SKILL_BLOCK]: COPY.skillBlockLabel + " " + BLOCK_META[SKILL_BLOCK].emoji, recovery: "Recovery ❄️" })[circuit.block] || circuit.name || "";
+  /* ONE NAME AND ONE EMOJI PER BLOCK, FROM THE ONE PLACE THAT DEFINES THEM.
+
+     This used to carry its own copy of BLOCK_LABEL and the emoji set, and the
+     two copies had drifted: the day card said "Warm-up" where this said
+     "Warm-Up", the finisher was 🪝 on one screen and 🏁 on the other, recovery
+     🧊 and ❄️ — and the main block was "Main Circuit" here while the progress
+     label three lines down said "Main". A second copy of a label map is a
+     second answer waiting to disagree, which is the same fault this whole
+     change is about. */
+  const blockLabel = (BLOCK_LABEL[circuit.block]
+    ? (circuit.block === SKILL_BLOCK ? COPY.skillBlockLabel : BLOCK_LABEL[circuit.block])
+      + ((BLOCK_META[circuit.block] || {}).emoji ? " " + BLOCK_META[circuit.block].emoji : "")
+    : (circuit.name || ""));
   /* THE ROUND NUMBER AND THE ROUND COUNT MUST BE ABOUT THE SAME THING.
      sess.round is the round of the DAY (a resume's first round is round two);
      circuit.rounds is only what THIS SITTING owes. Put together they read
@@ -360,13 +380,26 @@ export function buildSessionVM(state) {
     phase === "greeting" ? "Ready?" :
     phase === "getready" ? "Get ready…" :
     phase === "sideswitch" ? "Switch sides" :
-    phase === "sectionRest" ? "Section Done! 🎉" :
+    phase === "sectionRest" ? "Block Done! 🎉" :
     phase === "roundRest" ? "Round Done! 💪" :
     phase === "rest" ? "Quick Rest" :
     phase === "breath" ? "Breath rehearsal" :
     (ex.name || "");
 
-  const curExDose = timerIsReps ? (screenRepsDetail(ex) || ex.dose || "") : (sess.sideLabel || ex.dose || "");
+  /* THE RING SAYS WHAT SHE COUNTS TO; THE LINE UNDER IT SAYS THE WHOLE DOSE.
+
+     Both used to render the same authored string, so "8/dir" appeared twice
+     and the thirty-two reps it stands for appeared nowhere. The ring is a
+     fixed circle, so it keeps the short form; the line below has room for the
+     total, and DURING the reps it counts up instead — which is how she can see
+     the coach trailing her and know not to tap Done yet. */
+  const exPrescriptionUnit = (e) => (e && e.prescription && e.prescription.unit) || "reps";
+  const lines = timerIsReps ? doseLines(ex) : null;
+  const curExDose = lines ? lines.big : (sess.sideLabel || ex.dose || "");
+  const curExDoseSub = !lines ? ""
+    : (phase === "reps" && sess.repsTarget > 0)
+      ? sess.repsCounted + " of " + sess.repsTarget + " " + (exPrescriptionUnit(ex) || "reps")
+      : lines.sub;
   const curPlanned = refTime(ex);
   const curActual = timerIsReps ? sess.exElapsed : Math.max(0, (sess.timerMax || 0) - (sess.timerSecs || 0));
   const exOver = curActual > curPlanned + 2;
@@ -382,8 +415,10 @@ export function buildSessionVM(state) {
   const totalExCount = circuits.reduce((acc, c) =>
     acc + c.exercises.reduce((n, ex) => n + Math.min(c.rounds, Number(ex.rounds) || c.rounds), 0), 0);
   const doneCount = sess.exDone || 0;
-  const secNames = { warmup: "Warm-Up", coordination: "Coordination", main: "Main", prep: "Prep", finisher: "Finisher", [SKILL_BLOCK]: COPY.skillBlockLabel, recovery: "Recovery" };
-  const progressLabel = (secNames[circuit.block] || "") + " · " + Math.min(sess.ei + 1, circuit.exercises.length) + " of " + circuit.exercises.length;
+  /* A third copy of the same names lived here, and it was the one that said
+     "Main" while the badge above said "Main Circuit". Same source now. */
+  const secName = circuit.block === SKILL_BLOCK ? COPY.skillBlockLabel : (BLOCK_LABEL[circuit.block] || "");
+  const progressLabel = secName + " · " + Math.min(sess.ei + 1, circuit.exercises.length) + " of " + circuit.exercises.length;
   const sessionTimePct = Math.min(100, Math.round(sess.elapsed / Math.max(1, sess.plannedSecs) * 100));
   /* THE DOTS SHOW ROUNDS THAT COUNTED, in the colour the finish screen will
      use for them. They used to be drawn off the round NUMBER: every round
@@ -404,6 +439,14 @@ export function buildSessionVM(state) {
   const roundLine = !showRoundLine ? ""
     : mainFinished ? "Main · " + roundsCounted + " of " + roundsShown + " done"
     : (circuit.name || "") + " · Round " + sess.round + " of " + roundsShown;
+  /* The same fact without the block's name in front of it, because the title it
+     now sits on already says the name. `roundLine` is kept as it was: the HUD
+     strip it was written for is gone, but the field is the one thing that told
+     us this belongs to the block, and removing it would only move the coupling
+     somewhere less obvious. */
+  const roundShort = !showRoundLine ? ""
+    : mainFinished ? roundsCounted + " of " + roundsShown + " done"
+    : "Round " + sess.round + " of " + roundsShown;
   const roundDots = showRoundLine ? Array.from({ length: roundsShown }, (_, i) => ({
     style: "width:10px;height:10px;border-radius:50%;flex-shrink:0;"
       + (i < roundsCounted ? "background:var(--mint);"
@@ -413,16 +456,6 @@ export function buildSessionVM(state) {
 
   // Exercise timeline (left pane list)
   const BLOCK_COLORS = { warmup: "var(--coral)", coordination: "var(--sun-ink)", main: "var(--sea)", prep: "var(--grape)", finisher: "var(--mint-ink)", [SKILL_BLOCK]: "var(--aqua-ink)", recovery: "var(--grape)" };
-  /* HOW WELL EACH FINISHED MOVE WAS HELD, on the list she is already looking at.
-
-     The timeline showed a tick for every move that ended, and a twelve-second
-     version of a thirty-second hold got the same tick as the real thing. The
-     ledger has always known the difference. The dot beside the tick is that
-     difference, in the same four colours the finish screen and the Grown-up
-     Zone use, so nobody has to learn a second vocabulary. Nothing here changes
-     a status: a `done` move is still done, still paid, still a streak unit.
-     Only the colour says how close it was. */
-  const PACE_DOT = { green: "var(--mint)", amber: "var(--sun)", yellow: "var(--coral)", red: "var(--stop)" };
 
   /* ---- THE LIST IS THE DAY, AND THE PILL IS WHERE SHE PICKS UP -------------
 
@@ -444,27 +477,36 @@ export function buildSessionVM(state) {
   const moveKey = (block, name) => block + "|" + name;
 
   const historyRows = (sess.priorRows || []).concat(sess.ledger || []);
-  /* How every round of each move landed. A move reads `done` only once every
-     round the day asked for is done; one skip anywhere makes it skipped, and
-     anything short of that with work in it is a move she cut short. */
-  const seenByMove = new Map();
+  /* ONE MARK PER MOVE, ABOUT THE ROUND SHE IS IN — AND NOTHING ELSE.
+
+     This used to grade a move across ALL its rounds: `done` only once every
+     round the day asked for was done, and anything less with work in it read
+     `partial`. So a main move finished perfectly in round 1 of 3 showed a ½
+     under a legend that says "cut short", for the whole of rounds 1 and 2 —
+     the app telling a kid she had rushed a move she had just nailed.
+
+     That was a ROUND fact wearing a MOVE's clothes. The round belongs to the
+     round title (see roundLine), so the list answers the only question it is
+     in a position to answer: how did THIS move go in THIS round. When a new
+     round starts every mark clears and fills again, which is what a round is.
+
+     Across-rounds history is a different question for a different screen —
+     the end report and the Today list answer it, through shortRoundsFor. */
+  const historyByMove = roundHistoryByMove(historyRows);
+
+  /* Which round each block is showing. The one she is in shows the round she
+     is in; a block she has already left shows the last round of it she did,
+     so a finished warm-up keeps its ticks instead of blanking. */
+  const activeBlock = circuit ? circuit.block : null;
+  const lastRoundOf = new Map();
   historyRows.forEach(l => {
-    if (!l || !l.block || !l.name) return;
-    const k = moveKey(l.block, l.name);
-    const cur = seenByMove.get(k) || { done: 0, partial: 0, skipped: 0 };
-    if (l.status === "done") cur.done += 1;
-    else if (l.status === "skipped") cur.skipped += 1;
-    else if (l.status === "partial") cur.partial += 1;
-    seenByMove.set(k, cur);
+    if (!l || !l.block) return;
+    const r = Number(l.round) || 1;
+    if (!lastRoundOf.has(l.block) || r > lastRoundOf.get(l.block)) lastRoundOf.set(l.block, r);
   });
-  const paceByMove = new Map();
-  historyRows.forEach(l => {
-    if (!l || l.status === "skipped" || !l.block || !l.name) return;
-    const band = paceBand(l);
-    if (!band) return;
-    // The most recent attempt is the one worth showing: latest wins.
-    paceByMove.set(moveKey(l.block, l.name), band);
-  });
+  const shownRound = (c) => (activeBlock && c.block === activeBlock)
+    ? (Number(sess.round) || Number(c.roundBase) || 1)
+    : (lastRoundOf.has(c.block) ? lastRoundOf.get(c.block) : (Number(c.roundBase) || 1));
 
   // Where she is standing, named rather than indexed — for the same reason.
   const curKey = (sess.running && !sessionDone && circuit && circuit.exercises[sess.ei])
@@ -489,7 +531,17 @@ export function buildSessionVM(state) {
   let sawHistory = false;
   const sessionExList = [];
   listCircuits.forEach((c, ci) => {
-    sessionExList.push({ isHeader: true, name: c.name + (c.rounds > 1 ? ` ×${c.rounds}` : ""), color: BLOCK_COLORS[c.block] || "var(--ink-soft)" });
+    /* The block title is where a round is named, and the only place. It used to
+       print a static "×3" off the plan — a round figure on the list that never
+       moved, which is what sent a reader hunting for per-move round state in
+       the first place. It carries the live round now. */
+    /* DOTS, NOT WORDS. The round is NAMED beside the timer, which is never
+       collapsed; this list lives in a rail she can close, so a round that only
+       said its name here would vanish with it. The dots are the glance that
+       explains why the marks below reset. */
+    const hostsRound = c.rounds > 1 && !!roundShort && c.block === "main";
+    sessionExList.push({ isHeader: true, name: c.name, color: BLOCK_COLORS[c.block] || "var(--ink-soft)",
+      roundDots: hostsRound ? roundDots : [] });
     c.exercises.forEach((e, ei) => {
       const k = moveKey(c.block, e.name);
       const isCur = !!curKey && k === curKey;
@@ -499,14 +551,8 @@ export function buildSessionVM(state) {
       if (explore) {
         st = sess.exStatus[ci + "-" + ei];
       } else {
-        const seen = seenByMove.get(k);
-        // What this move was asked for: its own round cap where it has one.
-        const asked = Math.min(c.rounds, Number(e.rounds) > 0 ? Number(e.rounds) : c.rounds);
-        if (seen) {
-          st = seen.skipped ? "skipped"
-            : seen.done >= asked ? "done"
-            : (seen.done || seen.partial) ? "partial" : undefined;
-        }
+        const perRound = historyByMove.get(k);
+        st = roundStatusOf(perRound && perRound.get(shownRound(c))) || undefined;
       }
       if (st) sawHistory = true;
       const state = isCur ? "current" : st === "done" ? "done"
@@ -524,13 +570,6 @@ export function buildSessionVM(state) {
           + "background:" + pill.bg + ";color:" + pill.ink + ";",
         nameStyle: "flex:1;min-width:0;font-weight:800;color:" + NAME_INK[state],
         statusIcon: pill.icon,
-        paceDotStyle: paceByMove.has(k)
-          ? "width:8px;height:8px;border-radius:50%;flex-shrink:0;background:" + PACE_DOT[paceByMove.get(k)] + ";"
-          : "",
-        paceTitle: paceByMove.has(k)
-          ? { green: "Held the full time", amber: "Almost the full time",
-              yellow: "Short of the full time", red: "Well short of the full time" }[paceByMove.get(k)]
-          : "",
         secColor: pill.sec
       });
     });
@@ -538,7 +577,7 @@ export function buildSessionVM(state) {
   /* What the colours mean, said once and only where there is history to read.
      Done and cut-short shared a glyph before this. */
   const exListLegend = (!explore && sawHistory)
-    ? "✓ done · ½ cut short · ⏭ skipped — you’re picking up at ▶"
+    ? "this round — ✓ done · ½ short · ⏭ skipped — you’re picking up at ▶"
     : "";
 
 
@@ -589,7 +628,7 @@ export function buildSessionVM(state) {
     stopOverlay: sess.stopOverlay,
     confirmSkip: !!sess.confirmSkip,
     detailOverlay: state.detailOverlay,
-    detailName: de.name || "", detailDose: de.dose || "", detailCue: de.cue || "",
+    detailName: de.name || "", detailDose: de.byReps ? doseLines(de).full : (de.dose || ""), detailCue: de.cue || "",
     detailWatchFor: de.parentWatch || "", detailFix: de.redFlag || de.fix || "",
     detailTransfer: de.transfer || "",
     // The repo holds 39 "- Timer Image.png" files and zero "- Demo Image.png",
@@ -630,7 +669,7 @@ export function buildSessionVM(state) {
     paceBand: (pace && pace.band) || "",
     paceCounts,
     sessionPlannedDisplay: Math.max(1, Math.round(sess.plannedSecs / 60)) + " min",
-    sessionTimePct, roundLine, roundDots,
+    sessionTimePct, roundLine, roundDots, roundShort,
     progressLabel, progressValue: Math.min(doneCount, Math.max(1, totalExCount)), progressMax: Math.max(1, totalExCount),
     sessionExList, exListLegend,
 
@@ -659,7 +698,7 @@ export function buildSessionVM(state) {
     // rendered there and did nothing at all when tapped.
     canOpenDetail: !!sess.currentEx && !isResting && (!isPrompt || isFormCheck),
     stageTitle, blockBadgeVariant, blockLabel, roundLabelText,
-    curExName: ex.name || "", curExDose,
+    curExName: ex.name || "", curExDose, curExDoseSub,
     curExCue: isResting ? sess.restCue : (ex.cue || ""),
     curExWatchFor: ex.parentWatch || "", curExFix: ex.redFlag || "",
     curExTransfer: ex.transfer || "",
@@ -670,13 +709,17 @@ export function buildSessionVM(state) {
     upNextName: sess.upNextName, upNextDose: sess.upNextDose,
 
     /* ---- live coach state -------------------------------------------------
-       SET 1 OF 2 · LEFT SIDE · REP 5 OF 8 · NEXT: SWITCH SIDES. The engine has
+       SET 1 OF 2 · FIRST SIDE · REP 5 OF 8 · NEXT: SWITCH SIDES. The engine has
        always tracked every one of these; nothing ever showed them, so a session
        run with the voice off (or on a device with no installed voice) gave her
        no way to know which set or which side she was on. */
     coachSetLine: sess.totalSets > 1 ? `SET ${sess.currentSet} OF ${sess.totalSets}` : "",
     coachSideLine: sess.totalSides > 1
-      ? (sess.currentSide === 1 ? "LEFT SIDE" : "RIGHT SIDE") : "",
+      /* FIRST / SECOND, never LEFT / RIGHT. Nothing in the plan, the engine or
+         the ledger records which side she starts on, and the coach only ever
+         says "first side" / "second side" — so naming a left knee was the
+         screen asserting something the app cannot know. */
+      ? (sess.currentSide === 1 ? "FIRST SIDE" : "SECOND SIDE") : "",
     coachDirectionLine: sess.totalDirections > 1
       ? `DIRECTION ${sess.currentDirection} OF ${sess.totalDirections}` : "",
     coachRepLine: sess.repsInSegment > 0 ? `REP ${sess.repInSegment} OF ${sess.repsInSegment}` : "",
@@ -720,7 +763,10 @@ export function buildSessionVM(state) {
     /* The rep question. Three answers and the rule in one line — a kid who
        finished before the coach did is being asked, not told off. */
     isRepCheck,
-    repCheckQuestion: "Did you get all " + (sess.repsTarget || 0) + "?",
+    /* NAME BOTH NUMBERS. This asked "Did you get all 32?" for a move whose ring
+       had only ever said "8/dir" — a total she had never been shown, arriving
+       at the one moment it decides what gets recorded. */
+    repCheckQuestion: "You counted " + (sess.repsCounted || 0) + " of " + (sess.repsTarget || 0) + ". Did you finish the rest?",
     repCheckRule: "All " + (sess.repsTarget || 0) + " counts the move.",
     repCheckOpts: [
       { arg: "all",    label: "All of them", bg: "var(--mint)",    ink: "#fff",           edge: "var(--mint-deep)" },
@@ -771,8 +817,9 @@ export function buildSessionVM(state) {
     xpEarned: sess.xpEarned, leveledUp: sess.leveledUp,
     xpLine,
     // The per-move review, and whether she has opened it.
-    moveReview, moveReviewOpen: !!state.moveReviewOpen,
-    moveReviewLegend: moveReview.length ? moveReviewLegend() : "",
+    notFull, notFullCount: notFull.length,
+    allInFull: useRec && !!dayRec.plan && notFull.length === 0,
+    redoDayKey: sess.dayKey || "",
     /* MOOD, REFLECTION AND THE QUIZ ONLY EXIST IF THERE IS A RECORD TO PUT
        THEM ON.
 

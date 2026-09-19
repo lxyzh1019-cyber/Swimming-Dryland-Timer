@@ -4,7 +4,7 @@
    history, journey XP, and live Edmonton dates.
    ============================================================ */
 
-import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, RANK_LORE, BLOCK_META, BLOCK_LABEL, levelCost, fmtXp, overloadWeek } from "../data.js";
+import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, RANK_LORE, BLOCK_META, BLOCK_LABEL, levelCost, fmtXp, overloadWeek, doseLines } from "../data.js";
 import { SKILL_BLOCK, ATHLETE_DEFAULT, COPY, EMOJI } from "../sport.js";
 import { settings, loadSessions, loadJourney, levelFromXp } from "../store.js";
 /* STREAK_WORK_FRACTION is imported, not re-typed. This file used to carry a
@@ -340,7 +340,17 @@ export function buildTodayVM(state) {
   const record = recordForDay(selectedKey, records);
   const showActuals = !!(record && record.plan);
   const planState = showActuals ? record.plan : dayPlanState(selectedKey, { fragments: [] });
-  /* The pill beside each performance, in the finish screen's own glyphs. */
+  /* THE DAY, ONE ROW PER MOVE, ONE ICON PER ROUND.
+
+     This printed one row per PERFORMANCE — a move in a three-round block got
+     three rows, each repeating the name. Three screens were describing the
+     same day three different ways, and the round a row belonged to was a
+     little "R2" tag easy to miss.
+
+     A move gets one row now, and its rounds are drawn as icons in round order:
+     position IS the round, so which round fell short is visible without
+     reading a number. This is the screen that answers "how did the whole day
+     go" — the finish screen deliberately answers only "what is still owed". */
   const REVIEW_PILL = {
     done:    { icon: "✓", bg: "var(--mint)", ink: "#fff" },
     banked:  { icon: "✓", bg: "var(--mint)", ink: "#fff" },
@@ -348,19 +358,54 @@ export function buildTodayVM(state) {
     skipped: { icon: "⏭", bg: "var(--coral)", ink: "#fff" },
     missing: { icon: "—", bg: "rgba(255,255,255,0.28)", ink: "#fff" }
   };
-  const reviewRows = (b) => !showActuals ? [] : (planState.moves || [])
-    .filter(m => m.block === b.block && m.circuit === b.name)
-    .map(m => {
-      const pill = REVIEW_PILL[m.status] || REVIEW_PILL.missing;
-      const doseLabel = m.got === null || m.planned === null ? ""
-        : m.driver === "reps" ? m.got + " of " + m.planned + " reps"
-        : m.got + "s of " + m.planned + "s";
-      return {
-        name: m.name, round: m.round, roundLabel: b.rounds > 1 ? "R" + m.round : "",
-        status: m.status, icon: pill.icon, doseLabel, reason: m.reason || "",
-        pillStyle: "width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;background:" + pill.bg + ";color:" + pill.ink + ";"
-      };
+  /* What each slot SAYS when she holds it. The status is an internal enum, and
+     falling through to it put "Round 2 — partial" and "Round 3 — banked" into
+     an aria-label beside a sibling reading the plain "not reached". */
+  const SLOT_WORDS = { done: "done in full", banked: "done in full", partial: "came up short",
+                       skipped: "skipped", missing: "not reached" };
+  const slotStyle = (pill) => "width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;"
+    + "align-items:center;justify-content:center;font-size:11px;font-weight:900;background:" + pill.bg + ";color:" + pill.ink + ";";
+  const reviewRows = (b) => {
+    if (!showActuals) return [];
+    const rows = (planState.moves || []).filter(m => m.block === b.block && m.circuit === b.name);
+    if (!rows.length) return [];
+    /* The block's rounds in the order they were trained. Taken from the rows
+       rather than counted from 1, because `round` is absolute across sittings
+       (see roundBase) — slot one is this block's first round, whatever number
+       the day gave it. */
+    const roundsInOrder = [...new Set(rows.map(m => Number(m.round) || 1))].sort((a, b2) => a - b2);
+    const byName = new Map();
+    const order = [];
+    rows.forEach(m => {
+      let g = byName.get(m.name);
+      if (!g) { g = { name: m.name, perRound: new Map(), reason: "", doseLabel: "" }; byName.set(m.name, g); order.push(g); }
+      g.perRound.set(Number(m.round) || 1, m);
     });
+    return order.map(g => {
+      const slots = roundsInOrder.map((r, i) => {
+        const m = g.perRound.get(r);
+        const pill = REVIEW_PILL[(m && m.status) || "missing"] || REVIEW_PILL.missing;
+        return { round: r, slot: i + 1, status: (m && m.status) || "missing",
+                 icon: pill.icon, style: slotStyle(pill),
+                 title: "Round " + (i + 1) + " — " + SLOT_WORDS[(m && m.status) || "missing"] };
+      });
+      /* The row's own verdict is the worst round in it, so a day card can still
+         be asked "did anything go wrong here" in one attribute. */
+      const status = slots.some(x => x.status === "skipped") ? "skipped"
+        : slots.some(x => x.status === "partial") ? "partial"
+        : slots.some(x => x.status === "missing") ? "missing" : "done";
+      /* The explanation belongs to the round that earned it — the first one
+         that fell short — not to a move that mostly went fine. */
+      const firstShort = roundsInOrder.map(r => g.perRound.get(r))
+        .find(m => m && (m.status === "partial" || m.status === "skipped"));
+      const doseLabel = !firstShort || firstShort.got === null || firstShort.planned === null ? ""
+        : firstShort.driver === "reps" ? firstShort.got + " of " + firstShort.planned + " reps"
+        : firstShort.got + "s of " + firstShort.planned + "s";
+      return { name: g.name, status, slots,
+               multiRound: roundsInOrder.length > 1,
+               doseLabel, reason: (firstShort && firstShort.reason) || "" };
+    });
+  };
   const blocks = planState.blocks.map(b => {
     const circuit = planState.circuits.find(c => c.block === b.block && c.name === b.name);
     const exs = (circuit && circuit.exercises) || [];
@@ -388,7 +433,7 @@ export function buildTodayVM(state) {
       isBlockDone: showActuals && b.planned > 0 && b.done >= b.planned,
       isBlockSkipped: showActuals && b.performed === 0,
       moves: exs.map(e => ({
-        text: e.name + " · " + e.dose, cue: e.cue,
+        text: e.name + " · " + (e.byReps ? doseLines(e).short : e.dose), cue: e.cue,
         transfer: e.transfer || ""
       })),
       /* THE PER-MOVE REVIEW: what counted and why, one line each, for a day
@@ -452,7 +497,7 @@ export function buildTodayVM(state) {
   if (status === "today") {
     const base = {
       badgeLabel: "TODAY" + (tag ? " · " + tag : ""), title: fullDay.title,
-      mins: stats.mins, movesLabel: plural(stats.moves, "distinct movement"),
+      mins: stats.mins, movesLabel: plural(stats.moves, "move"),
       showChips: true, isActive: true, showCta: true, showSettings: true, ctaAction: "goSession"
     };
     dayView = { ...base, ctaLabel: isSpaDay ? "Start Recovery" : "Let's go!", ctaIcon: isSpaDay ? "🧘" : "▶️" };
@@ -566,13 +611,15 @@ export function buildTodayVM(state) {
       badgeLabel: shortU + (isPartial ? " · PARTLY DONE ✓" : " · COMPLETED ✓"),
       title: fullDay.title,
       mins: stats.mins, minsLabel: timeLabel,
-      /* BOTH UNITS, EACH NAMED. "Movements" are distinct moves, counted once
-         however many rounds they run; "performances" are every planned
+      /* BOTH FACTS, IN PLAIN WORDS. "Moves" are distinct moves, counted once
+         however many rounds they run; "times done" counts every planned
          instance, a main move once per round. The card printed one of them
          beside a Progress row that printed the other under the same word. */
       movesLabel: (showActuals
-        ? mv.performed + " of " + mv.planned + " movements · " + pf.performed + " of " + pf.planned + " performances"
-        : plural(planState.movements, "distinct movement")),
+        ? mv.performed + " of " + mv.planned + " moves · "
+          + (pf.performed === pf.planned ? pf.performed + " times done"
+                                         : pf.performed + " of " + pf.planned + " times done")
+        : plural(planState.movements, "move")),
       roundsLabel: (showActuals && !isSpaDay && roundsAsked > 0)
         ? dayRounds + " of " + plural(roundsAsked, "main round") : "",
       earnedXpLabel: isSpaDay || !earnedXp ? "" : "+" + earnedXp + " XP earned",
@@ -604,7 +651,7 @@ export function buildTodayVM(state) {
       ctaLabel: isSpaDay ? "Do it again" : (resumable ? "Finish remaining moves" : "Look at the moves"),
       ctaIcon: isSpaDay ? "🧘" : (resumable ? "▶️" : "🧪"),
       ctaVariant: (isSpaDay || !resumable) ? "secondary" : "primary",
-      ctaSubtext: isSpaDay ? "Doesn't change progress" : (resumable ? "" : "The workout screen, nothing counting down, nothing recorded"),
+      ctaSubtext: isSpaDay ? "Doesn't change progress" : (resumable ? "" : "The session screen, nothing counting down, nothing recorded"),
       ctaAction: (isSpaDay || !resumable) ? "goExplore" : "goSession",
       // Offered whenever today's record holds a move she cut short — with or
       // without anything else left to add it to.
@@ -617,7 +664,7 @@ export function buildTodayVM(state) {
     // worse than none: it tells her the app isn't really watching.
     const warmupDone = !!(record && (record.rows || [])
       .some(l => l && l.block === "warmup" && l.status === "done"));
-    dayView = { badgeLabel: shortU + " · CATCH UP", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "distinct movement"), showChips: true, isMissed: true, showCta: true, ctaLabel: "Catch Up Now", ctaIcon: "↺", showSettings: false, ctaAction: "goSession",
+    dayView = { badgeLabel: shortU + " · CATCH UP", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"), showChips: true, isMissed: true, showCta: true, ctaLabel: "Catch Up Now", ctaIcon: "↺", showSettings: false, ctaAction: "goSession",
       missedSub: warmupDone
         ? "You still got the warm-up in — every streak has bumps."
         : "Every streak has bumps. Pick it back up whenever you're ready." };
@@ -625,7 +672,7 @@ export function buildTodayVM(state) {
     const recov = (fullDay && fullDay.recovery) || [];
     dayView = {
       badgeLabel: shortU + " · RECOVERY DAY", title: fullDay.title,
-      mins: stats.mins, movesLabel: plural(stats.moves, "distinct movement"),
+      mins: stats.mins, movesLabel: plural(stats.moves, "move"),
       showChips: true, isRest: true, showCta: true,
       ctaLabel: "Start Recovery", ctaIcon: "🧘", ctaAction: "goSession",
       showSettings: false,
@@ -635,7 +682,7 @@ export function buildTodayVM(state) {
     const hasPlan = stats.moves > 0;
     if (hasPlan) {
       dayView = {
-        badgeLabel: shortU + " · UPCOMING", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "distinct movement"),
+        badgeLabel: shortU + " · UPCOMING", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"),
         showChips: true, isPreview: true, showCta: true, ctaVariant: "secondary",
         ctaLabel: "Start Early", ctaIcon: "▶️",
         ctaSubtext: "Can’t wait? Starting now still counts for " + DAY_LONG[selectedKey] + ".",
@@ -679,7 +726,7 @@ export function buildTodayVM(state) {
   const coachIconBtnStyle = "width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;flex-shrink:0;font-size:15px;display:flex;align-items:center;justify-content:center;"
     + (settings.coachVoiceOn ? "background:#fff;color:var(--aqua-deep);" : "background:rgba(255,255,255,0.18);color:#fff;");
   const practiceLinkLabel = "🧪 Explore the moves";
-  const practiceHintLine = "The workout screen at your own pace — nothing counts down, nothing is recorded.";
+  const practiceHintLine = "The session screen at your own pace — nothing counts down, nothing is recorded.";
   const practiceBtnStyle = "width:100%;min-height:48px;display:flex;align-items:center;justify-content:center;gap:9px;border-radius:var(--radius-pill);cursor:pointer;font-family:inherit;font-weight:900;font-size:14px;padding:0 18px;"
     + "background:rgba(255,255,255,0.14);color:#fff;border:2px solid rgba(255,255,255,0.45);";
 
