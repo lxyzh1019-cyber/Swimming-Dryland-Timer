@@ -392,7 +392,7 @@ export const DAYS = {
         X({ name: "A-Skip", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m", cue: "Same pattern with rhythm." })
       ],
       main: [
-        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s", note: "Parent Echo — count out loud",
             parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
@@ -445,12 +445,12 @@ export const DAYS = {
         X({ name: "Carioca", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m each way", cue: "Hip over hip — trunk-hip separation." })
       ],
       main: [
-        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s", note: "Parent Echo — count out loud",
             parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
             swimTransfer: "Body line + kick" }),
-        X({ name: "Band Row", block: "main", driver: "reps", repsDetail: "12 · 2-1-2 tempo", dose: "12 · 2-1-2",
+        X({ name: "Band Row", prescription: { reps: 12, tempo: [2, 1, 2] }, block: "main", driver: "reps",
             reset: "Blades first.", cue: "Drive elbows back, squeeze the blades.",
             parentWatch: "Shrugging / arms-only", fix: "Reset, blades first.",
             swimTransfer: "Freestyle pull" }),
@@ -508,7 +508,7 @@ export const DAYS = {
         X({ name: "Carioca", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m each way", cue: "Hip over hip — trunk-hip separation." })
       ],
       main: [
-        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s", note: "Parent Echo — count out loud",
             parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
@@ -571,7 +571,7 @@ export const DAYS = {
         X({ name: "Ankle Dribbles", block: "coordination", driver: "time", work: 60, dose: "15s", cue: "Low, fast, stiff ankle." })
       ],
       main: [
-        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s", note: "Parent Echo — count out loud",
             parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
@@ -635,7 +635,7 @@ export const DAYS = {
         X({ name: "Fast Leg", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 4 per side", cue: "One sharp snap leg in a march." })
       ],
       main: [
-        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s", note: "Parent Echo — count out loud",
             parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
@@ -702,7 +702,7 @@ export const DAYS = {
         X({ name: "Lateral Shuffle", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m each way", cue: "Stay low, don't cross your feet." })
       ],
       main: [
-        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s · Parent Echo",
+        X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s", note: "Parent Echo — count out loud",
             parentEcho: true, faultAnchor: true, reset: "Ribs down, low back glued.",
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",

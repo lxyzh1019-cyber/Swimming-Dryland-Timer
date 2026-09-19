@@ -377,12 +377,26 @@ export function describeDose(p) {
   if (p.sets  > 1) divisors.push({ kind: "sets",  n: p.sets,  short: "", long: p.sets + " sets" });
   const totalLow = p.totalReps;
   const totalHigh = p.repsHigh ? p.totalReps + (p.repsHigh - p.reps) * p.segments : null;
-  const total = p.segments > 1
+  /* A total is worth saying when it is news. "1 rep, 3 sets" totalling
+     "3 reps" is not news -- and on Pull-Up (heavy), where the 1 is a
+     placeholder for "then as many clean reps as you have", it is a lie. */
+  const totalIsNews = p.segments > 1 && !(p.reps === 1 && !p.repsHigh && !p.sideReps);
+  const total = totalIsNews
     ? (marker === "+" ? totalLow + "+" : marker + totalLow + (totalHigh ? "\u2013" + totalHigh : ""))
     : "";
+  /* "2-1-2 tempo" is three real phases and reads as one. But a tempo whose
+     only slow phase is the lower -- [4,0,1] -- is not a rhythm, it is an
+     instruction, and the authored strings said so in words ("5 . 4s lower").
+     Deriving the dose must not turn that into a code she has to decode. */
+  const slowLowerOnly = p.tempo && p.tempo.length === 3 && p.tempo[1] === 0 && p.tempo[2] <= 1;
   const cadence = p.holdSeconds ? p.holdSeconds + "s hold"
+    : slowLowerOnly ? p.tempo[0] + "s lower"
     : p.tempo ? p.tempo.join("-") + " tempo" : "";
-  return { count, unit, divisors, total, cadence, segments: p.segments, totalReps: p.totalReps };
+  /* "1 reps" is the kind of thing a derived string says and a person never
+     does. The count is a bare number only when nothing else shapes it. */
+  const countedOne = p.reps === 1 && !p.repsHigh && !p.sideReps && !marker;
+  const unitFor = countedOne ? unit.replace(/s$/, "") : unit;
+  return { count, unit, unitFor, divisors, total, cadence, segments: p.segments, totalReps: p.totalReps };
 }
 
 /* The strings a screen shows. `big` goes in the ring, which is a fixed circle
@@ -408,9 +422,10 @@ export function doseLines(ex) {
   /* When the counts already name the sides ("8 left, 10 right") the side
      divisor has been said — repeating it gives "8 left, 10 right reps each
      side", which is nobody's sentence. */
-  const longDivisors = d.divisors.filter(x => !(p.sideReps && x.kind === "sides")).map(x => x.long);
+  const longDivisors = d.divisors.filter(x => !(p.sideReps && x.kind === "sides"));
   const full = [
-    [d.count, d.unit].join(" ") + (longDivisors.length ? " " + longDivisors.join(", ") : ""),
+    longDivisors.reduce((line, x) => line + (x.kind === "sets" ? ", " : " ") + x.long,
+                        [d.count, d.unitFor].join(" ")),
     d.total ? d.total + " " + d.unit + " in total" : "",
     d.cadence, note
   ].filter(Boolean).join(" \u00b7 ");
@@ -447,6 +462,10 @@ export function spokenDose(ex) {
        "8 reps per side" is already the whole story, "8 in each of 4 directions"
        is not. This is also what keeps the legacy phrasings word for word. */
     if (p.dirs > 1 || p.sideReps) said += `, ${p.totalReps} in total`;
+    /* Where the count is a placeholder for "and then as many as you have",
+       the number on its own is not the prescription. The screen already says
+       so in the note; the coach must not say less. */
+    if (!d.total && p.reps === 1 && !p.repsHigh && ex.note) said += `, ${ex.note}`;
     return said;
   }
   if (ex.byReps) {
