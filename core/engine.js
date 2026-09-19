@@ -484,7 +484,8 @@ export function estimateSessionSecs(circuits) {
           // display string with the same regex that never matched.
           const p = exPrescription(ex);
           total += p.totalReps * repSeconds(p, settings.secondsPerRep || 3)
-                 + Math.max(0, p.segments - 1) * SIDE_SWITCH_BUFFER;
+                 + Math.max(0, p.segments - 1) * SIDE_SWITCH_BUFFER
+                 + (p.keepGoingSeconds || 0);
         } else {
           total += exWork(ex) + (ex.eachSide ? SIDE_SWITCH_BUFFER : 0);
         }
@@ -663,6 +664,14 @@ async function segmentBreak(seg) {
    the reps she can always make cleanly — and then offers the extra rather
    than demanding it. She takes them and taps Done, or the offer times out. */
 async function offerExtraReps(p, stopped) {
+  /* Open-ended: there is no ceiling to name, so the offer names the STANDARD
+     instead. She ends it by tapping Done -- which sets `stopped`, so the
+     window is a cap on waiting, never a cap on her. */
+  if (p.keepGoingSeconds) {
+    if (voiceOn()) await speakAndWait(`That's ${p.reps}. As many more as you can while they're still clean — then tap Done.`);
+    await repSleep(p.keepGoingSeconds * 1000, stopped);
+    return;
+  }
   const extra = p.repsHigh - p.reps;
   if (extra <= 0) return;
   if (voiceOn()) await speakAndWait(`That's ${p.reps}. ${extra === 1 ? "One more" : `Up to ${extra} more`} if they're still clean — then tap Done.`);
@@ -791,7 +800,7 @@ async function runPrescribedReps(ex) {
       sess.segmentsDone += 1;
     }
     if (stopped) return;
-    if (p.repsHigh) await offerExtraReps(p, isStopped);
+    if (p.repsHigh || p.keepGoingSeconds) await offerExtraReps(p, isStopped);
     // Ran to the end under its own power.
     if (!stopped && sess.byRepsResolver) sess.byRepsResolver("complete");
   })();

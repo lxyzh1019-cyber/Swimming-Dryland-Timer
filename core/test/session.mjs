@@ -1097,6 +1097,107 @@ const stopInRoundTwo = (reason) => ({
     }
   }
   ok(swept > 0, "the sweep found approximate doses to check (" + swept + ")");
+
+  /* ONE OWNER FOR HOW LONG A REP TAKES. refTime used to re-derive this inline
+     while the session estimate called repSeconds, so the same move could be
+     priced two ways. Assert they agree across the whole plan. */
+  ok(plan.repSeconds(plan.normalizePrescription({ reps: 6, secondsPerRep: 8 })) === 8,
+     "a move that states its own per-rep seconds is paced by them");
+  ok(plan.repSeconds(plan.normalizePrescription({ reps: 6 })) === 3,
+     "and one that does not falls back to the setting");
+  for (const day of Object.values(data.DAYS)) {
+    for (const e of Object.values(day.blocks || {}).flat()) {
+      if (!e || !e.byReps) continue;
+      const q = plan.exPrescription(e);
+      const byEngine = q.totalReps * plan.repSeconds(q, 3)
+        + Math.max(0, q.segments - 1) * util.SIDE_SWITCH_BUFFER + (q.keepGoingSeconds || 0);
+      ok(util.refTime(e) === byEngine,
+         e.name + ": the plan estimate and the session estimate price it the same (" + util.refTime(e) + " vs " + byEngine + ")");
+    }
+  }
+
+  /* NO ORPHANED estSecs. It was wired once, the core migration dropped the
+     reader, and 49 values stayed in the data where nothing could read them. */
+  const stray = [];
+  for (const day of Object.values(data.DAYS))
+    for (const e of Object.values(day.blocks || {}).flat())
+      if (e && e.estSecs != null) stray.push(e.name);
+  ok(stray.length === 0, "no move carries a time nothing reads (" + stray.slice(0, 3).join(", ") + ")");
+}
+
+/* ---- Open-ended reps: "3, then as many clean as you can" ----------------
+   The heavy pull-up is three slow lowers and then max clean reps. Written as
+   three SETS of one it became five seconds of rep ring, five seconds of
+   switch countdown, three times over -- which is why it read as a timed set.
+   Written as one set of three with a keep-going window it is one unbroken rep
+   ring, and the tail the count cannot hold is actually offered. */
+{
+  const openEnded = (e) => e && e.byReps && (plan.exPrescription(e) || {}).keepGoingSeconds;
+  const findOpen = () => {
+    for (const [key, day] of Object.entries(data.DAYS)) {
+      if (day.spa) continue;
+      for (const e of Object.values(day.blocks || {}).flat()) if (openEnded(e)) return { key, e };
+    }
+    return null;
+  };
+  const found = findOpen();
+  if (found) {
+    const { key, e } = found;
+    /* Green, not red: a red light drops whole blocks, and this move lives in
+       the finisher — under red it never runs and every assertion below would
+       pass by never happening. */
+    const q = plan.exPrescription(e);
+    const lines = plan.doseLines(e);
+
+    /* THE REPORTED SYMPTOM, AS A TEST. One segment means no switch ring. */
+    ok(q.segments === 1, e.name + ": it is ONE set, so no switch clock interrupts it (" + q.segments + " segments)");
+    ok(lines.big === String(q.reps), "the ring shows the target, not a placeholder (" + lines.big + ")");
+    ok(!lines.sub, "and it prints no total, because the target IS the total");
+
+    /* The tail is said the same way in both places. */
+    ok(/as many clean reps as you can/.test(lines.full), "the long line offers the extra reps: " + lines.full);
+    ok(/as many clean reps as you can/.test(plan.spokenDose(e)), "and so does the coach: " + plan.spokenDose(e));
+    ok(!/as many clean/.test(lines.short), "the short form stays short");
+
+    /* Left alone, the offer actually happens. */
+    let sawSwitch = false, secsOnIt = 0, phasesSeen = new Set();
+    const s1 = await runSession({ dayKey: key, light: "green", gateUnlocked: true, seed: voiceOn }, {
+      onTick: (ms, sess) => {
+        if (answerChecks(sess)) return;
+        if (sess.currentEx && sess.currentEx.name === e.name) {
+          secsOnIt += 1;
+          phasesSeen.add(sess.phase);
+          if (sess.phase === "sideswitch") sawSwitch = true;
+        }
+      }
+    });
+    const row1 = s1.ledger.find(l => l.name === e.name);
+    ok(!sawSwitch, "no switch countdown ever ran inside it — it is a rep set end to end");
+    ok(phasesSeen.has("reps"), "and the phase it ran in was reps (" + [...phasesSeen].join(", ") + ")");
+    ok(row1 && row1.repsCounted === q.totalReps && row1.status === "done",
+       "left alone it counts the target and reads done (" + (row1 || {}).repsCounted + " of " + q.totalReps + ")");
+    ok(secsOnIt >= q.keepGoingSeconds,
+       "and it waited out the keep-going window rather than moving on at the third rep (" + secsOnIt + "s)");
+
+    /* Done during the window ends it at once, and still counts in full. */
+    let tapped = false, secsAfterTap = 0;
+    const s2 = await runSession({ dayKey: key, light: "green", gateUnlocked: true, seed: voiceOn }, {
+      onTick: (ms, sess) => {
+        if (answerChecks(sess)) return;
+        const onIt = sess.currentEx && sess.currentEx.name === e.name;
+        if (onIt && !tapped && sess.repsCounted >= q.totalReps && sess.byRepsResolver) {
+          tapped = true; engine.advance(); return;
+        }
+        if (tapped && onIt) secsAfterTap += 1;
+      }
+    });
+    const row2 = s2.ledger.find(l => l.name === e.name);
+    ok(tapped, "Done was tapped during the keep-going window");
+    ok(secsAfterTap < q.keepGoingSeconds,
+       "the move ended on the tap instead of waiting the window out (" + secsAfterTap + "s of " + q.keepGoingSeconds + "s)");
+    ok(row2 && row2.status === "done" && row2.repsCounted === q.totalReps,
+       "and stopping when she chose still counts as done in full (" + (row2 || {}).repsCounted + " of " + q.totalReps + ")");
+  }
 }
 
 console.log("✓ session safety passed (" + passed + " assertions)");

@@ -217,6 +217,17 @@ export function normalizePrescription(p) {
        So a side is named here or nowhere. */
     sideNames: Array.isArray(p.sideNames) && p.sideNames.length === sides
       ? p.sideNames.map(String) : null,
+    /* OPEN-ENDED REPS. "3 slow lowers, then max clean reps" has a target the
+       runner can count to and a tail it cannot. The tail was a note: a
+       sentence beside a structure that said something else, and the app never
+       ran it. Saying how long to keep going makes it a prescription -- the
+       screen shows it, the coach offers it, and the estimate can price it. */
+    keepGoingSeconds: Math.max(0, Number(p.keepGoingSeconds) || 0) || null,
+    /* Not every rep is three seconds. A quarter-to-half-to-full rotating jump
+       is eight, and only the plan knows that. A tempo would price it too, but
+       a tempo is three named phases and this move has none -- it would print
+       "1-2-5 tempo", which is not its cadence. So: pacing, with no grammar. */
+    secondsPerRep: Math.max(0, Number(p.secondsPerRep) || 0) || null,
     segments, totalReps
   };
 }
@@ -225,6 +236,7 @@ export function normalizePrescription(p) {
    per-rep estimate the settings own. */
 export function repSeconds(p, secondsPerRep = 3) {
   if (p && p.tempo) return p.tempo.reduce((a, b) => a + b, 0);
+  if (p && p.secondsPerRep) return p.secondsPerRep;
   return secondsPerRep;
 }
 
@@ -396,7 +408,11 @@ export function describeDose(p) {
      does. The count is a bare number only when nothing else shapes it. */
   const countedOne = p.reps === 1 && !p.repsHigh && !p.sideReps && !marker;
   const unitFor = countedOne ? unit.replace(/s$/, "") : unit;
-  return { count, unit, unitFor, divisors, total, cadence, segments: p.segments, totalReps: p.totalReps };
+  /* The tail the count cannot hold. One sentence, said the same way on the
+     screen and out loud, so the two cannot drift into different offers. */
+  const keepGoing = p.keepGoingSeconds ? "then as many clean reps as you can" : "";
+  return { count, unit, unitFor, divisors, total, cadence, keepGoing,
+           segments: p.segments, totalReps: p.totalReps };
 }
 
 /* The strings a screen shows. `big` goes in the ring, which is a fixed circle
@@ -427,7 +443,7 @@ export function doseLines(ex) {
     longDivisors.reduce((line, x) => line + (x.kind === "sets" ? ", " : " ") + x.long,
                         [d.count, d.unitFor].join(" ")),
     d.total ? d.total + " " + d.unit + " in total" : "",
-    d.cadence, note
+    d.cadence, d.keepGoing, note
   ].filter(Boolean).join(" \u00b7 ");
   const short = sub ? big + " \u00b7 " + sub : big;
   return { big, sub, full, short };
@@ -462,10 +478,9 @@ export function spokenDose(ex) {
        "8 reps per side" is already the whole story, "8 in each of 4 directions"
        is not. This is also what keeps the legacy phrasings word for word. */
     if (p.dirs > 1 || p.sideReps) said += `, ${p.totalReps} in total`;
-    /* Where the count is a placeholder for "and then as many as you have",
-       the number on its own is not the prescription. The screen already says
-       so in the note; the coach must not say less. */
-    if (!d.total && p.reps === 1 && !p.repsHigh && ex.note) said += `, ${ex.note}`;
+    /* An open-ended tail is part of the prescription, not a footnote: the
+       number on its own would be an instruction to stop at three. */
+    if (d.keepGoing) said += `, ${d.keepGoing}`;
     return said;
   }
   if (ex.byReps) {

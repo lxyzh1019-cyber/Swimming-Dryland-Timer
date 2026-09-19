@@ -99,6 +99,7 @@ export function escapeRegex(text) {
 }
 
 import { FEATURES } from "./sport.js";
+import { repSeconds } from "./plan.js";
 
 export function escapeHtml(text) {
   return String(text == null ? "" : text)
@@ -151,8 +152,12 @@ export function refTime(ex) {
   // plus a reset between each side / direction / set.
   const p = ex.prescription;
   if (p) {
-    const perRep = p.tempo ? p.tempo.reduce((a, b) => a + b, 0) : 3;
-    return p.totalReps * perRep + Math.max(0, p.segments - 1) * SIDE_SWITCH_BUFFER;
+    /* repSeconds is the single owner of "how long one rep takes" -- the
+       session estimate already used it while this re-derived it inline, so
+       the two could price the same move differently. */
+    return p.totalReps * repSeconds(p)
+         + Math.max(0, p.segments - 1) * SIDE_SWITCH_BUFFER
+         + (p.keepGoingSeconds || 0);
   }
   // Fallback for plain objects with only a display dose (legacy records).
   const d = (ex.dose || "").toLowerCase();
