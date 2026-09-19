@@ -39,7 +39,7 @@ function repRing(vm, size, capVh) {
   <div data-action="advance" title="Tap the ring when you're done" style="cursor:pointer;flex:0 1 ${size}px;max-width:${capVh ? `min(${size}px, ${capVh}vh)` : `${size}px`};min-width:${size >= 300 ? 220 : 160}px;aspect-ratio:1;border-radius:50%;background:var(--grape-wash);border:${border}px solid var(--grape);display:flex;flex-direction:column;align-items:center;justify-content:center;box-sizing:border-box;padding:${size >= 300 ? 26 : 14}px;">
     <div style="font-weight:900;font-size:${size >= 300 ? 15 : 11}px;letter-spacing:0.1em;color:var(--grape-deep);">BY REPS</div>
     <div style="font-family:var(--font-display);font-size:${size >= 300 ? 50 : 32}px;font-weight:600;color:var(--grape);text-align:center;line-height:1.05;margin:${size >= 300 ? 8 : 4}px 0;">${vm.curExDose}</div>
-    ${vm.showClock ? `<div style="font-weight:900;font-size:${size >= 300 ? 20 : 14}px;color:${vm.paceColor};">⏱ <span id="s-timer-text">${vm.exActualDisplay}</span>${size >= 300 ? ` <span style="font-weight:700;opacity:0.65;">/ ${vm.exPlannedDisplay}</span>` : ""}</div>` : ""}
+    ${vm.showClock ? `<div style="font-weight:900;font-size:${size >= 300 ? 20 : 14}px;color:var(--grape-deep);">⏱ <span id="s-timer-text">${vm.exActualDisplay}</span></div>` : ""}
     <div style="font-size:12px;font-weight:800;color:var(--grape-deep);opacity:0.8;margin-top:6px;">${vm.explore ? "No clock here — tap Next when you've had a look" : "Tap the ring when you're done"}</div>
   </div>`;
 }
@@ -80,6 +80,18 @@ function promptCard(vm, size) {
       ${imgWithFallbacks(photoSources(POSES.think), `alt="" style="height:70px;object-fit:contain;"`)}
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--mint-ink);text-align:center;">${vm.formCheckTitle}</div>
       <div style="font-size:15px;font-weight:700;color:var(--ink);text-align:center;line-height:1.45;">${vm.cleanCheckQuestion}<br><span style="font-size:13px;color:var(--ink-soft);">${vm.checkNote}</span></div>
+    </div>`;
+  }
+  /* Done before the coach's count finished. The card takes the rep ring's
+     place — same grape, so it reads as part of the move — and asks once. */
+  if (vm.phase === "repcheck") {
+    return `
+    <div data-rep-check style="flex:0 1 ${size}px;max-width:${size}px;min-width:240px;min-height:${Math.round(size * 0.8)}px;border-radius:26px;background:var(--grape-wash);border:3px solid var(--grape);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;box-sizing:border-box;">
+      <div style="font-family:var(--font-display);font-weight:600;font-size:24px;color:var(--ink);text-align:center;">${vm.repCheckQuestion}</div>
+      <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
+        ${vm.repCheckOpts.map(o => `<button type="button" data-action="answerRepCheck" data-arg="${o.arg}" style="min-height:52px;border-radius:16px;border:3px solid ${o.edge};background:${o.bg};color:${o.ink};font-weight:900;font-size:17px;cursor:pointer;font-family:inherit;">${o.label}</button>`).join("")}
+      </div>
+      <div style="font-size:13px;font-weight:800;color:var(--grape-deep);text-align:center;">${vm.repCheckRule}</div>
     </div>`;
   }
   // breath rehearsal
@@ -312,10 +324,26 @@ function completeScreen(vm) {
       <span>${escapeHtml(vm.paceNote)}</span>
     </div>` : ""}
     ${vm.sessionMantra && c.mantra ? `<div style="font-family:var(--font-hand);font-size:26px;font-weight:700;color:var(--aqua-ink);line-height:1.2;">${vm.sessionMantra}</div>` : ""}
-    <div style="font-size:16px;font-weight:700;color:var(--ink-soft);">${vm.sessionDayTitle}${vm.explore ? "" : ` · ${vm.sessionMinutes} min`}${vm.showRoundsLine ? ` · ${vm.roundsLine}` : ""}${vm.xpEarned ? ` · ⭐ +${vm.xpEarned} XP` : ""}</div>
+    <div style="font-size:16px;font-weight:700;color:var(--ink-soft);">${vm.sessionDayTitle}${vm.explore ? "" : ` · ${vm.sessionMinutes} min`}${vm.showRoundsLine ? ` · ${vm.roundsLine}` : ""}${vm.xpLine ? ` · ⭐ ${escapeHtml(vm.xpLine)}` : ""}</div>
     ${vm.showRoundsLine && (vm.roundShortNotes || []).length ? `
     <div style="font-size:14px;font-weight:700;color:var(--ink-soft);max-width:480px;line-height:1.5;">
       ${vm.roundShortNotes.map(n => `<div>${n}</div>`).join("")}
+    </div>` : ""}
+    ${(vm.moveReview || []).length ? `
+    <div style="max-width:520px;width:100%;box-sizing:border-box;text-align:left;">
+      <button type="button" data-action="toggleMoveReview" aria-expanded="${vm.moveReviewOpen ? "true" : "false"}" style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:2px solid var(--hairline);border-radius:var(--radius-pill);padding:9px 16px;cursor:pointer;font-weight:900;font-size:14px;color:var(--ink);font-family:inherit;min-height:44px;">See every move ${vm.moveReviewOpen ? "▴" : "▾"}</button>
+      ${vm.moveReviewOpen ? `
+      <div style="margin-top:10px;background:var(--surface);border-radius:16px;padding:12px 14px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:2px;" data-move-review-list="1">
+        <div style="font-size:11px;font-weight:800;color:var(--ink-soft);line-height:1.35;padding-bottom:6px;border-bottom:1px solid var(--hairline);margin-bottom:4px;">${escapeHtml(vm.moveReviewLegend)}</div>
+        ${vm.moveReview.map(r => `
+        <div style="display:flex;align-items:flex-start;gap:9px;padding:5px 0;font-size:13px;font-weight:700;color:var(--ink);" data-move-review="${escapeHtml(r.status)}">
+          <span style="${r.pillStyle}" aria-label="${escapeHtml(r.status)}">${r.icon}</span>
+          <span style="flex:1;min-width:0;">
+            <span>${r.roundLabel ? `<span style="color:var(--ink-faint);font-size:11px;font-weight:900;margin-right:5px;">${r.roundLabel}</span>` : ""}${escapeHtml(r.name)}${r.doseLabel ? ` <span style="color:var(--ink-soft);font-weight:800;">· ${escapeHtml(r.doseLabel)}</span>` : ""}</span>
+            ${r.reason ? `<span style="display:block;font-size:12px;font-weight:700;color:var(--ink-soft);line-height:1.35;">${escapeHtml(r.reason)}</span>` : ""}
+          </span>
+        </div>`).join("")}
+      </div>` : ""}
     </div>` : ""}
     ${vm.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="display:flex;align-items:center;gap:10px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:14px 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
     ${vm.saveFailed ? `
@@ -366,7 +394,7 @@ function completeScreen(vm) {
       <div style="font-weight:800;font-size:16px;color:var(--ink);line-height:1.4;">${vm.quizQuestion}</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
         ${vm.quizOpts.map(qo => `
-          <button type="button" data-action="quizPick" data-arg="${qo.idx}" style="${qo.style}">
+          <button type="button" data-action="quizPick" data-arg="${qo.idx}"${qo.disabled ? " disabled" : ""} style="${qo.style}">
             <span style="width:26px;height:26px;border-radius:50%;background:var(--surface-2);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;flex-shrink:0;">${qo.prefix}</span>
             <span style="flex:1;">${qo.label}</span>
           </button>`).join("")}
@@ -476,9 +504,15 @@ function centerStack(vm, wide, tablet) {
     : timerRing(vm, ringSize, capVh);
 
   /* Everything that belongs to the CLOCK sits in one column under the ring —
-     the cue, the ❗, the dose, what is next, the pace bar. It used to be laid
-     out full-width under the picture AND the ring, which left a dead strip
-     down each outside edge and put the cue a picture's width from the timer. */
+     the cue, the ❗, the dose, what is next. It used to be laid out full-width
+     under the picture AND the ring, which left a dead strip down each outside
+     edge and put the cue a picture's width from the timer.
+
+     There is no per-move "Elapsed" pace bar here any more. A rep move's
+     planned time is reps × 3 s — an estimate — while the grade is the coach's
+     spoken count, which is slower. The bar filled before the coach finished,
+     so she tapped Done at "100%" and got a ½. The rep ring follows the count,
+     so on it "full" means full. */
   const ringColumn = `
   <div style="flex:1 1 ${showPhoto ? (tablet ? "56%" : "51%") : "100%"};min-width:0;display:flex;flex-direction:column;align-items:center;gap:${tablet ? 10 : 12}px;">
     ${ring}
@@ -486,18 +520,7 @@ function centerStack(vm, wide, tablet) {
     <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;text-align:center;">
       ${vm.overNudge ? `<div style="font-family:var(--font-hand);font-size:17px;font-weight:700;color:var(--sun-ink);line-height:1.2;">Past the planned time — that's okay. Finish clean, then rest 💛</div>` : ""}
       ${vm.notResting ? `<div style="font-family:var(--font-hand);font-size:${wide ? 16 : 15}px;color:var(--aqua-ink);font-style:italic;line-height:1.2;">${vm.curExDose}</div>` : ""}
-      
     </div>
-    ${vm.notResting && vm.showClock && vm.timerIsReps ? `
-    <div style="width:100%;max-width:340px;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;">
-        <span style="font-size:12px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;">Elapsed</span>
-        <span style="font-weight:900;font-size:15px;color:${vm.paceColor};"><span id="s-ex-actual">${vm.exActualDisplay}</span> <span style="color:var(--ink-faint);font-weight:700;">/ ${vm.exPlannedDisplay}</span></span>
-      </div>
-      <div style="height:7px;background:var(--surface-2);border-radius:7px;overflow:hidden;">
-        <div id="s-ex-fill" style="width:${vm.exPacePct}%;height:100%;background:${vm.paceColor};border-radius:7px;transition:width 0.4s;"></div>
-      </div>
-    </div>` : ""}
   </div>`;
 
   return `
@@ -694,7 +717,7 @@ export function sessionScreen(vm) {
         <div style="flex-shrink:0;background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-lg);padding:12px 14px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;box-sizing:border-box;">
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
             <span style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);">Session time</span>
-            <span style="font-weight:900;font-size:14px;color:var(--aqua-ink);"><span id="s-elapsed2">${vm.elapsedDisplay}</span> <span style="color:var(--ink-faint);font-weight:700;">/ ~${vm.sessionPlannedDisplay}</span></span>
+            <span style="font-weight:900;font-size:14px;color:var(--aqua-ink);"><span id="s-elapsed2">${vm.elapsedDisplay}</span> <span style="color:var(--ink-faint);font-weight:700;">/ ~${vm.sessionPlannedDisplay} · estimate</span></span>
           </div>
           <div style="height:8px;background:var(--surface-2);border-radius:8px;overflow:hidden;">
             <div id="s-sess-fill" style="width:${vm.sessionTimePct}%;height:100%;background:var(--aqua);border-radius:8px;transition:width 0.4s;"></div>
@@ -734,7 +757,7 @@ export function sessionScreen(vm) {
     <div style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;box-sizing:border-box;">
       <div style="padding:14px 16px 0;flex-shrink:0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-          <span style="font-weight:900;font-size:12px;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;">${vm.sessionDayTitle}${vm.explore ? ` · ${vm.progressLabel}` : ` · <span id="s-elapsed">${vm.elapsedDisplay}</span> / ~${vm.sessionPlannedDisplay}`}</span>
+          <span style="font-weight:900;font-size:12px;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;">${vm.sessionDayTitle}${vm.explore ? ` · ${vm.progressLabel}` : ` · <span id="s-elapsed">${vm.elapsedDisplay}</span> / ~${vm.sessionPlannedDisplay} · estimate`}</span>
         </div>
         <div style="height:8px;background:var(--surface-2);border-radius:8px;overflow:hidden;">
           <div id="s-sess-fill" style="width:${vm.explore ? Math.round(vm.progressValue / vm.progressMax * 100) : vm.sessionTimePct}%;height:100%;background:var(--aqua);border-radius:8px;"></div>
@@ -767,11 +790,8 @@ export function updateSessionTick(vm) {
   set("s-timer-text", vm.timerIsReps ? vm.exActualDisplay : vm.timerDisplay);
   set("s-elapsed", vm.elapsedDisplay);
   set("s-elapsed2", vm.elapsedDisplay);
-  set("s-ex-actual", vm.exActualDisplay);
   const sf = document.getElementById("s-sess-fill");
   if (sf) sf.style.width = vm.sessionTimePct + "%";
-  const ef = document.getElementById("s-ex-fill");
-  if (ef) ef.style.width = vm.exPacePct + "%";
   const arc = document.getElementById("s-ring-arc");
   if (arc) {
     const c = Number(arc.getAttribute("stroke-dasharray"));

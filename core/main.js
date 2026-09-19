@@ -60,6 +60,7 @@ export const state = {
   prizeDraw: null,
   detailOverlay: false,
   detailEx: null,
+  moveReviewOpen: false,        // the finish screen's "See every move" list
   weather: null,                // { icon, temp, caption } once fetched
   backupNote: "", backupNoteOk: false,   // result line under Backup & restore
   walletRepairNote: "",         // result line under the prize wallet repair
@@ -159,9 +160,24 @@ function gateHtml() {
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.5;margin-bottom:10px;">${hasPasskey()
         ? "This device will ask for your face, fingerprint or passcode."
         : passkeySupported()
-          ? "No passkey is set up on this device, so there is nothing to confirm with. Set one up on a device that already has a grown-up unlocked, or restore a backup."
-          : "This browser has no passkey support, so a forgotten PIN cannot be reset here. Restore a backup on another device instead."}</div>
-      ${hasPasskey() ? btn("unlockWithPasskey", state.gateBusy ? "Waiting for the device…" : "🔐 Confirm with this device", true) : ""}`;
+          /* THE RESTORED-DEVICE DEAD END. The PIN and the passkey are both
+             device-local by design, so a second iPad, a reinstall or cleared
+             browser data restores the family's history from the cloud and has
+             neither. This card used to say "set one up on a device that
+             already has a grown-up unlocked" — impossible, a passkey cannot
+             travel — and offered only Cancel. Enrolling a passkey HERE is the
+             honest way through: the platform demands Face ID / Touch ID / the
+             device passcode to enrol, which is the same adult proof the
+             ceremony gives, and the enrol handler then grants the PIN choice. */
+          ? (state.gateWantsNewPin
+              ? "There is no passkey on this device, so there is nothing yet to confirm with. Set one up now: confirming with Face ID, Touch ID or the device passcode proves a grown-up is here, and then you choose a new PIN for this device."
+              : "This device has the family's training history, but no grown-up PIN has been set on it yet — the PIN and the passkey stay on the device they were made on, so a restored device starts without them. Set up a passkey now: confirming with Face ID, Touch ID or the device passcode proves a grown-up is here, and then you choose a PIN for this device.")
+          : (state.gateWantsNewPin
+              ? "This browser has no passkey support, so a forgotten PIN cannot be reset here. Open the app in Safari or Chrome on this device, or restore on a device that has one."
+              : "This device has the family's training history but no grown-up PIN yet, and this browser has no passkey support, so there is no way to prove a grown-up is here. Open the app in Safari or Chrome on this device, or restore on a device that has one.")}</div>
+      ${hasPasskey() ? btn("unlockWithPasskey", state.gateBusy ? "Waiting for the device…" : "🔐 Confirm with this device", true)
+        : passkeySupported() ? btn("enrollPasskey", state.gateBusy ? "Waiting for the device…" : "🔐 Set up a passkey on this device", true) : ""}
+      ${state.passkeyNote ? `<div style="margin-top:8px;font-size:13px;font-weight:800;line-height:1.45;color:${state.passkeyNoteOk ? "var(--mint-ink)" : "var(--stop-ink)"};">${escapeHtml(state.passkeyNote)}</div>` : ""}`;
 
   return `<div style="position:fixed;inset:0;z-index:210;background:rgba(20,59,74,0.62);display:flex;align-items:center;justify-content:center;padding:24px;font-family:var(--font-ui);">
     <div data-stop-propagation="1" style="background:var(--surface);border-radius:20px;padding:22px 24px;max-width:380px;width:100%;box-shadow:0 18px 40px rgba(20,59,74,0.3);">
@@ -564,6 +580,8 @@ Object.assign(RAW, {
   resumeFromStop() { engine.resumeFromStop(); },
   endFromStop(arg) { engine.endFromStop(arg || "pain"); },
   toggleWatch() { state.watchOpen = !state.watchOpen; render(); },
+  // "See every move" on the finish screen — the per-move review, collapsed by default.
+  toggleMoveReview() { state.moveReviewOpen = !state.moveReviewOpen; render(); },
   toggleRail() { state.railOpen = state.railOpen === false; render(); },
   askRestart() { engine.sess.confirmRestart = true; render(); },
   cancelRestart() { engine.sess.confirmRestart = false; render(); },
@@ -573,6 +591,7 @@ Object.assign(RAW, {
   confirmSkipEx() { engine.sess.confirmSkip = false; engine.skipCurrentExercise(); },
   pickIntent(arg) { engine.pickIntentWord(arg); },
   answerMicro(arg) { engine.answerMicroLoop(arg); },
+  answerRepCheck(arg) { engine.answerRepCheck(arg); },
   pickClean() { engine.pickClean(); },
   pickWobbly() { engine.pickWobbly(); },
   skipFormCheck() { engine.skipFormCheck(); },
@@ -581,7 +600,15 @@ Object.assign(RAW, {
   reflectNext(arg) { engine.setReflect("nextTime", arg); },
   quizPick(arg) {
     const i = Number(arg);
+    // The first tap locks the card (setQuizPick refuses a second one too), so
+    // a later tap on the green answer cannot turn a wrong pick into a right
+    // one on screen while the ledger remembers the truth.
     const first = engine.sess.quizPick == null;
+    if (!first) return;
+    // No saved row means nothing to pay against — and a pick consumed here
+    // wasted the question's XP for good. The finish screen is already showing
+    // the "didn't save" note; the question stays open to pay another time.
+    if (!engine.sess.savedEntry) return;
     engine.setQuizPick(i);
     // Priced off the same ledger as the Quiz Deck: a question pays +10 the
     // first time it's attempted and +25 the first time it's answered right,
@@ -745,16 +772,27 @@ Object.assign(RAW, {
     state.gateBusy = true;
     state.passkeyNote = "";
     render();
+    /* From the gate card with no PIN to type (a device restored from the cloud
+       has the history but neither PIN nor passkey), or from "Forgot the PIN?",
+       a successful enrolment IS the adult proof: the platform demanded Face ID /
+       Touch ID / the device passcode to create the credential, exactly what
+       unlockWithPasskey would ask for next. So it earns the PIN choice the same
+       way, and the card re-renders as "Choose a grown-up PIN". */
+    const earnsPin = !!state.gateAsk && (state.gateWantsNewPin || !hasGrownupPin());
+    const failNote = earnsPin
+      ? "This device or browser wouldn't set up a passkey. Try again, or open the app in Safari or Chrome on this device."
+      : "This device or browser wouldn't set up a passkey. The PIN still works — but there is no way to reset it if it is forgotten, so write it down.";
     enrollPasskey(settings.athleteName || APP_NAME).then(ok => {
       state.gateBusy = false;
       state.passkeyNote = ok
-        ? "Passkey enrolled on this device. If the PIN is ever forgotten, this is how you get back in."
-        : "This device or browser wouldn't set up a passkey. The PIN still works — but there is no way to reset it if it is forgotten, so write it down.";
+        ? (earnsPin ? "Passkey enrolled on this device. Now choose a PIN." : "Passkey enrolled on this device. If the PIN is ever forgotten, this is how you get back in.")
+        : failNote;
       state.passkeyNoteOk = !!ok;
+      if (ok && earnsPin) allowPinChoice();
       render();
     }).catch(() => {
       state.gateBusy = false;
-      state.passkeyNote = "This device or browser wouldn't set up a passkey. The PIN still works — but there is no way to reset it if it is forgotten, so write it down.";
+      state.passkeyNote = failNote;
       state.passkeyNoteOk = false;
       render();
     });
@@ -1063,23 +1101,42 @@ function boot() {
   // Pull anything this device is missing back out of the cloud mirror (a wiped
   // or brand-new browser starts empty, but the history is still up there), then
   // repaint so the restored streak / XP / log show up straight away.
-  restoreFromCloud().then((result) => {
-    /* WHAT THE RESTORE ACTUALLY ESTABLISHED, handed to the gate.
+  settleBootstrap(restoreFromCloud());
+}
 
-       Until this resolves, an empty session list says nothing about whether
-       this family is new — see setBootstrapState in js/gate.js. A restore that
-       brought rows back, or found the device already holding history, proves it
-       is not; one that reached the mirror and found nothing proves it is; one
-       that could not reach the mirror at all proves neither, and says so. */
+/* WHAT THE RESTORE ACTUALLY ESTABLISHED, handed to the gate.
+
+   Until the restore resolves, an empty session list says nothing about whether
+   this family is new — see setBootstrapState in js/gate.js. A restore that
+   brought rows back, or found the device already holding history, proves it
+   is not; one that reached the mirror and found nothing proves it is; one
+   that could not reach the mirror at all proves neither, and says so.
+
+   It ALWAYS resolves. restoreFromCloud is written never to throw, but the gate
+   card's "Checking for this family's history…" has no way out except this
+   call, so a rejection — a thrown import, a bug in a merge step, anything —
+   used to leave the gate on "checking" for the rest of the launch, with no
+   button at all. A rejected restore is treated as "could not reach the
+   mirror": the honest answer, and the one that still lets an adult set the
+   device up. Exported so the rule can be tested without a live boot. */
+export function settleBootstrap(restore) {
+  const settle = (result) => {
     const reached = !!(result && result.reachedCloud);
     const hasHistory = (loadSessions() || []).length > 0;
     setBootstrapState(hasHistory ? "restored" : reached ? "empty" : "offline-unverified");
+  };
+  return Promise.resolve(restore).then(settle, (e) => {
+    console.warn("Cloud restore failed:", e);
+    settle(null);
+  }).then(() => {
     /* A second amnesty pass, now that the other device's wallet has merged in:
        prizes it still held as spent have only just arrived. The cutoff was
        stamped on the first pass, so this forgives exactly the same set and
        cannot reach anything redeemed since. */
-    migratePrizeAmnesty();
-    // The XP total is rebuilt from the synced sources, so repaint regardless.
+    try { migratePrizeAmnesty(); } catch (e) { console.warn("Prize amnesty skipped:", e); }
+  }).finally(() => {
+    // The XP total is rebuilt from the synced sources, and the gate may have
+    // been waiting on this answer, so repaint regardless.
     if (!state.inSession) render();
   });
 }

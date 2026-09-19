@@ -7,9 +7,9 @@
 import { DAY_MS, todayISODate, edmontonISO, edmontonWeekISODates } from "./util.js";
 import { STORAGE_KEYS as K, ATHLETE_DEFAULT, LEGACY_ATHLETE, BACKUP_APP, LORE_TRANSFER_FIELD, COPY } from "./sport.js";
 export { LEGACY_ATHLETE, BACKUP_APP };
-import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE, VALGUS_FLOOR, TRAINING_QS, KID_COACHING } from "./data.js";
+import { DAYS, PRIZE_POOL, levelCost, LADDER, RANK_LORE, VALGUS_FLOOR, TRAINING_QS, KID_COACHING, SESSION_QUIZ } from "./data.js";
 import { outcomeOf, deriveSessionOutcome, OUTCOME_VERSION, roundPayCredit, workoutDate,
-         streakDatesOf, freezeDatesOf } from "./outcome.js";
+         dayRecords, scheduleStreak, longestScheduleStreak } from "./outcome.js";
 
 /* ---- keys (unchanged from the old app unless noted) ---- */
 export const SETTINGS_KEY     = K.settings;
@@ -482,14 +482,18 @@ export function currentStreak(sessions, freezeDays = null) {
    one number she cares about.
 
    These two are what every consumer asks now. The pair above stay exported for
-   the day-level tests and for any caller that already holds the days. */
+   the day-level tests and for any caller that already holds the days.
+
+   The unit is the DAY RECORD (dayRecords in js/outcome.js) and the rule is the
+   schedule-aware one: a scheduled weekday with neither a counting day nor a
+   finished recovery breaks the run, Sunday never does, and today with nothing
+   on it is not a gap yet. Dates before STREAK_SCHEDULE_FROM keep the two-day
+   grace above, so nothing she is standing on drops — see scheduleStreak. */
 export function currentStreakOf(sessions) {
-  const rows = sessions || loadSessions();
-  return currentFromDays([...streakDatesOf(rows)].sort(), freezeDatesOf(rows));
+  return scheduleStreak(dayRecords(sessions ? { sessions } : {}), todayISODate());
 }
 export function longestStreakOf(sessions) {
-  const rows = sessions || loadSessions();
-  return longestFromDays([...streakDatesOf(rows)].sort(), freezeDatesOf(rows));
+  return longestScheduleStreak(dayRecords(sessions ? { sessions } : {}), todayISODate());
 }
 
 /* ---- skip history ---- */
@@ -1026,19 +1030,33 @@ export function payTodayQuestion(correct, quiz) {
   return { xp: QXP_TODAY, capped: false };
 }
 
-/* Mastery + remaining-XP snapshot over the whole bank. Feeds the kid's
-   "moves mastered" line and the grown-up's quiz card. */
+/* The Coach's Quiz's own questions, by the ledger key the finish screen pays
+   them under (see coachQuizPool in vm/session.js: `coach|<id>`). They are
+   priced through the same ledger as the deck, so they belong to the same
+   finite bank — the budget used to leave them out, and the README's cap
+   promise was at least a dozen questions short of what the code paid. The
+   training principles are already in the bank under their own key, shared
+   by both places. */
+export function coachQuizKeys() {
+  return (SESSION_QUIZ || []).map(q => quizQuestionKey("coach", q.id));
+}
+
+/* Mastery + remaining-XP snapshot over the whole bank — every key the ledger
+   can pay: the deck's questions and the Coach's Quiz's. Feeds the kid's
+   "questions mastered" line and the grown-up's quiz card, and is what makes
+   `quizXpFromLedger() <= quizBankStatus().xpTotal` always true. */
 export function quizBankStatus(quiz) {
   const led = (quiz || loadQuiz()).qLedger || {};
   const bank = questionBank();   // unlocked ranks only, so this grows with her
+  const keys = bank.map(([m, k]) => quizQuestionKey(m.name, k)).concat(coachQuizKeys());
   let mastered = 0, xpLeft = 0;
-  bank.forEach(([m, k]) => {
-    const rec = led[quizQuestionKey(m.name, k)] || {};
+  keys.forEach(key => {
+    const rec = led[key] || {};
     if (rec.mastered) mastered++; else xpLeft += QXP_CORRECT;
     if (!rec.attempted) xpLeft += QXP_ATTEMPT;
   });
-  return { total: bank.length, mastered, left: bank.length - mastered, xpLeft,
-           xpTotal: bank.length * (QXP_ATTEMPT + QXP_CORRECT) };
+  return { total: keys.length, mastered, left: keys.length - mastered, xpLeft,
+           xpTotal: keys.length * (QXP_ATTEMPT + QXP_CORRECT) };
 }
 
 /* ---- PR log ---- */
@@ -1373,43 +1391,42 @@ function pruneDayXp(map) {
    not the first one claimed. Taking the first would let a Recovery morning
    (cap 90) hold down a real session trained that afternoon; taking the largest
    still refuses a second full day's pay, because the cap is on the date's TOTAL
-   spend. A partial and its resume share one budget exactly as before. */
-/* What the training LOG already says about a date, for the sessions this device
-   can see — which includes every session synced from her other device.
+   spend. A partial and its resume share one budget exactly as before.
 
-   The banked row alone is a fact about one device: train on the tablet in the
-   morning and the phone in the afternoon and each grants a full day, because
-   neither has ever seen the other's row (the budget is deliberately not
-   published — see dayXpRow). Every session record, however, DOES sync, and
-   since finalize stamps what each one was actually paid, the day's spend can be
-   read back off the log. So the log is used as a floor under the banked value:
-   whichever knows about more spending wins.
+   The banked budget row alone is a fact about one device: train on the tablet
+   in the morning and the phone in the afternoon and each would grant a full
+   day, because neither has ever seen the other's row (the budget is
+   deliberately not published — see dayXpRow). Every session record, however,
+   DOES sync, so what the log already settles for the date is the floor under
+   the banked value: whichever knows about more spending wins. */
+/* THE SITTING IS PAID THE DIFFERENCE IT MADE TO THE DAY.
 
-   Only the STAMPED amount counts. Re-pricing a row here would count the session
-   being finalized right now — it is already in the log by this point, and its
-   stamp is written a moment later — at full value against its own budget. */
-function loggedDayXp(key, entry) {
-  const rows = loadSessions().filter(s =>
-    s && !s.practice && dayXpKey(s) === key);
-  let spent = 0;
-  let cap = dayXpCap(entry);
-  rows.forEach(s => {
-    if (Number.isFinite(s.xpEarned)) spent += Math.max(0, s.xpEarned);
-    cap = Math.max(cap, dayXpCap(s));
-  });
-  return { spent, cap };
-}
-
+   A sitting used to be priced on its own (`xpForSession`) and then squeezed
+   under the day's cap, which paid the show-up credit once per SITTING: a green
+   morning that banked two rounds (270) plus a red evening that added nothing
+   still settled the day at 360, while a pain stop followed by a finished
+   evening settled at 270 for three proven rounds. The day is priced once now
+   (see settledDayXp), and what this sitting earns is the day's settled value
+   with its row in the log minus the value without it — the number the finish
+   screen prints as "+N", and exactly what the journey rebuild will add up to
+   tomorrow. The banked budget row is kept as a floor under "already spent", so
+   a claim replayed for the same sitting, or a card run after another device
+   already drew the date, still pays nothing. Days whose rows were all written
+   before v6 take the same difference under the old per-sitting settlement, so
+   the number does not move for them. */
 export function claimSessionXp(entry) {
-  const want = xpForSession(entry);
-  if (want <= 0) return 0;
+  if (!entry) return 0;
   const j = loadJourney() || { xp: 0, prizesWon: [], pendingDraws: 0 };
   const key = dayXpKey(entry);
+  const mine = sessionKey(entry);
+  const others = loadSessions().filter(s => s && sessionKey(s) !== mine);
+  const settle = rows => settledDayXp(rows).find(d => d.date === key) || { settled: 0, cap: 0 };
+  const before = settle(others);
+  const after = settle(others.concat([entry]));
   const banked = dayXpRow(j.dayXpPaid, key);
-  const logged = loggedDayXp(key, entry);
-  const spent = Math.max(banked.spent, logged.spent);
-  const cap = Math.max(banked.cap, logged.cap);
-  const grant = Math.max(0, Math.min(want, cap - spent));
+  const spent = Math.max(banked.spent, before.settled);
+  const cap = Math.max(banked.cap, after.cap, dayXpCap(entry));
+  const grant = Math.max(0, Math.min(after.settled, cap) - spent);
   if (grant > 0) {
     j.dayXpPaid = pruneDayXp({ ...(j.dayXpPaid || {}), [key]: { spent: spent + grant, cap } });
     saveJourney(j);
@@ -2029,8 +2046,8 @@ export function quizXpFromLedger(quiz) {
 
    The live path already holds the line on one device and on two used in
    sequence: claimSessionXp takes the larger of the banked budget row and what
-   the synced log says the date has already been paid (see loggedDayXp), so a
-   day started on the tablet and finished on the phone draws from one budget.
+   the synced log already settles for the date (see claimSessionXp), so a day
+   started on the tablet and finished on the phone draws from one budget.
 
    What neither could cover is two devices OFFLINE AT ONCE. Each grants a full
    day against a budget the other has never seen, each stamps `xpEarned` on its
@@ -2047,7 +2064,7 @@ export function quizXpFromLedger(quiz) {
 
    Sessions are aggregated by WORKOUT first, so the two fragments of a day
    trained in two goes are the same workout and cannot each claim a day. */
-export function settledDayXp(sessions) {
+export function settledDayXp(sessions, opts = {}) {
   const byDate = new Map();
   (sessions || []).forEach(s => {
     if (!s || s.practice) return;
@@ -2056,6 +2073,7 @@ export function settledDayXp(sessions) {
     if (!byDate.has(date)) byDate.set(date, []);
     byDate.get(date).push(s);
   });
+  let events = null;
   const out = [];
   byDate.forEach((rows, date) => {
     /* Only rows priced by the CURRENT rules are capped. A legacy row carries a
@@ -2067,7 +2085,31 @@ export function settledDayXp(sessions) {
     const modern = rows.filter(s => s.xpVersion === XP_VERSION);
     const legacy = rows.filter(s => s.xpVersion !== XP_VERSION);
     const cap = modern.reduce((m, s) => Math.max(m, dayXpCap(s)), 0);
-    const claimed = modern.reduce((sum, s) => sum + sessionXp(s), 0);
+    /* PRICED ONCE PER DAY, BY ROUNDS. A date whose every row was written from
+       outcome v6 is worth what its day record proves: showing up once, each
+       main round once off the merged ledger, capped by the day's ask — see
+       dayPrice in js/outcome.js. The stamps on those rows are what each
+       sitting was told (the difference it made, see claimSessionXp), and they
+       add up to this same number, but the ledger is the authority so that two
+       devices that have seen the same rows settle to the same total. A date
+       with any earlier row keeps the per-sitting settlement it was paid under.
+       Only the LOG is priced: the live day-progress record is this device's
+       alone and expires, so nothing it holds may move a total. */
+    const dayPriced = modern.length > 0 && modern.every(s => Number(s.outcomeVersion) >= 6);
+    let claimed;
+    if (dayPriced) {
+      // dayRecords hands its own records back in (opts.records) rather than
+      // having them rebuilt once per date; xpByRounds is priced off the log
+      // either way, so the two paths agree.
+      let records = opts.records && opts.records.filter(r => r && r.date === date && !r.unsaved);
+      if (!records) {
+        if (!events) events = loadEvents();
+        records = dayRecords({ sessions: modern, events, dayProgress: () => null, priceOnly: true });
+      }
+      claimed = records.reduce((sum, r) => sum + (Number(r.xpByRounds) || 0), 0);
+    } else {
+      claimed = modern.reduce((sum, s) => sum + sessionXp(s), 0);
+    }
     const carried = legacy.reduce((sum, s) => sum + sessionXp(s), 0);
     out.push({
       date, cap, claimed, carried,
@@ -2093,9 +2135,9 @@ export function settledTrainingXp(sessions) {
 
    One date, one answer, everywhere. `settledDayXp` is still the authority;
    these are the two shapes the screens actually want. */
-export function settledXpByDate(sessions) {
+export function settledXpByDate(sessions, opts = {}) {
   const out = new Map();
-  settledDayXp(sessions).forEach(d => out.set(d.date, d.settled));
+  settledDayXp(sessions, opts).forEach(d => out.set(d.date, d.settled));
   return out;
 }
 export function settledXpInRange(sessions, from, to) {

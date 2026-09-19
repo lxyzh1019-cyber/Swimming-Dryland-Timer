@@ -9,7 +9,8 @@
    ============================================================ */
 
 import { deriveSessionOutcome, mainRoundsFromLedger, mainRoundReport, OUTCOME_VERSION,
-         mergeLedgerRows, logicalRowId, workoutDate, paceReport } from "./outcome.js";
+         mergeLedgerRows, logicalRowId, workoutDate, paceReport,
+         moveReviewReason, moveReviewDose } from "./outcome.js";
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BREATH_SAY, MANTRA,
          exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
          needsSetup, SETUP_SECONDS,
@@ -47,10 +48,12 @@ function blankSession() {
     running: false, paused: false, pauseReasons: [], pauseCount: 0,
     abort: false, skipExercise: false, forceDone: false, forceDoneAt: 0,
     byRepsResolver: null, intentResolver: null, microResolver: null,
+    // The "Did you get all N?" card — see repCheckPrompt.
+    repCheckResolver: null,
     announceResolver: null, lastTapAt: 0,
     savedEntry: false, saveFailed: false,
     currentEx: null, skipped: [], perExercise: [], justSkipped: false,
-    phase: "greeting",           // greeting|getready|work|reps|sideswitch|rest|roundRest|sectionRest|intent|microloop|breath|done
+    phase: "greeting",           // greeting|getready|work|reps|repcheck|sideswitch|rest|roundRest|sectionRest|intent|microloop|breath|done
     circuits: [], ci: 0, ei: 0, round: 1, exDone: 0,
     /* WHAT THE SIDE LIST SHOWS, which is not what the runner walks. A resume
        runs the REMAINDER; the list shows the WHOLE DAY, with her own history
@@ -134,6 +137,13 @@ function blankSession() {
        saved" sentinel had two spellings.) */
     quizCapped: false, saySafetyStop: false,
     suggestedLight: null, readinessDetail: null, dayIso: null,
+    /* True only when an adult moved the light this sitting was started with
+       away from the body check's answer. Decided at start, off the two lights
+       handed in — never off the light the day's lock then ran it under. */
+    wasOverridden: false,
+    // When this sitting's clock started, so the day-progress record can tell
+    // its own seconds from a sitting that never saved. See readDayProgress.
+    sittingStartedAt: 0,
     savedKey: null, fsId: null
   };
 }
@@ -647,6 +657,58 @@ async function offerExtraReps(p, stopped) {
   await repSleep(window, stopped);
 }
 
+/* THE QUESTION A SHORT COUNT EARNS.
+
+   A rep move is graded on the coach's SPOKEN count, and the coach is slower
+   than a kid who knows the move: every spoken number takes its time, so she
+   finishes her eight while the coach is on five, taps Done, and the ledger
+   records five of eight — `partial` — for a set she did in full. Nothing ever
+   asked her. This does, once, with three answers and no lecture:
+
+     All of them  → the count becomes the target, and the move is done
+     Almost       → the coach's count plus half of what was left, rounded
+                    down and never less than one more
+     Some         → the coach's count, exactly as before
+
+   It is asked only when Done lands BEFORE the count finishes. A Done after
+   the count, and a Done during the extra-reps offer, are what they always
+   were. An instant tap — nothing counted and under MIN_EXERCISE_SECS — is
+   not asked either: it is recorded as skipped whatever she answers, and a
+   question whose answer cannot matter is noise.
+
+   Done on the card keeps the coach's count; so does walking away from it,
+   after the same wait the clean-check gives. Skip, STOP and Back during the
+   card behave as they do during any prompt. */
+export const REP_CHECK_TIMEOUT_MS = 30000;
+function repCheckWanted() {
+  if (!(sess.repsCounted < sess.repsTarget)) return false;
+  syncClock();
+  return sess.repsCounted > 0 || sess.exElapsed >= MIN_EXERCISE_SECS;
+}
+function repCheckPrompt() {
+  return new Promise(resolve => {
+    setPhase("repcheck");
+    speakIfIdle("Did you get them all?");
+    const settle = (answer) => {
+      clearInterval(watchdog); clearTimeout(timeout);
+      sess.repCheckResolver = null;
+      resolve(answer);
+    };
+    const watchdog = setInterval(() => {
+      if (sess.abort || sess.skipExercise || sess.backTo != null) settle(null);
+    }, 200);
+    const timeout = setTimeout(() => settle(null), REP_CHECK_TIMEOUT_MS);
+    sess.repCheckResolver = settle;
+  });
+}
+function applyRepCheck(answer) {
+  const c = sess.repsCounted, t = sess.repsTarget;
+  if (answer === "all") sess.repsCounted = t;
+  else if (answer === "almost") sess.repsCounted = Math.min(t, Math.max(c + 1, c + Math.floor((t - c) / 2)));
+  // "some", a dismissal or a timeout: the coach's count stands.
+  notify("tick");
+}
+
 async function runPrescribedReps(ex) {
   const p = exPrescription(ex);
   const segments = prescriptionSegments(p);
@@ -712,7 +774,7 @@ async function runPrescribedReps(ex) {
     if (!stopped && sess.byRepsResolver) sess.byRepsResolver("complete");
   })();
 
-  const result = await finished;
+  let result = await finished;
   stopped = true;
   await workLoop;
   sess.sideLabel = "";
@@ -722,6 +784,14 @@ async function runPrescribedReps(ex) {
   sess.currentDirection = 0; sess.totalDirections = 0;
   sess.repInSegment = 0; sess.repsInSegment = 0;
   sess.currentSegment = 0; sess.totalSegments = 0;
+  // Done before the count finished: the count is stopped, and she is asked.
+  // The card can itself be ended by STOP or Back, which the caller has to
+  // hear about the same way it hears about them during the reps.
+  if (result === "done" && repCheckWanted()) {
+    applyRepCheck(await repCheckPrompt());
+    if (sess.abort) result = "abort";
+    else if (sess.backTo != null) result = "back";
+  }
   return result;
 }
 
@@ -764,12 +834,30 @@ function startElapsed() {
   sess.elapsed = 0; sess.pausedSecs = 0;
   sess.activeMs = 0; sess.pausedMs = 0; sess.exMs = 0;
   sess.clockAt = Date.now();
+  sess.sittingStartedAt = Date.now();
   if (elapsedInterval) clearInterval(elapsedInterval);
+  let ticks = 0;
   elapsedInterval = setInterval(() => {
     if (!sess.running) return;
     syncClock();
     notify("tick");
+    if (++ticks % HEARTBEAT_TICKS === 0) heartbeatDayProgress();
   }, 1000);
+}
+/* THE MINUTES OF A SITTING THAT NEVER SAVES used to exist nowhere: the row is
+   written only by finalize, and an iPad that dies mid-warm-up never gets
+   there. So while the clock runs, the day-progress record is told how long
+   this sitting has been going, once every thirty seconds — cheap, and only
+   once a record exists (a move has been attempted), so a session that recorded
+   nothing leaves nothing behind. It must never be the thing that breaks a
+   session: a full quota here is a lost heartbeat, not a lost workout. */
+export const HEARTBEAT_TICKS = 30;
+function heartbeatDayProgress() {
+  if (!ownsDayProgress() || !sess.running) return;
+  try {
+    if (!loadDayProgress(sess.dayKey)) return;
+    saveDayProgress(sess.dayKey, readDayProgress());
+  } catch (e) { /* a heartbeat is not worth a crash */ }
 }
 function stopElapsed() {
   syncClock();
@@ -1059,6 +1147,23 @@ function readDayProgress() {
   if (!prog.moves) prog.moves = {};
   if (!prog.partials) prog.partials = {};   // moves she tapped Done on early
   if (!Number.isFinite(Number(prog.bankedCredit))) prog.bankedCredit = 0;
+  /* THE PROOF, NOT THE COUNT. `moves` and `bankedCredit` say how many moves
+     were banked and which the resume may skip; `rows` says WHICH rows, by
+     block, round and name, with the seconds each took — the shape the day
+     record needs to reconstruct a sitting that never saved. A block finishing
+     no longer deletes its names (see recordBlockDone). */
+  if (!Array.isArray(prog.rows)) prog.rows = [];
+  /* AND THE SECONDS. `activeSecs` is every second of unsaved work the record
+     holds: `priorSecs` from earlier sittings that never reached finalize, plus
+     this sitting's clock. A new sitting folds the last one's total into
+     priorSecs the first time it writes; finalize stamps priorSecs onto the row
+     as `bankedSecs` and zeroes both, so nothing is ever counted twice. */
+  syncClock();
+  if (prog.sittingStartedAt !== sess.sittingStartedAt) {
+    prog.priorSecs = Number(prog.activeSecs) || 0;
+    prog.sittingStartedAt = sess.sittingStartedAt || null;
+  }
+  prog.activeSecs = (Number(prog.priorSecs) || 0) + (Number(sess.elapsed) || 0);
   // Every write goes through here, so this is the one place the id has to be
   // stamped for a resume to be able to read it back.
   if (sess.workoutInstanceId) prog.workoutInstanceId = sess.workoutInstanceId;
@@ -1135,6 +1240,13 @@ function bankMove(row) {
         prog.partials[block] = prog.partials[block].filter(n => n !== row.name);
       }
     }
+    // The row itself, keyed the way the log keys a planned move, so the day
+    // record can merge it against the log by name and never twice.
+    const id = logicalRowId(row);
+    if (!prog.rows.some(r => logicalRowId(r) === id)) {
+      prog.rows.push({ block, name: row.name, round: Number(row.round || 1), status: "done",
+                       secs: Number(row.actualSecs) || 0 });
+    }
   }
   /* A MOVE SHE TAPPED DONE ON IS A MOVE SHE HAS BEEN THROUGH.
 
@@ -1184,11 +1296,15 @@ function unbankMove(row) {
   // to redo, and a skip the second time would retire it for good.
   const wasDone = list.includes(row.name);
   const wasCut = cut.includes(row.name);
-  if (!wasDone && !wasCut) return;
+  const id = logicalRowId(row);
+  const hadRow = prog.rows.some(r => logicalRowId(r) === id);
+  if (!wasDone && !wasCut && !hadRow) return;
   if (wasDone) {
     prog.moves[block] = list.filter(n => n !== row.name);
     prog.bankedCredit = Math.max(0, Number(prog.bankedCredit) - 1);
   }
+  // The proof row goes with it: a row the ledger no longer holds is not proof.
+  if (hadRow) prog.rows = prog.rows.filter(r => logicalRowId(r) !== id);
   if (wasCut) prog.partials[block] = cut.filter(n => n !== row.name);
   saveDayProgress(sess.dayKey, prog);
 }
@@ -1241,8 +1357,11 @@ function recordBlockDone(blockKey, ci) {
   }
   const prog = readDayProgress();
   if (!prog.done.includes(blockKey)) prog.done.push(blockKey);
-  // The block is on the done list now, so its move-by-move record is redundant.
-  delete prog.moves[blockKey];
+  /* The block's names are KEPT beside the done list. Deleting them here was
+     what made a finished warm-up invisible: `done` tells the resume to skip
+     the block, but only the names (and `rows`) can tell the day record — and
+     the next sitting's `bankedRows` stamp — WHAT was done when the sitting
+     that did it never saved. */
   prog.light = sess.light;
   saveDayProgress(sess.dayKey, prog);
 }
@@ -1432,25 +1551,35 @@ export function roundsCapFromLog(frags) {
    shown a kid. Both are returned, named for what they are, because the card
    used to print one of them beside a minute total computed from the other. */
 export function dayPlanState(dayKey, opts = {}) {
-  const frags = opts.fragments || dayFragmentsFromLog(dayKey, opts.isoDate || null);
+  const frags = opts.fragments || (opts.rows ? [] : dayFragmentsFromLog(dayKey, opts.isoDate || null));
   const day = DAYS[dayKey] || {};
   const fallbackLight = day.spa ? "recovery" : (day.defaultLight || "green");
   /* The light the day was actually TRAINED under, not the weekday's default.
      planStats has always priced every card as green, so a Red day — a third the
      size — was shown the green plan's minutes and move count and then told it
-     had skipped the difference. */
-  const light = lockedLightFromLog(frags) || fallbackLight;
-  const cap = roundsCapFromLog(frags);
+     had skipped the difference.
+
+     The day record (dayRecords in outcome.js) has already settled the light,
+     the round cap and the merged rows — banked proof included — so it hands
+     them in directly (`opts.light`, `opts.roundsCap`, `opts.rows`) rather than
+     having them re-derived from the fragments under a different rule. */
+  const light = opts.light || lockedLightFromLog(frags) || fallbackLight;
+  const cap = Number.isFinite(Number(opts.roundsCap)) ? Number(opts.roundsCap) : roundsCapFromLog(frags);
   const rounds = Math.min(roundsForLight(light), cap);
   const circuits = assembleCircuits(dayKey, light,
     Number.isFinite(rounds) && rounds < roundsForLight(light) ? { mainRounds: rounds } : {});
 
-  const rows = mergeLedgerRows(frags.reduce((a, s) => a.concat(s.ledger || []), []));
+  const rows = opts.rows ? mergeLedgerRows(opts.rows)
+    : mergeLedgerRows(frags.reduce((a, s) => a.concat(s.ledger || []), []));
   const byId = new Map();
   rows.forEach(r => byId.set(logicalRowId(r), r));
 
   const blocks = [];
   const owed = [];
+  /* ONE ROW PER PLANNED PERFORMANCE, with its verdict and the reason for it —
+     the per-move review the day card and the finish screen both show. Built
+     here, beside the counts, so the list and the numbers cannot disagree. */
+  const moves = [];
   let planned = 0, done = 0, performed = 0;
   const seen = new Set(), didMove = new Set(), touched = new Set();
   circuits.forEach(c => {
@@ -1464,6 +1593,18 @@ export function dayPlanState(dayKey, opts = {}) {
         const row = byId.get(id);
         planned++; bPlanned++; bSecs += refTime(ex);
         seen.add(ex.name);
+        const status = !row ? "missing"
+          : row.banked ? "banked"
+          : row.status === "done" ? "done"
+          : row.status === "partial" ? "partial"
+          : "skipped";
+        const dose = moveReviewDose(row);
+        moves.push({
+          block: c.block, circuit: c.name, round, name: ex.name,
+          dose: ex.dose || ex.repsDetail || "",
+          status, got: dose.got, planned: dose.planned, driver: dose.driver,
+          reason: moveReviewReason(row, status)
+        });
         /* PERFORMED is not the same question as DONE, and the card needs both.
            `done` is the engine's verdict against its 80% floor and is what the
            resume and the round rule turn on. `performed` is simply "she was
@@ -1488,13 +1629,15 @@ export function dayPlanState(dayKey, opts = {}) {
   });
 
   return {
-    light, circuits, blocks, owed, rows,
+    light, circuits, blocks, owed, rows, moves,
     planned, done, performed,
     movements: seen.size,
     movementsDone: didMove.size,
     movementsPerformed: touched.size,
-    pace: paceReport(rows),
-    hasRecord: frags.length > 0,
+    // A banked row proves the move was done, not how well it was held: it
+    // carries no dose to grade, so it stays out of the pace report.
+    pace: paceReport(rows.filter(r => !r.banked)),
+    hasRecord: frags.length > 0 || rows.length > 0,
     fragments: frags
   };
 }
@@ -1730,8 +1873,15 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
      evening under a Green check runs Red (planResume holds a workout at the
      light it started under), and stamping `resolvedLight` told the readiness
      log the day finished Green and blamed a grown-up for an override nobody
-     made. */
-  stampReadinessOutcome(plan.light, resolvedSuggestion !== plan.light);
+     made.
+
+     WHETHER IT WAS OVERRIDDEN is a different question, and it is answered off
+     the two lights handed in: the body's suggestion and the light the adult
+     let through. Deriving it from the light the lock then ran under blamed a
+     grown-up for every resume the lock lowered — "green → red · Lowered below
+     the body check" in the one log a parent reads for real overrides. */
+  sess.wasOverridden = resolvedSuggestion !== resolvedLight;
+  stampReadinessOutcome(plan.light, sess.wasOverridden);
 
   const bankedRounds = plan.bankedRounds;
   const mainOwed = plan.mainOwed;
@@ -2297,6 +2447,37 @@ function clearProgressIfReplaced() {
   clearDayProgress(sess.dayKey);
 }
 
+/* The work the log cannot see, as this sitting saves: every row the day's
+   record holds that neither the log nor this sitting's own ledger proves, and
+   the seconds of the sittings that never saved. Read off the record the
+   engine itself banked into, so it is evidence the engine already paid on. */
+function bankedProof() {
+  if (!ownsDayProgress()) return { bankedRows: [], bankedSecs: 0 };
+  const existing = loadDayProgress(sess.dayKey);
+  if (!existing) return { bankedRows: [], bankedSecs: 0 };
+  const prog = readDayProgress();
+  const held = new Set(dayFragmentsFromLog(sess.dayKey, sess.dayIso || null)
+    .reduce((a, s) => a.concat(s.ledger || []), [])
+    .concat(sess.ledger || []).map(logicalRowId));
+  return {
+    bankedRows: (prog.rows || []).filter(r => r && !held.has(logicalRowId(r))).map(r => ({ ...r })),
+    bankedSecs: Math.max(0, Number(prog.priorSecs) || 0)
+  };
+}
+
+/* After the row is (or is not) written: a saved row carries the record's
+   unsaved seconds now, so the record starts counting from zero; a failed write
+   leaves them in the record, this sitting's included, for the next one to
+   carry; and "start over" throws the record away — see discardSession. */
+function settleDayProgressSecs(saved) {
+  if (!ownsDayProgress()) return;
+  if (sess.discard) { clearDayProgress(sess.dayKey); return; }
+  if (!loadDayProgress(sess.dayKey)) return;
+  const prog = readDayProgress();
+  if (saved) { prog.priorSecs = 0; prog.activeSecs = 0; }
+  saveDayProgress(sess.dayKey, prog);
+}
+
 /* ============================================================
    FINALIZATION — ended-early sessions are now RECORDED
    ("your progress is saved"), with endedEarly + pain flags.
@@ -2342,7 +2523,7 @@ export function finalize(completed) {
     sessionType: sess.recovery && !sess.spa ? "recovery" : sess.spa ? "spa" : "main",
     lightResult: sess.light,
     suggestedLight: sess.suggestedLight || sess.light,
-    wasOverridden: (sess.suggestedLight || sess.light) !== sess.light,   // a grown-up moved it
+    wasOverridden: !!sess.wasOverridden,   // a grown-up moved it — see startSession
     ...(sess.readinessDetail || {}),   // zones + answers, abnormal checks only
     // What was actually trained, and what the day asked for — two different
     // numbers. Storing only the planned one is what paid 150% for one day.
@@ -2387,6 +2568,14 @@ export function finalize(completed) {
     // the row so the record scores the same tomorrow, and after a cloud restore,
     // as it did on the finish screen tonight.
     bankedCredit: (sess.spa || sess.recovery) ? 0 : (sess.bankedCredit || 0),
+    /* AND THE PROOF BEHIND THE COUNT. A sitting that never reached finalize —
+       the iPad slept, the app was evicted — left its work only in the device's
+       day-progress record, which is cleared the moment a later sitting saves a
+       complete day. The count above survived that; the names and the minutes
+       did not, so the warm-up she did read as never done. The rows the log
+       does not already hold, and the seconds those sittings ran, ride on this
+       row by name (see bankedProof), and the day record rebuilds from them. */
+    ...bankedProof(),
     outcomeVersion: OUTCOME_VERSION,
     completedFully: !!completed
   };
@@ -2425,6 +2614,7 @@ export function finalize(completed) {
      the discard rides the same path a failed write does rather than needing
      its own branch through eighty lines of settlement. */
   const saved = sess.discard ? false : saveSession(entry);
+  settleDayProgressSecs(saved);
   // The RECORD, not a boolean. The finish screen has to say what the saved row
   // says — read back through outcomeOf, the same authority the parent reports
   // will use tomorrow — and it cannot do that from a `true`.
@@ -2663,6 +2853,8 @@ export function advance() {
   if (sess.phase === "reps" && sess.byRepsResolver) { sess.byRepsResolver("done"); return; }
   if (sess.phase === "intent" && sess.intentResolver) { sess.intentResolver(null); return; }
   if (sess.phase === "microloop" && sess.microResolver) { sess.microResolver(null); return; }
+  // Done on the "Did you get all N?" card: move on with the coach's count.
+  if (sess.phase === "repcheck" && sess.repCheckResolver) { sess.repCheckResolver(null); return; }
   if (["work", "rest", "roundRest", "sectionRest", "sideswitch", "getready", "greeting", "breath"].includes(sess.phase)) {
     /* THE TAP WAITS FOR THE CLOCK, because the clock is what she is tapping at.
        A rest stamps `since` at the moment its phase begins (see the rest
@@ -2752,7 +2944,13 @@ export function resumeFromStop() {
 export const STOP_REASONS = ["pain", "break", "restart"];
 /* Start over: end this attempt and keep NONE of it. Separate from endFromStop
    because the other two reasons record what she did and this one deliberately
-   does not. The caller relaunches the day once the runner has unwound. */
+   does not. The caller relaunches the day once the runner has unwound.
+
+   None of it includes the day-progress record: what this attempt banked used
+   to stay on disk, so the restart skipped the very blocks she had asked to
+   redo, and the day card then showed them as never done. finalize clears the
+   record on a discard (see settleDayProgressSecs). Work an EARLIER sitting
+   already saved is in the log and is still subtracted by planResume. */
 export function discardSession() {
   sess.stopOverlay = false;
   sess.confirmRestart = false;
@@ -2793,6 +2991,7 @@ export function endEarly() {
   if (sess.byRepsResolver) sess.byRepsResolver("abort");
   if (sess.intentResolver) sess.intentResolver(null);
   if (sess.microResolver) sess.microResolver(null);
+  if (sess.repCheckResolver) sess.repCheckResolver(null);
   if (sess.formResolver) sess.formResolver(null);
   /* A stop confirmation is a SAFETY line: it is spoken even with the coach
      muted, because "I stopped because it hurt" is the one thing she must hear
@@ -2810,6 +3009,11 @@ export function endEarly() {
 
 export function pickIntentWord(word) { if (sess.intentResolver) sess.intentResolver(word); }
 export function answerMicroLoop(answer) { if (sess.microResolver) sess.microResolver(answer); }
+/* "all" | "almost" | "some" — see repCheckPrompt. Anything else keeps the count. */
+export function answerRepCheck(answer) {
+  if (!sess.repCheckResolver) return;
+  sess.repCheckResolver(["all", "almost", "some"].includes(answer) ? answer : null);
+}
 function recordFormCheck(clean) {
   if (sess.cleanCheckMove) sess.formChecks.push({ name: sess.cleanCheckMove, clean });
   sess.cleanCheckMove = null;
@@ -2888,7 +3092,15 @@ export function setReflect(field, label) {
   }
   notify("phase");
 }
-export function setQuizPick(i) { sess.quizPick = i; notify("phase"); }
+/* FIRST TAP LOCKS THE CARD, the same as the Quiz Deck. Every tap used to
+   re-select, so a wrong first answer followed by a tap on the green one read
+   "Nailed it!" — the XP was guarded (main.js pays only the first pick), but
+   the screen said one thing and the ledger another. */
+export function setQuizPick(i) {
+  if (sess.quizPick != null) return;
+  sess.quizPick = i;
+  notify("phase");
+}
 
 /* Full reset before Today re-renders (guards double-running timers). */
 export function exitSession() {
@@ -2899,6 +3111,7 @@ export function exitSession() {
   if (sess.byRepsResolver) sess.byRepsResolver("abort");
   if (sess.intentResolver) sess.intentResolver(null);
   if (sess.microResolver) sess.microResolver(null);
+  if (sess.repCheckResolver) sess.repCheckResolver(null);
   if (sess.formResolver) sess.formResolver(null);
   if (sess.holdResolver) sess.holdResolver("abort");
   stopElapsed();

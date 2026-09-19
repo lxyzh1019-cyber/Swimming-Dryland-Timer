@@ -841,8 +841,12 @@ const BANK = store.questionBank().length;      // moves + unlocked ranks + train
 const MOVE_QS = store.movePool().reduce((n, m) => n + (m.cue ? 1 : 0) + (m.watch ? 1 : 0) + (m.fix ? 1 : 0), 0);
 ok(BANK === MOVE_QS + store.rankPool().length * 2 + store.principlePool().length,
    "the bank is the moves, the unlocked ocean chapters and the training principles");
-ok(bank0.total === BANK && bank0.mastered === 0, "nothing is mastered on a fresh device");
-ok(bank0.xpTotal === BANK * (store.QXP_ATTEMPT + store.QXP_CORRECT), "lifetime quiz XP budget is bank x question value");
+/* The budget walks every key the ledger can pay: the deck's bank AND the
+   Coach's Quiz's own questions (`coach|<id>`), which used to sit outside it. */
+const COACH_QS = store.coachQuizKeys().length;
+ok(COACH_QS > 0, "the Coach's Quiz has questions of its own");
+ok(bank0.total === BANK + COACH_QS && bank0.mastered === 0, "nothing is mastered on a fresh device, and the budget counts the Coach's Quiz too");
+ok(bank0.xpTotal === (BANK + COACH_QS) * (store.QXP_ATTEMPT + store.QXP_CORRECT), "lifetime quiz XP budget is bank x question value");
 
 /* --- the ocean chapters are quiz material too, once unlocked --- */
 const swimBank1 = store.questionBank(1), swimBank26 = store.questionBank(26);
@@ -905,6 +909,8 @@ ok(store.payQuizQuestion(coachKey, true).xp === 0, "answering it again pays noth
 localStorage.removeItem(store.LS_QUIZ);
 ok(store.payQuizQuestion(coachKey, false).xp === 5, "a missed question pays the attempt credit only");
 ok(store.payQuizQuestion(coachKey, true).xp === 25, "and pays the rest when it is finally learned");
+ok(store.quizXpFromLedger() <= store.quizBankStatus().xpTotal,
+   "what the ledger has paid never exceeds the budget the Grown-up card shows — the Coach's Quiz is inside the bank");
 const spent = store.loadQuiz();
 spent.dayISO = new Date().toLocaleDateString("en-CA", { timeZone: "America/Edmonton" });
 spent.dayXp = store.QXP_DAILY_CAP; store.saveQuiz(spent);
@@ -1334,7 +1340,10 @@ localStorage.clear();
 store.migrate();
 /* The ledger has to SHOW the rounds the row claims: XP is priced off the rows
    now, not off `roundsDone`, precisely so a counter written at the wrong moment
-   cannot pay a full session the show-up credit alone. */
+   cannot pay a full session the show-up credit alone. And since outcome v6 the
+   DAY is priced once, by the rounds its merged ledger proves, so the resumed
+   row has to prove the whole green day for the day to be worth one — two
+   proven rounds are worth 270, however many sittings claimed them. */
 const mainRound = (r, n = 2) => Array.from({ length: n }, (_, i) => ({
   name: "m" + r + "-" + i, block: "main", round: r, status: "done" }));
 const partial = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
@@ -1342,8 +1351,8 @@ const partial = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOSt
   outcomeVersion: store.OUTCOME_VERSION,
   completedFully: false, endedEarly: true, ledger: mainRound(1) };
 const firstPay = store.claimSessionXp(partial);
-const resumed = { ...partial, roundsDone: 2, completedFully: true, endedEarly: false,
-  ledger: [...mainRound(1), ...mainRound(2)] };
+const resumed = { ...partial, roundsDone: 3, completedFully: true, endedEarly: false,
+  ledger: [...mainRound(1), ...mainRound(2), ...mainRound(3)] };
 const secondPay = store.claimSessionXp(resumed);
 ok(firstPay === 180, "the partial pays for the one round it finished");
 ok(firstPay + secondPay === 360, "and the resume tops it up to exactly one full day, never 540");
@@ -1699,7 +1708,10 @@ const oldMini = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOSt
   completedFully: true, ledger: [{ name: "x", block: "main", round: 1, status: "done" }] };
 ok(store.sessionRoundsPlanned(oldMini) === 1, "a historical mini still asks for one round");
 ok(store.xpForSession(oldMini) === 180, "and is still priced as a one-round day");
-ok(pvm.logEntryView(oldMini).lightLabel === "MINI", "the log still labels it MINI");
+/* The log is one row per DAY RECORD now, so the mini is asked for as a day. */
+localStorage.clear(); store.migrate(); store.saveSession(oldMini);
+ok(pvm.logEntryView(outcome.dayRecords()[0]).lightLabel === "MINI", "the log still labels it MINI");
+localStorage.clear(); store.migrate();
 
 /* --- the Coach's Quiz pays once, not twice --------------------------------
    Reproduces the report exactly: 360 session + 30 quiz should read 390 after
@@ -2043,16 +2055,36 @@ store.saveSession(row({ isoDate: iso(4), durationSecs: 1200, completedFully: tru
   ledger: [...mainRound(1), ...mainRound(2)], xpEarned: 270 }));
 
 const pv0 = pvm.buildProgressVM({ progressScope: "4w", logScope: "month" });
-const zeroMin = pvm.logEntryView(store.loadSessions()[1]);
+/* THE LOG IS ONE ROW PER DAY RECORD. The GO-and-quit on the same date as the
+   full session is a sitting of that day, not a log entry of its own; the
+   record for that date is the full session it shares the day with. A row
+   that is nothing but a skipped move on a day of its own reads NOTHING LOGGED. */
+const recOn = iso => outcome.dayRecords().find(r => r.date === util.edmontonISO(iso));
+ok(recOn(iso(1)).fragments.length === 2, "the full session and the GO-and-quit are two sittings of one day");
+ok(pv0.logItems.length === 3, "so the log holds three days: the full one, the pain stop and the yellow one");
+localStorage.clear(); store.migrate();
+store.saveSession(row({ isoDate: iso(1), durationSecs: 20, completedFully: true, roundsDone: 0,
+  roundsPlanned: 3, ledger: [{ name: "a", status: "skipped" }], xpEarned: 0 }));
+const zeroMin = pvm.logEntryView(outcome.dayRecords()[0]);
 ok(zeroMin.duration === "under a min", "a 20-second session reads as under a minute, not as 1 min");
 ok(zeroMin.lightLabel === "NOTHING LOGGED",
    "and is labelled for what it was, not badged GREEN like a finished day");
-ok(pvm.logEntryView(store.loadSessions()[3]).lightLabel === "SAFETY STOP",
-   "a safety stop is named as one");
-ok(!pv0.logItems.some(l => /try-it/i.test(l.lightLabel || "")), "no try-it rows in her training log");
 ok(zeroMin.moodEmoji === "·" && /not answered/.test(zeroMin.moodLabel),
    "an unanswered mood is not rendered as 🙂 Okay");
-ok(pvm.logEntryView(store.loadSessions()[0]).moodEmoji === "😀", "an answered one still shows");
+localStorage.clear(); store.migrate();
+store.saveSession(row({ isoDate: iso(1), durationSecs: 1500, completedFully: true, roundsDone: 3,
+  roundsPlanned: 3, ledger: [...mainRound(1), ...mainRound(2), ...mainRound(3)],
+  mood: "great", xpEarned: 360 }));
+store.saveSession(row({ isoDate: iso(2), durationSecs: 400, practice: true, sessionType: "try-it" }));
+store.saveSession(row({ isoDate: iso(3), durationSecs: 300, safetyStop: true, pain: true,
+  endedEarly: true, completedFully: false, ledger: [{ name: "a", status: "done" }] }));
+store.saveSession(row({ isoDate: iso(4), durationSecs: 1200, completedFully: true, roundsDone: 2,
+  roundsPlanned: 2, lightResult: "yellow",
+  ledger: [...mainRound(1), ...mainRound(2)], xpEarned: 270 }));
+ok(pvm.logEntryView(recOn(iso(3))).lightLabel === "PAIN STOP",
+   "a day that ended in a pain stop is named as one");
+ok(!pv0.logItems.some(l => /try-it/i.test(l.lightLabel || "")), "no try-it rows in her training log");
+ok(pvm.logEntryView(recOn(iso(1))).moodEmoji === "😀", "an answered one still shows");
 
 const pv = pvm.buildProgressVM({ progressScope: "4w", logScope: "week" });
 ok(/^2 sessions/.test(pv.sessionsLabel) || /^1 session$/.test(pv.sessionsLabel),
@@ -2181,17 +2213,23 @@ ok(store.countsAsTrained(shared) === true, "the store calls it trained");
 ok(store.isPartialSession(shared) === true, "and partial");
 ok(store.outcomeOf(shared).state === "partial", "the authority agrees");
 ok(store.xpForSession(shared) > 0, "and the XP it pays agrees that work happened");
-ok(pvm.logEntryView(shared).lightLabel === "ENDED EARLY", "the log reports the same partial session");
+store.saveSession(shared);
+ok(pvm.logEntryView(outcome.dayRecords()[0]).lightLabel === "ENDED EARLY", "the log reports the same partial session");
 
 /* --- regression: the one-full-day XP cap still holds over partial + resume --- */
 localStorage.clear(); store.migrate();
+/* Each row proves the rounds it claims: since v6 the day is priced off the
+   merged ledger, once, so a "resume" that proves no more rounds than the
+   partial did is worth nothing more — a second show-up credit is exactly
+   what this rule stopped paying. */
+const roundRows = n => Array.from({ length: n }, (_, r) => ({ name: "x", block: "main", round: r + 1, status: "done" }));
 const capBase = { app: "swimming", dayKey: "monday", isoDate: new Date().toISOString(),
-  xpVersion: store.XP_VERSION, outcomeVersion: OV, sessionType: "main", roundsPlanned: 3,
-  ledger: [{ name: "x", block: "main", round: 1, status: "done" }] };
-const payA = store.claimSessionXp({ ...capBase, roundsDone: 1 });
-const payB = store.claimSessionXp({ ...capBase, roundsDone: 2 });
+  xpVersion: store.XP_VERSION, outcomeVersion: OV, sessionType: "main", roundsPlanned: 3 };
+const payA = store.claimSessionXp({ ...capBase, roundsDone: 1, ledger: roundRows(1) });
+const payB = store.claimSessionXp({ ...capBase, roundsDone: 3, ledger: roundRows(3) });
+ok(payA === 180, "the partial pays for the one round it finished");
 ok(payA + payB === 360, "partial then resume still tops out at exactly one full day");
-ok(store.claimSessionXp({ ...capBase, roundsDone: 3 }) === 0, "and a third attempt pays nothing");
+ok(store.claimSessionXp({ ...capBase, roundsDone: 3, ledger: roundRows(3) }) === 0, "and a third attempt pays nothing");
 
 /* --- regression: a pain stop is still zero XP and zero streak --- */
 ok(store.xpForSession({ ...capBase, roundsDone: 3, safetyStop: true }) === 0, "a pain stop still pays no XP");
@@ -2657,7 +2695,11 @@ const mkRow = o => ({ app: "swimming", dayKey: "monday", isoDate: new Date().toI
   ledger: [{ name: "x", block: "main", round: 1, status: "done" }], ...o });
 store.saveSession(mkRow({}));                                                   // a real session
 store.saveSession(mkRow({ sessionType: "recovery", roundsDone: 0, roundsPlanned: 0, durationSecs: 600 }));
-store.saveSession(mkRow({ safetyStop: true, pain: true, durationSecs: 900, completedFully: false, endedEarly: true }));
+/* On its OWN day: a pain stop is the verdict of the day it ENDS, so stacking
+   it after the full session above would make that day a safety-stop day —
+   which is the day record being right, not this test's question. */
+store.saveSession(mkRow({ safetyStop: true, pain: true, durationSecs: 900, completedFully: false, endedEarly: true,
+  isoDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() }));
 store.saveSession(mkRow({ practice: true, sessionType: "try-it", durationSecs: 1200 }));
 
 const an6 = gvm.buildGrownupVM({ gsScope: "month", grownupTab: "analytics" }).analytics;
@@ -4598,7 +4640,7 @@ store.setOnlineForTest(true);
   ok(w[0].key === "monday" && w[6].key === "sunday", "Monday first, Sunday last — the calendar week");
   ok(w[1].isToday === true, "and Tuesday is marked as today");
   ok(w.every(d => !d.hasWork), "with no history, no day claims any work");
-  ok(w[4].plannedLabel === "—" && w[4].movesLabel === "—",
+  ok(w[4].plannedLabel === "—" && w[4].performancesLabel === "—" && w[4].movementsLabel === "—",
      "a Friday that has not happened shows a dash, not a zero — it has not failed anything");
   ok(pscreen.progressScreen(pvm.buildProgressVM({ progressScope: "4w", logScope: "week" })).includes("DAY STREAK"),
      "and the screen still renders with the streak in the corner of the table");

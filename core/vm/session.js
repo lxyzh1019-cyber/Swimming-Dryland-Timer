@@ -9,7 +9,8 @@ import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, S
 import { SKILL_BLOCK, COPY } from "../sport.js";
 import { fmtMMSS, exercisePhotoUrl, photoSources, plural } from "../util.js";
 import { loadSessions, loadQuiz, quizQuestionKey } from "../store.js";
-import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION, paceBand } from "../outcome.js";
+import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION, paceBand,
+         dayRecordFor, moveReviewLegend } from "../outcome.js";
 
 /* What changes at the end of this segment — named before she gets there, so the
    switch is never a surprise she hears about only if the voice is on. */
@@ -141,22 +142,46 @@ export function buildSessionVM(state) {
         completedFully: !sess.endedEarly
       });
 
+  /* THE DAY RECORD, once this sitting is saved.
+
+     The finish screen judged THIS SITTING — its own ledger plus a banked count
+     — and the strip, the card, the streak and the reports judged the day. On a
+     day trained in two goes, or finished after a pain stop, the two disagreed:
+     "complete, 3 of 3, streak earned" here and "partly done, 2 rounds, no
+     streak" on the strip she looked at next. So once the row is saved, every
+     day-level fact below is read off dayRecordFor — the same record every
+     other screen reads — and the live ledger is only asked while the session
+     is still running, or for a care pass (whose record is the day's care, not
+     its training). */
+  const dayRec = (sessionDone && sess.savedEntry && !explore && liveOutcome.state !== "recovery")
+    ? dayRecordFor(sess.dayKey, sess.dayIso || null) : null;
+  const useRec = !!(dayRec && !dayRec.care && dayRec.outcome);
+
   /* The one value the finish screen switches on. Six states, in priority order:
      a failed save outranks everything (nothing was recorded, so nothing may be
-     claimed), then safety, then care, then what the ledger can actually prove. */
-  const completionState = explore ? "explore" : sess.saveFailed ? "save-failed" : liveOutcome.state;
+     claimed), then safety, then care, then what the day record says: complete
+     ⇔ the record's own `dayComplete`, which is the same fact the week strip
+     ticks and the log labels. */
+  const completionState = explore ? "explore" : sess.saveFailed ? "save-failed"
+    : useRec
+      ? (dayRec.safetyStop ? "safety-stop"
+         : !dayRec.outcome.countsAsTraining ? "none"
+         : dayRec.dayComplete ? "complete" : "partial")
+      : liveOutcome.state;
 
   /* A partial is not one outcome, it is two: the day that cleared the streak
      bar and the day that did not. Both were shown the same words — "part of the
      way, and it counts" — which is true of the work and silent about the thing
      she actually wants to know. The numbers to say which have been computed all
      along (js/outcome.js surfaces workRatio precisely so a screen can say how
-     far short it fell) and were read by nobody. */
-  const streakEarned = !!liveOutcome.countsForStreak;
+     far short it fell) and were read by nobody. The streak note is the DAY's:
+     `countsForStreak` on the record, never this sitting's alone. */
+  const streakEarned = useRec ? !!dayRec.countsForStreak : !!liveOutcome.countsForStreak;
   const streakFrozen = !!liveOutcome.streakFreeze;
-  const ratio = Number(liveOutcome.workRatio);
+  const ratio = Number(useRec ? dayRec.outcome.workRatio : liveOutcome.workRatio);
+  const askSize = useRec ? (Number(dayRec.expectedWork) || 0) : (sess.expectedWork || 0);
   const streakShortBy = Number.isFinite(ratio)
-    ? Math.max(1, Math.round((STREAK_WORK_FRACTION - ratio) * (sess.expectedWork || 0)))
+    ? Math.max(1, Math.round((STREAK_WORK_FRACTION - ratio) * askSize))
     : null;
   const completionKey = explore ? "explore" : completionState === "partial"
     ? (streakEarned ? "partial-streak" : "partial-short")
@@ -173,7 +198,7 @@ export function buildSessionVM(state) {
      moves short and a day half done. */
   const donePercent = Number.isFinite(ratio)
     ? Math.max(0, Math.min(100, Math.round(ratio * 100))) : null;
-  const skippedRows = (sess.ledger || []).filter(l => l && l.status === "skipped");
+  const skippedRows = (useRec ? dayRec.rows : (sess.ledger || [])).filter(l => l && l.status === "skipped");
   const skippedCount = skippedRows.length;
   const skippedNames = [...new Set(skippedRows.map(l => l.name).filter(Boolean))];
   const skippedPhrase = skippedCount
@@ -234,14 +259,49 @@ export function buildSessionVM(state) {
      startSession), so the line can say what every other number here is saying.
      On a first sitting bankedRounds is 0 and dayRoundsPlanned IS roundsPlanned,
      which is why nothing about a single-sitting day moves. */
-  const dayRoundsDone = Math.max(0, Number(sess.bankedRounds) || 0) + roundsDone;
-  const dayRoundsAsked = Math.max(0, Number(sess.dayRoundsPlanned) || 0);
+  const dayRoundsDone = useRec ? Math.max(0, Number(dayRec.mainRoundsDone) || 0)
+    : Math.max(0, Number(sess.bankedRounds) || 0) + roundsDone;
+  const dayRoundsAsked = useRec ? Math.max(0, Number(dayRec.roundsPlanned) || 0)
+    : Math.max(0, Number(sess.dayRoundsPlanned) || 0);
+
+  /* WHAT THIS SITTING WAS PAID, with the day's settled total beside it when
+     the two differ. `xpEarned` is already the day-delta (see claimSessionXp),
+     so a resume that added one round reads "+90 XP this time · 360 today"
+     rather than a bare +90 that looks like the whole day was worth 90. */
+  const settledToday = useRec ? (Number(dayRec.settledXp) || 0) : null;
+  const xpLine = !sess.xpEarned ? ""
+    : (settledToday != null && settledToday !== sess.xpEarned)
+      ? "+" + sess.xpEarned + " XP this time · " + settledToday + " today"
+      : "+" + sess.xpEarned + " XP";
+
+  /* THE PER-MOVE REVIEW — every planned performance of the day with its
+     verdict and the reason, off the record's plan (see dayPlanState and
+     moveReviewReason). Collapsed by default; the screen offers "See every
+     move". Same rows as the day card's expanded blocks. */
+  const REVIEW_PILL = {
+    done:    { icon: "✓", bg: "var(--mint)",      ink: "#fff" },
+    banked:  { icon: "✓", bg: "var(--mint)",      ink: "#fff" },
+    partial: { icon: "½", bg: "var(--sun)",       ink: "var(--sun-ink)" },
+    skipped: { icon: "⏭", bg: "var(--coral)",     ink: "#fff" },
+    missing: { icon: "—", bg: "var(--surface-2)", ink: "var(--ink-soft)" }
+  };
+  const moveReview = useRec && dayRec.plan ? (dayRec.plan.moves || []).map(m => {
+    const pill = REVIEW_PILL[m.status] || REVIEW_PILL.missing;
+    return {
+      name: m.name, circuit: m.circuit, round: m.round, status: m.status, icon: pill.icon,
+      roundLabel: (dayRec.plan.blocks.find(b => b.block === m.block && b.name === m.circuit) || {}).rounds > 1 ? "R" + m.round : "",
+      doseLabel: m.got === null || m.planned === null ? ""
+        : m.driver === "reps" ? m.got + " of " + m.planned + " reps" : m.got + "s of " + m.planned + "s",
+      reason: m.reason || "",
+      pillStyle: "width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;background:" + pill.bg + ";color:" + pill.ink + ";"
+    };
+  }) : [];
 
   /* One line per main round that did not count, naming the move that cost it.
      Deliberately factual and never scolding: she is told what happened and what
      "counting" means, not that she failed. A round short of ROWS is a round she
      did not reach, which is a different sentence from a round she trained short. */
-  const roundShortNotes = (liveOutcome.roundReport || [])
+  const roundShortNotes = ((useRec ? dayRec.mainRounds : liveOutcome.roundReport) || [])
     .filter(r => !r.counts)
     .map(r => {
       if (r.skipped.length) return `Round ${r.round} wasn't a full round — ${r.skipped[0]} got skipped.`;
@@ -256,7 +316,10 @@ export function buildSessionVM(state) {
     });
 
   const isResting = phase === "rest" || phase === "roundRest" || phase === "sectionRest";
-  const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath" || phase === "formcheck";
+  const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath" || phase === "formcheck" || phase === "repcheck";
+  // "Did you get all N?" — asked when Done lands before the coach's count
+  // finishes. See repCheckPrompt in js/engine.js.
+  const isRepCheck = phase === "repcheck";
   // The clean-check is asked ABOUT a move, so the move stays on screen — the
   // photo and the ring's spot hold the question, not the breath card.
   const isFormCheck = phase === "formcheck";
@@ -307,7 +370,6 @@ export function buildSessionVM(state) {
   const curPlanned = refTime(ex);
   const curActual = timerIsReps ? sess.exElapsed : Math.max(0, (sess.timerMax || 0) - (sess.timerSecs || 0));
   const exOver = curActual > curPlanned + 2;
-  const paceColor = exOver ? "var(--sun-ink)" : "var(--aqua)";
 
   // Per-section progress + whole-session pacing. exDone counts every
   // completed exercise in every round, so the bar actually reaches 100%
@@ -323,9 +385,30 @@ export function buildSessionVM(state) {
   const secNames = { warmup: "Warm-Up", coordination: "Coordination", main: "Main", prep: "Prep", finisher: "Finisher", [SKILL_BLOCK]: COPY.skillBlockLabel, recovery: "Recovery" };
   const progressLabel = (secNames[circuit.block] || "") + " · " + Math.min(sess.ei + 1, circuit.exercises.length) + " of " + circuit.exercises.length;
   const sessionTimePct = Math.min(100, Math.round(sess.elapsed / Math.max(1, sess.plannedSecs) * 100));
-  const roundLine = (roundsShown || 1) > 1 ? ((circuit.name || "") + " · Round " + sess.round + " of " + roundsShown) : "";
-  const roundDots = (roundsShown || 1) > 1 ? Array.from({ length: roundsShown }, (_, i) => ({
-    style: "width:10px;height:10px;border-radius:50%;flex-shrink:0;" + (i < sess.round - 1 ? "background:var(--mint);" : (i === sess.round - 1 ? "background:var(--aqua);" : "background:var(--surface-2);border:1.5px solid var(--hairline);box-sizing:border-box;"))
+  /* THE DOTS SHOW ROUNDS THAT COUNTED, in the colour the finish screen will
+     use for them. They used to be drawn off the round NUMBER: every round
+     before the current one green whether or not it counted, the current one
+     always in the accent, and once the main block ended the finisher's own
+     "round 1" reset the line to one accent dot — so after three of three she
+     saw one green at most, and never three. Green is now the day's counted
+     rounds — the banked ones plus the ones this sitting's ledger proves, the
+     same `dayRoundsDone` the finish screen prints — the accent is the round
+     she is in, and the rest are hollow. The line is only about the main
+     block: shown while she is in it, and kept, with its verdict, once she has
+     come out the other side. */
+  const mainIdx = circuits.map((c, i) => c.block === "main" ? i : -1).filter(i => i >= 0);
+  const inMain = circuit.block === "main";
+  const mainFinished = !inMain && mainIdx.length > 0 && mainIdx.every(i => i < sess.ci);
+  const showRoundLine = (inMain || mainFinished) && (roundsShown || 1) > 1;
+  const roundsCounted = Math.min(roundsShown, dayRoundsDone);
+  const roundLine = !showRoundLine ? ""
+    : mainFinished ? "Main · " + roundsCounted + " of " + roundsShown + " done"
+    : (circuit.name || "") + " · Round " + sess.round + " of " + roundsShown;
+  const roundDots = showRoundLine ? Array.from({ length: roundsShown }, (_, i) => ({
+    style: "width:10px;height:10px;border-radius:50%;flex-shrink:0;"
+      + (i < roundsCounted ? "background:var(--mint);"
+        : (inMain && i === sess.round - 1) ? "background:var(--aqua);"
+        : "background:var(--surface-2);border:1.5px solid var(--hairline);box-sizing:border-box;")
   })) : [];
 
   // Exercise timeline (left pane list)
@@ -475,8 +558,11 @@ export function buildSessionVM(state) {
   const quizAnswered = sess.quizPick != null;
   const quizOpts = QZ.opts.map((o, i) => ({
     label: o.t, idx: i,
+    // One answer per question: the options go grey and dead after the reveal.
+    disabled: quizAnswered,
     prefix: quizAnswered ? (o.ok ? "✓" : (sess.quizPick === i ? "✕" : "")) : String.fromCharCode(65 + i),
-    style: "display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px 16px;border-radius:16px;border:3px solid;cursor:pointer;font-weight:800;font-size:15px;font-family:inherit;box-sizing:border-box;"
+    style: "display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px 16px;border-radius:16px;border:3px solid;font-weight:800;font-size:15px;font-family:inherit;box-sizing:border-box;"
+      + (quizAnswered ? "cursor:default;" : "cursor:pointer;")
       + (!quizAnswered ? "border-color:var(--hairline);background:var(--surface);color:var(--ink);"
         : o.ok ? "border-color:var(--mint);background:var(--mint-wash);color:var(--mint-ink);"
         : sess.quizPick === i ? "border-color:var(--coral);background:color-mix(in srgb, var(--coral) 12%, #fff);color:var(--coral);"
@@ -579,9 +665,8 @@ export function buildSessionVM(state) {
     curExTransfer: ex.transfer || "",
     curExPhotoUrl: exercisePhotoUrl(ex.name || "rest", "Timer"),
     curExPhotoSources: photoSources(exercisePhotoUrl(ex.name || "rest", "Timer")),
-    exActualDisplay: fmtMMSS(curActual), exPlannedDisplay: fmtMMSS(curPlanned),
-    exPacePct: Math.round((curPlanned > 0 ? Math.min(1, curActual / curPlanned) : 0) * 100),
-    paceColor, overNudge: !!(exOver && timerIsReps),
+    exActualDisplay: fmtMMSS(curActual),
+    overNudge: !!(exOver && timerIsReps),
     upNextName: sess.upNextName, upNextDose: sess.upNextDose,
 
     /* ---- live coach state -------------------------------------------------
@@ -620,6 +705,10 @@ export function buildSessionVM(state) {
     doneLabel: explore ? "Next move ▶"
       : isResting ? "⏭ Skip Rest"
       : isFormCheck ? "Move on →"
+      // On the rep question, Done means "the coach's count is fine" — the
+      // card's own buttons are the answers, and the label must not read as
+      // a fourth one that means "all of them".
+      : isRepCheck ? "Keep coach's count →"
       : sess.announceResolver ? "▶ Go"
       : "✓ Done — Next",
 
@@ -628,6 +717,16 @@ export function buildSessionVM(state) {
     microAnswered: !!sess.microLoop, microCorrectAnswer: MICRO_LOOP.a,
     microPicked: sess.microLoop ? sess.microLoop.answer : null,
     breathText: BREATH_REHEARSAL,
+    /* The rep question. Three answers and the rule in one line — a kid who
+       finished before the coach did is being asked, not told off. */
+    isRepCheck,
+    repCheckQuestion: "Did you get all " + (sess.repsTarget || 0) + "?",
+    repCheckRule: "All " + (sess.repsTarget || 0) + " counts the move.",
+    repCheckOpts: [
+      { arg: "all",    label: "All of them", bg: "var(--mint)",    ink: "#fff",           edge: "var(--mint-deep)" },
+      { arg: "almost", label: "Almost",      bg: "var(--sun)",     ink: "var(--sun-ink)", edge: "var(--sun-deep)" },
+      { arg: "some",   label: "Some",        bg: "var(--surface)", ink: "var(--ink)",     edge: "var(--hairline)" }
+    ],
 
     // complete screen
     endedEarly: sess.endedEarly, painFlag: sess.painFlag,
@@ -670,6 +769,10 @@ export function buildSessionVM(state) {
        short the whole time and simply never said. */
     roundShortNotes,
     xpEarned: sess.xpEarned, leveledUp: sess.leveledUp,
+    xpLine,
+    // The per-move review, and whether she has opened it.
+    moveReview, moveReviewOpen: !!state.moveReviewOpen,
+    moveReviewLegend: moveReview.length ? moveReviewLegend() : "",
     /* MOOD, REFLECTION AND THE QUIZ ONLY EXIST IF THERE IS A RECORD TO PUT
        THEM ON.
 

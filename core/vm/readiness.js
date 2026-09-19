@@ -5,9 +5,12 @@
      severity, light, overridden, resultSource, readinessDone }
    ============================================================ */
 
-import { READINESS_QS, BODY_ZONES, SEVERITY_LEVELS, LIGHT_META, BODY_RESULTS, LIGHT_ROUNDS } from "../data.js";
+import { READINESS_QS, BODY_ZONES, SEVERITY_LEVELS, LIGHT_META, BODY_RESULTS, LIGHT_ROUNDS, DAYS } from "../data.js";
 import { settings, loadReadiness } from "../store.js";
 import { ATHLETE_DEFAULT } from "../sport.js";
+import { dayRecordFor } from "../outcome.js";
+import { planResume, roundsForLight } from "../engine.js";
+import { plural } from "../util.js";
 
 export function newReadinessFlow(dayKey, practice) {
   return {
@@ -284,9 +287,39 @@ export function buildReadinessVM(r, isWide) {
     ? "Body Check said " + lightWord(bodyLight) + ". Quick check said "
       + lightWord(readinessLight) + ". Today runs the smaller one."
     : "";
-  const resultDesc = showBodyResult ? BR.desc : light.desc;
+  /* WHAT WILL ACTUALLY RUN, before the card promises anything.
+
+     The light's own copy says "Full 3 rounds. Start Training!" whatever the
+     day already holds. A completed red day, re-checked green in the evening,
+     was told that and then started nothing. So when today's record — or the
+     live progress record — already holds work, the card reads the remaining
+     ask off the same function the engine starts from (planResume: the chosen
+     light lowered by the locked one, minus what is banked) and says that
+     instead: "2 rounds left today — still to do: …", or that today is done. */
+  const todayAsk = (() => {
+    const day = DAYS[r.dayKey] || {};
+    if (!r.dayKey || r.practice || day.spa || lightKey === "recovery") return null;
+    let rec = null, plan = null;
+    try { rec = dayRecordFor(r.dayKey); plan = planResume(r.dayKey, lightKey); } catch { return null; }
+    if (!plan) return null;
+    const banked = (plan.bankedRounds || 0) > 0
+      || Object.values(plan.bankedMoves || {}).some(l => Array.isArray(l) && l.length > 0);
+    if (!rec && !banked) return null;                         // a fresh day: the light's own copy stands
+    const runs = (plan.circuits || []).filter(c => c.block !== "prep");
+    if (!runs.length) return { finished: true, desc: "Today is already finished — Explore the moves?" };
+    const full = roundsForLight(plan.light);
+    const blocksLeft = [...new Set(runs.map(c => c.name))];
+    const roundsPart = plan.mainOwed > 0
+      ? plural(plan.mainOwed, "round") + " left today" + (plan.mainOwed < full ? " (" + (full - plan.mainOwed) + " already done)" : "")
+      : "No main rounds left today";
+    return { finished: false, desc: roundsPart + " — still to do: " + blocksLeft.join(", ") + "." };
+  })();
+  const resultDesc = todayAsk ? todayAsk.desc : showBodyResult ? BR.desc : light.desc;
   // action encoded for the delegated handler: continue | retry | back
-  const resultCta = showBodyResult
+  const resultCta = todayAsk && todayAsk.finished
+    ? { color: light.btnColor, deep: light.btnDeep, text: light.btnText || "#fff", icon: "🏠", label: "Back to Today",
+        action: "back", secondaryLabel: "", secondaryAction: "" }
+    : showBodyResult
     ? { color: BR.ctaColor, deep: BR.ctaDeep, text: BR.ctaText || "#fff", icon: BR.ctaIcon, label: BR.cta,
         action: BR.action, secondaryLabel: BR.secondaryLabel || "", secondaryAction: BR.secondary || "" }
     : { color: light.btnColor, deep: light.btnDeep, text: light.btnText || "#fff", icon: light.btnIcon, label: light.btnLabel,
@@ -354,6 +387,8 @@ export function buildReadinessVM(r, isWide) {
     noMarksLight: LIGHT_NAME[r.readinessLight || "green"] || "Green",
     noMarksCtaLabel: "Nothing feels off now",
     isBodyResultPath, resultDesc, resultCta,
+    // What today's remaining ask is, when the day already holds work.
+    todayFinished: !!(todayAsk && todayAsk.finished), todayAskLine: todayAsk ? todayAsk.desc : "",
     suggestionLine, combinedLine, wasOverridden, suggestedLight: suggested,
     bodyLight, readinessLight,
     // Pain severity 3 ("changed movement") must not be self-cleared: require an

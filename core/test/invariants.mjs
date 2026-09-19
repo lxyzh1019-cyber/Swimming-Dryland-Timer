@@ -20,7 +20,7 @@
    Run by `npm test`.
    ============================================================ */
 
-import { data, util, store, engine, outcome, svm, tvm, pvm, gvm, gscreen, overlays,
+import { data, util, store, engine, outcome, svm, tvm, pvm, gvm, gscreen, sscreen, tscreen, rvm, overlays,
          runSession, answerChecks } from "./harness.mjs";
 
 let passed = 0;
@@ -772,6 +772,335 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
   same(res.xp, 0, "today's card pays once a day and no more");
   same(store.loadQuiz().dayXp || 0, xpBefore, "and a repeat costs the day's ceiling nothing");
   localStorage.clear(); store.migrate();
+}
+
+/* ============================================================
+   N+4. THE COACH'S QUIZ TAKES ONE ANSWER
+
+   Every tap on the end-of-session card re-selected. The XP was guarded — only
+   the first pick was priced — but the screen was not: a wrong first answer
+   followed by a tap on the green one read "Nailed it!", and the ledger
+   remembered the truth. The Quiz Deck was already locked; this is the same
+   rule on the same kind of card.
+   ============================================================ */
+{
+  localStorage.clear(); store.migrate();
+  /* A real finished session, so the finish screen has a saved row to stand on. */
+  await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, answerChecks());
+  ok(engine.sess.phase === "done" && !!engine.sess.savedEntry, "the session finished and saved");
+  const q = svm.sessionQuizFor(engine.sess.dayKey);
+  const wrong = q.opts.findIndex(o => !o.ok), right = q.opts.findIndex(o => o.ok);
+  ok(wrong >= 0 && right >= 0, "the day's question has a right and a wrong answer to pick between");
+
+  engine.setQuizPick(wrong);
+  const ledgerBefore = JSON.stringify(store.loadQuiz().qLedger || {});
+  const vmBefore = svm.buildSessionVM({ isWide: true, detailEx: null });
+  same(engine.sess.quizPick, wrong, "the first tap is recorded");
+  ok(/Good try/.test(vmBefore.quizFeedback), "and a wrong first answer reads as a good try");
+
+  engine.setQuizPick(right);
+  same(engine.sess.quizPick, wrong, "a second tap on the right answer changes nothing");
+  const vmAfter = svm.buildSessionVM({ isWide: true, detailEx: null });
+  same(vmAfter.quizFeedback, vmBefore.quizFeedback, "so the verdict on screen is the one she earned");
+  ok(!/Nailed it/.test(vmAfter.quizFeedback), "and never turns into \"Nailed it!\"");
+  same(JSON.stringify(store.loadQuiz().qLedger || {}), ledgerBefore, "and the quiz ledger is untouched by it");
+
+  /* The options go dead after the reveal, so the second tap cannot even be made. */
+  ok(vmAfter.quizOpts.every(o => o.disabled), "every option is disabled once she has answered");
+  const html = sscreen.sessionScreen(vmAfter);
+  const dead = (html.match(/data-action="quizPick"[^>]*\sdisabled/g) || []).length;
+  same(dead, q.opts.length, "and the rendered buttons carry `disabled`");
+  engine.exitSession();
+  localStorage.clear(); store.migrate();
+}
+
+/* ============================================================
+   14. ONE VERDICT EVERYWHERE
+
+   The day record (dayRecords in js/outcome.js) is the one authority, and
+   every screen is a view of it. This drives four of the day-record fixtures
+   through the REAL engine on a movable wall clock — the same builders as
+   core/test/dayrecords.mjs, replicated here because that suite is a script
+   — and then asks every screen the same questions the record answers:
+
+     the Today strip chip · the day card's badge, XP, rounds and streak note
+     Progress's week column, period board and log label
+     the Grown-up board's Completed count and adherence
+     the finish screen's completionState, rounds line and streak note
+
+   Each must equal the record's verdict. A failure here is the app telling a
+   ten-year-old two different things about one day.
+   ============================================================ */
+{
+  const RealDate = Date;
+  const RT = { si: setInterval, ci: clearInterval, st: setTimeout, ct: clearTimeout };
+  let clock = null;
+  const clockAt = (iso) => {
+    let now = new RealDate(iso).getTime(), id = 1;
+    const timers = new Map();
+    class FakeDate extends RealDate {
+      constructor(...a) { super(...(a.length ? a : [now])); }
+      static now() { return now; }
+    }
+    globalThis.Date = FakeDate;
+    globalThis.setInterval = (fn, ms) => { const k = id++; timers.set(k, { fn, ms, next: now + ms, repeat: true }); return k; };
+    globalThis.setTimeout  = (fn, ms) => { const k = id++; timers.set(k, { fn, ms: ms || 0, next: now + (ms || 0), repeat: false }); return k; };
+    globalThis.clearInterval = k => timers.delete(k);
+    globalThis.clearTimeout = k => timers.delete(k);
+    clock = {
+      async advance(ms, step = 50) {
+        for (let d = 0; d < ms; d += step) {
+          now += step;
+          [...timers.entries()].forEach(([k, t]) => {
+            if (t.next > now) return;
+            if (t.repeat) t.next = now + t.ms; else timers.delete(k);
+            t.fn();
+          });
+          await new Promise(r => process.nextTick(r));
+        }
+      },
+      set(iso) { now = new RealDate(iso).getTime(); },
+      restore() {
+        globalThis.Date = RealDate;
+        Object.assign(globalThis, { setInterval: RT.si, clearInterval: RT.ci, setTimeout: RT.st, clearTimeout: RT.ct });
+      }
+    };
+    return clock;
+  };
+  const fresh = () => {
+    localStorage.clear(); store.migrate();
+    store.updateSettings({ coachVoiceOn: false, exerciseRestSeconds: 3, roundRestSeconds: 10, sectionRestSeconds: 5, cloudMirror: false });
+    store.saveGate({ unlocked: true, cleanWeeks: [] });
+    engine.exitSession();
+  };
+  const drive = async (opts, onTick) => {
+    engine.exitSession();
+    const run = engine.startSession(opts);
+    let ms = 0;
+    while (engine.sess.running && ms < 7200000) {
+      await clock.advance(1000); ms += 1000;
+      if (onTick) onTick(ms, engine.sess);
+    }
+    await run;
+    return { ...engine.sess };
+  };
+  const clean = s => { if (s.phase === "formcheck") { engine.pickClean(); return true; } return false; };
+  const honest = (ms, s) => { clean(s); };
+  const beatShort = (ms, s) => {
+    if (clean(s)) return;
+    if (s.phase === "repcheck") { engine.answerRepCheck("some"); return; }
+    if (s.phase === "work" && s.timerMax > 0 && !s.announceResolver && s.timerSecs > 0 && s.timerSecs <= Math.ceil(s.timerMax * 0.15)) engine.advance();
+    else if (s.phase === "reps" && s.byRepsResolver && s.repsTarget > 1 && s.repsCounted === s.repsTarget - 1) engine.advance();
+  };
+  const stopAt = (rounds, reason) => { let done = false; return (ms, s) => {
+    if (clean(s)) return;
+    if (!done && s.roundsCompleted >= rounds && ["work", "reps"].includes(s.phase) && s.running) {
+      done = true;
+      if (reason) { engine.openStopOverlay(); engine.endFromStop(reason); } else engine.endEarly();
+    }
+  }; };
+
+  const DAY = "monday";
+  const T = { start: "2026-09-14T21:00:00Z", read: "2026-09-14T22:30:00Z" };   // Monday 15:00 → read 16:30 Edmonton
+  const recordFor = () => outcome.dayRecords().find(r => r.dayKey === DAY && !r.care) || null;
+
+  /* Every screen, asked about one day, against the record. */
+  const everyScreenAgrees = (label, expect) => {
+    const rec = recordFor();
+    ok(rec, label + ": the day has a record");
+    same(rec.dayComplete, expect.complete, label + ": the record's verdict is what the fixture built");
+    const roundsText = rec.mainRoundsDone + " of " + rec.roundsPlanned + " main round" + (rec.roundsPlanned === 1 ? "" : "s");
+
+    // Today: the strip chip, the card's badge, XP, rounds and streak note, the flame chip.
+    const strip = tvm.weekStatuses();
+    same(strip[DAY], rec.dayComplete ? "done" : "partial", label + ": the Today strip chip is the record's verdict");
+    const tv = tvm.buildTodayVM({ selectedDay: DAY, expanded: {}, isWide: true });
+    same(/COMPLETED/.test(tv.dayView.badgeLabel), rec.dayComplete, label + ": the day card's badge is the record's verdict");
+    same(tv.dayView.earnedXpLabel, "+" + rec.settledXp + " XP earned", label + ": the day card's XP is the record's settled XP");
+    same(tv.dayView.roundsLabel, roundsText, label + ": the day card's rounds are the record's");
+    same(tv.dayView.minsLabel.split(" of ")[0], String(rec.minutes), label + ": the day card's minutes are the record's");
+    same(tv.dayView.movesLabel, rec.movements.performed + " of " + rec.movements.planned + " movements · "
+      + rec.performances.performed + " of " + rec.performances.planned + " performances",
+      label + ": the day card says both movement units, each by name");
+    same(/counts toward your streak/.test(tv.dayView.doneSub), !rec.dayComplete && rec.countsForStreak,
+      label + ": the card's streak note is the record's countsForStreak (a complete day needs no note)");
+    same(tv.statChips[0].value, String(outcome.scheduleStreak(outcome.dayRecords(), util.todayISODate())),
+      label + ": the flame chip is the schedule streak over the same records");
+    same(tv.statChips[0].value, rec.countsForStreak ? "1" : "0", label + ": and it counts this day exactly when the record does");
+
+    // Progress: the week column on the record's DATE, the period board, the log.
+    const pv = pvm.buildProgressVM({ progressScope: "4w", logScope: "month" });
+    const col = pv.weekDays.find(d => d.iso === rec.date);
+    ok(col && col.hasWork, label + ": Progress files the day under the date it was trained");
+    same(col.earlyLabel, rec.dayComplete ? "No" : "Yes", label + ": Progress's 'ended early' is the record's verdict");
+    same(col.roundsLabel, rec.mainRoundsDone + "/" + rec.roundsPlanned, label + ": Progress's rounds are the record's");
+    same(col.minsLabel, rec.minutes + "m", label + ": Progress's minutes are the record's");
+    same(col.performancesLabel, rec.performances.performed + "/" + rec.performances.planned, label + ": Progress's performances are the record's");
+    same(col.movementsLabel, rec.movements.performed + "/" + rec.movements.planned, label + ": Progress's movements are the record's");
+    same(col.streakMark, rec.countsForStreak ? "🔥" : "—", label + ": Progress's flame is the record's countsForStreak");
+    const rowOf = l => pv.periodStats.rows.find(x => x.label === l);
+    same(rowOf("Completion status").total, (rec.dayComplete ? 1 : 0) + " of 1", label + ": the period board's finished count is the record's verdict");
+    same(rowOf("XP earned").total, String(rec.settledXp), label + ": the period board's XP is the record's settled XP");
+    same(rowOf("Main rounds").total.split("  ")[0], rec.mainRoundsDone + " of " + rec.roundsPlanned, label + ": the period board's rounds are the record's");
+    same(pv.logItems.length, 1, label + ": the log holds one row for the day, however many sittings");
+    const logRow = pv.logItems[0];
+    same(logRow.lightLabel, rec.safetyStop ? "PAIN STOP" : rec.dayComplete ? String(rec.light).toUpperCase() : "ENDED EARLY",
+      label + ": the log's label is the record's verdict");
+    same(logRow.sittingsLabel, rec.fragments.length > 1 ? rec.fragments.length + " sittings" : "", label + ": and says how many sittings it took");
+    same(logRow.painNote, rec.hadPainStop && !rec.safetyStop ? "paused for pain" : "", label + ": a pain stop she came back from is a note, not the verdict");
+    same(pv.dayStreakVal, tv.statChips[0].value, label + ": Progress's streak is Today's streak");
+
+    // Grown-up: Completed, adherence, rounds, minutes, the grid.
+    const gv = gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics", isWide: true });
+    const indOf = l => gv.analytics.indicators.find(x => x.label === l);
+    same(indOf("Completed").total, (rec.dayComplete ? 1 : 0) + " of 1", label + ": the Grown-up board's Completed is the record's verdict");
+    same(indOf("Rounds").total, String(rec.mainRoundsDone), label + ": the Grown-up board's rounds are the record's");
+    same(indOf("Total time").total, rec.minutes + "m", label + ": the Grown-up board's minutes are the record's");
+    same(indOf("XP earned").total, String(rec.settledXp), label + ": the Grown-up board's XP is the record's settled XP");
+    same(gv.analytics.adherence, Math.round((1 / gv.analytics.scheduled) * 100), label + ": adherence is one kept day over the scheduled days so far");
+    same(gv.analytics.scheduled, expect.scheduled, label + ": and the scheduled days are Monday to today, Sunday excluded");
+    const cell = gv.analytics.consistency.cells.find(c => c.d === data.DAY_SHORT[util.edmontonDayKey()]);
+    ok(cell && (rec.dayComplete ? /var\(--mint\)/ : /var\(--sun\)/).test(cell.cellStyle), label + ": the consistency grid paints the record's verdict on the date it was trained");
+
+    // The finish screen, still on the sitting that just finished.
+    const fv = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+    same(fv.completionState, rec.dayComplete ? "complete" : "partial", label + ": the finish screen's completionState is the record's verdict");
+    same(fv.streakEarned, rec.countsForStreak, label + ": the finish screen's streak note is the record's countsForStreak");
+    same(fv.roundsLine, roundsText, label + ": the finish screen's rounds line is the record's");
+    ok(new RegExp("(^\\+|· )" + rec.settledXp + " (XP|today)").test(fv.xpLine), label + ": the finish screen names the day's settled XP (" + fv.xpLine + ")");
+    same(fv.moveReview.length, rec.plan.moves.length, label + ": the finish screen's per-move review is the record's plan, one row per performance");
+    same(fv.moveReview.length, rec.performances.planned, label + ": which is every planned performance");
+    return { rec, tv, pv, gv, fv };
+  };
+
+  const scenario = async (title, startIso, readIso, run, check) => {
+    fresh(); clockAt(startIso);
+    const r = await run();
+    clock.set(readIso);
+    await check(r);
+    clock.restore();
+  };
+
+  /* S2 · every move a beat short — she finished the plan, so it is COMPLETE everywhere. */
+  await scenario("S2", T.start, T.read, () => drive({ dayKey: DAY, light: "green" }, beatShort), () => {
+    const { rec, tv, fv } = everyScreenAgrees("S2", { complete: true, scheduled: 1 });
+    ok(rec.rows.some(l => l.status === "partial"), "S2: the ledger really holds partial rows");
+    const partials = rec.plan.moves.filter(m => m.status === "partial");
+    ok(partials.length > 0, "S2: so the review holds ½ rows");
+    ok(partials.every(m => /needs \d+s \(80%\) to count$|all \d+ to count$/.test(m.reason)),
+      "S2: and every ½ row says, in her units, what would have counted: " + JSON.stringify(partials.slice(0, 2).map(m => m.reason)));
+    ok(fv.moveReview.some(r => r.icon === "½"), "S2: the finish screen's review shows the ½ pill");
+    ok(tv.blocks.some(b => b.review.some(r => r.icon === "½")), "S2: and so does the day card's expanded block");
+    same(tv.reviewLegend, outcome.moveReviewLegend(), "S2: the card carries the one-line legend");
+    ok(/80% of the time or all reps/.test(tv.reviewLegend), "S2: which states the rule");
+    const html = tscreen.todayWide({ ...tv, blocks: tv.blocks.map(b => ({ ...b, bodyStyle: "" })) });
+    ok(html.includes(outcome.moveReviewLegend().replace(/&/g, "&amp;")), "S2: and the legend is rendered above the list");
+    ok(/data-move-review="partial"/.test(html), "S2: with a ½ row on the screen");
+    /* "+ ADD THEM BACK" IS OFFERED OFF THE RECORD. Nothing is owed on this
+       day, so the old card hid the offer — exactly when everything left was a
+       move she cut short. The offer follows the same function the engine
+       asks: shown whenever a redo would run something. */
+    const redo = engine.planResume(DAY, "green", { redoPartials: true }).circuits.filter(c => c.block !== "prep");
+    same(tv.dayView.ctaLabel, "Look at the moves", "S2: nothing is owed, so the button is explore");
+    same(!!tv.dayView.partialSkipLabel, redo.length > 0, "S2: and the cut-short moves are offered back exactly when a redo has something to run");
+    if (redo.length) ok(/you cut short can be done again today$/.test(tv.dayView.partialSkipLabel),
+      "S2: worded for a day with nothing else left: " + JSON.stringify(tv.dayView.partialSkipLabel));
+    const cardHtml = tscreen.todayWide(tv);
+    same(/data-action="goSessionRedo"/.test(cardHtml), redo.length > 0, "S2: with the + Add them back button on the card");
+  });
+
+  /* THE BODY CHECK READS THE DAY'S REMAINING ASK before promising rounds. A
+     day with one round banked is told "2 rounds left today", and a finished
+     day is told it is finished — never "Full 3 rounds" the engine will refuse. */
+  await scenario("BC", T.start, T.read, async () => {
+    await drive({ dayKey: DAY, light: "green" }, stopAt(1, null));
+    const half = rvm.buildReadinessVM(rvm.newReadinessFlow(DAY), true);
+    const left = engine.planResume(DAY, "green");
+    same(left.mainOwed, engine.roundsForLight("green") - 1, "BC: one round is banked, so two are owed");
+    ok(new RegExp("^" + left.mainOwed + " rounds left today \\(1 already done\\) — still to do: ").test(half.resultDesc),
+      "BC: the card says what will actually run: " + JSON.stringify(half.resultDesc));
+    ok(!/Full 3 rounds/.test(half.resultDesc), "BC: and never the light's own full promise");
+    same(half.resultCta.action, "continue", "BC: Start still starts");
+    clock.set("2026-09-14T22:00:00Z");
+    return drive({ dayKey: DAY, light: "green" }, honest);
+  }, () => {
+    const rec = recordFor();
+    same(rec.dayComplete, true, "BC: the day is now finished");
+    const doneCard = rvm.buildReadinessVM(rvm.newReadinessFlow(DAY), true);
+    same(doneCard.resultDesc, "Today is already finished — Explore the moves?", "BC: a finished day is told so, in those words");
+    same(doneCard.todayFinished, true, "BC: and the VM says why");
+    same(doneCard.resultCta.action, "back", "BC: the button goes back to Today instead of starting nothing");
+    same(doneCard.resultCta.label, "Back to Today", "BC: and says so");
+    // A fresh day keeps the light's own copy: nothing banked, nothing to warn about.
+    localStorage.clear(); store.migrate();
+    const freshCard = rvm.buildReadinessVM(rvm.newReadinessFlow(DAY), true);
+    same(freshCard.todayAskLine, "", "BC: a fresh day carries no remaining-ask line");
+    same(freshCard.resultCta.action, "continue", "BC: and starts as before");
+  });
+
+  /* S5 · two devices: one day, one record, however the ids fell. */
+  await scenario("S5", T.start, T.read, async () => {
+    await drive({ dayKey: DAY, light: "green" }, stopAt(1, null));
+    store.clearDayProgress(DAY);                       // device two never had the record
+    clock.set("2026-09-14T23:00:00Z");
+    return drive({ dayKey: DAY, light: "green" }, honest);
+  }, () => {
+    const { rec, pv, fv } = everyScreenAgrees("S5", { complete: true, scheduled: 1 });
+    same(rec.fragments.length, 2, "S5: two sittings");
+    same(pv.logItems[0].sittingsLabel, "2 sittings", "S5: the log says so");
+    ok(/360 today$|^\+360 XP$/.test(fv.xpLine), "S5: the finish screen names the day's 360 beside this sitting's share: " + fv.xpLine);
+  });
+
+  /* S7 · Monday catch-up trained on Wednesday: Monday's chip, Wednesday's column. */
+  await scenario("S7", "2026-09-16T21:00:00Z", "2026-09-16T22:30:00Z",
+    () => drive({ dayKey: DAY, light: "green" }, honest), () => {
+    const { rec, pv } = everyScreenAgrees("S7", { complete: true, scheduled: 3 });
+    same(rec.date, "2026-09-16", "S7: the record is dated Wednesday");
+    const strip = tvm.weekStatuses();
+    same(strip.monday, "done", "S7: Monday's chip is ticked");
+    same(strip.wednesday, "today", "S7: and Wednesday's is still today's");
+    same(pv.weekDays.find(d => d.key === "wednesday").forLabel, "for Mon", "S7: Progress's Wednesday column says it was for Monday");
+    same(pv.weekDays.find(d => d.key === "monday").hasWork, false, "S7: and Monday's column holds nothing — the date decides the column");
+  });
+
+  /* S8 · pain stop after round one, come back and finish: a finished day, with a note. */
+  await scenario("S8", T.start, T.read, async () => {
+    await drive({ dayKey: DAY, light: "green" }, stopAt(1, "pain"));
+    clock.set("2026-09-14T22:00:00Z");
+    return drive({ dayKey: DAY, light: "green" }, honest);
+  }, () => {
+    const { rec, pv, gv } = everyScreenAgrees("S8", { complete: true, scheduled: 1 });
+    same(rec.hadPainStop, true, "S8: the pain stop is on the record");
+    same(pv.logItems[0].painNote, "paused for pain", "S8: the log notes it without making it the verdict");
+    ok(gv.analytics.hasStops, "S8: and Safety & Flags still lists the stop");
+  });
+
+  fresh();
+}
+
+/* ============================================================
+   15. NO SCREEN RE-DERIVES A DAY-LEVEL FACT
+
+   The rule, enforced on the source: nothing under core/vm/ or core/screens/
+   may re-group sittings into workouts, judge completion off a session's
+   state, walk the raw session list for streak dates, or date a session by its
+   finish stamp. Those are the four ways the screens used to disagree, and
+   each is a string that cannot appear. Whitelist nothing — fix the code.
+   ============================================================ */
+{
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const { fileURLToPath } = await import("node:url");
+  const path = await import("node:path");
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const banned = ['state === "complete"', "workoutInstances(", "streakDatesOf(", "edmontonISO(s.isoDate)"];
+  ["vm", "screens"].forEach(dir => {
+    const full = path.join(here, "..", dir);
+    readdirSync(full).filter(f => f.endsWith(".js")).forEach(f => {
+      const src = readFileSync(path.join(full, f), "utf8");
+      banned.forEach(needle => ok(!src.includes(needle),
+        "core/" + dir + "/" + f + " re-derives a day-level fact with `" + needle + "` — read the day record instead"));
+    });
+  });
 }
 
 console.log("✓ invariants passed (" + passed + " assertions)");

@@ -418,7 +418,7 @@ export function prizeDrawHtml(pd) {
       <div style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);line-height:1.1;">Pick a prize envelope!</div>
       <button type="button" data-action="closePrizeDraw" aria-label="Close" style="position:absolute;top:12px;right:12px;width:44px;height:44px;border-radius:50%;border:none;background:var(--surface-2);color:var(--ink-soft);font-size:18px;font-weight:900;cursor:pointer;">✕</button>
       ${hasPicked && !pd.waiting ? `<div style="font-family:var(--font-hand);font-size:22px;font-weight:700;color:var(--aqua-ink);">You picked — enjoy it! 🌟</div>` : ""}
-      ${pd.waiting ? `<div role="status" style="background:var(--sun-wash);border:2px solid var(--sun);border-radius:14px;padding:10px 14px;font-size:14px;font-weight:800;color:var(--sun-ink);line-height:1.45;max-width:420px;">Your prize is safe. The app is waiting to check in with your other device before it adds it — try again in a moment, or close this and pick it up from Progress later.</div>` : ""}
+      ${pd.waiting ? `<div role="status" style="background:var(--sun-wash);border:2px solid var(--sun);border-radius:14px;padding:10px 14px;font-size:14px;font-weight:800;color:var(--sun-ink);line-height:1.45;max-width:420px;">Your prize is safe. The app is waiting to check in with your other device before it adds it — try again in a moment, or close this and pick it up later with the 🎁 prize-draw button on your Progress page.</div>` : ""}
       <div style="display:flex;gap:12px;width:100%;justify-content:center;flex-wrap:wrap;">
         ${pd.cards.map((c, i) => {
           const revealed = pd.picked === i;

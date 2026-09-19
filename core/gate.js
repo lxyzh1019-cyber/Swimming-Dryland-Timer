@@ -68,9 +68,9 @@ export const UNGATED_ACTIONS = [
   "goSession", "goSessionRedo", "goExplore", "exitExplore", "goBack", "goToMove",
   "advance", "pauseTimer", "skipEx", "stopNow", "resumeFromStop", "endFromStop",
   "askEnd", "cancelEnd", "confirmEndEarly",
-  "askSkip", "cancelSkip", "confirmSkipEx", "pickIntent", "answerMicro",
+  "askSkip", "cancelSkip", "confirmSkipEx", "pickIntent", "answerMicro", "answerRepCheck",
   "pickClean", "pickWobbly", "skipFormCheck", "pickMood", "reflectWell",
-  "reflectNext", "quizPick", "exitSession",
+  "reflectNext", "quizPick", "exitSession", "toggleMoveReview",
   "openDetail", "openDetailCur", "openDetailAt", "watchVideo", "closeDetail", "resumeFromDetail",
   // her body check (the two adult decisions inside it are gated by name)
   "rAnswer", "rPickZone", "rSetZoneSev", "rClosePopup",
@@ -205,8 +205,11 @@ export function gateMode(wantsNewPin = false) {
   if (wantsNewPin) return "passkey";
   if (hasGrownupPin()) return "pin";
   // No PIN, and either the restore is still running or it brought history back.
-  // Waiting is a second; the passkey is the way through if it turns out there
-  // really is nothing to restore.
+  // Waiting is a second. A device restored from the cloud has the history but
+  // neither PIN nor passkey (both are device-local), so "passkey" here means
+  // the card offers to ENROL one — the platform demands Face ID / Touch ID /
+  // the passcode to create it, which is the adult proof — and the app then
+  // calls allowPinChoice so a PIN can be chosen for this device.
   return bootstrap === "checking" ? "checking" : "passkey";
 }
 

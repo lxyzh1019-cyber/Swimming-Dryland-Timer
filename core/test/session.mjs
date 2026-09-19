@@ -14,7 +14,14 @@ const escapeForRe = (t) => String(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
 const voiceOn = () => store.updateSettings({ coachSpeechOn: true, voiceStyle: "classic" });
-const answerChecks = (sess) => { if (sess.phase === "formcheck") { engine.pickClean(); return true; } return false; };
+/* Answers the prompts a run can park on. The rep question is answered "Some"
+   — the coach's count, which is exactly what every tap here recorded before
+   the question existed — so nothing below changes meaning by being asked. */
+const answerChecks = (sess) => {
+  if (sess.phase === "formcheck") { engine.pickClean(); return true; }
+  if (sess.phase === "repcheck") { engine.answerRepCheck("some"); return true; }
+  return false;
+};
 
 /* Any day with at least one timed move and one rep move in it. */
 const dayWith = (pred) => Object.keys(data.DAYS).find(k => !data.DAYS[k].spa
@@ -171,7 +178,9 @@ setSpeechDelay(0);
         setTimeout(() => engine.advance(), 100);   // the second half of a double tap
         return;
       }
-      if (tappedAt >= 0 && ms <= tappedAt + 3000 && sess.phase === "rest") restTicks++;
+      // A beat longer than the rest itself: Done before the count finished
+      // now asks "Did you get all N?", and answerChecks answers it a tick later.
+      if (tappedAt >= 0 && ms <= tappedAt + 4000 && sess.phase === "rest") restTicks++;
     }
   });
   ok(tappedAt > 0, "Done was double-tapped on a rep move (" + tappedMove + ")");
@@ -391,6 +400,13 @@ const stopInRoundTwo = (reason) => ({
     /* The cue MOVED to the ring; it was not copied there. */
     ok(count(html, new RegExp(escapeForRe(snap.currentEx.cue), "g")) === 1,
        name + ": the coach tip appears exactly once — moved, not duplicated");
+    /* The per-move "Elapsed" pace bar is gone: its planned time was reps × 3 s
+       and it filled before the coach's count did, so a full set read as ½.
+       The one planned time still printed says what it is. */
+    ok(!/id="s-ex-fill"/.test(html) && !/>Elapsed</.test(html),
+       name + ": there is no per-move Elapsed bar under the ring");
+    ok(/~\d+ min · estimate/.test(html),
+       name + ": and the session-time line calls its planned minutes an estimate");
   }
 
   /* The picture is the clock's tenant, not its landlord: it goes when the
@@ -589,6 +605,162 @@ const stopInRoundTwo = (reason) => ({
        "while a day she can still train keeps its own start button");
   }
   localStorage.clear(); store.migrate();
+}
+
+/* ---- DONE BEFORE THE COUNT FINISHED ASKS, ONCE ----------------------------
+
+   A rep move is graded on the coach's spoken count, and the coach is slower
+   than a kid who knows the move. She finished her eight while the coach was on
+   five, tapped Done, and the ledger said five of eight — partial — for a set
+   she did in full. Nothing asked her. Now something does: "Did you get all
+   8?" with All of them / Almost / Some, and the answer is what is recorded.
+   A Done after the count finished is what it always was. */
+{
+  store.updateSettings({ coachSpeechOn: false });
+  setSpeechDelay(0);
+  const vmNow = () => svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+
+  /* Tap Done part-way through the count, answer `answer`, and return the row. */
+  const cutAndAnswer = async (answer, seed) => {
+    let tapped = null, card = null, html = "", asked = false, spokenBefore = 0;
+    const s = await runSession({ dayKey: repsDay, light: "red", gateUnlocked: true, seed }, {
+      onTick: (ms, sess) => {
+        if (sess.phase === "formcheck") { engine.pickClean(); return; }
+        if (!tapped && sess.phase === "reps" && sess.byRepsResolver
+            && sess.repsCounted >= 1 && sess.repsCounted < sess.repsTarget) {
+          tapped = { name: sess.currentEx.name, coach: sess.repsCounted, target: sess.repsTarget };
+          spokenBefore = spoken.length;
+          engine.advance();
+          return;
+        }
+        if (tapped && sess.phase === "repcheck") {
+          asked = true;
+          if (!card) { card = vmNow(); html = sscreen.sessionScreen(card); }
+          engine.answerRepCheck(answer);
+          return;
+        }
+        if (tapped && sess.ledger.some(l => l.name === tapped.name) && sess.running) engine.endEarly();
+      }
+    });
+    const row = s.ledger.find(l => l.name === tapped.name);
+    return { tapped, asked, card, html, row, said: spoken.slice(spokenBefore) };
+  };
+
+  /* "All of them" — the whole set, done. */
+  const all = await cutAndAnswer("all", voiceOn);
+  ok(all.tapped && all.tapped.coach < all.tapped.target,
+     "Done was tapped at " + all.tapped.coach + " of " + all.tapped.target + " on " + all.tapped.name);
+  ok(all.asked && all.card && all.card.isRepCheck, "and the question came up in the ring's place");
+  ok(all.card.repCheckQuestion === "Did you get all " + all.tapped.target + "?",
+     "asking about the whole set: " + all.card.repCheckQuestion);
+  ok(all.card.repCheckRule === "All " + all.tapped.target + " counts the move.",
+     "with the rule in one line: " + all.card.repCheckRule);
+  ok((all.html.match(/data-action="answerRepCheck"/g) || []).length === 3
+     && /All of them/.test(all.html) && /Almost/.test(all.html) && /Some</.test(all.html),
+     "three answers, and no others");
+  ok(!/id="s-timer-text"/.test(all.html), "the count is paused — the rep ring is gone while she answers");
+  ok(!/data-action="askSkip"/.test(all.html), "and Skip is not offered over a question, as on any prompt");
+  ok(all.said.some(t => /Did you get them all\?/.test(t)), "the coach asks it out loud, in one line, when the voice is on");
+  ok(all.row && all.row.status === "done" && all.row.repsCounted === all.tapped.target,
+     "\"All of them\" records the full count and the move reads done (" + all.row.repsCounted + " of " + all.row.repsPlanned + ")");
+
+  /* "Some" — the coach's count, as before. */
+  const some = await cutAndAnswer("some");
+  ok(some.asked, "the question came up again");
+  ok(some.row && some.row.status === "partial" && some.row.repsCounted === some.tapped.coach,
+     "\"Some\" keeps the coach's count and the move reads partial (" + some.row.repsCounted + " of " + some.row.repsPlanned + ")");
+
+  /* "Almost" — the coach's count plus half of what was left, at least one. */
+  const almost = await cutAndAnswer("almost");
+  const c = almost.tapped.coach, t = almost.tapped.target;
+  const want = Math.min(t, Math.max(c + 1, c + Math.floor((t - c) / 2)));
+  ok(almost.row && almost.row.repsCounted === want,
+     "\"Almost\" records the coach's " + c + " plus half the rest: " + almost.row.repsCounted + " of " + t);
+  ok(almost.row.status === (want >= t ? "done" : "partial"), "and is graded on that number");
+
+  /* Done ON the card keeps the coach's count — it is not a fourth answer. */
+  {
+    let tapped = null, dismissedAt = -1, card = null;
+    const s = await runSession({ dayKey: repsDay, light: "red", gateUnlocked: true }, {
+      onTick: (ms, sess) => {
+        if (sess.phase === "formcheck") { engine.pickClean(); return; }
+        if (!tapped && sess.phase === "reps" && sess.byRepsResolver
+            && sess.repsCounted >= 1 && sess.repsCounted < sess.repsTarget) {
+          tapped = { name: sess.currentEx.name, coach: sess.repsCounted }; engine.advance(); return;
+        }
+        if (tapped && sess.phase === "repcheck") {
+          card = card || vmNow();
+          if (dismissedAt < 0) { dismissedAt = ms; engine.advance(); }
+          return;
+        }
+        if (tapped && sess.ledger.some(l => l.name === tapped.name) && sess.running) engine.endEarly();
+      }
+    });
+    const row = s.ledger.find(l => l.name === tapped.name);
+    ok(card && /coach's count/i.test(card.doneLabel), "the Done button says what it does on the card: " + card.doneLabel);
+    ok(row && row.repsCounted === tapped.coach, "and doing it keeps the coach's count (" + row.repsCounted + ")");
+  }
+
+  /* Done AFTER the count finished: no question. The only moment a finished
+     count is still on screen is the extra-reps offer of a ranged move. */
+  const rangedDay = dayWith(e => e.byReps && (data.exPrescription(e).repsHigh || 0) > data.exPrescription(e).reps);
+  if (rangedDay) {
+    let tapped = null, asked = false;
+    const s = await runSession({ dayKey: rangedDay, light: "red", gateUnlocked: true }, {
+      onTick: (ms, sess) => {
+        if (sess.phase === "formcheck") { engine.pickClean(); return; }
+        if (!tapped && sess.phase === "reps" && sess.byRepsResolver && sess.repsCounted >= sess.repsTarget) {
+          tapped = { name: sess.currentEx.name }; engine.advance(); return;
+        }
+        if (tapped && sess.phase === "repcheck") asked = true;
+        if (tapped && sess.ledger.some(l => l.name === tapped.name) && sess.running) engine.endEarly();
+      }
+    });
+    ok(tapped, "Done was tapped with the count already complete (" + tapped.name + ")");
+    ok(!asked, "and nothing was asked");
+    const row = s.ledger.find(l => l.name === tapped.name);
+    ok(row && row.status === "done" && row.repsCounted === row.repsPlanned, "the move reads done, as it always did");
+  } else {
+    ok(true, "no ranged rep move in this plan — nothing to prove about the extra-reps offer");
+  }
+  engine.exitSession();
+}
+
+/* ---- THE ROUND DOTS SHOW ROUNDS THAT COUNTED -----------------------------
+
+   The dots were drawn off the round NUMBER: every earlier round green whether
+   or not it counted, the current one always in the accent, and once main
+   ended the finisher's own "round 1" reset the line — so after three of three
+   she saw one green. Green is the day's counted rounds now, the accent is the
+   round she is in, and once main is behind her the line says so. */
+{
+  store.updateSettings({ coachSpeechOn: false });
+  setSpeechDelay(0);
+  const vmNow = () => svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+  const paint = (dots) => dots.map(d => /var\(--mint\)/.test(d.style) ? "mint"
+    : /var\(--aqua\)/.test(d.style) ? "accent" : "hollow");
+  let warm = null, second = null, after = null;
+  await runSession({ dayKey: timedDay, light: "green", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      if (answerChecks(sess)) return;
+      if (!["work", "reps"].includes(sess.phase) || !sess.currentEx) return;
+      const block = (sess.circuits[sess.ci] || {}).block;
+      if (!warm && block === "warmup") warm = vmNow();
+      if (!second && block === "main" && sess.round === 2) second = vmNow();
+      const mains = sess.circuits.map((c, i) => c.block === "main" ? i : -1).filter(i => i >= 0);
+      if (!after && block !== "main" && mains.length && mains.every(i => i < sess.ci)) after = vmNow();
+    }
+  });
+  ok(warm && warm.roundLine === "" && warm.roundDots.length === 0, "the warm-up carries no round line at all");
+  ok(second, "the run reached round two of main");
+  ok(/Round 2 of 3/.test(second.roundLine), "in round two the line says so: " + second.roundLine);
+  ok(paint(second.roundDots).join(",") === "mint,accent,hollow",
+     "and the dots read counted, in progress, to come: " + paint(second.roundDots).join(","));
+  ok(after, "the run went on past the main block");
+  ok(after.roundLine === "Main · 3 of 3 done", "after main the line gives main's verdict: " + after.roundLine);
+  ok(paint(after.roundDots).join(",") === "mint,mint,mint",
+     "with every counted round green: " + paint(after.roundDots).join(","));
+  engine.exitSession();
 }
 
 console.log("✓ session safety passed (" + passed + " assertions)");

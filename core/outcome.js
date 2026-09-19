@@ -57,12 +57,23 @@
    session; meanwhile a session of 7-of-8 reps on every move read as NOTHING,
    because only a `done` ledger row counted as work.
 
-   This module is the single answer. It is pure and dependency-free so the
-   store, the view-models and the tests can all import it without a cycle.
-   Nothing else may re-derive completion.
+   This module is the single answer. The scoring rules are pure functions of a
+   record, so the store, the view-models and the tests can all ask them without
+   a cycle. Nothing else may re-derive completion.
+
+   The DAY RECORD at the bottom of this file is the one exception: it reads the
+   session log, the event log and the day-progress record, and prices the day's
+   plan through the engine. Those imports are used only inside functions, never
+   while the module loads, which is what keeps the store -> outcome -> engine ->
+   store cycle safe at start-up.
    ============================================================ */
 
-import { edmontonISO } from "./util.js";
+import { edmontonISO, todayISODate, DAY_MS } from "./util.js";
+import { DAYS } from "./data.js";
+import { roundsForLight, assembleCircuits, lockedLightFromLog, dayPlanState,
+         countExpectedWork, countExpectedByRound, DONE_WORK_FRACTION, MIN_EXERCISE_SECS } from "./engine.js";
+import { loadSessions, loadEvents, loadDayProgress, dayRoundsPlanned, settledXpByDate,
+         XP_SHOWED_UP, XP_PER_ROUND } from "./store.js";
 
 /* Records written from this version carry `outcomeVersion`, which is what lets
    partial work count as work. Rows written before it keep the old done-only
@@ -74,9 +85,13 @@ import { edmontonISO } from "./util.js";
    what the day has already banked, which is what makes its ledger rows safe to
    merge per planned move — see mergeLedgerRows. v5 pays a round that fell short
    the fraction of it she actually did, instead of nothing — see roundPayCredit.
-   Each step is gated on the version that introduced it, so a record is always
-   read by the rules it was written under. */
-export const OUTCOME_VERSION = 5;
+   v6 stamps the row with the PROOF of work banked before it (`bankedRows` by
+   name and `bankedSecs`, instead of a bare count), records an override only
+   when an adult actually moved the light, and prices XP once per DAY off the
+   merged ledger rather than once per sitting — see dayRecords below and
+   settledDayXp in store.js. Each step is gated on the version that introduced
+   it, so a record is always read by the rules it was written under. */
+export const OUTCOME_VERSION = 6;
 
 /* How much of a session has to actually be there before the day counts toward
    the streak. Deliberately high: the streak is the app's loudest claim about
@@ -340,6 +355,60 @@ function worstRow(rs) {
     got: l.driver === "reps" ? l.repsCounted : l.actualSecs,
     planned: l.driver === "reps" ? l.repsPlanned : l.plannedSecs
   };
+}
+
+/* ---- WHY A MOVE COUNTED, OR DIDN'T, IN HER OWN UNITS -----------------------
+
+   Nothing ever showed, move by move, what counted and why: the day card listed
+   moves with dose and cue, the finish screen named short rounds but not moves,
+   and a kid tapping Done a beat early learned nothing from a "½". These are the
+   rules already stated in this file and in the engine, quoted back one move at
+   a time — DONE_WORK_FRACTION for the clock, the whole rep count for reps,
+   MIN_EXERCISE_SECS for an instant tap — so the sentence beside a move can
+   never disagree with the verdict on it. Factual, never scolding: what she
+   did, what was asked, what "counting" means.
+
+   `status` is one of done | partial | skipped | banked | missing — the last
+   two for a row the log cannot grade (proved earlier today, or never reached). */
+/* A function, not a constant: the engine's numbers are read inside it, after
+   both modules have loaded, which is what the import cycle above requires. */
+export function moveReviewLegend() {
+  return "✓ counts: " + Math.round(DONE_WORK_FRACTION * 100)
+    + "% of the time or all reps · ½ short · ⏭ skipped (under " + MIN_EXERCISE_SECS + "s or Skip)";
+}
+
+export function moveReviewReason(row, status) {
+  if (status === "banked") return "done earlier today";
+  if (status === "missing") return "not reached";
+  if (!row) return "";
+  const driver = row.driver || (Number(row.repsPlanned) > 0 ? "reps" : "time");
+  const got = driver === "reps" ? Math.round(Number(row.repsCounted) || 0) : Math.round(Number(row.actualSecs) || 0);
+  const planned = driver === "reps" ? Math.round(Number(row.repsPlanned) || 0) : Math.round(Number(row.plannedSecs) || 0);
+  if (status === "skipped") {
+    return (Number(row.actualSecs) || 0) >= MIN_EXERCISE_SECS
+      ? "skipped"
+      : "under " + MIN_EXERCISE_SECS + "s — counted as skipped";
+  }
+  if (status === "partial") {
+    if (driver === "reps") return got + " of " + planned + " reps — all " + planned + " to count";
+    if (planned > 0) {
+      const need = Math.ceil(planned * DONE_WORK_FRACTION);
+      return got + "s of " + planned + "s — needs " + need + "s (" + Math.round(DONE_WORK_FRACTION * 100) + "%) to count";
+    }
+    return "cut short";
+  }
+  return "";
+}
+
+/* The two numbers the review prints beside the reason, or nulls for a row
+   with nothing measurable on it (a banked row, a legacy row). */
+export function moveReviewDose(row) {
+  if (!row || row.banked) return { got: null, planned: null, driver: row && row.driver ? row.driver : null };
+  const driver = row.driver || (Number(row.repsPlanned) > 0 ? "reps" : "time");
+  const got = driver === "reps" ? Number(row.repsCounted) : Number(row.actualSecs);
+  const planned = driver === "reps" ? Number(row.repsPlanned) : Number(row.plannedSecs);
+  if (!Number.isFinite(planned) || planned <= 0) return { got: null, planned: null, driver };
+  return { got: Math.round(Math.max(0, Number(got) || 0)), planned: Math.round(planned), driver };
 }
 
 export function mainRoundsFromLedger(ledger, expectedByRound = null, outcomeVersion = null) {
@@ -833,4 +902,394 @@ export function freezeDatesOf(sessions) {
   return new Set(workoutInstances(sessions)
     .filter(w => w.outcome.streakFreeze)
     .map(w => w.date).filter(Boolean));
+}
+
+/* ============================================================
+   THE DAY RECORD — one authority, every screen a view of it
+
+   There was no single "day" in the engine. Each screen rebuilt the day from
+   raw session rows with its own date key, its own way of grouping sittings,
+   its own filter and its own rounding, and so the same Monday read "done" on
+   the strip, "partly done" on the card, "2 of 3" on Progress, "3 of 3" on the
+   Grown-up board and "complete" on the finish screen. This settles each
+   training day once:
+
+     identity   the weekday it was FOR (dayKey) plus the date it was trained on
+                (workoutDate: the start date, with the six-hour grace) — never
+                the device-local workoutInstanceId, so a morning on the iPad and
+                an afternoon on the phone are one workout;
+     evidence   the log's rows merged per planned move, plus the work the log
+                cannot see: the day-progress record while it exists, and the
+                `bankedRows` the next sitting stamped on its row once the record
+                was cleared. Both are marked `banked` so pace never grades a
+                row it cannot measure;
+     the ask    what the day was STARTED under — its first sitting's light and
+                rounds — lowered only by a genuine tier drop, never by a lower
+                light on a resume (that is what printed "2 of 1");
+     numbers    minutes summed in seconds and rounded once; rounds scored on the
+                merged ledger; movements in both units under both names;
+                completion; the round-priced XP; streak and freeze.
+
+   A pain stop is one sitting's fact, not the day's verdict: `hadPainStop` says
+   it happened, `safetyStop` says the day ENDED there with nothing finished
+   after it. Coming back and finishing is a finished day.
+   ============================================================ */
+
+const isCareRow = s => s.sessionType === "recovery" || s.sessionType === "spa";
+const byIso = (a, b) => String(a.isoDate).localeCompare(String(b.isoDate));
+const painRow = s => !!(s && (s.safetyStop || s.pain));
+
+/* Every planned instance of the day under one light and round cap, in plan
+   order, keyed the way dayPlanState keys them (block | absolute round | name). */
+function plannedInstances(dayKey, light, roundsPlanned) {
+  const full = roundsForLight(light);
+  const circuits = assembleCircuits(dayKey, light,
+    Number.isFinite(roundsPlanned) && roundsPlanned < full ? { mainRounds: roundsPlanned } : {});
+  const out = [];
+  circuits.forEach(c => {
+    const rb = Number.isFinite(Number(c.roundBase)) ? Number(c.roundBase) : 1;
+    for (let r = 1; r <= c.rounds; r++) c.exercises.forEach(ex => {
+      if (ex.rounds && r > ex.rounds) return;
+      out.push({ block: c.block, round: rb + r - 1, name: ex.name });
+    });
+  });
+  return out;
+}
+
+/* The day's ask is lowered only by a genuine tier drop — a row that says so,
+   or a tier_drop event inside the day's span — never by the plain minimum
+   across sittings: a lower-light resume also stamps a smaller dayRoundsPlanned,
+   and taking the minimum is exactly what printed "2 of 1". */
+function tierDropCap(frags, events) {
+  let cap = Infinity;
+  frags.forEach(f => {
+    if (Number(f.tierDropped) > 0 && Number.isFinite(f.dayRoundsPlanned)) cap = Math.min(cap, f.dayRoundsPlanned);
+  });
+  const t0 = Math.min(...frags.map(f => new Date(f.isoDate).getTime() - (Number(f.durationSecs) || 0) * 1000 - 3600000));
+  const t1 = Math.max(...frags.map(f => new Date(f.isoDate).getTime()));
+  (events || []).forEach(e => {
+    if (e && e.type === "tier_drop" && e.day === frags[0].dayKey && e.t >= t0 && e.t <= t1 && Number(e.rounds) > 0) {
+      cap = Math.min(cap, e.rounds);
+    }
+  });
+  return cap;
+}
+
+/* Rows the log cannot see, from the two places they survive.
+
+   Source A is the live day-progress record: a v6 record keeps its rows by name
+   (see bankMove in engine.js); an older record only knows counts, and those
+   are reconstructed the way the old app did — a main round the log holds ANY
+   row for is judged by the log, never by a count, and the silent rounds are
+   filled in plan order.
+
+   Source B is what each saved sitting stamped about the work banked before it
+   ran. A v6 row carries `bankedRows` by name. A pre-v6 row carries only
+   `bankedCredit` and `bankedRounds`, counts of everything banked before it —
+   rows from earlier SAVED sittings (in the log) plus rows from a sitting that
+   never saved (not in the log). Only the second kind is missing, so the
+   counts are taken net of what the earlier rows already prove. The engine paid
+   XP on those stamps, so they are evidence, not invention. Prep is never
+   synthesised: the engine never banks it. */
+function bankedRowsFor(planned, logRows, prog, frags, expectedByRound, version) {
+  const out = [];
+  const seen = new Set(logRows.map(logicalRowId));
+  const add = (p, source, extra = {}) => {
+    const id = logicalRowId(p);
+    if (seen.has(id) || p.block === "prep") return;
+    seen.add(id);
+    out.push({ block: p.block, round: Number(p.round || 1), name: p.name, status: "done",
+               ...extra, banked: true, source });
+  };
+  const logRoundSet = new Set(logRows.filter(r => r.block === "main").map(r => Number(r.round || 1)));
+  const silentRounds = [...new Set(planned.filter(p => p.block === "main" && !logRoundSet.has(p.round)).map(p => p.round))]
+    .sort((a, b) => a - b);
+  const bankRounds = (n, source) => silentRounds.slice(0, Math.max(0, n))
+    .forEach(r => planned.forEach(p => { if (p.block === "main" && p.round === r) add(p, source); }));
+
+  if (prog) {
+    if (Array.isArray(prog.rows)) {
+      prog.rows.forEach(r => { if (r && r.status === "done") add(r, "record", { secs: Number(r.secs) || 0 }); });
+    } else {
+      const logCounted = mainRoundReport(logRows, expectedByRound, version).filter(r => r.counts).length;
+      bankRounds((Number(prog.mainRoundsCompleted) || 0) - logCounted, "record");
+      const doneBlocks = new Set(prog.done || []);
+      planned.forEach(p => {
+        if (p.block !== "main" && (doneBlocks.has(p.block) || ((prog.moves || {})[p.block] || []).includes(p.name))) add(p, "record");
+      });
+    }
+  }
+
+  const stamped = frags.filter(f => Array.isArray(f.bankedRows));
+  if (stamped.length) {
+    stamped.forEach(f => f.bankedRows.forEach(r => {
+      if (r && r.name && r.block && r.status !== "skipped") add(r, "row", { secs: Number(r.secs) || 0 });
+    }));
+    return out;
+  }
+  const last = frags[frags.length - 1];
+  if (!last || Number(last.outcomeVersion) >= 6) return out;
+  const lastIds = new Set((last.ledger || []).map(logicalRowId));
+  const priorRows = logRows.filter(r => !lastIds.has(logicalRowId(r)));
+  const priorCounted = mainRoundReport(priorRows, expectedByRound, version).filter(r => r.counts).length;
+  const priorDone = priorRows.filter(r => r.status === "done" && r.block !== "prep").length;
+  let credit = (Number(last.bankedCredit) || 0) - priorDone;
+  if (credit <= 0) return out;
+  const before = out.length;
+  bankRounds((Number(last.bankedRounds) || 0) - priorCounted, "row");
+  credit -= out.length - before;
+  planned.forEach(p => {
+    if (p.block !== "main" && credit > 0 && !seen.has(logicalRowId(p))) { add(p, "row"); credit--; }
+  });
+  return out;
+}
+
+/* WHAT A DAY IS WORTH, priced once.
+
+   Showing up pays once per day — a resume never re-earns it — and each main
+   round pays once off the MERGED ledger (roundPayCredit, so a short round is
+   still paid the fraction she did), capped by the day's own ask. A pain-stop
+   sitting contributes the rounds it finished when she comes back and goes on;
+   a day that ENDS in a pain stop still pays nothing for that sitting, which is
+   the promise the README makes — so on such a day only the rows the other
+   sittings proved are priced. A recovery pass pays its show-up credit as it
+   always has. Rows that exist only in this device's live day-progress record
+   are never priced: XP with no saved row behind it is how a total drifts away
+   from the history that is supposed to explain it. */
+function dayPrice({ frags, careFrags, rows, safetyStop, expectedByRound, version, roundsPlanned }) {
+  const showedUp = frags.some(f => !painRow(f) && outcomeOf(f).countsAsTraining);
+  const careShowUp = careFrags.some(f => f.sessionType === "recovery" && !painRow(f));
+  let payRows = rows.filter(r => r.source !== "record");
+  if (safetyStop) {
+    const painIds = new Set(frags.filter(painRow).reduce((a, f) => a.concat(f.ledger || []), []).map(logicalRowId));
+    const cleanIds = new Set(frags.filter(f => !painRow(f)).reduce((a, f) => a.concat(f.ledger || []), []).map(logicalRowId));
+    payRows = payRows.filter(r => r.banked || cleanIds.has(logicalRowId(r)) || !painIds.has(logicalRowId(r)));
+  }
+  const rounds = mainRoundReport(payRows, expectedByRound, version).reduce((a, r) => a + roundPayCredit(r), 0);
+  const cap = XP_SHOWED_UP + XP_PER_ROUND * Math.max(0, Number(roundsPlanned) || 0);
+  const raw = (showedUp ? XP_SHOWED_UP : 0) + (careShowUp ? XP_SHOWED_UP : 0) + Math.round(XP_PER_ROUND * rounds);
+  return Math.min(cap, raw);
+}
+
+/* Build one record per training day.
+
+   opts.sessions / opts.events / opts.dayProgress replace the stores (tests,
+   and the XP settlement, which must price the LOG alone). opts.priceOnly
+   skips the settled-XP lookup — the settlement itself calls this, so the
+   lookup would recurse. */
+export function dayRecords(opts = {}) {
+  const sessions = (opts.sessions || loadSessions()).filter(s => s && !s.practice);
+  const events = opts.events || loadEvents();
+  /* A day-progress record is fresh for six hours past midnight at most (see
+     loadDayProgress), so only today's and yesterday's records can be live.
+     Older dates are not asked, which is also what keeps a season of records
+     from re-reading storage once per day. */
+  const today = todayISODate();
+  const liveDates = new Set([today, shiftISO(today, -1)]);
+  const progressFor = opts.dayProgress || (k => loadDayProgress(k));
+  const dayProgress = (dayKey, date) => (liveDates.has(date) ? progressFor(dayKey) : null);
+  const plans = new Map();
+  const plannedFor = (dayKey, light, rounds) => {
+    const k = dayKey + "|" + light + "|" + rounds;
+    if (!plans.has(k)) plans.set(k, plannedInstances(dayKey, light, rounds));
+    return plans.get(k);
+  };
+  const groups = new Map();
+  sessions.forEach(s => {
+    const key = String(s.dayKey) + "|" + workoutDate([s]);
+    if (!groups.has(key)) groups.set(key, { train: [], care: [] });
+    groups.get(key)[isCareRow(s) ? "care" : "train"].push(s);
+  });
+  /* A day whose only proof is the live record — a first sitting that crashed
+     or never saved — is still a day she trained on. It is shown, never paid
+     (see dayPrice). Only today's own records can be live, by construction. */
+  if (!opts.sessions) {
+    Object.keys(DAYS).forEach(dayKey => {
+      const prog = progressFor(dayKey);
+      if (!prog || !(Array.isArray(prog.rows) ? prog.rows.length : (prog.done || []).length || Number(prog.mainRoundsCompleted) > 0)) return;
+      const key = dayKey + "|" + (prog.dayIso || todayISODate());
+      if (!groups.has(key)) groups.set(key, { train: [], care: [], live: prog });
+    });
+  }
+  const records = [];
+  groups.forEach(({ train, care, live }, key) => {
+    const [dayKey, date] = key.split("|");
+    const frags = train.sort(byIso), careFrags = care.sort(byIso);
+    const careOutcome = careFrags.length ? workoutOutcome(careFrags) : null;
+    const streakFreeze = !!(careOutcome && careOutcome.streakFreeze);
+    const recovery = careFrags.some(f => f.sessionType === "recovery");
+    const careSecs = careFrags.reduce((a, f) => a + (Number(f.durationSecs) || 0), 0);
+    const prog = live || dayProgress(dayKey, date);
+    const liveProg = prog && (!prog.dayIso || prog.dayIso === date) ? prog : null;
+    if (!frags.length && !live) {
+      records.push({
+        dayKey, date, weekday: dayKey, care: true, recovery, fragments: [], careFragments: careFrags,
+        rows: [], mainRounds: [], mainRoundsDone: 0, roundsPlanned: 0, light: null, lowestLight: null,
+        countsForStreak: false, streakFreeze, dayComplete: false, hadPainStop: false, safetyStop: false,
+        overridden: false, minutes: Math.round(careSecs / 60), unsaved: false,
+        performances: { performed: 0, planned: 0 }, movements: { performed: 0, planned: 0 },
+        xpByRounds: recovery ? XP_SHOWED_UP : 0,
+        settledXp: 0, version: null, outcome: careOutcome
+      });
+      return;
+    }
+    const first = frags[0] || null, last = frags[frags.length - 1] || null;
+    const version = frags.reduce((m, s) => Math.max(m, Number(s.outcomeVersion) || 0), 0) || (live ? OUTCOME_VERSION : null);
+    const light = first ? (first.lightResult || first.light || (DAYS[dayKey] || {}).defaultLight || "green")
+      : (live.lockedLight || live.light || (DAYS[dayKey] || {}).defaultLight || "green");
+    const lowestLight = first ? lockedLightFromLog(frags) : light;
+    const liveCap = live && Number.isFinite(Number(live.roundsCap)) ? Number(live.roundsCap) : Infinity;
+    const roundsPlanned = first ? Math.min(dayRoundsPlanned(first), tierDropCap(frags, events))
+      : Math.min(roundsForLight(light), liveCap);
+    let expectedWork = frags.reduce((m, s) => Number.isFinite(s.expectedWork) ? Math.max(m, s.expectedWork) : m, 0) || null;
+    const expectedByRound = {};
+    frags.forEach(s => Object.entries(s.expectedByRound || {}).forEach(([r, n]) => {
+      expectedByRound[r] = Math.max(Number(expectedByRound[r]) || 0, Number(n) || 0); }));
+    if (!first) {
+      const circuits = assembleCircuits(dayKey, light,
+        roundsPlanned < roundsForLight(light) ? { mainRounds: roundsPlanned } : {});
+      expectedWork = countExpectedWork(circuits);
+      Object.assign(expectedByRound, countExpectedByRound(circuits));
+    }
+    const ebr = Object.keys(expectedByRound).length ? expectedByRound : null;
+    const logRows = mergeLedgerRows(frags.reduce((a, s) => a.concat(s.ledger || []), []));
+    const planned = plannedFor(dayKey, light, roundsPlanned);
+    const rows = logRows.concat(bankedRowsFor(planned, logRows, liveProg, frags, ebr, version));
+    const mainRounds = mainRoundReport(rows, ebr, version);
+    /* A record with no main rows at all — a row written before the ledger, or
+       restored from a cloud that never had one — keeps the engine's bare count,
+       the way outcomeOf has always read it. Only where there are NO rows: the
+       moment the ledger can speak, it is the authority. */
+    const legacyRounds = frags.reduce((m, f) => Math.max(m, Number(f.roundsDone) || 0), 0);
+    const roundsCounted = rows.some(r => r.block === "main")
+      ? mainRounds.filter(r => r.counts).length
+      : Math.min(legacyRounds, Number.isFinite(roundsPlanned) ? roundsPlanned : legacyRounds);
+    const hadPainStop = frags.some(painRow);
+    const safetyStop = !!(last && painRow(last));
+    const oc = deriveSessionOutcome({
+      ledger: rows, expectedWork, expectedByRound: ebr, bankedCredit: 0, safetyStop,
+      explicitAbort: !!(last && last.endedEarly === true), sessionType: "main",
+      outcomeVersion: version, completedFully: frags.some(s => s.completedFully === true)
+    });
+    const st = dayPlanState(dayKey, { rows, light, roundsCap: roundsPlanned, fragments: frags });
+    const liveSecs = liveProg ? (Number(liveProg.activeSecs) || 0) : 0;
+    const secs = frags.reduce((a, f) => a + (Number(f.durationSecs) || 0) + (Number(f.bankedSecs) || 0), 0) + liveSecs;
+    /* Only an adult's own tap is an override. Rows from before v6 blamed one
+       on every resume the locked light lowered; a FIRST sitting has no lock
+       to be lowered by, so its stamp is trusted and a later sitting's is not. */
+    const overridden = frags.some((f, i) => f.wasOverridden === true && (Number(f.outcomeVersion) >= 6 || i === 0));
+    records.push({
+      dayKey, date, weekday: dayKey, care: false, recovery, light, lowestLight, roundsPlanned,
+      expectedWork, expectedByRound: ebr, version,
+      fragments: frags, careFragments: careFrags, rows, mainRounds, mainRoundsDone: roundsCounted,
+      minutes: Math.round(secs / 60),
+      performances: { performed: st.performed, planned: st.planned },
+      movements: { performed: st.movementsPerformed, planned: st.movements },
+      plan: st,
+      hadPainStop, safetyStop, overridden,
+      countsForStreak: oc.countsForStreak,
+      streakFreeze,
+      /* A row with no expected size was written before the day carried one,
+         so "every move the plan asked for" cannot be asked of it. It keeps the
+         reading it was always given — the outcome's own complete flag — rather
+         than being re-scored as unfinished forever. */
+      dayComplete: expectedWork === null
+        ? oc.completedFully
+        : (oc.countsAsTraining && oc.wholePlanAttempted && roundsCounted === roundsPlanned
+           && mainRounds.every(r => r.counts)),
+      unsaved: !first,
+      xpByRounds: dayPrice({ frags, careFrags, rows, safetyStop, expectedByRound: ebr, version, roundsPlanned }),
+      settledXp: 0,
+      outcome: oc
+    });
+  });
+  /* What the DATE settles at, on every record of that date — the same number
+     the journey is rebuilt from (settledDayXp prices v6 dates off these very
+     records, and older dates off their stamps). */
+  if (!opts.priceOnly) {
+    const settled = settledXpByDate(sessions, { records });
+    records.forEach(r => { r.settledXp = settled.get(r.date) || 0; });
+  }
+  return records.sort((a, b) => a.date.localeCompare(b.date) || a.dayKey.localeCompare(b.dayKey));
+}
+
+/* One day, by the weekday it was for and the date it was trained on. */
+export function dayRecordFor(dayKey, isoDate = null, opts = {}) {
+  const date = isoDate || todayISODate();
+  return dayRecords(opts).find(r => r.dayKey === dayKey && r.date === date) || null;
+}
+
+/* ---- THE STREAK, SCHEDULE-AWARE ------------------------------------------
+
+   The old rule forgave any gap of one or two calendar days, so a Mon/Wed/Fri
+   kid kept the flame — and so did a kid who skipped Wednesday. The streak now
+   knows the plan: a scheduled weekday with neither a counting day nor a
+   finished-recovery freeze breaks the run. Sunday (`DAYS[k].spa`) is never a
+   gap, today with nothing on it is not a gap yet, and a freeze day counts in
+   the length. A record covers the calendar date it was trained on: a Monday
+   catch-up done on Wednesday is Wednesday's training day here; "counts for
+   Monday" is the week strip's business.
+
+   Applied forward from STREAK_SCHEDULE_FROM. Dates before it keep the old
+   two-day-gap reading, so the number she is standing on tonight does not drop
+   because a rule changed underneath her. */
+export const STREAK_SCHEDULE_FROM = "2026-09-18";
+export const LEGACY_STREAK_MAX_GAP = 2;
+const WEEKDAY_KEYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const shiftISO = (iso, d) => { const t = new Date(iso + "T12:00:00Z"); t.setUTCDate(t.getUTCDate() + d); return t.toISOString().slice(0, 10); };
+const dayGap = (a, b) => Math.round((new Date(b + "T12:00:00Z") - new Date(a + "T12:00:00Z")) / DAY_MS);
+const weekdayOf = iso => WEEKDAY_KEYS[new Date(iso + "T12:00:00Z").getUTCDay()];
+
+function streakMarks(records) {
+  const marks = new Map();
+  (records || []).forEach(r => {
+    if (!r || !r.date) return;
+    if (r.countsForStreak) marks.set(r.date, "count");
+    else if (r.streakFreeze && !marks.has(r.date)) marks.set(r.date, "freeze");
+  });
+  return marks;
+}
+function allFrozenBetween(marks, fromISO, toISO) {
+  const gap = dayGap(fromISO, toISO);
+  if (gap < 1) return false;
+  for (let i = 1; i < gap; i++) if (marks.get(shiftISO(fromISO, i)) !== "freeze") return false;
+  return true;
+}
+const legacyHolds = (marks, fromISO, toISO) =>
+  dayGap(fromISO, toISO) <= LEGACY_STREAK_MAX_GAP || allFrozenBetween(marks, fromISO, toISO);
+
+/* One forward walk from the first record to today, under the old rule before
+   the cutoff and the schedule rule from it, joined by the old rule's tolerance
+   at the first counted day of the new regime. Returns the run she is standing
+   on and the best run ever. */
+function streakWalk(records, todayISO, days = DAYS) {
+  const marks = streakMarks(records);
+  const dates = [...marks.keys()].filter(d => d <= todayISO).sort();
+  if (!dates.length) return { current: 0, longest: 0 };
+  let run = 0, best = 0, lastCount = null, newHit = false;
+  for (let d = dates[0], i = 0; d <= todayISO && i < 4000; d = shiftISO(d, 1), i++) {
+    const mark = marks.get(d);
+    if (d < STREAK_SCHEDULE_FROM) {
+      if (mark === "count") {
+        run = lastCount && legacyHolds(marks, lastCount, d) ? run + 1 : 1;
+        lastCount = d;
+      } else if (lastCount && !legacyHolds(marks, lastCount, d)) {
+        run = 0; lastCount = null;
+      }
+    } else {
+      if (!newHit && lastCount && (mark || d === todayISO) && !legacyHolds(marks, lastCount, d)) run = 0;
+      if (mark) { run += 1; newHit = true; }
+      else if ((days[weekdayOf(d)] || {}).spa || !days[weekdayOf(d)]) { /* never a gap */ }
+      else if (d === todayISO) { /* not over yet */ }
+      else run = 0;
+    }
+    if (run > best) best = run;
+  }
+  return { current: run, longest: best };
+}
+export function scheduleStreak(records, todayISO = todayISODate(), days = DAYS) {
+  return streakWalk(records, todayISO, days).current;
+}
+export function longestScheduleStreak(records, todayISO = todayISODate(), days = DAYS) {
+  return streakWalk(records, todayISO, days).longest;
 }
