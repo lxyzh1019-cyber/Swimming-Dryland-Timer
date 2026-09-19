@@ -145,7 +145,7 @@ function makeSessionQ(pool) {
       opts: shuffle([
         { t: "To fix what I felt in round one and carry it into the next rounds", ok: true },
         { t: "To show Coach how hard I was working", ok: false },
-        { t: "To pick which exercise came next", ok: false }
+        { t: "To pick which move came next", ok: false }
       ]),
       why: "One word, said out loud, is what turns a round you felt into a round you change." };
   }

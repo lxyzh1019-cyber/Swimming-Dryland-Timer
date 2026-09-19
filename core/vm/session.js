@@ -4,7 +4,7 @@
    ============================================================ */
 
 import { sess, refTime, screenRepsDetail, pausedByBackground, canGoBack } from "../engine.js";
-import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, SESSION_QUIZ,
+import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, BLOCK_LABEL, SESSION_QUIZ,
          TRAINING_QS, REFLECT_WELL, REFLECT_NEXT, exWork, videoSearchUrl } from "../data.js";
 import { SKILL_BLOCK, COPY } from "../sport.js";
 import { fmtMMSS, exercisePhotoUrl, photoSources, plural } from "../util.js";
@@ -329,7 +329,7 @@ export function buildSessionVM(state) {
   // photo and the ring's spot hold the question, not the breath card.
   const isFormCheck = phase === "formcheck";
   // A move is only skippable while it is underway. Elsewhere Done already says
-  // "skip rest", and a "Skip this exercise? It won't count." over a breather
+  // "skip rest", and a "Skip this move? It won't count." over a breather
   // was a question about a move that had already been recorded.
   const canSkipExercise = phase === "work" || phase === "reps" || phase === "sideswitch";
   const isBigRest = phase === "roundRest" || phase === "sectionRest";
@@ -344,14 +344,29 @@ export function buildSessionVM(state) {
      finish. The rep ring says BY REPS, so the timed one says TIMED SET —
      "session" is already the whole workout here (Session time, End session)
      and would collide. */
-  const timerZone = ({ work: "TIMED SET", rest: "REST", roundRest: "ROUND REST", sectionRest: "SECTION REST",
-    sideswitch: "SWITCH", getready: "READY", greeting: "READY", breath: "BREATHE" })[phase] || "TIMED SET";
+  /* BLOCK, not section: the coach SPEAKS "Block done!" at this exact moment
+     (see engine.js), and every other screen says block too. And TIMED, not
+     TIMED SET: "set" already means a prescription set here — SET 1 OF 2 sits
+     in the coach strip a few lines down, counting something else entirely. */
+  const timerZone = ({ work: "TIMED", rest: "REST", roundRest: "ROUND REST", sectionRest: "BLOCK REST",
+    sideswitch: "SWITCH", getready: "READY", greeting: "READY", breath: "BREATHE" })[phase] || "TIMED";
   const timerUrgent = sess.urgent && phase !== "roundRest" && phase !== "sectionRest";
 
   const bvMap = { warmup: "sun", coordination: "sun", main: "aqua", prep: "grape", finisher: "mint", [SKILL_BLOCK]: "sea", recovery: "grape" };
   const blockBadgeVariant = bvMap[circuit.block] || "aqua";
-  const blockLabel = ({ warmup: "Warm-Up 🔥", coordination: "Coordination ⚡", main: "Main Circuit 💪",
-    prep: "Prep Pair 🎯", finisher: "Finisher 🏁", [SKILL_BLOCK]: COPY.skillBlockLabel + " " + BLOCK_META[SKILL_BLOCK].emoji, recovery: "Recovery ❄️" })[circuit.block] || circuit.name || "";
+  /* ONE NAME AND ONE EMOJI PER BLOCK, FROM THE ONE PLACE THAT DEFINES THEM.
+
+     This used to carry its own copy of BLOCK_LABEL and the emoji set, and the
+     two copies had drifted: the day card said "Warm-up" where this said
+     "Warm-Up", the finisher was 🪝 on one screen and 🏁 on the other, recovery
+     🧊 and ❄️ — and the main block was "Main Circuit" here while the progress
+     label three lines down said "Main". A second copy of a label map is a
+     second answer waiting to disagree, which is the same fault this whole
+     change is about. */
+  const blockLabel = (BLOCK_LABEL[circuit.block]
+    ? (circuit.block === SKILL_BLOCK ? COPY.skillBlockLabel : BLOCK_LABEL[circuit.block])
+      + ((BLOCK_META[circuit.block] || {}).emoji ? " " + BLOCK_META[circuit.block].emoji : "")
+    : (circuit.name || ""));
   /* THE ROUND NUMBER AND THE ROUND COUNT MUST BE ABOUT THE SAME THING.
      sess.round is the round of the DAY (a resume's first round is round two);
      circuit.rounds is only what THIS SITTING owes. Put together they read
@@ -365,7 +380,7 @@ export function buildSessionVM(state) {
     phase === "greeting" ? "Ready?" :
     phase === "getready" ? "Get ready…" :
     phase === "sideswitch" ? "Switch sides" :
-    phase === "sectionRest" ? "Section Done! 🎉" :
+    phase === "sectionRest" ? "Block Done! 🎉" :
     phase === "roundRest" ? "Round Done! 💪" :
     phase === "rest" ? "Quick Rest" :
     phase === "breath" ? "Breath rehearsal" :
@@ -387,8 +402,10 @@ export function buildSessionVM(state) {
   const totalExCount = circuits.reduce((acc, c) =>
     acc + c.exercises.reduce((n, ex) => n + Math.min(c.rounds, Number(ex.rounds) || c.rounds), 0), 0);
   const doneCount = sess.exDone || 0;
-  const secNames = { warmup: "Warm-Up", coordination: "Coordination", main: "Main", prep: "Prep", finisher: "Finisher", [SKILL_BLOCK]: COPY.skillBlockLabel, recovery: "Recovery" };
-  const progressLabel = (secNames[circuit.block] || "") + " · " + Math.min(sess.ei + 1, circuit.exercises.length) + " of " + circuit.exercises.length;
+  /* A third copy of the same names lived here, and it was the one that said
+     "Main" while the badge above said "Main Circuit". Same source now. */
+  const secName = circuit.block === SKILL_BLOCK ? COPY.skillBlockLabel : (BLOCK_LABEL[circuit.block] || "");
+  const progressLabel = secName + " · " + Math.min(sess.ei + 1, circuit.exercises.length) + " of " + circuit.exercises.length;
   const sessionTimePct = Math.min(100, Math.round(sess.elapsed / Math.max(1, sess.plannedSecs) * 100));
   /* THE DOTS SHOW ROUNDS THAT COUNTED, in the colour the finish screen will
      use for them. They used to be drawn off the round NUMBER: every round
@@ -505,9 +522,13 @@ export function buildSessionVM(state) {
        print a static "×3" off the plan — a round figure on the list that never
        moved, which is what sent a reader hunting for per-move round state in
        the first place. It carries the live round now. */
+    /* DOTS, NOT WORDS. The round is NAMED beside the timer, which is never
+       collapsed; this list lives in a rail she can close, so a round that only
+       said its name here would vanish with it. The dots are the glance that
+       explains why the marks below reset. */
     const hostsRound = c.rounds > 1 && !!roundShort && c.block === "main";
     sessionExList.push({ isHeader: true, name: c.name, color: BLOCK_COLORS[c.block] || "var(--ink-soft)",
-      roundText: hostsRound ? roundShort : "", roundDots: hostsRound ? roundDots : [] });
+      roundDots: hostsRound ? roundDots : [] });
     c.exercises.forEach((e, ei) => {
       const k = moveKey(c.block, e.name);
       const isCur = !!curKey && k === curKey;
@@ -543,7 +564,7 @@ export function buildSessionVM(state) {
   /* What the colours mean, said once and only where there is history to read.
      Done and cut-short shared a glyph before this. */
   const exListLegend = (!explore && sawHistory)
-    ? "this round — ✓ done · ½ cut short · ⏭ skipped — you’re picking up at ▶"
+    ? "this round — ✓ done · ½ short · ⏭ skipped — you’re picking up at ▶"
     : "";
 
 
@@ -675,13 +696,17 @@ export function buildSessionVM(state) {
     upNextName: sess.upNextName, upNextDose: sess.upNextDose,
 
     /* ---- live coach state -------------------------------------------------
-       SET 1 OF 2 · LEFT SIDE · REP 5 OF 8 · NEXT: SWITCH SIDES. The engine has
+       SET 1 OF 2 · FIRST SIDE · REP 5 OF 8 · NEXT: SWITCH SIDES. The engine has
        always tracked every one of these; nothing ever showed them, so a session
        run with the voice off (or on a device with no installed voice) gave her
        no way to know which set or which side she was on. */
     coachSetLine: sess.totalSets > 1 ? `SET ${sess.currentSet} OF ${sess.totalSets}` : "",
     coachSideLine: sess.totalSides > 1
-      ? (sess.currentSide === 1 ? "LEFT SIDE" : "RIGHT SIDE") : "",
+      /* FIRST / SECOND, never LEFT / RIGHT. Nothing in the plan, the engine or
+         the ledger records which side she starts on, and the coach only ever
+         says "first side" / "second side" — so naming a left knee was the
+         screen asserting something the app cannot know. */
+      ? (sess.currentSide === 1 ? "FIRST SIDE" : "SECOND SIDE") : "",
     coachDirectionLine: sess.totalDirections > 1
       ? `DIRECTION ${sess.currentDirection} OF ${sess.totalDirections}` : "",
     coachRepLine: sess.repsInSegment > 0 ? `REP ${sess.repInSegment} OF ${sess.repsInSegment}` : "",

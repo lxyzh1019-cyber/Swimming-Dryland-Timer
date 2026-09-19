@@ -60,7 +60,7 @@ await H.runSession({ dayKey: timedDay, light: "green", gateUnlocked: true }, {
 ok(seen > 5 && marked === seen, `exactly one row was current at every sampled phase (${marked}/${seen})`);
 
 const warn = draw({ isWide:true }, { stopOverlay:true, confirmRestart:true });
-ok(/Start this workout over\?/.test(warn) && /erased/.test(warn), "the warning says the attempt is erased");
+ok(/Start this session over\?/.test(warn) && /erased/.test(warn), "the warning says the attempt is erased");
 ok(/Keep what I've done/.test(warn), "and offers to keep it");
 const reasons = draw({ isWide:true }, { stopOverlay:true });
 for (const r of ["pain","break","restart"]) ok(new RegExp(`data-arg="${r}"|askRestart`).test(reasons), `STOP offers the '${r}' path`);

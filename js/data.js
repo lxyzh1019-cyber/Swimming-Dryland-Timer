@@ -753,8 +753,8 @@ export const DAYS = {
     equipment: ["Foam roller", "Massage gun (parent-operated)", "Mat"],
     safety: "Roller slow (2–3 cm/sec), pause 20s on tender spots. NEVER roll the lower-back spine or neck. Massage gun is PARENT-OPERATED only, lowest speed, big muscles only — never on bones, joints, spine, neck, or growth plates.",
     recovery: [
-      { name: "Calves — foam roller", dose: "60s/side", why: "Kick + rope volume lands here." },
-      { name: "Quads — roller or gun", dose: "60s/side", why: "Jump days (Wed/Sat)." },
+      { name: "Calves — foam roller", dose: "60s/side", why: "Kick + jump rope volume lands here." },
+      { name: "Quads — roller or gun", dose: "60s/side", why: "Power days (Wed/Sat)." },
       { name: "Lats / upper back — roller, arms overhead", dose: "60s", why: "Pull work + overhead range." },
       { name: "Glutes — foam roller", dose: "45s/side", why: "Bridge + landing absorption." },
       { name: "Touch-up — massage gun (parent)", dose: "30–45s/muscle", why: "Lowest speed, comfort not pain." },
@@ -798,7 +798,7 @@ export const DAY_LONG = {
 
 export const BLOCK_ORDER = ["warmup", "coordination", "main", "finisher", "swimskill"];
 export const BLOCK_LABEL = {
-  warmup: "Warm-up", coordination: "Coordination", main: "Main Circuit",
+  warmup: "Warm-up", coordination: "Coordination", main: "Main",
   prep: "Prep Pair", finisher: "Finisher", swimskill: "Swim-Skill", recovery: "Recovery"
 };
 /* Per-block emoji + Splash token color so the kid always knows which part she's in. */
@@ -1249,7 +1249,7 @@ export const BODY_ZONES = [
 
 export const SEVERITY_LEVELS = [
   { level: 1, emoji: "🙂", label: "OK",                   color: "var(--mint)",  desc: "Moved normally. Both sides feel similar." },
-  { level: 2, emoji: "😐", label: "Tired but controlled", color: "var(--sun)",   desc: "Tired or shaky, but still controlled. Better after 1–2 minutes rest." },
+  { level: 2, emoji: "😐", label: "Tired but controlled", color: "var(--sun)",   desc: "Tired or shaky, but still controlled. Better after 1–2 min rest." },
   { level: 3, emoji: "😟", label: "Changed movement",     color: "var(--coral)", desc: "Limp, lean, twist, shake, or less range. Tell coach or parent." },
   { level: 4, emoji: "🥺", label: "Pain / Stop",          color: "var(--stop)",  desc: "Pain, sharp pain, swelling, numbness, tingling, or affects normal activity. Stop now." }
 ];
@@ -1259,16 +1259,16 @@ export const SEVERITY_LEVELS = [
 // shows a warm caution button, not the same yellow as a green day — so the
 // safety signal survives all the way to the action.
 export const LIGHT_META = {
-  green:    { emoji: "🟢", color: "var(--mint)",  btnColor: "var(--mint)",  btnDeep: "var(--mint-deep)",  btnText: "#fff",           btnIcon: "💪", label: "Green Light — Full power!",  btnLabel: "Start Training!", desc: "You're good to go! Full 3 rounds. Focus on quality." },
-  yellow:   { emoji: "🟡", color: "var(--sun)",   btnColor: "var(--sun)",   btnDeep: "var(--sun-deep)",   btnText: "var(--sun-ink)", btnIcon: "🌊", label: "Yellow Light — Go easy",     btnLabel: "Start Training!", desc: "2 rounds, and we skip the extras. Listen to your body — clean form over effort." },
-  red:      { emoji: "🔴", color: "var(--stop)",  btnColor: "var(--coral)", btnDeep: "var(--coral-deep)", btnText: "#fff",           btnIcon: "💙", label: "Red Light — Light day",      btnLabel: "Start easy day",  desc: "1 round, warm-up and swim skill only. Something feels off — take it easy today." },
-  recovery: { emoji: "🟣", color: "var(--grape)", btnColor: "var(--grape)", btnDeep: "var(--grape-deep)", btnText: "#fff",           btnIcon: "🧊", label: "Recovery — Rest is training", btnLabel: "Start Recovery",  desc: "Rest day. Tell a grown-up, then stretch and hydrate." }
+  green:    { emoji: "🟢", color: "var(--mint)",  btnColor: "var(--mint)",  btnDeep: "var(--mint-deep)",  btnText: "#fff",           btnIcon: "💪", label: "Green Light — Full power!",  btnLabel: "Start training", desc: "You're good to go! Full 3 rounds. Focus on quality." },
+  yellow:   { emoji: "🟡", color: "var(--sun)",   btnColor: "var(--sun)",   btnDeep: "var(--sun-deep)",   btnText: "var(--sun-ink)", btnIcon: "🌊", label: "Yellow Light — Go easy",     btnLabel: "Start training", desc: "2 rounds max, and we skip the extras. Listen to your body — clean form over effort." },
+  red:      { emoji: "🔴", color: "var(--stop)",  btnColor: "var(--coral)", btnDeep: "var(--coral-deep)", btnText: "#fff",           btnIcon: "💙", label: "Red Light — Light day",      btnLabel: "Start easy day",  desc: "1 round, warm-up and Swim-Skill only. Something feels off — take it easy today." },
+  recovery: { emoji: "🟣", color: "var(--grape)", btnColor: "var(--grape)", btnDeep: "var(--grape-deep)", btnText: "#fff",           btnIcon: "🧊", label: "Recovery — Rest is training", btnLabel: "Start recovery",  desc: "Rest day. Tell a grown-up, then stretch and hydrate." }
 };
 
 export const BODY_RESULTS = {
-  1: { emoji: "✅", color: "var(--mint)",  desc: "You are OK. Keep moving with control.",          cta: "Continue to Training",    ctaIcon: "💪", ctaColor: "var(--mint)", ctaDeep: "var(--mint-deep)", ctaText: "#fff", action: "continue" },
-  2: { emoji: "⏱️", color: "var(--sun)",   desc: "Take 1–2 minutes rest, then go easy — 2 rounds max, clean form.", cta: "Start easy — Yellow light", ctaIcon: "💛", ctaColor: "var(--sun)", ctaDeep: "var(--sun-deep)", ctaText: "var(--sun-ink)", action: "continue", secondary: "retry", secondaryLabel: "Rest 1–2 min, then re-check" },
-  3: { emoji: "🗣️", color: "var(--coral)", desc: "Tell your coach or parent first. If they say OK — light day only, 1 easy round.", cta: "Start light day — Red light", ctaIcon: "💙", ctaColor: "var(--coral)", ctaDeep: "var(--coral-deep)", ctaText: "#fff", action: "continue", secondary: "back", secondaryLabel: "Stop — back to Today", needsGrownup: true },
+  1: { emoji: "✅", color: "var(--mint)",  desc: "You are OK. Keep moving with control.",          cta: "Start training",    ctaIcon: "💪", ctaColor: "var(--mint)", ctaDeep: "var(--mint-deep)", ctaText: "#fff", action: "continue" },
+  2: { emoji: "⏱️", color: "var(--sun)",   desc: "Take 1–2 min rest, then go easy — 2 rounds max, clean form.", cta: "Start easy — yellow light", ctaIcon: "💛", ctaColor: "var(--sun)", ctaDeep: "var(--sun-deep)", ctaText: "var(--sun-ink)", action: "continue", secondary: "retry", secondaryLabel: "Rest 1–2 min, then re-check" },
+  3: { emoji: "🗣️", color: "var(--coral)", desc: "Tell your coach or parent first. If they say OK — light day only, 1 easy round.", cta: "Start light day — red light", ctaIcon: "💙", ctaColor: "var(--coral)", ctaDeep: "var(--coral-deep)", ctaText: "#fff", action: "continue", secondary: "back", secondaryLabel: "Stop — back to Today", needsGrownup: true },
   4: { emoji: "🛑", color: "var(--stop)",  desc: "Stop now. Tell your coach or parent right away.",   cta: "Stop — back to Today",    ctaIcon: "🛑", ctaColor: "var(--stop)", ctaDeep: "var(--stop-deep)", ctaText: "#fff", action: "back" }
 };
 

@@ -176,7 +176,7 @@ export function readinessScreen(vm) {
           </div>`).join("")}
         ${vm.hasYesterday && vm.yesterdayZoneLine ? `
           <div style="font-size:13px;font-weight:700;color:var(--ink-soft);opacity:0.75;padding:0 4px;">${vm.yesterdayZoneLine}</div>` : ""}
-        <div style="text-align:center;font-family:var(--font-hand);font-size:20px;font-weight:700;color:var(--ink-soft);padding-top:4px;">No wrong answers — Coach picks the right workout for today.</div>
+        <div style="text-align:center;font-family:var(--font-hand);font-size:20px;font-weight:700;color:var(--ink-soft);padding-top:4px;">No wrong answers — Coach picks the right session for today.</div>
       </div>
       ${vm.showInlineReadinessResult ? resultCard(vm) : ""}
     </div>` : "";

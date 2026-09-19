@@ -82,7 +82,7 @@ export const COPY = {
   sessionQuizIntro: "How does today's work help you swim?",
   transferHeading:  "🏊 Swim transfer",
   transferBuilds:   "🏊 Builds:",
-  transferMove:     "🏊 pool:",
+  transferMove:     "🏊 Pool:",
   transferIcon:     "🏊",
   skillBlockLabel:  "Swim-Skill",
   storyTitle:       "Your ocean story",

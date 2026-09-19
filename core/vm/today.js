@@ -358,6 +358,11 @@ export function buildTodayVM(state) {
     skipped: { icon: "⏭", bg: "var(--coral)", ink: "#fff" },
     missing: { icon: "—", bg: "rgba(255,255,255,0.28)", ink: "#fff" }
   };
+  /* What each slot SAYS when she holds it. The status is an internal enum, and
+     falling through to it put "Round 2 — partial" and "Round 3 — banked" into
+     an aria-label beside a sibling reading the plain "not reached". */
+  const SLOT_WORDS = { done: "done in full", banked: "done in full", partial: "came up short",
+                       skipped: "skipped", missing: "not reached" };
   const slotStyle = (pill) => "width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;"
     + "align-items:center;justify-content:center;font-size:11px;font-weight:900;background:" + pill.bg + ";color:" + pill.ink + ";";
   const reviewRows = (b) => {
@@ -382,7 +387,7 @@ export function buildTodayVM(state) {
         const pill = REVIEW_PILL[(m && m.status) || "missing"] || REVIEW_PILL.missing;
         return { round: r, slot: i + 1, status: (m && m.status) || "missing",
                  icon: pill.icon, style: slotStyle(pill),
-                 title: "Round " + (i + 1) + " — " + ((m && m.status) || "not reached") };
+                 title: "Round " + (i + 1) + " — " + SLOT_WORDS[(m && m.status) || "missing"] };
       });
       /* The row's own verdict is the worst round in it, so a day card can still
          be asked "did anything go wrong here" in one attribute. */
@@ -644,7 +649,7 @@ export function buildTodayVM(state) {
       ctaLabel: isSpaDay ? "Do it again" : (resumable ? "Finish remaining moves" : "Look at the moves"),
       ctaIcon: isSpaDay ? "🧘" : (resumable ? "▶️" : "🧪"),
       ctaVariant: (isSpaDay || !resumable) ? "secondary" : "primary",
-      ctaSubtext: isSpaDay ? "Doesn't change progress" : (resumable ? "" : "The workout screen, nothing counting down, nothing recorded"),
+      ctaSubtext: isSpaDay ? "Doesn't change progress" : (resumable ? "" : "The session screen, nothing counting down, nothing recorded"),
       ctaAction: (isSpaDay || !resumable) ? "goExplore" : "goSession",
       // Offered whenever today's record holds a move she cut short — with or
       // without anything else left to add it to.
@@ -719,7 +724,7 @@ export function buildTodayVM(state) {
   const coachIconBtnStyle = "width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;flex-shrink:0;font-size:15px;display:flex;align-items:center;justify-content:center;"
     + (settings.coachVoiceOn ? "background:#fff;color:var(--aqua-deep);" : "background:rgba(255,255,255,0.18);color:#fff;");
   const practiceLinkLabel = "🧪 Explore the moves";
-  const practiceHintLine = "The workout screen at your own pace — nothing counts down, nothing is recorded.";
+  const practiceHintLine = "The session screen at your own pace — nothing counts down, nothing is recorded.";
   const practiceBtnStyle = "width:100%;min-height:48px;display:flex;align-items:center;justify-content:center;gap:9px;border-radius:var(--radius-pill);cursor:pointer;font-family:inherit;font-weight:900;font-size:14px;padding:0 18px;"
     + "background:rgba(255,255,255,0.14);color:#fff;border:2px solid rgba(255,255,255,0.45);";
 

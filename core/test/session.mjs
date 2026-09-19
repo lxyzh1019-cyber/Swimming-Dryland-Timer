@@ -391,7 +391,7 @@ const stopInRoundTwo = (reason) => ({
     /* End session was a strict subset of STOP and is gone; Skip took its slot. */
     ok(!/data-action="askEnd"/.test(html) && !/data-action="confirmEndEarly"/.test(html),
        name + ": the screen no longer offers End session, which STOP already did");
-    ok(/data-action="askSkip"/.test(html), name + ": and offers Skip this exercise in its place");
+    ok(/data-action="askSkip"/.test(html), name + ": and offers Skip this move in its place");
     /* The pain rule moved out of the far-left rail to under the buttons — in
        BOTH trees, which is the half that is easy to forget. */
     ok(/Sharp pain, pinching, or numbness/.test(html), name + ": the pain rule is on screen");
@@ -419,7 +419,8 @@ const stopInRoundTwo = (reason) => ({
      "but both still offer the ⓘ, which is where the photo went");
 
   /* The ring says which KIND of effort, and the rail can be collapsed. */
-  ok(/TIMED SET|BY REPS/.test(roomy), "the ring names the kind of effort, not just 'not a rest'");
+  ok(/\bTIMED\b|BY REPS/.test(roomy), "the ring names the kind of effort, not just 'not a rest'");
+  ok(!/TIMED SET/.test(roomy), "and does not call it a SET — a set is the prescription unit, counted in the coach strip");
   ok(/data-action="toggleRail"/.test(roomy) && !/data-action="toggleRail"/.test(narrow),
      "the rail collapses where there is a rail, and not on a phone");
 }
@@ -890,6 +891,70 @@ const stopInRoundTwo = (reason) => ({
   ok(lastSettled() === cleanXp,
      "the day pays what a day trained straight through pays — a redone round is not paid twice: "
      + lastSettled() + " vs " + cleanXp);
+  engine.exitSession();
+}
+
+/* ---- ONE WORD PER THING, AND THE SCREEN PROVES IT ------------------------
+
+   The app called the same thing two names in a dozen places, and two of them
+   contradicted each other at the same second: the coach SAID "Block done!"
+   while the screen said "Section Done!"; the badge said "Main Circuit" while
+   the progress label under it said "Main"; the list legend said "½ cut short"
+   while the move review's legend said "½ short"; and the coach strip claimed
+   "LEFT SIDE" when nothing in the app knows which side she started on.
+
+   The root of it was duplicated label maps — a second copy of a name is a
+   second answer waiting to disagree. This guard is the point of the whole
+   exercise: it fails the moment a retired word comes back, so the audit stays
+   done instead of being re-derived the next time two screens drift. */
+{
+  const RETIRED = [
+    [/\bCircuit\b/, "Circuit — the repeating unit is a Round, and the block is Main"],
+    [/\bSection\b/i, "Section — the coach says Block, so the screen says Block"],
+    [/LEFT SIDE|RIGHT SIDE/, "LEFT/RIGHT SIDE — the app only knows first and second"],
+    [/TIMED SET/, "TIMED SET — a set is the prescription unit, counted elsewhere"],
+    [/\bworkout\b/i, "workout — this is a session"],
+    [/\bexercises?\b/i, "exercise — the kid-facing word is move"],
+    [/\bpress\b/i, "press — every other instruction says tap"],
+    [/½ cut short/, "two legends for one glyph"],
+  ];
+  /* A status enum rendered raw into something she can read. `moveReview` used
+     to fall through to it, so an aria-label read "Round 2 — partial". */
+  const ENUM_IN_LABEL = /(?:title|aria-label)="[^"]*\b(?:partial|banked|missing)\b[^"]*"/;
+
+  /* Asset paths are not copy: assets/exercises/<name>.webp is a filename on
+     disk, not a word she reads. Strip src/href before matching. */
+  const copyOnly = (html) => String(html).replace(/(?:src|href|data-fallback)="[^"]*"/g, "");
+  const screens = [];
+  await runSession({ dayKey: repsDay, light: "green", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      if (answerChecks(sess)) return;
+      if (ms % 30000) return;
+      const vm = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+      screens.push(["session", copyOnly(sscreen.sessionScreen(vm))]);
+    }
+  });
+  const fin = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+  screens.push(["finish", copyOnly(sscreen.sessionScreen(fin))]);
+  const tv = tvm.buildTodayVM({ selectedDay: repsDay, expanded: { main: true, warmup: true } });
+  screens.push(["today", copyOnly(tscreen.todayWide({ ...tv, blocks: tv.blocks.map(b => ({ ...b, bodyStyle: "" })) }))]);
+
+  ok(screens.length > 3, "rendered the session, the finish screen and the day card (" + screens.length + " snapshots)");
+  RETIRED.forEach(([re, why]) => {
+    const hit = screens.find(([, html]) => re.test(html));
+    ok(!hit, "no screen says " + why + (hit ? " — found on the " + hit[0] + " screen" : ""));
+  });
+  const leak = screens.find(([, html]) => ENUM_IN_LABEL.test(html));
+  ok(!leak, "no title or aria-label renders a raw status enum"
+     + (leak ? " — on the " + leak[0] + " screen: " + (leak[1].match(ENUM_IN_LABEL) || [])[0] : ""));
+
+  /* And the round is named where it cannot be hidden. The exercise list is a
+     rail she can collapse; a round that only said its name there went with it. */
+  const anyVm = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+  const railless = sscreen.sessionScreen({ ...anyVm, sessionExList: [], railOpen: false, isWide: true });
+  ok(!/Round \d+ of \d+/.test(sscreen.sessionScreen({ ...anyVm, sessionExList: [] }))
+     || /Round \d+ of \d+/.test(railless),
+     "the round survives with no exercise list at all — it lives beside the timer");
   engine.exitSession();
 }
 
