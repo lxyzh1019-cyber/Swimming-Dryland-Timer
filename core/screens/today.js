@@ -231,10 +231,12 @@ function dayPane(vm, wide) {
               <div style="font-size:11px;font-weight:800;opacity:0.85;line-height:1.35;padding:4px 0 6px;">${escapeHtml(vm.reviewLegend || "")}</div>
               ${b.review.map(r => `
               <div style="display:flex;align-items:flex-start;gap:9px;padding:5px 0;font-size:${wide ? 14 : 13}px;font-weight:700;" data-move-review="${escapeHtml(r.status)}">
-                <span style="${r.pillStyle}" aria-label="${escapeHtml(r.status)}">${r.icon}</span>
                 <span style="flex:1;min-width:0;">
-                  <span>${r.roundLabel ? `<span style="opacity:0.7;font-size:11px;font-weight:900;margin-right:5px;">${r.roundLabel}</span>` : ""}${escapeHtml(r.name)}${r.doseLabel ? ` <span style="opacity:0.85;font-weight:800;">· ${escapeHtml(r.doseLabel)}</span>` : ""}</span>
+                  <span>${escapeHtml(r.name)}${r.doseLabel ? ` <span style="opacity:0.85;font-weight:800;">· ${escapeHtml(r.doseLabel)}</span>` : ""}</span>
                   ${r.reason ? `<span style="display:block;font-size:12px;font-weight:700;opacity:0.85;line-height:1.35;">${escapeHtml(r.reason)}</span>` : ""}
+                </span>
+                <span style="display:flex;gap:4px;flex-shrink:0;" data-round-slots="${r.slots.length}">
+                  ${r.slots.map(sl => `<span style="${sl.style}" title="${escapeHtml(sl.title)}" aria-label="${escapeHtml(sl.title)}" data-round-slot="${sl.slot}">${sl.icon}</span>`).join("")}
                 </span>
               </div>`).join("")}`
             : b.moves.map(m => `

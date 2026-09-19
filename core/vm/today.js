@@ -340,7 +340,17 @@ export function buildTodayVM(state) {
   const record = recordForDay(selectedKey, records);
   const showActuals = !!(record && record.plan);
   const planState = showActuals ? record.plan : dayPlanState(selectedKey, { fragments: [] });
-  /* The pill beside each performance, in the finish screen's own glyphs. */
+  /* THE DAY, ONE ROW PER MOVE, ONE ICON PER ROUND.
+
+     This printed one row per PERFORMANCE — a move in a three-round block got
+     three rows, each repeating the name. Three screens were describing the
+     same day three different ways, and the round a row belonged to was a
+     little "R2" tag easy to miss.
+
+     A move gets one row now, and its rounds are drawn as icons in round order:
+     position IS the round, so which round fell short is visible without
+     reading a number. This is the screen that answers "how did the whole day
+     go" — the finish screen deliberately answers only "what is still owed". */
   const REVIEW_PILL = {
     done:    { icon: "✓", bg: "var(--mint)", ink: "#fff" },
     banked:  { icon: "✓", bg: "var(--mint)", ink: "#fff" },
@@ -348,19 +358,49 @@ export function buildTodayVM(state) {
     skipped: { icon: "⏭", bg: "var(--coral)", ink: "#fff" },
     missing: { icon: "—", bg: "rgba(255,255,255,0.28)", ink: "#fff" }
   };
-  const reviewRows = (b) => !showActuals ? [] : (planState.moves || [])
-    .filter(m => m.block === b.block && m.circuit === b.name)
-    .map(m => {
-      const pill = REVIEW_PILL[m.status] || REVIEW_PILL.missing;
-      const doseLabel = m.got === null || m.planned === null ? ""
-        : m.driver === "reps" ? m.got + " of " + m.planned + " reps"
-        : m.got + "s of " + m.planned + "s";
-      return {
-        name: m.name, round: m.round, roundLabel: b.rounds > 1 ? "R" + m.round : "",
-        status: m.status, icon: pill.icon, doseLabel, reason: m.reason || "",
-        pillStyle: "width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;background:" + pill.bg + ";color:" + pill.ink + ";"
-      };
+  const slotStyle = (pill) => "width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;"
+    + "align-items:center;justify-content:center;font-size:11px;font-weight:900;background:" + pill.bg + ";color:" + pill.ink + ";";
+  const reviewRows = (b) => {
+    if (!showActuals) return [];
+    const rows = (planState.moves || []).filter(m => m.block === b.block && m.circuit === b.name);
+    if (!rows.length) return [];
+    /* The block's rounds in the order they were trained. Taken from the rows
+       rather than counted from 1, because `round` is absolute across sittings
+       (see roundBase) — slot one is this block's first round, whatever number
+       the day gave it. */
+    const roundsInOrder = [...new Set(rows.map(m => Number(m.round) || 1))].sort((a, b2) => a - b2);
+    const byName = new Map();
+    const order = [];
+    rows.forEach(m => {
+      let g = byName.get(m.name);
+      if (!g) { g = { name: m.name, perRound: new Map(), reason: "", doseLabel: "" }; byName.set(m.name, g); order.push(g); }
+      g.perRound.set(Number(m.round) || 1, m);
     });
+    return order.map(g => {
+      const slots = roundsInOrder.map((r, i) => {
+        const m = g.perRound.get(r);
+        const pill = REVIEW_PILL[(m && m.status) || "missing"] || REVIEW_PILL.missing;
+        return { round: r, slot: i + 1, status: (m && m.status) || "missing",
+                 icon: pill.icon, style: slotStyle(pill),
+                 title: "Round " + (i + 1) + " — " + ((m && m.status) || "not reached") };
+      });
+      /* The row's own verdict is the worst round in it, so a day card can still
+         be asked "did anything go wrong here" in one attribute. */
+      const status = slots.some(x => x.status === "skipped") ? "skipped"
+        : slots.some(x => x.status === "partial") ? "partial"
+        : slots.some(x => x.status === "missing") ? "missing" : "done";
+      /* The explanation belongs to the round that earned it — the first one
+         that fell short — not to a move that mostly went fine. */
+      const firstShort = roundsInOrder.map(r => g.perRound.get(r))
+        .find(m => m && (m.status === "partial" || m.status === "skipped"));
+      const doseLabel = !firstShort || firstShort.got === null || firstShort.planned === null ? ""
+        : firstShort.driver === "reps" ? firstShort.got + " of " + firstShort.planned + " reps"
+        : firstShort.got + "s of " + firstShort.planned + "s";
+      return { name: g.name, status, slots,
+               multiRound: roundsInOrder.length > 1,
+               doseLabel, reason: (firstShort && firstShort.reason) || "" };
+    });
+  };
   const blocks = planState.blocks.map(b => {
     const circuit = planState.circuits.find(c => c.block === b.block && c.name === b.name);
     const exs = (circuit && circuit.exercises) || [];

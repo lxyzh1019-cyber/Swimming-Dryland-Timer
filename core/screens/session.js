@@ -329,22 +329,18 @@ function completeScreen(vm) {
     <div style="font-size:14px;font-weight:700;color:var(--ink-soft);max-width:480px;line-height:1.5;">
       ${vm.roundShortNotes.map(n => `<div>${n}</div>`).join("")}
     </div>` : ""}
-    ${(vm.moveReview || []).length ? `
-    <div style="max-width:520px;width:100%;box-sizing:border-box;text-align:left;">
-      <button type="button" data-action="toggleMoveReview" aria-expanded="${vm.moveReviewOpen ? "true" : "false"}" style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:2px solid var(--hairline);border-radius:var(--radius-pill);padding:9px 16px;cursor:pointer;font-weight:900;font-size:14px;color:var(--ink);font-family:inherit;min-height:44px;">See every move ${vm.moveReviewOpen ? "▴" : "▾"}</button>
-      ${vm.moveReviewOpen ? `
-      <div style="margin-top:10px;background:var(--surface);border-radius:16px;padding:12px 14px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:2px;" data-move-review-list="1">
-        <div style="font-size:11px;font-weight:800;color:var(--ink-soft);line-height:1.35;padding-bottom:6px;border-bottom:1px solid var(--hairline);margin-bottom:4px;">${escapeHtml(vm.moveReviewLegend)}</div>
-        ${vm.moveReview.map(r => `
-        <div style="display:flex;align-items:flex-start;gap:9px;padding:5px 0;font-size:13px;font-weight:700;color:var(--ink);" data-move-review="${escapeHtml(r.status)}">
-          <span style="${r.pillStyle}" aria-label="${escapeHtml(r.status)}">${r.icon}</span>
-          <span style="flex:1;min-width:0;">
-            <span>${r.roundLabel ? `<span style="color:var(--ink-faint);font-size:11px;font-weight:900;margin-right:5px;">${r.roundLabel}</span>` : ""}${escapeHtml(r.name)}${r.doseLabel ? ` <span style="color:var(--ink-soft);font-weight:800;">· ${escapeHtml(r.doseLabel)}</span>` : ""}</span>
-            ${r.reason ? `<span style="display:block;font-size:12px;font-weight:700;color:var(--ink-soft);line-height:1.35;">${escapeHtml(r.reason)}</span>` : ""}
-          </span>
-        </div>`).join("")}
-      </div>` : ""}
+    ${vm.notFull && vm.notFull.length ? `
+    <div style="max-width:520px;width:100%;box-sizing:border-box;text-align:left;background:var(--surface);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;" data-not-full-list="1">
+      <div style="font-family:var(--font-display);font-weight:600;font-size:17px;color:var(--ink);">Not done in full</div>
+      ${vm.notFull.map(r => `
+      <div style="display:flex;align-items:baseline;gap:10px;font-size:14px;font-weight:800;color:var(--ink);" data-not-full="${escapeHtml(r.name)}">
+        <span style="flex:1;min-width:0;">${escapeHtml(r.name)}</span>
+        <span style="font-weight:800;color:${r.anySkipped ? "var(--coral)" : "var(--sun-ink)"};white-space:nowrap;">${escapeHtml(r.label)}</span>
+      </div>`).join("")}
+      <button type="button" data-action="goSessionRedo" data-arg="${escapeHtml(vm.redoDayKey)}" style="align-self:flex-start;margin-top:4px;background:var(--aqua);color:#fff;border:none;border-radius:var(--radius-pill);padding:11px 20px;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;min-height:44px;box-shadow:0 4px 0 var(--aqua-ink,var(--sea));">Redo these</button>
     </div>` : ""}
+    ${vm.allInFull ? `
+    <div style="font-size:14px;font-weight:800;color:var(--ink-soft);max-width:480px;line-height:1.5;">Every move was done in full.</div>` : ""}
     ${vm.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="display:flex;align-items:center;gap:10px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:14px 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
     ${vm.saveFailed ? `
     <div style="display:flex;flex-direction:column;gap:10px;background:var(--stop-wash, var(--surface));border:2px solid var(--stop);border-radius:20px;padding:18px 22px;max-width:600px;width:100%;box-sizing:border-box;text-align:left;">
@@ -426,7 +422,6 @@ function nameHeadline(vm, wide, tablet) {
   <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;flex-shrink:0;text-align:center;">
     <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;">
       ${badge(vm.blockBadgeVariant, vm.blockLabel)}
-      ${vm.roundLabelText ? `<span style="font-size:12px;font-weight:900;color:var(--ink-soft);background:var(--surface-2);border-radius:var(--radius-pill);padding:3px 10px;">${vm.roundLabelText}</span>` : ""}
     </div>
     ${vm.canOpenDetail ? `
     <button type="button" data-action="openDetailCur" title="See instructions &amp; video" style="display:flex;align-items:center;justify-content:center;gap:10px;background:none;border:none;padding:2px 6px;margin:0;cursor:pointer;font-family:inherit;min-height:44px;max-width:100%;">
@@ -630,6 +625,8 @@ function exList(vm, wide, tablet) {
     <div style="display:flex;align-items:center;gap:8px;padding:${wide ? "12px 0 4px" : "10px 0 4px"};">
       <span style="width:${wide ? 10 : 9}px;height:${wide ? 10 : 9}px;border-radius:50%;background:${sitem.color};flex-shrink:0;"></span>
       <span style="font-weight:900;font-size:12px;letter-spacing:0.05em;text-transform:uppercase;color:${sitem.color};">${sitem.name}</span>
+      ${sitem.roundText ? `<span style="font-weight:900;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">· ${sitem.roundText}</span>
+      <div style="display:flex;gap:4px;margin-left:auto;">${sitem.roundDots.map(rd => `<span style="${rd.style}"></span>`).join("")}</div>` : ""}
     </div>` : `
     <div ${sitem.isCur ? 'data-ex-cur="1" ' : ""}style="${sitem.cardStyle}">
       ${sitem.jumpAction ? `<button type="button" data-action="goToMove" data-arg="${sitem.ci}|${sitem.ei}" title="Jump to this move" style="${jumpOpen}">` : ""}
@@ -637,7 +634,6 @@ function exList(vm, wide, tablet) {
       <span style="${sitem.nameStyle}font-size:${nameSize}px;">${sitem.name}</span>
       ${sitem.jumpAction ? "</button>" : ""}
       <button type="button" data-action="openDetailAt" data-arg="${sitem.ci}|${sitem.ei}" title="See detail photo &amp; video" style="flex-shrink:0;width:${iconSize}px;height:${iconSize}px;border-radius:50%;border:none;background:var(--surface-2);color:var(--ink-soft);font-size:${tablet ? 13 : wide ? 14 : 13}px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">ⓘ</button>
-      ${sitem.paceDotStyle ? `<span title="${sitem.paceTitle}" aria-label="${sitem.paceTitle}" style="${sitem.paceDotStyle}"></span>` : ""}
       <span style="font-size:${nameSize}px;flex-shrink:0;width:${wide ? 18 : 16}px;text-align:center;color:${sitem.secColor};">${sitem.statusIcon}</span>
     </div>`).join("");
 }
@@ -722,11 +718,6 @@ export function sessionScreen(vm) {
           <div style="height:8px;background:var(--surface-2);border-radius:8px;overflow:hidden;">
             <div id="s-sess-fill" style="width:${vm.sessionTimePct}%;height:100%;background:var(--aqua);border-radius:8px;transition:width 0.4s;"></div>
           </div>
-          ${vm.roundLine ? `
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-            <span style="font-size:12px;font-weight:900;color:var(--ink-soft);">${vm.roundLine}</span>
-            <div style="display:flex;gap:5px;">${vm.roundDots.map(rd => `<span style="${rd.style}"></span>`).join("")}</div>
-          </div>` : ""}
         </div>` : ""}
 
         <div style="flex:1 1 auto;min-height:220px;display:flex;flex-direction:column;background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-lg);box-shadow:var(--shadow-soft);box-sizing:border-box;padding:14px 16px;">
@@ -762,7 +753,6 @@ export function sessionScreen(vm) {
         <div style="height:8px;background:var(--surface-2);border-radius:8px;overflow:hidden;">
           <div id="s-sess-fill" style="width:${vm.explore ? Math.round(vm.progressValue / vm.progressMax * 100) : vm.sessionTimePct}%;height:100%;background:var(--aqua);border-radius:8px;"></div>
         </div>
-        ${vm.roundLine ? `<div style="font-size:12px;font-weight:900;color:var(--ink-soft);padding-top:6px;">${vm.roundLine}</div>` : ""}
       </div>
 
       <div style="padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px;flex-shrink:0;">

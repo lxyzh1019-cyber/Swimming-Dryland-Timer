@@ -10,7 +10,9 @@ import { SKILL_BLOCK, COPY } from "../sport.js";
 import { fmtMMSS, exercisePhotoUrl, photoSources, plural } from "../util.js";
 import { loadSessions, loadQuiz, quizQuestionKey } from "../store.js";
 import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION, paceBand,
-         dayRecordFor, moveReviewLegend } from "../outcome.js";
+         dayRecordFor,
+         roundHistoryByMove, roundStatusOf, shortRoundsFrom,
+         shortRoundsByMoveFromPlan, shortRoundsLabel } from "../outcome.js";
 
 /* What changes at the end of this segment — named before she gets there, so the
    switch is never a surprise she hears about only if the voice is on. */
@@ -274,28 +276,31 @@ export function buildSessionVM(state) {
       ? "+" + sess.xpEarned + " XP this time · " + settledToday + " today"
       : "+" + sess.xpEarned + " XP";
 
-  /* THE PER-MOVE REVIEW — every planned performance of the day with its
-     verdict and the reason, off the record's plan (see dayPlanState and
-     moveReviewReason). Collapsed by default; the screen offers "See every
-     move". Same rows as the day card's expanded blocks. */
-  const REVIEW_PILL = {
-    done:    { icon: "✓", bg: "var(--mint)",      ink: "#fff" },
-    banked:  { icon: "✓", bg: "var(--mint)",      ink: "#fff" },
-    partial: { icon: "½", bg: "var(--sun)",       ink: "var(--sun-ink)" },
-    skipped: { icon: "⏭", bg: "var(--coral)",     ink: "#fff" },
-    missing: { icon: "—", bg: "var(--surface-2)", ink: "var(--ink-soft)" }
-  };
-  const moveReview = useRec && dayRec.plan ? (dayRec.plan.moves || []).map(m => {
-    const pill = REVIEW_PILL[m.status] || REVIEW_PILL.missing;
-    return {
-      name: m.name, circuit: m.circuit, round: m.round, status: m.status, icon: pill.icon,
-      roundLabel: (dayRec.plan.blocks.find(b => b.block === m.block && b.name === m.circuit) || {}).rounds > 1 ? "R" + m.round : "",
-      doseLabel: m.got === null || m.planned === null ? ""
-        : m.driver === "reps" ? m.got + " of " + m.planned + " reps" : m.got + "s of " + m.planned + "s",
-      reason: m.reason || "",
-      pillStyle: "width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;background:" + pill.bg + ";color:" + pill.ink + ";"
-    };
-  }) : [];
+  /* WHAT IS STILL OWED — and nothing else.
+
+     This printed every planned performance of the day: on a green day, every
+     move three times, each with a tick. A wall of ticks is not a report, it is
+     a receipt, and the one thing she needs off this screen — what did I not
+     finish, and can I go back for it — was buried in it.
+
+     So it is an exception list now. A move appears only if a round of it came
+     up short or got skipped, and the rounds are NAMED, in the same order the
+     Today list draws its per-round icons, so the two line up. Everything done
+     in full is one closing line. On a clean day this list is empty and the
+     screen says so in a sentence.
+
+     A round she never reached is `missing`, not short (see roundIsShort): it
+     is not something she left undone, and offering it back would be a
+     different promise from the one this list makes. */
+  const notFullGroups = useRec && dayRec.plan
+    ? [...shortRoundsByMoveFromPlan(dayRec.plan.moves || []).values()].filter(g => g.short.length)
+    : [];
+  const notFull = notFullGroups.map(g => ({
+    name: g.name,
+    circuit: g.circuit || "",
+    label: shortRoundsLabel(g.short, g.rounds.length),
+    anySkipped: g.short.some(r => r.status === "skipped")
+  }));
 
   /* One line per main round that did not count, naming the move that cost it.
      Deliberately factual and never scolding: she is told what happened and what
@@ -404,6 +409,14 @@ export function buildSessionVM(state) {
   const roundLine = !showRoundLine ? ""
     : mainFinished ? "Main · " + roundsCounted + " of " + roundsShown + " done"
     : (circuit.name || "") + " · Round " + sess.round + " of " + roundsShown;
+  /* The same fact without the block's name in front of it, because the title it
+     now sits on already says the name. `roundLine` is kept as it was: the HUD
+     strip it was written for is gone, but the field is the one thing that told
+     us this belongs to the block, and removing it would only move the coupling
+     somewhere less obvious. */
+  const roundShort = !showRoundLine ? ""
+    : mainFinished ? roundsCounted + " of " + roundsShown + " done"
+    : "Round " + sess.round + " of " + roundsShown;
   const roundDots = showRoundLine ? Array.from({ length: roundsShown }, (_, i) => ({
     style: "width:10px;height:10px;border-radius:50%;flex-shrink:0;"
       + (i < roundsCounted ? "background:var(--mint);"
@@ -413,16 +426,6 @@ export function buildSessionVM(state) {
 
   // Exercise timeline (left pane list)
   const BLOCK_COLORS = { warmup: "var(--coral)", coordination: "var(--sun-ink)", main: "var(--sea)", prep: "var(--grape)", finisher: "var(--mint-ink)", [SKILL_BLOCK]: "var(--aqua-ink)", recovery: "var(--grape)" };
-  /* HOW WELL EACH FINISHED MOVE WAS HELD, on the list she is already looking at.
-
-     The timeline showed a tick for every move that ended, and a twelve-second
-     version of a thirty-second hold got the same tick as the real thing. The
-     ledger has always known the difference. The dot beside the tick is that
-     difference, in the same four colours the finish screen and the Grown-up
-     Zone use, so nobody has to learn a second vocabulary. Nothing here changes
-     a status: a `done` move is still done, still paid, still a streak unit.
-     Only the colour says how close it was. */
-  const PACE_DOT = { green: "var(--mint)", amber: "var(--sun)", yellow: "var(--coral)", red: "var(--stop)" };
 
   /* ---- THE LIST IS THE DAY, AND THE PILL IS WHERE SHE PICKS UP -------------
 
@@ -444,27 +447,36 @@ export function buildSessionVM(state) {
   const moveKey = (block, name) => block + "|" + name;
 
   const historyRows = (sess.priorRows || []).concat(sess.ledger || []);
-  /* How every round of each move landed. A move reads `done` only once every
-     round the day asked for is done; one skip anywhere makes it skipped, and
-     anything short of that with work in it is a move she cut short. */
-  const seenByMove = new Map();
+  /* ONE MARK PER MOVE, ABOUT THE ROUND SHE IS IN — AND NOTHING ELSE.
+
+     This used to grade a move across ALL its rounds: `done` only once every
+     round the day asked for was done, and anything less with work in it read
+     `partial`. So a main move finished perfectly in round 1 of 3 showed a ½
+     under a legend that says "cut short", for the whole of rounds 1 and 2 —
+     the app telling a kid she had rushed a move she had just nailed.
+
+     That was a ROUND fact wearing a MOVE's clothes. The round belongs to the
+     round title (see roundLine), so the list answers the only question it is
+     in a position to answer: how did THIS move go in THIS round. When a new
+     round starts every mark clears and fills again, which is what a round is.
+
+     Across-rounds history is a different question for a different screen —
+     the end report and the Today list answer it, through shortRoundsFor. */
+  const historyByMove = roundHistoryByMove(historyRows);
+
+  /* Which round each block is showing. The one she is in shows the round she
+     is in; a block she has already left shows the last round of it she did,
+     so a finished warm-up keeps its ticks instead of blanking. */
+  const activeBlock = circuit ? circuit.block : null;
+  const lastRoundOf = new Map();
   historyRows.forEach(l => {
-    if (!l || !l.block || !l.name) return;
-    const k = moveKey(l.block, l.name);
-    const cur = seenByMove.get(k) || { done: 0, partial: 0, skipped: 0 };
-    if (l.status === "done") cur.done += 1;
-    else if (l.status === "skipped") cur.skipped += 1;
-    else if (l.status === "partial") cur.partial += 1;
-    seenByMove.set(k, cur);
+    if (!l || !l.block) return;
+    const r = Number(l.round) || 1;
+    if (!lastRoundOf.has(l.block) || r > lastRoundOf.get(l.block)) lastRoundOf.set(l.block, r);
   });
-  const paceByMove = new Map();
-  historyRows.forEach(l => {
-    if (!l || l.status === "skipped" || !l.block || !l.name) return;
-    const band = paceBand(l);
-    if (!band) return;
-    // The most recent attempt is the one worth showing: latest wins.
-    paceByMove.set(moveKey(l.block, l.name), band);
-  });
+  const shownRound = (c) => (activeBlock && c.block === activeBlock)
+    ? (Number(sess.round) || Number(c.roundBase) || 1)
+    : (lastRoundOf.has(c.block) ? lastRoundOf.get(c.block) : (Number(c.roundBase) || 1));
 
   // Where she is standing, named rather than indexed — for the same reason.
   const curKey = (sess.running && !sessionDone && circuit && circuit.exercises[sess.ei])
@@ -489,7 +501,13 @@ export function buildSessionVM(state) {
   let sawHistory = false;
   const sessionExList = [];
   listCircuits.forEach((c, ci) => {
-    sessionExList.push({ isHeader: true, name: c.name + (c.rounds > 1 ? ` ×${c.rounds}` : ""), color: BLOCK_COLORS[c.block] || "var(--ink-soft)" });
+    /* The block title is where a round is named, and the only place. It used to
+       print a static "×3" off the plan — a round figure on the list that never
+       moved, which is what sent a reader hunting for per-move round state in
+       the first place. It carries the live round now. */
+    const hostsRound = c.rounds > 1 && !!roundShort && c.block === "main";
+    sessionExList.push({ isHeader: true, name: c.name, color: BLOCK_COLORS[c.block] || "var(--ink-soft)",
+      roundText: hostsRound ? roundShort : "", roundDots: hostsRound ? roundDots : [] });
     c.exercises.forEach((e, ei) => {
       const k = moveKey(c.block, e.name);
       const isCur = !!curKey && k === curKey;
@@ -499,14 +517,8 @@ export function buildSessionVM(state) {
       if (explore) {
         st = sess.exStatus[ci + "-" + ei];
       } else {
-        const seen = seenByMove.get(k);
-        // What this move was asked for: its own round cap where it has one.
-        const asked = Math.min(c.rounds, Number(e.rounds) > 0 ? Number(e.rounds) : c.rounds);
-        if (seen) {
-          st = seen.skipped ? "skipped"
-            : seen.done >= asked ? "done"
-            : (seen.done || seen.partial) ? "partial" : undefined;
-        }
+        const perRound = historyByMove.get(k);
+        st = roundStatusOf(perRound && perRound.get(shownRound(c))) || undefined;
       }
       if (st) sawHistory = true;
       const state = isCur ? "current" : st === "done" ? "done"
@@ -524,13 +536,6 @@ export function buildSessionVM(state) {
           + "background:" + pill.bg + ";color:" + pill.ink + ";",
         nameStyle: "flex:1;min-width:0;font-weight:800;color:" + NAME_INK[state],
         statusIcon: pill.icon,
-        paceDotStyle: paceByMove.has(k)
-          ? "width:8px;height:8px;border-radius:50%;flex-shrink:0;background:" + PACE_DOT[paceByMove.get(k)] + ";"
-          : "",
-        paceTitle: paceByMove.has(k)
-          ? { green: "Held the full time", amber: "Almost the full time",
-              yellow: "Short of the full time", red: "Well short of the full time" }[paceByMove.get(k)]
-          : "",
         secColor: pill.sec
       });
     });
@@ -538,7 +543,7 @@ export function buildSessionVM(state) {
   /* What the colours mean, said once and only where there is history to read.
      Done and cut-short shared a glyph before this. */
   const exListLegend = (!explore && sawHistory)
-    ? "✓ done · ½ cut short · ⏭ skipped — you’re picking up at ▶"
+    ? "this round — ✓ done · ½ cut short · ⏭ skipped — you’re picking up at ▶"
     : "";
 
 
@@ -630,7 +635,7 @@ export function buildSessionVM(state) {
     paceBand: (pace && pace.band) || "",
     paceCounts,
     sessionPlannedDisplay: Math.max(1, Math.round(sess.plannedSecs / 60)) + " min",
-    sessionTimePct, roundLine, roundDots,
+    sessionTimePct, roundLine, roundDots, roundShort,
     progressLabel, progressValue: Math.min(doneCount, Math.max(1, totalExCount)), progressMax: Math.max(1, totalExCount),
     sessionExList, exListLegend,
 
@@ -771,8 +776,9 @@ export function buildSessionVM(state) {
     xpEarned: sess.xpEarned, leveledUp: sess.leveledUp,
     xpLine,
     // The per-move review, and whether she has opened it.
-    moveReview, moveReviewOpen: !!state.moveReviewOpen,
-    moveReviewLegend: moveReview.length ? moveReviewLegend() : "",
+    notFull, notFullCount: notFull.length,
+    allInFull: useRec && !!dayRec.plan && notFull.length === 0,
+    redoDayKey: sess.dayKey || "",
     /* MOOD, REFLECTION AND THE QUIZ ONLY EXIST IF THERE IS A RECORD TO PUT
        THEM ON.
 

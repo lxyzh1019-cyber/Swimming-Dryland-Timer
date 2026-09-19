@@ -8,6 +8,7 @@ import { engine, store, sport, data, util, tvm, gvm, svm, sscreen, tscreen, runS
 const base   = new URL("../", import.meta.url).href;
 const layout = await import(base + "layout.js");
 const plan   = await import(base + "plan.js");
+const outcome = await import(base + "outcome.js");
 
 /* RegExp.escape is not in Node 18, and a cue contains "." and "/" */
 const escapeForRe = (t) => String(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -760,6 +761,135 @@ const stopInRoundTwo = (reason) => ({
   ok(after.roundLine === "Main · 3 of 3 done", "after main the line gives main's verdict: " + after.roundLine);
   ok(paint(after.roundDots).join(",") === "mint,mint,mint",
      "with every counted round green: " + paint(after.roundDots).join(","));
+  engine.exitSession();
+}
+
+/* ---- THE LIST IS THIS ROUND, AND THE ROUND IS THE TITLE'S ------------------
+
+   The bug this is here for: a main move finished PERFECTLY in round 1 of 3
+   showed a ½ — the list was grading every move across all its rounds, so
+   "1 of 3 rounds done" came out as "cut short", under a legend that says
+   exactly that, for the whole of rounds 1 and 2. Beside it sat a second mark,
+   a pace dot, which read the same row as 100% and painted itself green. One
+   row, two marks, disagreeing, and neither one true.
+
+   A move row answers one question now — how did THIS move go in THIS round —
+   and the round belongs to the block title. */
+{
+  const seenPerRound = new Map();
+  const mainNames = ((data.DAYS[repsDay].blocks || {}).main || []).map(e => e.name);
+  let midRoundOne = null, roundTwoOpening = null, html = null;
+  await runSession({ dayKey: repsDay, light: "green", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      if (answerChecks(sess)) return;
+      if (!sess.currentEx || sess.currentEx.block !== "main") return;
+      const vm = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+      const rows = (vm.sessionExList || []).filter(r => r.isEx);
+      const done = sess.ledger.filter(l => l.block === "main" && l.round === sess.round);
+      /* The first look INSIDE each round, before anything in it has been done.
+         Counted over the MAIN moves only: a finished warm-up keeps its ticks,
+         because it is not the block whose rounds are turning over. */
+      if (!seenPerRound.has(sess.round) && !done.length) {
+        seenPerRound.set(sess.round, rows.filter(r => !r.isCur && r.statusIcon && mainNames.includes(r.name)).length);
+      }
+      if (!midRoundOne && sess.round === 1 && done.length >= 3) midRoundOne = { vm, rows, done };
+      if (!roundTwoOpening && sess.round === 2) roundTwoOpening = { vm, rows };
+      if (!html && sess.round === 2) html = sscreen.sessionScreen(vm);
+    }
+  });
+
+  ok(midRoundOne, "the run got several moves into round one of main");
+  /* A row is written the instant a move ends, while she is still standing on
+     it — and standing on a move outranks its history, by design. So the check
+     is on the moves she has moved PAST. */
+  const curName = (midRoundOne.rows.find(r => r.isCur) || {}).name;
+  const ledgerDone = midRoundOne.done.filter(l => l.status === "done" && l.name !== curName).map(l => l.name);
+  ok(ledgerDone.length >= 2, "and the ledger really did record them done: " + ledgerDone.length);
+  ledgerDone.forEach(name => {
+    const row = midRoundOne.rows.find(r => r.name === name && !r.isCur);
+    ok(row && row.statusIcon === "✓",
+       "a move done in full in round one reads done, not cut short: " + name + " -> " + (row && row.statusIcon));
+  });
+  ok(midRoundOne.rows.every(r => r.paceDotStyle === undefined),
+     "there is no second mark on the row to disagree with the first");
+
+  ok(roundTwoOpening, "the run reached round two");
+  ok(seenPerRound.get(2) === 0,
+     "and round two opens with every mark cleared, because a round is a fresh one: "
+     + seenPerRound.get(2) + " marks left over");
+
+  /* THE RULE, AS A TEST. Round is a block-title word; nothing on a move row
+     may say it, and nothing may quietly count rounds at her either. */
+  ok(html, "the session screen rendered mid-round");
+  ok((html.match(/Round 2 of 3/g) || []).length === 1,
+     "the round is named exactly once on the whole screen, not three times over");
+  ok(!/\bx3\b|×3/.test(html), "and no static round figure is left sitting on the list");
+  const moveRows = (roundTwoOpening.rows || []);
+  ok(moveRows.length > 0 && moveRows.every(r => !/round/i.test(r.name) && !/\d+\s*of\s*\d+/.test(r.name)),
+     "no move row names a round or counts them");
+  engine.exitSession();
+}
+
+/* ---- WHAT IS OWED IS ONE LIST, AND REDOING IT CLEARS IT --------------------
+
+   "+ Add them back" re-ran the move but filed it under the NEXT unbanked round
+   number, so the redo never matched the row it was meant to improve: rows are
+   keyed block|round|name, and the ½ stood for ever however many times she went
+   back for it. The end report and the redo read the same merged rows now, so
+   what the report offers is what the redo runs — and once it is run, the offer
+   stops being made. */
+{
+  /* Named off the plan, never off one app's content: this core runs under both. */
+  const mainOf = (k) => ((data.DAYS[k].blocks || {}).main || []);
+  const redoDay = Object.keys(data.DAYS).find(k => !data.DAYS[k].spa
+    && mainOf(k).some(e => !e.byReps && Number(e.work) >= 20));
+  ok(redoDay, "the plan has a day with a timed main move long enough to cut short");
+  const MOVE = mainOf(redoDay).find(e => !e.byReps && Number(e.work) >= 20).name;
+  const lastSettled = () => {
+    const recs = outcome.dayRecords();
+    return recs.length ? recs[recs.length - 1].settledXp : null;
+  };
+  const answerOnly = { onTick: (ms, sess) => { answerChecks(sess); } };
+
+  // What the day pays when it is trained straight through, for comparison.
+  await runSession({ dayKey: redoDay, light: "green", gateUnlocked: true }, answerOnly);
+  const cleanXp = lastSettled();
+  ok(cleanXp > 0, "a clean run of the day pays something to compare against: " + cleanXp);
+  engine.exitSession();
+
+  const short = (sess) => sess.phase === "work" && sess.currentEx && sess.currentEx.name === MOVE
+    && sess.round === 1 && sess.timerMax - sess.timerSecs >= 5 && sess.timerSecs > 10;
+  await runSession({ dayKey: redoDay, light: "green", gateUnlocked: true }, {
+    onTick: (ms, sess) => { if (answerChecks(sess)) return; if (short(sess)) engine.advance(); }
+  });
+  const rowsAfterOne = store.loadSessions().flatMap(r => r.ledger || []);
+  const owed = outcome.shortRoundsFor(rowsAfterOne, "main", MOVE);
+  ok(owed.length === 1 && owed[0].round === 1 && owed[0].status === "partial",
+     "round one is what is owed, and it is named: " + JSON.stringify(owed));
+  const fvOwed = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+  ok(!fvOwed.allInFull && fvOwed.notFull.some(r => r.name === MOVE && /round 1 short/.test(r.label)),
+     "the finish screen says so in the same words: " + JSON.stringify(fvOwed.notFull));
+  ok(fvOwed.notFull.length < mainOf(redoDay).length,
+     "and lists nothing she finished — it is an exception list, not a receipt");
+
+  const offeredAs = [];
+  await runSession({ dayKey: redoDay, light: "green", gateUnlocked: true, wipe: false, redoPartials: true }, {
+    onTick: (ms, sess) => {
+      if (answerChecks(sess)) return;
+      if (sess.currentEx && sess.currentEx.name === MOVE && !offeredAs.includes(sess.round)) offeredAs.push(sess.round);
+    }
+  });
+  ok(offeredAs.length === 1 && offeredAs[0] === 1,
+     "the redo offers ROUND ONE back, under its own number, not the next free one: " + JSON.stringify(offeredAs));
+  const rowsAfterRedo = store.loadSessions().flatMap(r => r.ledger || []);
+  ok(outcome.shortRoundsFor(rowsAfterRedo, "main", MOVE).length === 0,
+     "so the merged record upgrades it and nothing is owed any more");
+  const fvClear = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+  ok(fvClear.allInFull && fvClear.notFull.length === 0,
+     "and the finish screen has nothing left to list");
+  ok(lastSettled() === cleanXp,
+     "the day pays what a day trained straight through pays — a redone round is not paid twice: "
+     + lastSettled() + " vs " + cleanXp);
   engine.exitSession();
 }
 

@@ -741,6 +741,113 @@ export function mergeLedgerRows(rows) {
   return [...best.values()];
 }
 
+/* ------------------------------------------------------------
+   HOW EACH ROUND OF A MOVE ACTUALLY WENT.
+
+   Three screens need to answer a question about a move ACROSS its rounds —
+   the end report ("what is still owed"), the Today list (one icon per round)
+   and the resume's redo ("offer those rounds again"). They used to answer it
+   three different ways, and the screens disagreed.
+
+   They go through here now, and the merge is the reason why. A day's rows are
+   not one row per planned unit: a redo writes a SECOND row for the same
+   block|round|name, so the raw list holds both the partial she cut short and
+   the done she came back and finished. Counting raw rows leaves a move short
+   forever — the redo could never clear it, and the report would keep offering
+   a round she had already fixed. mergeLedgerRows keeps the best proof per
+   logical row, so a round is judged once, on her best attempt at it.
+
+   Banked rows are `done` (see bankMove), so nothing special is needed for
+   them; a round she never reached has no row and is not short, it is simply
+   not there.
+   ------------------------------------------------------------ */
+const moveHistoryKey = (block, name) => String(block || "?") + "|" + String(name || "?");
+
+/* One merge, then indexed: move -> (round -> its best row). Callers that walk
+   a whole plan build this ONCE rather than re-merging the ledger per move. */
+export function roundHistoryByMove(rows) {
+  const byMove = new Map();
+  mergeLedgerRows(rows).forEach(row => {
+    if (!row || !row.block || !row.name) return;
+    const k = moveHistoryKey(row.block, row.name);
+    let perRound = byMove.get(k);
+    if (!perRound) { perRound = new Map(); byMove.set(k, perRound); }
+    perRound.set(Number(row.round) || 1, row);
+  });
+  return byMove;
+}
+
+export function roundHistoryFor(rows, block, name) {
+  return roundHistoryByMove(rows).get(moveHistoryKey(block, name)) || new Map();
+}
+
+/* The verdict one round of one move earned. `null` when she never reached it. */
+export function roundStatusOf(row) {
+  if (!row) return null;
+  if (row.banked) return "done";
+  return row.status || null;
+}
+
+/* The rounds of a move that were NOT completed in full, oldest first, each
+   with what went wrong. This is the list the end report prints and the list
+   the redo hands back — the same list, so the two cannot disagree about what
+   is still owed. */
+/* ONE predicate for "this round was not done in full", so the end report, the
+   Today list and the redo cannot disagree about what is still owed. `missing`
+   is deliberately not short: a round she never reached is not a round she came
+   up short on, and offering it back as a redo would be a different promise. */
+export const roundIsShort = (status) => status === "partial" || status === "skipped";
+
+export function shortRoundsFrom(perRound) {
+  if (!perRound) return [];
+  return [...perRound.entries()]
+    .map(([round, row]) => ({ round, status: roundStatusOf(row) }))
+    .filter(r => roundIsShort(r.status))
+    .sort((a, b) => a.round - b.round);
+}
+
+/* The same question asked of a day PLAN's move rows (dayPlanState's shape)
+   instead of raw ledger rows. Those are already merged and already carry one
+   status per planned round, so the screens that have a plan in hand use this
+   and the ones that only have rows use shortRoundsFor — same predicate. */
+export function shortRoundsByMoveFromPlan(moves) {
+  const out = new Map();
+  (moves || []).forEach(m => {
+    if (!m || !m.name) return;
+    const k = String(m.block || "?") + "|" + String(m.name);
+    let g = out.get(k);
+    if (!g) { g = { block: m.block, name: m.name, circuit: m.circuit, rounds: [], short: [] }; out.set(k, g); }
+    g.rounds.push({ round: m.round, status: m.status });
+    if (roundIsShort(m.status)) g.short.push({ round: m.round, status: m.status });
+  });
+  out.forEach(g => {
+    g.rounds.sort((a, b) => a.round - b.round);
+    g.short.sort((a, b) => a.round - b.round);
+  });
+  return out;
+}
+
+/* "round 3 short" · "rounds 2, 3 skipped" · "round 2 short · round 3 skipped".
+   The round is NAMED rather than counted, because the Today list shows one
+   icon per round in round order — so the two readings line up. A move with a
+   single round has no round to name and just says what happened. */
+export function shortRoundsLabel(short, totalRounds) {
+  if (!short || !short.length) return "";
+  const word = (st) => st === "skipped" ? "skipped" : "short";
+  if (!(totalRounds > 1)) return word(short[0].status);
+  const parts = [];
+  ["partial", "skipped"].forEach(st => {
+    const rs = short.filter(s => s.status === st).map(s => s.round);
+    if (!rs.length) return;
+    parts.push((rs.length > 1 ? "rounds " : "round ") + rs.join(", ") + " " + word(st));
+  });
+  return parts.join(" · ");
+}
+
+export function shortRoundsFor(rows, block, name) {
+  return shortRoundsFrom(roundHistoryFor(rows, block, name));
+}
+
 /* ============================================================
    ONE WORKOUT, HOWEVER MANY SITTINGS IT TOOK
 

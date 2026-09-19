@@ -10,7 +10,7 @@
 
 import { deriveSessionOutcome, mainRoundsFromLedger, mainRoundReport, OUTCOME_VERSION,
          mergeLedgerRows, logicalRowId, workoutDate, paceReport,
-         moveReviewReason, moveReviewDose } from "./outcome.js";
+         moveReviewReason, moveReviewDose, roundIsShort } from "./outcome.js";
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BREATH_SAY, MANTRA,
          exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
          needsSetup, SETUP_SECONDS,
@@ -255,6 +255,15 @@ export function assembleCircuits(dayKey, light, opts = {}) {
      than a shorter block, so it is handled separately below. */
   const skipMoves = opts.skipMoves || {};
   const mainPartial = opts.mainPartialRound || [];
+  /* ROUNDS SHE ASKED FOR BACK, each under the round number it already has.
+
+     "+ Add them back" used to hand a cut-short move to the NEXT unbanked round
+     number, so the redo wrote a fresh row instead of a better attempt at the
+     one that was short: rows are keyed block|round|name, the new row never
+     matched the old, and the ½ stood for ever however many times she went back
+     for it. Re-offering round one AS round one is what lets mergeLedgerRows
+     see the two as attempts at the same unit and keep the better of them. */
+  const mainRedo = (opts.mainRedo || []).filter(r => r && r.round > 0 && (r.names || []).length);
   /* HOW MANY MAIN ROUNDS OF THE DAY ARE ALREADY BEHIND US.
 
      A resume's rounds are rounds 2 and 3 of the day, not rounds 1 and 2 of a
@@ -305,7 +314,7 @@ export function assembleCircuits(dayKey, light, opts = {}) {
       exs = exs.filter(ex => !banked.includes(ex.name));
     }
     if (!exs.length) return;
-    if (bk === "main" && rounds <= 0 && !mainPartial.length) return;   // nothing owed
+    if (bk === "main" && rounds <= 0 && !mainPartial.length && !mainRedo.length) return;   // nothing owed
     if (bk === "main") {
       /* THE RAGGED ROUND.
 
@@ -321,6 +330,18 @@ export function assembleCircuits(dayKey, light, opts = {}) {
          remainder circuit declares its OWN expected size, so finishing those
          moves credits the interrupted round exactly once — and a remainder
          round cut short again still cannot pass for a finished one. */
+      /* Asked-for rounds come first and keep their own numbers; only the moves
+         that were short or skipped in that round are re-run, because the rest
+         of it is already finished work and asking for it again is not a second
+         chance, it is a punishment. */
+      mainRedo.forEach(r => {
+        const again = exs.filter(ex => (r.names || []).includes(ex.name));
+        if (again.length) {
+          circuits.push({ name: BLOCK_LABEL[bk], block: bk, rounds: 1,
+                          roundBase: r.round, partialRound: true, redo: true,
+                          exercises: again });
+        }
+      });
       const remainder = exs.filter(ex => !mainPartial.includes(ex.name));
       const ragged = !!(mainPartial.length && remainder.length);
       /* The interrupted round is ONE OF THE ROUNDS STILL OWED, not an extra one
@@ -328,7 +349,12 @@ export function assembleCircuits(dayKey, light, opts = {}) {
          the day's plan, and finishing the ragged round finishes the first of
          them — so the full rounds that follow are one fewer. Counting it as
          extra ran a green day for four main rounds and printed "4 of 3". */
-      const fullRounds = Math.max(0, rounds - (ragged ? 1 : 0));
+      /* A round she asked back is one of the rounds still owed, not an extra
+         one after them — the same arithmetic the ragged round above needs. A
+         round that was short is exactly why the day owes another, so counting
+         the redo separately would run the day for one round too many and hand
+         her back work she had already finished. */
+      const fullRounds = Math.max(0, rounds - (ragged ? 1 : 0) - mainRedo.length);
       // Both numbered from where the day actually is.
       const base = roundOffset + (ragged ? 2 : 1);
       if (ragged) {
@@ -1680,6 +1706,23 @@ export function planResume(dayKey, light = "green", opts = {}) {
   const logBankable = redoPartials ? logDone : logRows.filter(r => r &&
     (r.status === "done" || (r.status === "partial" && r.block !== "main")));
   const logRounds = care ? 0 : mainRoundsFromLedger(logRows, null, OUTCOME_VERSION);
+  /* The main rounds she is asking back, grouped by the round they belong to.
+     `logRows` is already merged, which is the whole point: once she has redone
+     round one it no longer reads short, so the offer stops being made instead
+     of repeating for ever. Same predicate as the end report's list, so the two
+     cannot differ about what is owed. */
+  const mainRedo = [];
+  if (redoPartials && !care) {
+    const byRound = new Map();
+    logRows.forEach(r => {
+      if (!r || r.block !== "main" || !r.name || !roundIsShort(r.status)) return;
+      const rd = Number(r.round) || 1;
+      if (!byRound.has(rd)) byRound.set(rd, []);
+      const names = byRound.get(rd);
+      if (!names.includes(r.name)) names.push(r.name);
+    });
+    [...byRound.entries()].sort((a, b) => a[0] - b[0]).forEach(([round, names]) => mainRedo.push({ round, names }));
+  }
 
   const lockedLight = lowerOrNull(prog && prog.lockedLight, lockedLightFromLog(logFrags));
   const finalLight = lockedLight ? lowerLight(lockedLight, resolvedLight) : resolvedLight;
@@ -1735,6 +1778,7 @@ export function planResume(dayKey, light = "green", opts = {}) {
         mainRounds: mainOwed,
         skipMoves: bankedMoves,
         mainPartialRound: bankedMoves.main || [],
+        mainRedo,
         // Rounds already on disk, so this sitting's rows are numbered as rounds
         // OF THE DAY and cannot collide with the earlier sitting's.
         roundOffset: bankedRounds
