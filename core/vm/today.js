@@ -4,7 +4,7 @@
    history, journey XP, and live Edmonton dates.
    ============================================================ */
 
-import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, RANK_LORE, BLOCK_META, BLOCK_LABEL, levelCost, fmtXp, overloadWeek } from "../data.js";
+import { DAYS, WEEK_ORDER, DAY_SHORT, DAY_LONG, LADDER, RANK_LORE, BLOCK_META, BLOCK_LABEL, levelCost, fmtXp, overloadWeek, doseLines } from "../data.js";
 import { SKILL_BLOCK, ATHLETE_DEFAULT, COPY, EMOJI } from "../sport.js";
 import { settings, loadSessions, loadJourney, levelFromXp } from "../store.js";
 /* STREAK_WORK_FRACTION is imported, not re-typed. This file used to carry a
@@ -433,7 +433,7 @@ export function buildTodayVM(state) {
       isBlockDone: showActuals && b.planned > 0 && b.done >= b.planned,
       isBlockSkipped: showActuals && b.performed === 0,
       moves: exs.map(e => ({
-        text: e.name + " · " + e.dose, cue: e.cue,
+        text: e.name + " · " + (e.byReps ? doseLines(e).short : e.dose), cue: e.cue,
         transfer: e.transfer || ""
       })),
       /* THE PER-MOVE REVIEW: what counted and why, one line each, for a day

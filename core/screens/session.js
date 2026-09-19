@@ -38,7 +38,7 @@ function repRing(vm, size, capVh) {
   return `
   <div data-action="advance" title="Tap the ring when you're done" style="cursor:pointer;flex:0 1 ${size}px;max-width:${capVh ? `min(${size}px, ${capVh}vh)` : `${size}px`};min-width:${size >= 300 ? 220 : 160}px;aspect-ratio:1;border-radius:50%;background:var(--grape-wash);border:${border}px solid var(--grape);display:flex;flex-direction:column;align-items:center;justify-content:center;box-sizing:border-box;padding:${size >= 300 ? 26 : 14}px;">
     <div style="font-weight:900;font-size:${size >= 300 ? 15 : 11}px;letter-spacing:0.1em;color:var(--grape-deep);">BY REPS</div>
-    <div style="font-family:var(--font-display);font-size:${size >= 300 ? 50 : 32}px;font-weight:600;color:var(--grape);text-align:center;line-height:1.05;margin:${size >= 300 ? 8 : 4}px 0;">${vm.curExDose}</div>
+    <div style="font-family:var(--font-display);font-size:${(String(vm.curExDose || "").length > 6 ? (size >= 300 ? 26 : 20) : (size >= 300 ? 50 : 32))}px;font-weight:600;color:var(--grape);text-align:center;line-height:1.05;margin:${size >= 300 ? 8 : 4}px 0;">${vm.curExDose}</div>
     ${vm.showClock ? `<div style="font-weight:900;font-size:${size >= 300 ? 20 : 14}px;color:var(--grape-deep);">⏱ <span id="s-timer-text">${vm.exActualDisplay}</span></div>` : ""}
     <div style="font-size:12px;font-weight:800;color:var(--grape-deep);opacity:0.8;margin-top:6px;">${vm.explore ? "No clock here — tap Next when you've had a look" : "Tap the ring when you're done"}</div>
   </div>`;
@@ -515,7 +515,7 @@ function centerStack(vm, wide, tablet) {
     ${coachStrip(vm, wide)}
     <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;text-align:center;">
       ${vm.overNudge ? `<div style="font-family:var(--font-hand);font-size:17px;font-weight:700;color:var(--sun-ink);line-height:1.2;">Past the planned time — that's okay. Finish clean, then rest 💛</div>` : ""}
-      ${vm.notResting ? `<div style="font-family:var(--font-hand);font-size:${wide ? 16 : 15}px;color:var(--aqua-ink);font-style:italic;line-height:1.2;">${vm.curExDose}</div>` : ""}
+      ${vm.notResting && vm.curExDoseSub ? `<div style="font-family:var(--font-hand);font-size:${wide ? 16 : 15}px;color:var(--aqua-ink);font-style:italic;line-height:1.2;">${vm.curExDoseSub}</div>` : ""}
     </div>
   </div>`;
 

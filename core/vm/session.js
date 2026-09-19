@@ -3,9 +3,9 @@
    values from the engine's `sess` view-state.
    ============================================================ */
 
-import { sess, refTime, screenRepsDetail, pausedByBackground, canGoBack } from "../engine.js";
+import { sess, refTime, pausedByBackground, canGoBack } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, BLOCK_LABEL, SESSION_QUIZ,
-         TRAINING_QS, REFLECT_WELL, REFLECT_NEXT, exWork, videoSearchUrl } from "../data.js";
+         TRAINING_QS, REFLECT_WELL, REFLECT_NEXT, exWork, doseLines, videoSearchUrl } from "../data.js";
 import { SKILL_BLOCK, COPY } from "../sport.js";
 import { fmtMMSS, exercisePhotoUrl, photoSources, plural } from "../util.js";
 import { loadSessions, loadQuiz, quizQuestionKey } from "../store.js";
@@ -386,7 +386,20 @@ export function buildSessionVM(state) {
     phase === "breath" ? "Breath rehearsal" :
     (ex.name || "");
 
-  const curExDose = timerIsReps ? (screenRepsDetail(ex) || ex.dose || "") : (sess.sideLabel || ex.dose || "");
+  /* THE RING SAYS WHAT SHE COUNTS TO; THE LINE UNDER IT SAYS THE WHOLE DOSE.
+
+     Both used to render the same authored string, so "8/dir" appeared twice
+     and the thirty-two reps it stands for appeared nowhere. The ring is a
+     fixed circle, so it keeps the short form; the line below has room for the
+     total, and DURING the reps it counts up instead — which is how she can see
+     the coach trailing her and know not to tap Done yet. */
+  const exPrescriptionUnit = (e) => (e && e.prescription && e.prescription.unit) || "reps";
+  const lines = timerIsReps ? doseLines(ex) : null;
+  const curExDose = lines ? lines.big : (sess.sideLabel || ex.dose || "");
+  const curExDoseSub = !lines ? ""
+    : (phase === "reps" && sess.repsTarget > 0)
+      ? sess.repsCounted + " of " + sess.repsTarget + " " + (exPrescriptionUnit(ex) || "reps")
+      : lines.sub;
   const curPlanned = refTime(ex);
   const curActual = timerIsReps ? sess.exElapsed : Math.max(0, (sess.timerMax || 0) - (sess.timerSecs || 0));
   const exOver = curActual > curPlanned + 2;
@@ -615,7 +628,7 @@ export function buildSessionVM(state) {
     stopOverlay: sess.stopOverlay,
     confirmSkip: !!sess.confirmSkip,
     detailOverlay: state.detailOverlay,
-    detailName: de.name || "", detailDose: de.dose || "", detailCue: de.cue || "",
+    detailName: de.name || "", detailDose: de.byReps ? doseLines(de).full : (de.dose || ""), detailCue: de.cue || "",
     detailWatchFor: de.parentWatch || "", detailFix: de.redFlag || de.fix || "",
     detailTransfer: de.transfer || "",
     // The repo holds 39 "- Timer Image.png" files and zero "- Demo Image.png",
@@ -685,7 +698,7 @@ export function buildSessionVM(state) {
     // rendered there and did nothing at all when tapped.
     canOpenDetail: !!sess.currentEx && !isResting && (!isPrompt || isFormCheck),
     stageTitle, blockBadgeVariant, blockLabel, roundLabelText,
-    curExName: ex.name || "", curExDose,
+    curExName: ex.name || "", curExDose, curExDoseSub,
     curExCue: isResting ? sess.restCue : (ex.cue || ""),
     curExWatchFor: ex.parentWatch || "", curExFix: ex.redFlag || "",
     curExTransfer: ex.transfer || "",
@@ -750,7 +763,10 @@ export function buildSessionVM(state) {
     /* The rep question. Three answers and the rule in one line — a kid who
        finished before the coach did is being asked, not told off. */
     isRepCheck,
-    repCheckQuestion: "Did you get all " + (sess.repsTarget || 0) + "?",
+    /* NAME BOTH NUMBERS. This asked "Did you get all 32?" for a move whose ring
+       had only ever said "8/dir" — a total she had never been shown, arriving
+       at the one moment it decides what gets recorded. */
+    repCheckQuestion: "You counted " + (sess.repsCounted || 0) + " of " + (sess.repsTarget || 0) + ". Did you finish the rest?",
     repCheckRule: "All " + (sess.repsTarget || 0) + " counts the move.",
     repCheckOpts: [
       { arg: "all",    label: "All of them", bg: "var(--mint)",    ink: "#fff",           edge: "var(--mint-deep)" },

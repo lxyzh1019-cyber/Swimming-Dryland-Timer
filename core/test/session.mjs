@@ -653,8 +653,13 @@ const stopInRoundTwo = (reason) => ({
   ok(all.tapped && all.tapped.coach < all.tapped.target,
      "Done was tapped at " + all.tapped.coach + " of " + all.tapped.target + " on " + all.tapped.name);
   ok(all.asked && all.card && all.card.isRepCheck, "and the question came up in the ring's place");
-  ok(all.card.repCheckQuestion === "Did you get all " + all.tapped.target + "?",
-     "asking about the whole set: " + all.card.repCheckQuestion);
+  /* Both numbers, not just the target: the ring never showed her the total,
+     so a bare "Did you get all 32?" arrived out of nowhere at the one moment
+     it decides what is recorded. */
+  ok(/^You counted \d+ of \d+\. Did you finish the rest\?$/.test(all.card.repCheckQuestion),
+     "asking with the count she is at AND the one she is aiming for: " + all.card.repCheckQuestion);
+  ok(all.card.repCheckQuestion.includes(" of " + all.tapped.target + "."),
+     "and the target is the move's whole dose: " + all.card.repCheckQuestion);
   ok(all.card.repCheckRule === "All " + all.tapped.target + " counts the move.",
      "with the rule in one line: " + all.card.repCheckRule);
   ok((all.html.match(/data-action="answerRepCheck"/g) || []).length === 3
@@ -662,7 +667,8 @@ const stopInRoundTwo = (reason) => ({
      "three answers, and no others");
   ok(!/id="s-timer-text"/.test(all.html), "the count is paused — the rep ring is gone while she answers");
   ok(!/data-action="askSkip"/.test(all.html), "and Skip is not offered over a question, as on any prompt");
-  ok(all.said.some(t => /Did you get them all\?/.test(t)), "the coach asks it out loud, in one line, when the voice is on");
+  ok(all.said.some(t => /You counted \d+ of \d+\. Did you finish the rest\?/.test(t)),
+     "the coach asks it out loud with both numbers, the way the card does");
   ok(all.row && all.row.status === "done" && all.row.repsCounted === all.tapped.target,
      "\"All of them\" records the full count and the move reads done (" + all.row.repsCounted + " of " + all.row.repsPlanned + ")");
 
@@ -915,6 +921,10 @@ const stopInRoundTwo = (reason) => ({
     [/TIMED SET/, "TIMED SET — a set is the prescription unit, counted elsewhere"],
     [/\bworkout\b/i, "workout — this is a session"],
     [/\bexercises?\b/i, "exercise — the kid-facing word is move"],
+    /* "press" is an instruction word, but Pallof Press is a MOVE. Move names
+       come from the plan and are not ours to police, so they are struck out
+       before matching — otherwise this guard fails on content the moment a
+       snapshot happens to include that move. */
     [/\bpress\b/i, "press — every other instruction says tap"],
     [/½ cut short/, "two legends for one glyph"],
   ];
@@ -924,7 +934,12 @@ const stopInRoundTwo = (reason) => ({
 
   /* Asset paths are not copy: assets/exercises/<name>.webp is a filename on
      disk, not a word she reads. Strip src/href before matching. */
-  const copyOnly = (html) => String(html).replace(/(?:src|href|data-fallback)="[^"]*"/g, "");
+  const moveNames = Object.values(data.DAYS)
+    .flatMap(d => Object.values(d.blocks || {}).flat().concat(d.prepMenu || [], d.recovery || []))
+    .map(e => e && e.name).filter(Boolean);
+  const copyOnly = (html) => moveNames.reduce(
+    (t, n) => t.split(n).join(" "),
+    String(html).replace(/(?:src|href|data-fallback)="[^"]*"/g, ""));
   const screens = [];
   await runSession({ dayKey: repsDay, light: "green", gateUnlocked: true }, {
     onTick: (ms, sess) => {
@@ -956,6 +971,87 @@ const stopInRoundTwo = (reason) => ({
      || /Round \d+ of \d+/.test(railless),
      "the round survives with no exercise list at all — it lives beside the timer");
   engine.exitSession();
+}
+
+/* ---- ONE DOSE, SAID THE SAME WAY BY THE SCREEN AND THE COACH ---------------
+
+   Band Ankle 4-Way is {reps:8, dirs:4} — thirty-two reps. The ring showed the
+   string somebody typed, "8/dir"; the coach read a different string and said
+   "8 reps"; and the count the runner walked was a third thing neither of them
+   consulted. A kid who did eight and tapped Done was then asked "Did you get
+   all 32?" — a number she had never been shown — and answering yes banked
+   thirty-two of thirty-two for a quarter of the move.
+
+   The prescription is described once now, and both voices format those parts.
+   These assertions are about the two of them agreeing, not about wording for
+   its own sake. */
+{
+  const P = (pr) => ({ byReps: true, prescription: plan.normalizePrescription(pr) });
+  const rows = [
+    [{ reps: 8, dirs: 4 },                          "8 × 4 ways",            "32 reps in total"],
+    [{ reps: 8, dirs: 2 },                          "8 × 2 ways",            "16 reps in total"],
+    [{ reps: 3, sides: 2, dirs: 2, sideWord: "arm" }, "3 × 2 ways, each arm", "12 reps in total"],
+    [{ reps: 8, sides: 2, dirs: 2, sideWord: "leg" }, "8 × 2 ways, each leg", "32 reps in total"],
+    [{ sets: 2, reps: 8, sides: 2 },                "8 each side",           "32 reps in total"],
+    [{ reps: 8, repsHigh: 10, sides: 2 },           "8–10 each side",        "16–20 reps in total"],
+    [{ reps: 8, sideReps: [8, 10], sides: 2 },      "8 then 10",             "18 reps in total"],
+    [{ reps: 2, repsHigh: 3 },                      "2–3",                   ""],
+    [{ reps: 12 },                                  "12",                    ""]
+  ];
+  rows.forEach(([pr, big, sub]) => {
+    const d = plan.doseLines(P(pr));
+    ok(d.big === big, "the ring says " + JSON.stringify(big) + ", got " + JSON.stringify(d.big));
+    ok(d.sub === sub, "and the line under it says " + JSON.stringify(sub) + ", got " + JSON.stringify(d.sub));
+  });
+
+  /* The ring is a fixed circle. A dose that needs a sentence gets one BELOW
+     it, never inside it. */
+  rows.forEach(([pr]) => ok(plan.doseLines(P(pr)).big.length <= 22,
+    "no ring string is longer than the ring: " + plan.doseLines(P(pr)).big));
+
+  /* THE WHOLE POINT: the screen and the coach must not name different numbers. */
+  rows.forEach(([pr]) => {
+    const ex = P(pr), d = plan.doseLines(ex), said = plan.spokenDose(ex);
+    const total = String(ex.prescription.totalReps);
+    if (ex.prescription.segments > 1 && d.sub.includes(total)) {
+      ok(said.includes(total) || !/in total/.test(said),
+         "the coach does not contradict the screen's total (" + total + "): " + said);
+    }
+    ok(!/\d+\s*\/\s*(dir|side|leg|arm)/.test(d.big + d.sub + d.full),
+       "and no derived string still carries a raw /dir or /side: " + d.short);
+  });
+
+  const bandAnkle = P({ reps: 8, dirs: 4 });
+  ok(plan.spokenDose(bandAnkle) === "8 reps in each of 4 directions, 32 in total",
+     "the coach says the whole dose for a four-way move: " + plan.spokenDose(bandAnkle));
+
+  /* A note is for reading. It must reach the sentence and nothing else — not
+     the ring, not a list row, and never the coach. */
+  const noted = { ...P({ reps: 8 }), note: "dowel on the back" };
+  const nd = plan.doseLines(noted);
+  ok(nd.full.includes("dowel on the back"), "a note reaches the long form: " + nd.full);
+  ok(!nd.big.includes("dowel") && !nd.short.includes("dowel"), "but not the ring or a list row");
+  ok(!plan.spokenDose(noted).includes("dowel"), "and the coach never reads it out");
+
+  /* The four oldest fixtures carry no prescription at all. They still get the
+     reading they always had — content exists whose repsDetail is prose and
+     could never be parsed, and it must keep working. */
+  ok(plan.spokenDose({ byReps: true, repsDetail: "8/side" }) === "8 reps per side", "legacy: reps per side");
+  ok(plan.spokenDose({ byReps: true, repsDetail: "2×8/side" }) === "2 sets of 8 per side", "legacy: sets per side");
+  ok(plan.spokenDose({ byReps: true, repsDetail: "10" }) === "10 reps", "legacy: plain reps");
+  ok(plan.spokenDose({ byReps: true, repsDetail: "" }) === "", "legacy: an unreadable dose stays silent");
+
+  /* A DIRECTION COUNT MUST BE STATED. */
+  let threw = "";
+  try { plan.parsePrescription("8/dir"); } catch (e) { threw = e.message; }
+  ok(/does not say how many directions/.test(threw), "a bare /dir fails at load: " + threw);
+  ok(plan.parsePrescription("8/4-way").dirs === 4, "and a stated count is read: 8/4-way is four");
+
+  /* An asymmetric dose is walked, not averaged. */
+  const rock = plan.normalizePrescription({ reps: 8, sideReps: [8, 10], sides: 2 });
+  ok(rock.totalReps === 18, "eight on one side and ten on the other is eighteen, not sixteen");
+  ok(plan.prescriptionSegments(rock).map(g => g.reps).join(",") === "8,10",
+     "and the runner counts to each of them in turn");
 }
 
 console.log("✓ session safety passed (" + passed + " assertions)");

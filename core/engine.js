@@ -12,7 +12,7 @@ import { deriveSessionOutcome, mainRoundsFromLedger, mainRoundReport, OUTCOME_VE
          mergeLedgerRows, logicalRowId, workoutDate, paceReport,
          moveReviewReason, moveReviewDose, roundIsShort } from "./outcome.js";
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BREATH_SAY, MANTRA,
-         exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds,
+         exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds, doseLines,
          needsSetup, SETUP_SECONDS,
          VALGUS_FLOOR, VALGUS_PROGRESSIONS } from "./data.js";
 import { settings, configuredExerciseRest, configuredRoundRest, configuredSectionRest, saveSession, logEvent,
@@ -100,7 +100,7 @@ function blankSession() {
     workoutInstanceId: null,
     savedOutcome: null,
     blocksCompleted: 0, expectedByRound: {},
-    repsCounted: 0, repsTarget: 0, repNow: 0, segmentsDone: 0, segmentsPlanned: 0,
+    repsCounted: 0, repsTarget: 0, repNow: 0, repsReachedCap: 0, segmentsDone: 0, segmentsPlanned: 0,
     sideLabel: "", segmentLabel: "",
     /* Live coach state. The engine has always known all of this; it just never
        said it out loud anywhere she could see. Speech may announce it, but the
@@ -568,24 +568,11 @@ function sleep(ms) {
   });
 }
 
-/* ---- reps: a real state machine over the structured prescription ----------
-   This used to read the DISPLAY string with a regex that never matched, so
-   every rep exercise counted to 10 once and none of them ever switched sides.
-   The count, the cadence, the sets and the sides now all come from
-   ex.prescription (parsed in data.js), and the exercise is walked as an
-   ordered list of segments — one per set × side × direction — with a reset
-   between each.
-
-   Done at any point ENDS THE EXERCISE. Whether that counts as finished is not
-   decided here: the caller compares repsCounted against the target. */
-
-const CADENCE_PATTERN = /\d+s\s+(?:up|open|raise)/i;
-export function screenRepsDetail(ex) {
-  const detail = exRepsDetail(ex) || ex.dose;
-  if (!(ex.byReps && CADENCE_PATTERN.test(ex.repsDetail || ""))) return detail;
-  const m = detail.match(/^(\d+\s+reps?)/i);
-  return m ? m[1] : detail.replace(/·.*$/, "").trim();
-}
+/* The ring's dose is derived from the prescription now (see doseLines in
+   plan.js), so there is no hand-written string left to trim. `screenRepsDetail`
+   and its cadence regex existed only to cut a long authored label down to
+   something that would fit — a workaround for the display and the count being
+   two different things. */
 
 /* Wait `ms` of UNPAUSED time, bailing the moment the exercise is over. */
 function repSleep(ms, stopped) {
@@ -714,7 +701,7 @@ function repCheckWanted() {
 function repCheckPrompt() {
   return new Promise(resolve => {
     setPhase("repcheck");
-    speakIfIdle("Did you get them all?");
+    speakIfIdle(`You counted ${sess.repsCounted} of ${sess.repsTarget}. Did you finish the rest?`);
     const settle = (answer) => {
       clearInterval(watchdog); clearTimeout(timeout);
       sess.repCheckResolver = null;
@@ -729,7 +716,16 @@ function repCheckPrompt() {
 }
 function applyRepCheck(answer) {
   const c = sess.repsCounted, t = sess.repsTarget;
-  if (answer === "all") sess.repsCounted = t;
+  /* "ALL OF THEM" MEANS THE STRETCH SHE WAS ON, NOT THE WHOLE MOVE.
+
+     Tapping Done at direction one of four and answering "all" used to bank
+     thirty-two of thirty-two: three directions she never did, certified by a
+     button. She can only vouch for the reps the coach was counting, so the
+     credit stops at the end of the segment she had reached. */
+  if (answer === "all") {
+    const reached = Number.isFinite(sess.repsReachedCap) ? sess.repsReachedCap : t;
+    sess.repsCounted = Math.max(c, Math.min(t, reached));
+  }
   else if (answer === "almost") sess.repsCounted = Math.min(t, Math.max(c + 1, c + Math.floor((t - c) / 2)));
   // "some", a dismissal or a timeout: the coach's count stands.
   notify("tick");
@@ -808,6 +804,16 @@ async function runPrescribedReps(ex) {
   sess.currentSet = 0; sess.totalSets = 0;
   sess.currentSide = 0; sess.totalSides = 0;
   sess.currentDirection = 0; sess.totalDirections = 0;
+  /* HOW FAR SHE ACTUALLY GOT, CAPTURED BEFORE THE STATE IS CLEARED.
+
+     The rep-check card is asked below, AFTER these resets — so by the time
+     "All of them" is answered there is nothing left on `sess` to say which
+     segment she had reached, and the answer could only ever mean "the whole
+     move". That is how a Done tap at direction one of four banked thirty-two
+     of thirty-two. The cap is taken here, while it is still knowable. */
+  sess.repsReachedCap = sess.repsInSegment > 0
+    ? Math.min(sess.repsTarget, (sess.segmentsDone || 0) * sess.repsInSegment + sess.repsInSegment)
+    : sess.repsTarget;
   sess.repInSegment = 0; sess.repsInSegment = 0;
   sess.currentSegment = 0; sess.totalSegments = 0;
   // Done before the count finished: the count is stopped, and she is asked.
@@ -944,7 +950,7 @@ async function announce(msg) {
 function setUpNext(nextStep) {
   const nx = nextStep ? nextStep.ex : null;
   sess.upNextName = nx ? nx.name : "";
-  sess.upNextDose = nx ? (nx.dose || "") : "";
+  sess.upNextDose = nx ? (nx.byReps ? doseLines(nx).short : (nx.dose || "")) : "";
 }
 
 /* ---- the completion ledger -------------------------------------------------
@@ -1010,7 +1016,7 @@ function recordExercise(ex, circuit, ci, ei, r, wasSkipped) {
     block: circuit.block,
     ci, ei, round: r,
     driver: ex.driver || (ex.byReps ? "reps" : "time"),
-    dose: ex.dose || ex.repsDetail || "",
+    dose: ex.byReps ? doseLines(ex).short : (ex.dose || ""),
     gate: ex.gate || null,
     plannedSecs, actualSecs,
     repsPlanned: ex.byReps ? sess.repsTarget : 0,
@@ -1627,7 +1633,7 @@ export function dayPlanState(dayKey, opts = {}) {
         const dose = moveReviewDose(row);
         moves.push({
           block: c.block, circuit: c.name, round, name: ex.name,
-          dose: ex.dose || ex.repsDetail || "",
+          dose: ex.byReps ? doseLines(ex).short : (ex.dose || ""),
           status, got: dose.got, planned: dose.planned, driver: dose.driver,
           reason: moveReviewReason(row, status)
         });

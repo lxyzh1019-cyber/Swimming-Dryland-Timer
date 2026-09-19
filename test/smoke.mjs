@@ -1069,8 +1069,14 @@ const shape = p => `${p.sets}x${p.reps}${p.repsHigh ? "-" + p.repsHigh : ""}/s${
 ok(shape(P("8/side")) === "1x8/s2/d1", "8/side is eight reps on each of two sides");
 ok(shape(P("2×8/side")) === "2x8/s2/d1", "2x8/side is four segments of eight");
 ok(P("2×8/side").totalReps === 32, "…which is 32 reps, not the 10 the old parser counted");
-ok(shape(P("8/dir/leg")) === "1x8/s2/d2", "8/dir/leg is both directions on both legs");
-ok(shape(P("3/dir each")) === "1x3/s2/d2", "3/dir each is both directions, each arm");
+/* A DIRECTION COUNT HAS TO BE SAID OUT LOUD. "/dir" used to mean two, quietly,
+   which is exactly how Band Ankle 4-Way came to show eight and count thirty-two.
+   It fails at load now, where a test sees it, and the count is written down. */
+let dirThrew = "";
+try { P("8/dir/leg"); } catch (e) { dirThrew = e.message; }
+ok(/does not say how many directions/.test(dirThrew), "a bare /dir will not parse: " + dirThrew);
+ok(shape(P("8/2-way/leg")) === "1x8/s2/d2", "said out loud, it is both directions on both legs");
+ok(shape(P("3/2-way each")) === "1x3/s2/d2", "3 per direction each arm, with the directions counted");
 ok(shape(P("2–3 clean reps")) === "1x2-3/s1/d1", "a range keeps both ends");
 ok(P("~24").reps === 24, "an approximate count is still a count");
 ok(P("8 cycles").unit === "cycles", "a cycle is not a rep");
@@ -1108,8 +1114,10 @@ ok(segs.length === 4, "2x8/side walks four segments");
 // left, right, left, right — three switches, and each one gets its own reset.
 ok(segs.filter(g => g.transition === "side").length === 3, "switching sides between every one of them");
 ok(segs[0].transition === null, "the first segment has nothing to switch from");
-ok(data.prescriptionSegments(P("8/dir")).some(g => g.transition === "direction"),
-   "and a /dir move changes direction rather than sides");
+ok(data.prescriptionSegments(data.normalizePrescription({ reps: 8, dirs: 4 })).some(g => g.transition === "direction"),
+   "and a multi-direction move changes direction rather than sides");
+ok(data.prescriptionSegments(data.normalizePrescription({ reps: 8, dirs: 4 })).length === 4,
+   "walking one segment per direction — the four of Band Ankle 4-Way");
 
 /* The day card and the session screen must not disagree about the day. The
    card read authored timeLo/timeHi and counted five named blocks once; the
@@ -4651,5 +4659,39 @@ store.setOnlineForTest(true);
 /* The finished-day case for that rule — where the card's own button turns
    into explore and the second one used to appear under it — is asserted in
    core/test/session.mjs, because the rule is the core's, not this app's. */
+
+/* EVERY REP MOVE IN THIS APP SAYS ITS WHOLE DOSE.
+   Not a spot-check: a derived dose is only worth having if it holds for all of
+   them, and this is the sweep that would have caught Band Ankle 4-Way. */
+{
+  const repEx = Object.values(data.DAYS).flatMap(d => Object.values(d.blocks || {}).flat()
+    .concat(d.prepMenu || [])).filter(e => e.byReps);
+  ok(repEx.length > 60, "there are rep moves to check (" + repEx.length + ")");
+  repEx.forEach(ex => {
+    const d = data.doseLines(ex);
+    ok(d.big && !/\/(dir|side|leg|arm)/.test(d.big),
+       ex.name + ": the ring shows a derived dose, not a raw slash: " + JSON.stringify(d.big));
+    if (ex.prescription.segments > 1) {
+      ok(d.sub.includes(String(ex.prescription.totalReps)),
+         ex.name + ": and the line under it names the true total " + ex.prescription.totalReps + ": " + d.sub);
+    }
+    ok(data.spokenDose(ex), ex.name + ": the coach has something to say");
+  });
+  const ankle = repEx.find(e => e.name === "Band Ankle 4-Way");
+  ok(ankle && ankle.prescription.totalReps === 32, "Band Ankle 4-Way is thirty-two reps");
+  ok(data.doseLines(ankle).big === "8 \u00d7 4 ways", "the ring says how many ways: " + data.doseLines(ankle).big);
+  ok(data.doseLines(ankle).sub === "32 reps in total", "and the line below says the total");
+  ok(data.spokenDose(ankle) === "8 reps in each of 4 directions, 32 in total",
+     "and the coach says the same thing: " + data.spokenDose(ankle));
+  const hip = repEx.find(e => e.name === "Hip Circles");
+  ok(hip && hip.prescription.dirs === 2 && hip.prescription.totalReps === 16,
+     "Hip Circles states its two directions rather than inheriting a guess");
+
+  /* A clock is a clock: no timed move may wear a rep-shaped dose. */
+  const timed = Object.values(data.DAYS).flatMap(d => Object.values(d.blocks || {}).flat()
+    .concat(d.prepMenu || [])).filter(e => !e.byReps && e.work > 0);
+  timed.forEach(ex => ok(!/\breps?\b|\/dir|\/leg/.test(ex.dose || ""),
+    ex.name + ": a timed move does not promise reps: " + JSON.stringify(ex.dose)));
+}
 
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);
