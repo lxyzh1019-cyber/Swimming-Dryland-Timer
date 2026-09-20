@@ -125,10 +125,10 @@ export function progressScreen(vm) {
         <div style="flex:1;min-width:220px;background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-xl);padding:16px 18px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;">
           <div style="font-weight:900;font-size:12px;letter-spacing:0.05em;color:var(--sun-ink);text-transform:uppercase;">My prizes 🎁</div>
           ${vm.pendingDraws > 0 ? `
-          <button type="button" data-action="openPrizeDraw" style="width:100%;min-height:48px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:10px 16px;font-family:var(--font-display);font-weight:600;font-size:17px;cursor:pointer;box-shadow:0 4px 0 var(--sun-deep);">${escapeHtml(vm.pendingDrawLabel)}</button>` : ""}
+          <button type="button" data-action="openPrizeDraw" style="width:100%;flex-shrink:0;min-height:48px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:10px 16px;font-family:var(--font-display);font-weight:600;font-size:17px;cursor:pointer;box-shadow:0 4px 0 var(--sun-deep);">${escapeHtml(vm.pendingDrawLabel)}</button>` : ""}
           ${vm.hasPrizes ? `
-          <div class="list-wrap" style="--fade-to:var(--sun-wash);">
-            <div data-list="1" style="max-height:260px;display:flex;flex-direction:column;gap:8px;padding-bottom:8px;">
+          <div class="list-wrap" style="--fade-to:var(--sun-wash);flex:1 1 auto;min-height:260px;">
+            <div data-list="1" style="position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;padding-bottom:8px;">
               ${vm.prizesWon.map(pz => `
               <div style="${pz.cardStyle}">
                 <span style="font-size:22px;flex-shrink:0;">${escapeHtml(pz.icon)}</span>
