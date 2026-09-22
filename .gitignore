@@ -1,3 +1,8 @@
 node_modules/
 package-lock.json
 _drive.mjs
+
+# Claude working rules: track .claude/, ignore its local state
+!.claude/
+.claude/state/
+__pycache__/
