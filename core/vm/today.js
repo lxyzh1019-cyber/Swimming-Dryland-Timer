@@ -382,12 +382,20 @@ export function buildTodayVM(state) {
       g.perRound.set(Number(m.round) || 1, m);
     });
     return order.map(g => {
+      /* A SHORT ROUND SAYS WHY WHEN SHE HOLDS IT. The title carried only the
+         verdict ("came up short"), so the reason for the ½ in round two was
+         nowhere at all — the one sentence on the row was round one's. The
+         round's own reason follows the verdict, unless it would only repeat it
+         (a plain Skip's reason is the word "skipped"). */
       const slots = roundsInOrder.map((r, i) => {
         const m = g.perRound.get(r);
-        const pill = REVIEW_PILL[(m && m.status) || "missing"] || REVIEW_PILL.missing;
-        return { round: r, slot: i + 1, status: (m && m.status) || "missing",
+        const st = (m && m.status) || "missing";
+        const pill = REVIEW_PILL[st] || REVIEW_PILL.missing;
+        const why = (st === "partial" || st === "skipped") && m.reason && m.reason !== SLOT_WORDS[st]
+          ? ": " + m.reason : "";
+        return { round: r, slot: i + 1, status: st,
                  icon: pill.icon, style: slotStyle(pill),
-                 title: "Round " + (i + 1) + " — " + SLOT_WORDS[(m && m.status) || "missing"] };
+                 title: "Round " + (i + 1) + " — " + SLOT_WORDS[st] + why };
       });
       /* The row's own verdict is the worst round in it, so a day card can still
          be asked "did anything go wrong here" in one attribute. */
@@ -401,8 +409,19 @@ export function buildTodayVM(state) {
       const doseLabel = !firstShort || firstShort.got === null || firstShort.planned === null ? ""
         : firstShort.driver === "reps" ? firstShort.got + " of " + firstShort.planned + " reps"
         : firstShort.got + "s of " + firstShort.planned + "s";
+      /* EVERY SHORT ROUND GETS ITS OWN LINE on a move with more than one
+         round — "Round 2: 4 of 6 reps — all 6 to count" — numbered by the slot
+         it is drawn in, so the line and the ½ beside it name the same round.
+         The reason already quotes her numbers for a ½, so the line is the
+         round and the reason and nothing twice. A single-round move keeps the
+         one-line form above (doseLabel, reason); it has no round to name. */
+      const multiRound = roundsInOrder.length > 1;
+      const shortRounds = !multiRound ? [] : slots
+        .filter(sl => sl.status === "partial" || sl.status === "skipped")
+        .map(sl => ({ slot: sl.slot, round: sl.round, status: sl.status,
+                      text: "Round " + sl.slot + ": " + (g.perRound.get(sl.round).reason || SLOT_WORDS[sl.status]) }));
       return { name: g.name, status, slots,
-               multiRound: roundsInOrder.length > 1,
+               multiRound, shortRounds,
                doseLabel, reason: (firstShort && firstShort.reason) || "" };
     });
   };

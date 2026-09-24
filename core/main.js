@@ -19,7 +19,7 @@ import { page, shellWithRail, bottomNav } from "./screens/shell.js";
 import { newReadinessFlow, answerQuestion, setZoneSev, resetBodyCheck, confirmGrownup, buildReadinessVM, mayStartFromReadiness } from "./vm/readiness.js";
 import { readinessScreen } from "./screens/readiness.js";
 import * as engine from "./engine.js";
-import { buildSessionVM, sessionQuizFor, sessionListScrollIntoView } from "./vm/session.js";
+import { buildSessionVM, sessionQuizOf, sessionListScrollIntoView } from "./vm/session.js";
 import { sessionScreen, updateSessionTick } from "./screens/session.js";
 import { buildQuizDeck, answerQuizDeck, finishQuizDeck, quizDeckHtml, newPrizeDraw, claimPrize, prizeDrawHtml } from "./screens/overlays.js";
 import { buildProgressVM, toggleRedeem } from "./vm/progress.js";
@@ -616,7 +616,10 @@ Object.assign(RAW, {
     // six deep, so without the ledger this paid 25 XP a session forever for
     // re-answering questions the kid already knew.
     if (first && engine.sess.savedEntry) {
-      const q = sessionQuizFor(engine.sess.dayKey);
+      // The question ON SCREEN, pinned the first time the finish screen asked
+      // (see sessionQuizOf) — never the rule asked afresh, which may already
+      // have moved on.
+      const q = sessionQuizOf(engine.sess);
       const correct = !!(q.opts[i] && q.opts[i].ok);
       // The question's OWN key, not always "coach". A training principle is
       // asked both here and in the Quiz Deck; keying it by where it was asked
