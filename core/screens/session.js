@@ -614,6 +614,10 @@ function controls(vm, wide) {
 
 function exList(vm, wide, tablet) {
   const nameSize = tablet ? 16 : wide ? 17 : 15;
+  /* A ½ or ⏭ row carries its reason as a second, smaller line under the name
+     (statusNote, see buildSessionVM). The name and the note share one
+     flex:1 column so the note WRAPS inside the rail rather than widening it,
+     and every other row renders exactly as it did. */
   const iconSize = tablet ? 24 : wide ? 26 : 24;
   /* The number and the name are a BUTTON where the list is navigable — which
      is explore only, where nothing is recorded and walking in order is not the
@@ -631,7 +635,10 @@ function exList(vm, wide, tablet) {
     <div ${sitem.isCur ? 'data-ex-cur="1" ' : ""}style="${sitem.cardStyle}">
       ${sitem.jumpAction ? `<button type="button" data-action="goToMove" data-arg="${sitem.ci}|${sitem.ei}" title="Jump to this move" style="${jumpOpen}">` : ""}
       <span style="${sitem.numStyle}">${sitem.num}</span>
-      <span style="${sitem.nameStyle}font-size:${nameSize}px;">${sitem.name}</span>
+      ${sitem.statusNote ? `<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;">
+        <span style="${sitem.nameStyle}font-size:${nameSize}px;">${sitem.name}</span>
+        <span style="font-size:${wide ? 12 : 11}px;font-weight:700;color:var(--ink-soft);line-height:1.3;overflow-wrap:anywhere;">${escapeHtml(sitem.statusNote)}</span>
+      </span>` : `<span style="${sitem.nameStyle}font-size:${nameSize}px;">${sitem.name}</span>`}
       ${sitem.jumpAction ? "</button>" : ""}
       <button type="button" data-action="openDetailAt" data-arg="${sitem.ci}|${sitem.ei}" title="See detail photo &amp; video" style="flex-shrink:0;width:${iconSize}px;height:${iconSize}px;border-radius:50%;border:none;background:var(--surface-2);color:var(--ink-soft);font-size:${tablet ? 13 : wide ? 14 : 13}px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">ⓘ</button>
       <span style="font-size:${nameSize}px;flex-shrink:0;width:${wide ? 18 : 16}px;text-align:center;color:${sitem.secColor};">${sitem.statusIcon}</span>

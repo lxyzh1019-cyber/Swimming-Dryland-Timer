@@ -428,6 +428,39 @@ gatedNames.forEach(name => {
 });
 resetGateState();
 
+/* --- HER OWN SCREEN IS HERS: hiding the panel and opening 👀 ------------
+   Both are views of her own session and change nothing that is stored, but
+   neither was on the kid-safe list, so a child hiding the move list or asking
+   what to watch for was met by the PIN. Start-over still asks: it throws her
+   progress away. Tapped the real way, through the click dispatcher. */
+{
+  gate.lockGate(); resetGateState();
+  const railWas = main.state.railOpen !== false;
+  fireEvent("click", clickTarget("toggleRail"));
+  ok(main.state.gateAsk === null, "hiding the move panel asks nobody");
+  ok((main.state.railOpen !== false) === !railWas, "and the panel actually toggles");
+  fireEvent("click", clickTarget("toggleRail"));
+  ok((main.state.railOpen !== false) === railWas, "and toggles back");
+
+  gate.lockGate(); resetGateState();
+  const watchWas = !!main.state.watchOpen;
+  fireEvent("click", clickTarget("toggleWatch"));
+  ok(main.state.gateAsk === null, "opening what to watch for asks nobody");
+  ok(!!main.state.watchOpen === !watchWas, "and it actually opens");
+  fireEvent("click", clickTarget("toggleWatch"));
+  ok(!!main.state.watchOpen === watchWas, "and closes again");
+
+  gate.lockGate(); resetGateState();
+  const restartWas = !!engine.sess.confirmRestart;
+  fireEvent("click", clickTarget("askRestart"));
+  ok(main.state.gateAsk === "askRestart", "\"I need to start over\" still asks for a grown-up");
+  ok(!!engine.sess.confirmRestart === restartWas, "and does nothing until one answers");
+  ["askRestart", "cancelRestart", "doRestart"].forEach(n =>
+    ok(!gate.UNGATED_ACTIONS.includes(n), n + " stays gated — it erases her progress"));
+  main.actions.cancelGate();
+  resetGateState();
+}
+
 /* --- an action NOBODY REMEMBERED TO GATE is blocked by the dispatcher -----
    The real claim. `defineAction` is the only way an action gets into the table,
    and the guard is on dispatch rather than on registration, so a brand-new
@@ -973,6 +1006,33 @@ engine.exitSession();
   main.state.inSession = false;
   ok(asked.includes("[data-ex-list]"),
      "painting the session screen asks the list to re-centre — selectors seen: " + asked.join(" "));
+}
+
+/* ---- THE QUIZ PAYS FOR, AND KEEPS SHOWING, THE QUESTION SHE ANSWERED -----
+
+   The real tap path. A right answer masters the question, and the question
+   used to be re-chosen on every render by "ask something she has not
+   mastered" — so the tap that paid for one question redrew the card as
+   another, and the ✓ sat on options she had never read. */
+{
+  localStorage.clear(); store.migrate();
+  engine.exitSession();
+  Object.assign(engine.sess, { phase: "done", running: false, explore: false, dayKey: "monday",
+    savedEntry: { app: "x", dayKey: "monday", isoDate: new Date().toISOString(), ledger: [] }, savedKey: null });
+  const before = svm.buildSessionVM({ isWide: true, detailEx: null });
+  const shown = svm.coachQuizPool().find(q => q.q === before.quizQuestion);
+  ok(shown, "the finish screen shows a question from the pool");
+  const right = shown.opts.findIndex(o => o.ok);
+  main.actions.quizPick(String(right));
+  ok((store.loadQuiz().qLedger[shown.ledgerKey] || {}).mastered === true,
+     "the tap pays and masters the question that was on screen");
+  ok(engine.sess.quizXp > 0, "and banks XP for it: " + engine.sess.quizXp);
+  const after = svm.buildSessionVM({ isWide: true, detailEx: null });
+  ok(after.quizQuestion === before.quizQuestion,
+     "the card still shows the question she answered — got " + JSON.stringify(after.quizQuestion));
+  ok(/^Nailed it!/.test(after.quizFeedback), "and says so: " + JSON.stringify(after.quizFeedback));
+  engine.exitSession();
+  localStorage.clear(); store.migrate();
 }
 
 console.log(`✓ action-layer tests passed (${passed} assertions)`);

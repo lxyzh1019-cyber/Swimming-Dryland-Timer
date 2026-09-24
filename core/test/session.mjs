@@ -837,6 +837,86 @@ const stopInRoundTwo = (reason) => ({
   engine.exitSession();
 }
 
+/* ---- A ½ ON THE LIST SAYS WHY ---------------------------------------------
+
+   The pill said "short" and nothing said by how much, so a kid who tapped Done
+   a beat early saw a ½ and learned nothing from it — the reason existed, word
+   for word, on the Today review and nowhere she could see it mid-session. The
+   row carries the same sentence now (moveReviewReason), under the name, and
+   only on a ½ or ⏭: a ✓ and a move not yet reached stay one line. */
+{
+  store.updateSettings({ coachSpeechOn: false });
+  setSpeechDelay(0);
+  const both = Object.keys(data.DAYS).find(k => {
+    const moves = Object.values(data.DAYS[k].blocks || {}).flat();
+    return !data.DAYS[k].spa && moves.some(e => e.byReps) && moves.some(e => !e.byReps && e.work > 0);
+  });
+  ok(both, "a day has both a rep move and a timed move to cut short");
+  /* Cut the first rep move and the first timed move that each have another move
+     after them in the same circuit — so the next move is in the same round,
+     and the cut one is on the list as history rather than as ▶. */
+  const cut = { reps: null, time: null };
+  const seen = { reps: null, time: null };
+  const hasNext = (sess) => {
+    const c = (sess.circuits || [])[sess.ci];
+    return !!c && sess.ei < c.exercises.length - 1;
+  };
+  await runSession({ dayKey: both, light: "red", gateUnlocked: true }, {
+    onTick: (ms, sess) => {
+      if (sess.phase === "formcheck") { engine.pickClean(); return; }
+      if (sess.phase === "repcheck") { engine.answerRepCheck("some"); return; }
+      const ex = sess.currentEx;
+      if (!ex) return;
+      if (!cut.reps && sess.phase === "reps" && sess.byRepsResolver && hasNext(sess)
+          && sess.repsTarget > 1 && sess.repsCounted >= 1 && sess.repsCounted < sess.repsTarget) {
+        cut.reps = { name: ex.name, block: ex.block, round: sess.round }; engine.advance(); return;
+      }
+      if (!cut.time && sess.phase === "work" && !ex.byReps && sess.timerMax >= 10 && hasNext(sess)
+          && !sess.announceResolver && sess.timerSecs > 0 && sess.timerSecs <= Math.floor(sess.timerMax * 0.5)) {
+        cut.time = { name: ex.name, block: ex.block, round: sess.round }; engine.advance(); return;
+      }
+      /* The first look at the list once she has moved on to another move. */
+      ["reps", "time"].forEach(kind => {
+        const c = cut[kind];
+        if (!c || seen[kind] || !["work", "reps"].includes(sess.phase) || ex.name === c.name) return;
+        const row = sess.ledger.find(l => l.name === c.name && l.block === c.block && l.round === c.round);
+        if (!row) return;
+        const vm = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+        seen[kind] = { row, vm, html: sscreen.sessionScreen(vm) };
+      });
+    }
+  });
+  ok(seen.reps && seen.time, "both cut moves were seen on the list after she moved on: "
+     + JSON.stringify({ reps: !!seen.reps, time: !!seen.time }));
+
+  const repRow = seen.reps.row;
+  ok(repRow.status === "partial", "the rep move she cut short is recorded partial: " + repRow.status);
+  const repWant = repRow.repsCounted + " of " + repRow.repsPlanned + " reps — all " + repRow.repsPlanned + " to count";
+  const repItem = seen.reps.vm.sessionExList.find(r => r.isEx && r.name === cut.reps.name && r.statusIcon === "½");
+  ok(repItem, "the list shows it as ½");
+  ok(repItem.statusNote === repWant, "and says why, in her units: " + JSON.stringify(repItem.statusNote) + " wanted " + JSON.stringify(repWant));
+  ok(seen.reps.html.includes(repWant), "and the reason is on the rendered list");
+
+  const timeRow = seen.time.row;
+  ok(timeRow.status === "partial", "the timed move she cut short is recorded partial: " + timeRow.status);
+  const planned = Math.round(timeRow.plannedSecs);
+  const timeWant = Math.round(timeRow.actualSecs) + "s of " + planned + "s — needs "
+    + Math.ceil(planned * engine.DONE_WORK_FRACTION) + "s (80%) to count";
+  const timeItem = seen.time.vm.sessionExList.find(r => r.isEx && r.name === cut.time.name && r.statusIcon === "½");
+  ok(timeItem, "the list shows the timed one as ½");
+  ok(timeItem.statusNote === timeWant, "and says why, in seconds: " + JSON.stringify(timeItem.statusNote) + " wanted " + JSON.stringify(timeWant));
+  ok(seen.time.html.includes(timeWant), "and that reason is on the rendered list too");
+
+  /* A ✓, the ▶ she is standing on and a move not reached yet stay one line. */
+  [seen.reps.vm, seen.time.vm].forEach(vm => {
+    const plain = vm.sessionExList.filter(r => r.isEx && (r.statusIcon === "✓" || r.statusIcon === "▶" || r.statusIcon === ""));
+    ok(plain.length > 0, "the list has done, current or pending moves to check");
+    ok(plain.every(r => !r.statusNote), "and none of them carries a note: "
+       + JSON.stringify(plain.filter(r => r.statusNote).map(r => [r.name, r.statusNote])));
+  });
+  engine.exitSession();
+}
+
 /* ---- WHAT IS OWED IS ONE LIST, AND REDOING IT CLEARS IT --------------------
 
    "+ Add them back" re-ran the move but filed it under the NEXT unbanked round

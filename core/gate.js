@@ -72,6 +72,10 @@ export const UNGATED_ACTIONS = [
   "pickClean", "pickWobbly", "skipFormCheck", "pickMood", "reflectWell",
   "reflectNext", "quizPick", "exitSession", "toggleMoveReview",
   "openDetail", "openDetailCur", "openDetailAt", "watchVideo", "closeDetail", "resumeFromDetail",
+  // hiding the move panel and opening 👀 "what to watch for": views of her own
+  // screen that store nothing. "I need to start over" (askRestart and its
+  // confirm) is deliberately NOT here — it throws her progress away.
+  "toggleRail", "toggleWatch",
   // her body check (the two adult decisions inside it are gated by name)
   "rAnswer", "rPickZone", "rSetZoneSev", "rClosePopup",
   "rGoBack", "rExit", "rResultCta", "rResultSecondary",

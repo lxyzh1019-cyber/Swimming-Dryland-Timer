@@ -128,6 +128,10 @@ function blankSession() {
     dayKey: null, light: "green", practice: false, spa: false, recovery: false,
     endedEarly: false, xpEarned: 0, leveledUp: false,
     mood: null, wentWell: null, nextTime: null, quizPick: null, quizXp: 0,
+    /* Which Coach's Quiz question this finish screen asked, by ledger key —
+       pinned by sessionQuizOf in js/vm/session.js so a right answer cannot
+       redeal the card under her. */
+    quizKey: null,
     /* Every key the runner ever writes is declared HERE, because exitSession
        resets with Object.assign and an assign cannot remove what it does not
        mention. `quizCapped` leaking into the next session is what made a fresh

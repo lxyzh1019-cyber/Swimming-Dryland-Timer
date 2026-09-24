@@ -232,8 +232,13 @@ function dayPane(vm, wide) {
               ${b.review.map(r => `
               <div style="display:flex;align-items:flex-start;gap:9px;padding:5px 0;font-size:${wide ? 14 : 13}px;font-weight:700;" data-move-review="${escapeHtml(r.status)}">
                 <span style="flex:1;min-width:0;">
+                  ${(r.shortRounds || []).length ? `
+                  <!-- More than one round: one line per short round, each
+                       naming its slot, instead of round one's reason alone. -->
+                  <span>${escapeHtml(r.name)}</span>
+                  ${r.shortRounds.map(l => `<span style="display:block;font-size:12px;font-weight:700;opacity:0.85;line-height:1.35;" data-short-round="${l.slot}">${escapeHtml(l.text)}</span>`).join("")}` : `
                   <span>${escapeHtml(r.name)}${r.doseLabel ? ` <span style="opacity:0.85;font-weight:800;">· ${escapeHtml(r.doseLabel)}</span>` : ""}</span>
-                  ${r.reason ? `<span style="display:block;font-size:12px;font-weight:700;opacity:0.85;line-height:1.35;">${escapeHtml(r.reason)}</span>` : ""}
+                  ${r.reason ? `<span style="display:block;font-size:12px;font-weight:700;opacity:0.85;line-height:1.35;">${escapeHtml(r.reason)}</span>` : ""}`}
                 </span>
                 <span style="display:flex;gap:4px;flex-shrink:0;" data-round-slots="${r.slots.length}">
                   ${r.slots.map(sl => `<span style="${sl.style}" title="${escapeHtml(sl.title)}" aria-label="${escapeHtml(sl.title)}" data-round-slot="${sl.slot}">${sl.icon}</span>`).join("")}

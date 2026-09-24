@@ -12,7 +12,7 @@ import { loadSessions, loadQuiz, quizQuestionKey } from "../store.js";
 import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION, paceBand,
          dayRecordFor,
          roundHistoryByMove, roundStatusOf, shortRoundsFrom,
-         shortRoundsByMoveFromPlan, shortRoundsLabel } from "../outcome.js";
+         shortRoundsByMoveFromPlan, shortRoundsLabel, moveReviewReason } from "../outcome.js";
 
 /* What changes at the end of this segment — named before she gets there, so the
    switch is never a surprise she hears about only if the voice is on. */
@@ -95,9 +95,10 @@ export function unlockedSessionQuiz(quiz) {
 
    Rotating the whole bank by session count was never enough on its own: the
    index moves by one per session, so a question she got right on Tuesday came
-   back within the week while a dozen she had never seen waited. Both this VM
-   and main.js call it with the same dayKey during the done screen, so the
-   displayed question and the XP-awarding question always match. */
+   back within the week while a dozen she had never seen waited. The finish
+   screen and main.js do not ask it directly: they read it through
+   sessionQuizOf below, which asks once and keeps the answer, so the displayed
+   question and the XP-awarding question always match. */
 export function sessionQuizFor(dayKey) {
   const open = unlockedSessionQuiz();
   const led = loadQuiz().qLedger || {};
@@ -105,6 +106,33 @@ export function sessionQuizFor(dayKey) {
   const bank = fresh.length ? fresh : open;
   const n = (dayKey ? String(dayKey).length : 0) + loadSessions().length;
   return bank[n % bank.length];
+}
+
+/* THE QUESTION THIS FINISH SCREEN ASKED — chosen once, then kept.
+
+   sessionQuizFor is a RULE, and a rule asked twice can answer twice. It was
+   asked on every render: a RIGHT answer marks the question mastered, the rule
+   then skips it, and the very next render dealt a different question — her ✓
+   or ✕ landing on options she had never read, while the XP had been paid for
+   the one she had. A wrong answer masters nothing, which is why it only
+   happened sometimes.
+
+   So the first time the finish screen asks, the question's ledger key is
+   written onto the session, and every later render — and main.js, which pays
+   for the answer — reads that same question back. It is pinned only once the
+   row is saved, because that is when the quiz is on screen at all (see
+   showCompletionExtras); before then the rule is asked as it always was.
+   exitSession clears the pin, so the next session deals by the rule again. A
+   key that no longer names a question (a data edit) falls back to the rule
+   rather than leaving the card empty. */
+export function sessionQuizOf(s) {
+  if (s.quizKey) {
+    const kept = coachQuizPool().find(q => q.ledgerKey === s.quizKey);
+    if (kept) return kept;
+  }
+  const q = sessionQuizFor(s.dayKey);
+  if (s.phase === "done" && s.savedEntry) s.quizKey = q.ledgerKey;
+  return q;
 }
 
 export function buildSessionVM(state) {
@@ -547,17 +575,25 @@ export function buildSessionVM(state) {
       const isCur = !!curKey && k === curKey;
       /* Explore writes no ledger at all — nothing there is recorded, which is
          the whole point of it — so its own in-memory verdicts answer instead. */
-      let st;
+      let st, row = null;
       if (explore) {
         st = sess.exStatus[ci + "-" + ei];
       } else {
         const perRound = historyByMove.get(k);
-        st = roundStatusOf(perRound && perRound.get(shownRound(c))) || undefined;
+        row = (perRound && perRound.get(shownRound(c))) || null;
+        st = roundStatusOf(row) || undefined;
       }
       if (st) sawHistory = true;
       const state = isCur ? "current" : st === "done" ? "done"
         : st === "partial" ? "partial" : st === "skipped" ? "skipped" : "pending";
       const pill = PILL[state];
+      /* A ½ OR A ⏭ SAYS WHY, in the sentence the Today review already uses
+         for the same row (moveReviewReason) — so the two screens can never
+         word one verdict two ways. Only the mark on screen gets a note: the
+         move she is standing on shows ▶, not its history, and a ✓ or a move
+         not reached needs no explaining. Explore has no rows, so no notes. */
+      const statusNote = (state === "partial" || state === "skipped") && row
+        ? moveReviewReason(row, st) : "";
       sessionExList.push({
         isEx: true, num: ei + 1, name: e.name, ci, ei, isCur,
         /* Tapping a move is navigation, and navigation is explore's alone: a
@@ -570,6 +606,7 @@ export function buildSessionVM(state) {
           + "background:" + pill.bg + ";color:" + pill.ink + ";",
         nameStyle: "flex:1;min-width:0;font-weight:800;color:" + NAME_INK[state],
         statusIcon: pill.icon,
+        statusNote,
         secColor: pill.sec
       });
     });
@@ -593,7 +630,7 @@ export function buildSessionVM(state) {
   const reflectWellOpts = REFLECT_WELL.map(t => ({ label: t, style: rChip(sess.wentWell === t) }));
   const reflectNextOpts = REFLECT_NEXT.map(t => ({ label: t, style: rChip(sess.nextTime === t) }));
 
-  const QZ = sessionQuizFor(sess.dayKey);
+  const QZ = sessionQuizOf(sess);
   const quizAnswered = sess.quizPick != null;
   const quizOpts = QZ.opts.map((o, i) => ({
     label: o.t, idx: i,

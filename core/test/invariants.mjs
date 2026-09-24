@@ -815,6 +815,49 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
 }
 
 /* ============================================================
+   N+5. A RIGHT ANSWER KEEPS ITS QUESTION
+
+   The question was chosen again on every render, by the rule "ask something
+   she has not mastered". A RIGHT answer masters it — so the very next render
+   dealt a different question, and her ✓ landed on options she had never
+   read. A wrong answer masters nothing, which is why it only happened
+   sometimes. The question is picked once, on the finish screen, and kept.
+   ============================================================ */
+{
+  localStorage.clear(); store.migrate();
+  await runSession({ dayKey: "monday", light: "red", gateUnlocked: true }, answerChecks());
+  ok(engine.sess.phase === "done" && !!engine.sess.savedEntry, "the session finished and saved");
+  const led0 = store.loadQuiz().qLedger || {};
+  const freshLeft = svm.unlockedSessionQuiz().filter(q => !(led0[q.ledgerKey] || {}).mastered);
+  ok(freshLeft.length >= 2, "there are at least two questions she has not mastered, so mastering one changes the rule's pick");
+
+  const vmBefore = svm.buildSessionVM({ isWide: true, detailEx: null });
+  const shown = svm.coachQuizPool().find(q => q.q === vmBefore.quizQuestion);
+  ok(shown, "the question on screen is one from the pool");
+  const right = shown.opts.findIndex(o => o.ok);
+
+  /* What the action does (main.js quizPick): lock the pick, then pay the
+     question's own ledger key — which marks it mastered. */
+  engine.setQuizPick(right);
+  store.payQuizQuestion(shown.ledgerKey, true);
+  ok((store.loadQuiz().qLedger[shown.ledgerKey] || {}).mastered, "a right answer masters the question");
+
+  const vmAfter = svm.buildSessionVM({ isWide: true, detailEx: null });
+  same(vmAfter.quizQuestion, vmBefore.quizQuestion, "the question she answered is still the one on screen");
+  same(JSON.stringify(vmAfter.quizOpts.map(o => o.label)), JSON.stringify(vmBefore.quizOpts.map(o => o.label)),
+    "with the same options");
+  ok(/^Nailed it!/.test(vmAfter.quizFeedback), "and it reads \"Nailed it!\": " + JSON.stringify(vmAfter.quizFeedback));
+  same(vmAfter.quizOpts[right].prefix, "✓", "with the tick on the answer she picked");
+
+  /* Closing the session forgets the pin, so the next finish screen deals a
+     fresh question by the same rule — and this one, mastered, is not it. */
+  engine.exitSession();
+  same(engine.sess.quizKey == null, true, "closing the session forgets which question was asked");
+  ok(svm.sessionQuizFor("monday").ledgerKey !== shown.ledgerKey, "and the next pick is a question she has not mastered");
+  localStorage.clear(); store.migrate();
+}
+
+/* ============================================================
    14. ONE VERDICT EVERYWHERE
 
    The day record (dayRecords in js/outcome.js) is the one authority, and
@@ -1092,6 +1135,46 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
     same(rec.hadPainStop, true, "S8: the pain stop is on the record");
     same(pv.logItems[0].painNote, "paused for pain", "S8: the log notes it without making it the verdict");
     ok(gv.analytics.hasStops, "S8: and Safety & Flags still lists the stop");
+  });
+
+  /* S9 · one main move cut short in EVERY round: every short round says why.
+     The review used to explain only the first short round of a move, so the
+     ½ in round two sat beside a sentence about round one. */
+  const target = ((data.DAYS[DAY].blocks || {}).main || [])[0];
+  ok(target, "S9: the day has a main move to cut short");
+  const cutEveryRound = (ms, s) => {
+    if (clean(s)) return;
+    if (s.phase === "repcheck") { engine.answerRepCheck("some"); return; }
+    const ex = s.currentEx;
+    if (!ex || ex.block !== "main" || ex.name !== target.name) return;
+    if (s.phase === "work" && s.timerMax > 0 && !s.announceResolver && s.timerSecs > 0
+        && s.timerSecs <= Math.floor(s.timerMax * 0.5)) engine.advance();
+    else if (s.phase === "reps" && s.byRepsResolver && s.repsTarget > 1
+        && s.repsCounted >= 1 && s.repsCounted < s.repsTarget) engine.advance();
+  };
+  await scenario("S9", T.start, T.read, () => drive({ dayKey: DAY, light: "green" }, cutEveryRound), () => {
+    const rec = recordFor();
+    ok(rec && rec.plan, "S9: the day has a record with a plan");
+    const shortMoves = rec.plan.moves.filter(m => m.block === "main" && m.name === target.name
+      && (m.status === "partial" || m.status === "skipped")).sort((a, b) => a.round - b.round);
+    ok(shortMoves.length >= 2, "S9: the move came up short in more than one round: " + shortMoves.length);
+    const tv = tvm.buildTodayVM({ selectedDay: DAY, expanded: {}, isWide: true });
+    const row = tv.blocks.flatMap(b => b.review).find(r => r.name === target.name && r.multiRound);
+    ok(row, "S9: the review has a multi-round row for it");
+    same(row.status, "partial", "S9: and its verdict is still the worst round");
+    ok(Array.isArray(row.shortRounds), "S9: the row lists its short rounds");
+    same((row.shortRounds || []).length, shortMoves.length, "S9: one line per short round, not just the first");
+    const roundsInOrder = row.slots.map(sl => sl.round);
+    shortMoves.forEach((m, i) => {
+      const slot = roundsInOrder.indexOf(m.round) + 1;
+      const line = (row.shortRounds || [])[i] || {};
+      same(line.slot, slot, "S9: line " + (i + 1) + " is for the slot the round is drawn in");
+      same(line.text, "Round " + slot + ": " + m.reason, "S9: and says that round's own reason");
+      const sl = row.slots[slot - 1];
+      ok(sl.title.includes(m.reason), "S9: holding round " + slot + "'s ½ says why too: " + JSON.stringify(sl.title));
+    });
+    const html = tscreen.todayWide({ ...tv, blocks: tv.blocks.map(b => ({ ...b, bodyStyle: "" })) });
+    (row.shortRounds || []).forEach(l => ok(html.includes(l.text), "S9: \"" + l.text + "\" is on the card"));
   });
 
   fresh();
