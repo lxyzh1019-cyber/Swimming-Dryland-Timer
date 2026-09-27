@@ -322,6 +322,11 @@ export function X(o) {
   }
   else if (driver === "time") { ex.work = o.work; }
   if (o.eachSide) ex.eachSide = true;
+  /* Seconds of "Get on the bar" AFTER the move is announced and BEFORE its
+     first rep or its work clock — see leadInSecs in engine.js. Explicit per
+     move, never inferred from the name, and absent unless it is a real number
+     of seconds, so every other move keeps exactly the shape it had. */
+  if (Number(o.leadInSeconds) > 0) ex.leadInSeconds = Number(o.leadInSeconds);
   return ex;
 }
 

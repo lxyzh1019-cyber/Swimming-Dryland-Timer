@@ -359,7 +359,8 @@ export function buildSessionVM(state) {
   // A move is only skippable while it is underway. Elsewhere Done already says
   // "skip rest", and a "Skip this move? It won't count." over a breather
   // was a question about a move that had already been recorded.
-  const canSkipExercise = phase === "work" || phase === "reps" || phase === "sideswitch";
+  const canSkipExercise = phase === "work" || phase === "reps" || phase === "sideswitch"
+    || (phase === "getready" && !!sess.leadIn);   // a move's lead-in — see runLeadIn
   const isBigRest = phase === "roundRest" || phase === "sectionRest";
   const timerIsReps = phase === "reps";
   const timerIsTime = !timerIsReps && !isPrompt;
@@ -406,7 +407,9 @@ export function buildSessionVM(state) {
 
   const stageTitle =
     phase === "greeting" ? "Ready?" :
-    phase === "getready" ? "Get ready…" :
+    // A move's own lead-in names what to do ("Get on the bar"); the session's
+    // opening lead-in has no move yet.
+    phase === "getready" ? (sess.leadIn || "Get ready…") :
     phase === "sideswitch" ? "Switch sides" :
     phase === "sectionRest" ? "Block Done! 🎉" :
     phase === "roundRest" ? "Round Done! 💪" :
@@ -790,6 +793,8 @@ export function buildSessionVM(state) {
       // a fourth one that means "all of them".
       : isRepCheck ? "Keep coach's count →"
       : sess.announceResolver ? "▶ Go"
+      // During a move's lead-in a tap starts the move — it does not end it.
+      : sess.leadIn ? "▶ Go"
       : "✓ Done — Next",
 
     // prompts
