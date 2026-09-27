@@ -10,6 +10,7 @@ Single working record for this repository. Updated by the main session at the en
   - `toggleRail` (hide/show left panel) and `toggleWatch` (👀 What to watch for) added to `UNGATED_ACTIONS`; `askRestart`/`cancelRestart`/`doRestart` stay gated (user choice).
   - ½ / ⏭ moves in the session left panel show a reason line (`moveReviewReason`); Today "Review what you did" gives every short round its own reason line, and the round dot's title carries it. Both apps.
   - `sw.js` version bump v21 → v22.
+- Plan v1 approved 2026-09-27 (branch `claude/hopeful-dirac-a3cbqn`): tests start on a pinned weekday — new `core/test/clock.mjs` (clock shifted to Wed 2026-09-23 12:00 Edmonton, still advancing), loaded by `core/test/run.mjs` via `--import` for every suite. Test files only; rides in the rules-stub PR.
 
 ## Pending
 - none
@@ -23,6 +24,8 @@ Single working record for this repository. Updated by the main session at the en
 | 4 | R1 2026-09-24 | Found in scope sweep: "I need to start over" also gated | done | user chose: keep the PIN (it erases progress) — no change |
 | 5 | R1 2026-09-24 | Plan explained in plain text | done | Plan v2 |
 | 6 | R1 2026-09-24 | ½ pill shows recorded status (reps short / tapped timer early) — left panel + Today review, both apps | done | reuses `moveReviewReason` wording; "tapped Done early" wording offered, not adopted |
+| 7 | R2 2026-09-27 | Install hz-rules stub (central rules v3.1.4) | done | installer output only; INSTALL OK |
+| 8 | R2 2026-09-27 | "Fix the confliction" on the stub PR | done | not a merge conflict: `test` check red because suites read the real date and 2026-09-27 is a Sunday (recovery day); fixed structurally by the pinned test clock |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Last symptom | Rewrite-vs-repair reviewed? |
@@ -30,6 +33,7 @@ Single working record for this repository. Updated by the main session at the en
 | Coach's Quiz (finish screen) | 1 | 0 | question swaps after a correct tap | no |
 | Grown-up gate / UNGATED_ACTIONS coverage | 1 | 0 | kid session buttons ask for PIN | no — structural option noted below |
 | Move status list (session rail / Today review) | 1 | 0 | ½ gave no reason | no |
+| Test suite depends on the real date | 2 | 1 | Sunday-only failures (earlier: Monday-only assertion) | structural fix applied: pinned test clock |
 Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → no further patch until the comparison is presented.
 
 Structural option (not approved, not done): a test that renders every screen, collects every `data-action` a kid can reach during a session, and fails if any is gated without being named in an explicit "adult-only" list — so a new kid button cannot silently ship behind the PIN.
@@ -44,11 +48,14 @@ Structural option (not approved, not done): a test that renders every screen, co
 | sw.js version bump | COMPLETE | sw.js diff; release-check logic ok on working tree |
 | Commit, push, draft PR | NOT STARTED | |
 | Verified on live site | NOT STARTED | no on-page version stamp; user must check on device |
+| R2 pinned test clock | PARTIAL | done + tests green locally on a real Sunday; awaiting CI on the PR + merge |
 
 ## Checks and evidence
 - 2026-09-24 baseline `node core/test/run.mjs` → all suites green (before changes)
 - 2026-09-24 after changes, rerun by main session: `node core/test/run.mjs` → all suites green, both TZs (swim invariants 569, session 325, actions 302; skate invariants 572, session 327); `diff -r core` swim vs skate → identical
 - 2026-09-24 live site → untested (no on-page stamp)
+- 2026-09-27 (Sunday) before fix: `node core/test/run.mjs` → skate 4 failing / swim 6 failing (invariants, session; swim also smoke); same on base `main`; clock shifted to Sat/Mon → all green
+- 2026-09-27 after fix, rerun by main session on the real Sunday clock: all suites green in both repos; `release-check origin/main` → ok; `clock.mjs` and `run.mjs` identical across repos; worker also green under outer shifts to other Sundays/Saturday
 
 ## Open questions / blockers
 - No visible deploy stamp on the page (rules require one) — flagged, out of scope this round.
