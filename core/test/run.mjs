@@ -5,31 +5,34 @@
    green suites behind it and nobody could tell whether the app or the test
    was broken. This runs each suite in its own process, under the default
    timezone and again under one a day-boundary bug would show up in, keeps
-   going past failures, and reports all of them at the end.
+   going past failures, and reports all of them at the end. Every suite
+   starts on the same pinned weekday (clock.mjs), so the real date — a
+   Sunday recovery day included — never decides the result.
 
    Usage: node core/test/run.mjs [suite.mjs ...]
-   With no arguments it runs every *.mjs under core/test/ (except this file
-   and the harness) and every *.mjs under the app's own test/. */
+   With no arguments it runs every *.mjs under core/test/ (except this file,
+   the harness and the clock) and every *.mjs under the app's own test/. */
 import { spawnSync } from "node:child_process";
 import { readdirSync, existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const listed = process.argv.slice(2);
 const discover = (dir) => existsSync(dir)
-  ? readdirSync(dir).filter(f => f.endsWith(".mjs") && !/^(run|harness)\.mjs$/.test(f)).sort().map(f => path.join(dir, f))
+  ? readdirSync(dir).filter(f => f.endsWith(".mjs") && !/^(run|harness|clock)\.mjs$/.test(f)).sort().map(f => path.join(dir, f))
   : [];
 const suites = listed.length ? listed.map(s => path.resolve(root, s))
   : [...discover(path.join(root, "test")), ...discover(path.join(root, "core", "test"))];
 const zones = [null, "America/New_York"];
+const clock = pathToFileURL(path.join(root, "core", "test", "clock.mjs")).href;
 
 const failures = [];
 for (const suite of suites) {
   for (const tz of zones) {
     const env = { ...process.env };
     if (tz) env.TZ = tz; else delete env.TZ;
-    const r = spawnSync(process.execPath, [suite], { env, encoding: "utf8" });
+    const r = spawnSync(process.execPath, ["--import", clock, suite], { env, encoding: "utf8" });
     const label = path.relative(root, suite) + (tz ? " (TZ=" + tz + ")" : "");
     const summary = (r.stdout.match(/^✓ .*$/m) || [])[0];
     if (r.status === 0 && summary) console.log(summary.replace(/^✓ /, "✓ " + label + ": "));
