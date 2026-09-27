@@ -54,7 +54,7 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R3 lead-in: failing tests first | COMPLETE | worker: 22 target checks failed before the change, pass after |
 | R3 lead-in: core runner + estimates (both repos, core identical) | COMPLETE | core/engine.js, core/plan.js, core/vm/session.js; `diff -r core` identical; screen text checked in VM output only, not in a browser |
 | R3 lead-in: data flags on pull-up moves + sw.js bump | COMPLETE | test/leadin.mjs checks every X() copy; sw.js v22 → v23 |
-| R3 records, regression table, commit, push, draft PRs | PARTIAL | records + FEATURES updated; commit/push/PR in progress |
+| R3 records, regression table, commit, push, draft PRs | COMPLETE | pushed; draft PR lxyzh1019-cyber/Swimming-Dryland-Timer#64 (awaiting CI + user merge) |
 | R3 checked on a device | NOT STARTED | user, after merge (no on-page stamp) |
 | R2 pinned test clock | PARTIAL | done + tests green locally on a real Sunday; awaiting CI on the PR + merge |
 
