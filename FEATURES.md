@@ -1,4 +1,4 @@
-# FEATURES — Splash (Swim Dryland Timer) — manifest v1 (partial) — confirmed 2026-09-24
+# FEATURES — Splash (Swim Dryland Timer) — manifest v1 (partial) — confirmed 2026-09-24, updated 2026-09-27 (R3)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -14,6 +14,8 @@ Locked features of the current version. Every edit is checked against this list 
 - 👀 "What to watch for" by the coach tip opens and closes with no grown-up PIN.
 - "I need to start over" (erases the attempt) asks for the grown-up PIN.
 - Left panel move list: ✓ done · ½ short · ⏭ skipped · ▶ current, for the round she is in.
+- Bar moves ("Clean Pull-Ups" and "Scap Pull-Up + Dead Hang", flagged `leadInSeconds: 5`): after the move is named, a 5s "Get on the bar" get-ready countdown runs before rep 1 / the work clock, then "Go.". Not work time (the hang stays 30s; reps and the move clock start after it). Done ("▶ Go") starts the move early; Skip skips the move; Back goes to the move before; STOP ends the session. The +5s setup in the rest before these moves is kept.
+- Session length estimate ("about N min") includes each lead-in.
 - Left panel: a ½ or ⏭ move shows a small reason line (e.g. "4 of 6 reps — all 6 to count", "20s of 30s — needs 24s (80%) to count", "under 3s — counted as skipped").
 
 ## Today screen

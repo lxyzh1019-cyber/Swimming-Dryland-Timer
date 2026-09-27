@@ -312,7 +312,7 @@ export const REFLECT_NEXT = ["Slow down", "Breathe out loud", "Point my toes", "
 
 /* Shared finisher + swim-skill block builders */
 const FINISHER = () => [
-  X({ name: "Scap Pull-Up + Dead Hang", block: "finisher", driver: "time", work: 30,
+  X({ name: "Scap Pull-Up + Dead Hang", leadInSeconds: 5, block: "finisher", driver: "time", work: 30,
       dose: "30s", reset: "Hang tall, shoulders ready.",
       cue: "Shoulders slide DOWN, hang and decompress.",
       swimTransfer: "Shoulder control / decompression" })
@@ -397,7 +397,7 @@ export const DAYS = {
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
             swimTransfer: "Body line + kick" }),
-        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", note: "clean reps only",
+        X({ name: "Clean Pull-Ups", leadInSeconds: 5, block: "main", driver: "reps", repsDetail: "2–3 clean reps", note: "clean reps only",
             reset: "Shoulders sink first.", cue: "Shoulders sink first, THEN bend.",
             parentWatch: "Kipping / swinging", fix: "One swing = set over.",
             swimTransfer: "Catch with the lats" }),
@@ -513,7 +513,7 @@ export const DAYS = {
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
             swimTransfer: "Body line + kick" }),
-        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", note: "clean reps only",
+        X({ name: "Clean Pull-Ups", leadInSeconds: 5, block: "main", driver: "reps", repsDetail: "2–3 clean reps", note: "clean reps only",
             reset: "Shoulders sink first.", cue: "Shoulders sink first, THEN bend.",
             parentWatch: "Kipping / swinging", fix: "One swing = set over.",
             swimTransfer: "Catch with the lats" }),
@@ -640,7 +640,7 @@ export const DAYS = {
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
             swimTransfer: "Body line + kick" }),
-        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", note: "clean reps only",
+        X({ name: "Clean Pull-Ups", leadInSeconds: 5, block: "main", driver: "reps", repsDetail: "2–3 clean reps", note: "clean reps only",
             reset: "Shoulders sink first.", cue: "Shoulders sink first, THEN bend.",
             parentWatch: "Kipping / swinging", fix: "One swing = set over.",
             swimTransfer: "Catch with the lats" }),
@@ -707,7 +707,7 @@ export const DAYS = {
             cue: "Ribs down, low back glued to floor.",
             parentWatch: "Rib flare / breath-holding", fix: "Exhale slowly, count aloud.",
             swimTransfer: "Body line + kick" }),
-        X({ name: "Clean Pull-Ups", block: "main", driver: "reps", repsDetail: "2–3 clean reps", note: "clean reps only",
+        X({ name: "Clean Pull-Ups", leadInSeconds: 5, block: "main", driver: "reps", repsDetail: "2–3 clean reps", note: "clean reps only",
             reset: "Shoulders sink first.", cue: "Shoulders sink first, THEN bend.",
             parentWatch: "Kipping / swinging", fix: "One swing = set over.",
             swimTransfer: "Catch with the lats" }),

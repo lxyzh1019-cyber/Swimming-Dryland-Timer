@@ -40,6 +40,19 @@ const HARD_EXERCISES = new Set([
    estimateSessionSecs so the day's "about N min" stays honest. */
 function setupSecs(ex) { return needsSetup(ex) ? SETUP_SECONDS : 0; }
 
+/* THE LEAD-IN is the other half of a bar move's setup. The setup seconds above
+   come out of the REST before it; these come after the move has been named and
+   before its first rep or its work clock — the seconds it takes to jump up and
+   hang still. Rep one used to be counted while she was still reaching for the
+   bar. Opt-in per move (`leadInSeconds`, see X() in plan.js). Not work: the
+   move's own clock starts when the lead-in ends. Counted in estimateSessionSecs
+   only — refTime and the ledger's planned seconds measure work. */
+export const LEAD_IN_LABEL = "Get on the bar";
+function leadInSecs(ex) {
+  const n = Number(ex && ex.leadInSeconds);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 /* ---- session view-state (the single source the UI renders from) ---- */
 export const sess = blankSession();
 
@@ -66,6 +79,7 @@ function blankSession() {
     exElapsed: 0, elapsed: 0, pausedSecs: 0, plannedSecs: 0, expectedWork: 0,
     clockAt: 0, activeMs: 0, pausedMs: 0, exMs: 0,
     upNextName: "", upNextDose: "", restCue: "",
+    leadIn: "",                  // "Get on the bar" while a move's lead-in runs — see runLeadIn
     stopOverlay: false, confirmEnd: false, painFlag: false,
     discard: false, stopReason: null, confirmRestart: false,
     pendingCleanCheck: false, cleanCount: 0, wobblyCount: 0, lastWobbly: false,
@@ -482,6 +496,8 @@ export function estimateSessionSecs(circuits) {
         // Every setup move is preceded by some break, and the runner lengthens
         // that break by exactly this much — see setupSecs.
         total += setupSecs(ex);
+        // The "Get on the bar" before the first rep or the work clock.
+        total += leadInSecs(ex);
         if (ex.byReps) {
           // Straight from the prescription: every rep of every segment, plus a
           // reset between segments. The old guess re-derived reps from the
@@ -956,6 +972,36 @@ async function announce(msg) {
   if (cut) cancelSpeech();
   // Whether she cut it short, so a caller can drop the beat that follows.
   return cut;
+}
+
+/* THE LEAD-IN, run after the step's clock is reset and before its work.
+
+   "Pull-Up (heavy). 3 reps. Depress shoulders first. Get on the bar." — then
+   the get-ready screen, reading "Get on the bar", counts down leadInSeconds.
+   After a rest that ran out (`preAnnounced`: the rest already said "Rest.
+   Next: <move>") only "Get on the bar." is said. The phase is "getready", so
+   the ring is a READY clock and syncClock charges none of it to the move.
+
+   `since` is stamped before the line is spoken, as the rests and segmentBreak
+   do: a Done tap during the line or the countdown means "I'm on, go" and ends
+   the lead-in — never the move. A tap that cuts the announcement itself means
+   the same. Skip ("skip"), Back ("back") and STOP ("abort") come back to the
+   caller, which handles them as it does for any countdown. */
+async function runLeadIn(ex, preAnnounced) {
+  sess.leadIn = LEAD_IN_LABEL;
+  try {
+    setPhase("getready");
+    const since = Date.now();
+    const line = LEAD_IN_LABEL + ".";
+    const cut = await announce(preAnnounced ? line : openingLine(ex, line));
+    if (sess.abort) return "abort";
+    if (sess.backTo != null) return "back";
+    if (sess.skipExercise) return "skip";
+    if (cut) return "cut";
+    return await countdown(leadInSecs(ex), { since });
+  } finally {
+    sess.leadIn = "";
+  }
 }
 
 /* What comes after the step she is on — read off the step list, which is
@@ -1818,6 +1864,8 @@ function backTarget() {
   if (sess.explore) return sess.stepIdx > 0 ? sess.stepIdx - 1 : null;
   const ph = sess.phase;
   if (ph === "work" || ph === "reps" || ph === "sideswitch") return sess.stepIdx - 1;
+  // A move's lead-in is part of the move: Back goes to the one before it.
+  if (ph === "getready" && sess.leadIn) return sess.stepIdx - 1;
   if (ph === "rest" || ph === "roundRest" || ph === "sectionRest" || ph === "formcheck") return sess.stepIdx;
   return null;
 }
@@ -2116,9 +2164,23 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     // ---------- WORK ----------
     const work = ex.byReps ? 0 : exWork(ex);
     playCue("work");
-    if (ex.byReps) {
+    /* A lead-in move is named and then given its seconds to get on the bar;
+       only then does the count or the clock start, with a short "Go." — see
+       runLeadIn. Skip there skips the move; nothing of it ran. */
+    const hasLeadIn = leadInSecs(ex) > 0;
+    let leadResult = null;
+    if (hasLeadIn) {
+      leadResult = await runLeadIn(ex, preAnnounced);
+      preAnnounced = false;
+      if (leadResult === "abort" || sess.abort) return finalize(false);
+      if (leadResult === "back" || wentBack()) { back(); continue; }
+    }
+    if (leadResult === "skip") {
+      // Skipped while getting on the bar: recorded as skipped below.
+    } else if (ex.byReps) {
       setPhase("reps");
-      if (!preAnnounced) await announce(openingLine(ex, "Go."));
+      if (hasLeadIn) await announce("Go.");
+      else if (!preAnnounced) await announce(openingLine(ex, "Go."));
       preAnnounced = false;
       if (sess.abort) return finalize(false);
       if (wentBack()) { back(); continue; }
@@ -2129,7 +2191,8 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     } else {
       sess.timerSecs = work; sess.timerMax = work;
       setPhase("work");
-      if (!preAnnounced) await announce(openingLine(ex, "Three, two, one, go."));
+      if (hasLeadIn) await announce("Go.");
+      else if (!preAnnounced) await announce(openingLine(ex, "Three, two, one, go."));
       preAnnounced = false;
       if (sess.abort) return finalize(false);
       if (wentBack()) { back(); continue; }
@@ -2319,7 +2382,9 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
         // Skip Rest used to take the same branch, which marked the next move as
         // announced and skipped its name — she heard "Go" and nothing else. A
         // cut rest gets the move's full announcement.
-        if (result === "done") { speak("Go"); preAnnounced = true; }
+        // A lead-in move is not told "Go" here: it is about to be told to get
+        // on the bar, and its "Go." comes when the lead-in ends.
+        if (result === "done") { if (!leadInSecs(upcomingEx)) speak("Go"); preAnnounced = true; }
       }
     }
 
@@ -2958,7 +3023,8 @@ export function skipCurrentExercise() {
   if (sess.explore) { if (sess.holdResolver) sess.holdResolver("skip"); return; }
   // During rests and prompts no exercise is underway — Skip there means
   // "skip the wait", not "log the exercise that just finished as skipped".
-  if (!["work", "reps", "sideswitch"].includes(sess.phase)) { advance(); return; }
+  // A move's lead-in is the move under way: Skip there skips it.
+  if (!["work", "reps", "sideswitch"].includes(sess.phase) && !(sess.phase === "getready" && sess.leadIn)) { advance(); return; }
   if (sess.currentEx) {
     // Tagged with the step, so "back a move" can take the skip off the list
     // when she goes back and does it after all.
