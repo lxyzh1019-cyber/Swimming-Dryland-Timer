@@ -1,15 +1,6 @@
 {
-  "model": "fable",
   "permissions": {
     "defaultMode": "plan",
-    "ask": [
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(git merge:*)",
-      "Bash(gh pr merge:*)",
-      "Bash(firebase deploy:*)",
-      "Bash(npm run deploy:*)"
-    ],
     "deny": [
       "Bash(git reset --hard:*)",
       "Bash(git checkout -- :*)",
@@ -18,7 +9,16 @@
       "Bash(git branch -D:*)",
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
-      "Bash(git stash drop:*)"
+      "Bash(git stash drop:*)",
+      "Bash(gh pr merge:*)"
+    ],
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr ready:*)"
     ]
   },
   "hooks": {
@@ -38,22 +38,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'p=$(command -v python3 || command -v python); exec \"$p\" -B \"$CLAUDE_PROJECT_DIR/.claude/hz-loader.py\" plan-gate.py'"
-          },
-          {
-            "type": "command",
-            "command": "bash -c 'p=$(command -v python3 || command -v python); exec \"$p\" -B \"$CLAUDE_PROJECT_DIR/.claude/hz-loader.py\" skill-router.py'"
+            "command": "bash -c 'p=$(command -v python3 || command -v python); exec \"$p\" -B \"$CLAUDE_PROJECT_DIR/.claude/hz-loader.py\" dispatch.py'"
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|Agent|Task|WebFetch|mcp__.*",
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'p=$(command -v python3 || command -v python); exec \"$p\" -B \"$CLAUDE_PROJECT_DIR/.claude/hz-loader.py\" routing-guard.py'"
+            "command": "bash -c 'p=$(command -v python3 || command -v python); exec \"$p\" -B \"$CLAUDE_PROJECT_DIR/.claude/hz-loader.py\" dispatch.py'"
           }
         ]
       }
@@ -63,11 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'p=$(command -v python3 || command -v python); exec \"$p\" -B \"$CLAUDE_PROJECT_DIR/.claude/hz-loader.py\" record-guard.py'"
-          },
-          {
-            "type": "command",
-            "command": "bash -c 'p=$(command -v python3 || command -v python); exec \"$p\" -B \"$CLAUDE_PROJECT_DIR/.claude/hz-loader.py\" validation-line.py'"
+            "command": "bash -c 'p=$(command -v python3 || command -v python); exec \"$p\" -B \"$CLAUDE_PROJECT_DIR/.claude/hz-loader.py\" dispatch.py'"
           }
         ]
       }
