@@ -31,12 +31,12 @@ Single working record for this repository. Updated by the main session at the en
 | 10 | R3 2026-09-27 | "Scap pull up also get the 5 s get ready time" | done | timed move: lead-in before the hang clock; hang length unchanged |
 
 ## Hotspot counter
-| Area / feature | Fix rounds | Recurrences | Last symptom | Rewrite-vs-repair reviewed? |
-|---|---|---|---|---|
-| Coach's Quiz (finish screen) | 1 | 0 | question swaps after a correct tap | no |
-| Grown-up gate / UNGATED_ACTIONS coverage | 1 | 0 | kid session buttons ask for PIN | no — structural option noted below |
-| Move status list (session rail / Today review) | 1 | 0 | ½ gave no reason | no |
-| Test suite depends on the real date | 2 | 1 | Sunday-only failures (earlier: Monday-only assertion) | structural fix applied: pinned test clock |
+| Area / feature | Fix rounds | Recurrences | Regressions caused | Workarounds/exceptions | Last symptom | Rewrite-vs-repair reviewed? |
+|---|---|---|---|---|---|---|
+| Coach's Quiz (finish screen) | 1 | 0 | 0 | 0 | question swaps after a correct tap | no |
+| Grown-up gate / UNGATED_ACTIONS coverage | 1 | 0 | 0 | 0 | kid session buttons ask for PIN | no — structural option noted below |
+| Move status list (session rail / Today review) | 1 | 0 | 0 | 0 | ½ gave no reason | no |
+| Test suite depends on the real date | 2 | 1 | 0 | 0 | Sunday-only failures (earlier: Monday-only assertion) | structural fix applied: pinned test clock |
 Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → no further patch until the comparison is presented.
 
 Structural option (not approved, not done): a test that renders every screen, collects every `data-action` a kid can reach during a session, and fails if any is gated without being named in an explicit "adult-only" list — so a new kid button cannot silently ship behind the PIN.
