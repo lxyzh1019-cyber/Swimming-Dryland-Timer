@@ -62,7 +62,7 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R3 records, regression table, commit, push, draft PRs | COMPLETE | pushed; draft PR lxyzh1019-cyber/Swimming-Dryland-Timer#64 (awaiting CI + user merge) |
 | R3 checked on a device | NOT STARTED | user, after merge (no on-page stamp) |
 | R2 pinned test clock | PARTIAL | done + tests green locally on a real Sunday; awaiting CI on the PR + merge |
-| R4-1 PR 1 tokens, slots, stylesheet fix, docs copy (both repos) | PARTIAL | opus-worker 2026-09-30: changes made on `claude/splash-pr1-tokens-slots`; `npm test` exit 0; `diff -rq core` empty; release-check ok; Today screenshots 0 px diff at 3 sizes; commit/push/PR not run by the worker (executor rule) — COMPLETE once the PR is open |
+| R4-1 PR 1 tokens, slots, stylesheet fix, docs copy (both repos) | COMPLETE | opus-worker 2026-09-30: changes made on `claude/splash-pr1-tokens-slots`; `npm test` exit 0; `diff -rq core` empty; release-check ok; Today screenshots 0 px diff at 3 sizes; commit/push/PR not run by the worker (executor rule) — COMPLETE once the PR is open; PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#67 |
 | R4-2 Merge PR pair 1 | WAITING ON YOU — merge PR pair 1 | |
 | R4-3 PR 2 Session screen + size-floor test | NOT STARTED | |
 | R4-4 Merge PR pair 2 | NOT STARTED | |
