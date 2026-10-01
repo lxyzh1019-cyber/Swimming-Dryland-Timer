@@ -486,7 +486,8 @@ export function buildSessionVM(state) {
   })) : [];
 
   // Exercise timeline (left pane list)
-  const BLOCK_COLORS = { warmup: "var(--coral)", coordination: "var(--sun-ink)", main: "var(--sea)", prep: "var(--grape)", finisher: "var(--mint-ink)", [SKILL_BLOCK]: "var(--aqua-ink)", recovery: "var(--grape)" };
+  // Block titles are words on white, so every block uses its family's -ink shade.
+  const BLOCK_COLORS = { warmup: "var(--coral-ink)", coordination: "var(--sun-ink)", main: "var(--sea-ink)", prep: "var(--grape-ink)", finisher: "var(--mint-ink)", [SKILL_BLOCK]: "var(--aqua-ink)", recovery: "var(--grape-ink)" };
 
   /* ---- THE LIST IS THE DAY, AND THE PILL IS WHERE SHE PICKS UP -------------
 
@@ -550,7 +551,7 @@ export function buildSessionVM(state) {
     done:    { bg: "var(--mint)",      ink: "#fff",            icon: "✓", sec: "var(--mint)" },
     partial: { bg: "var(--sun)",       ink: "var(--sun-ink)",  icon: "½", sec: "var(--sun-deep)" },
     skipped: { bg: "var(--coral)",     ink: "#fff",            icon: "⏭", sec: "var(--coral)" },
-    current: { bg: "var(--aqua)",      ink: "#fff",            icon: "▶", sec: "var(--aqua)" },
+    current: { bg: "var(--btn-primary-bg,var(--aqua))", ink: "var(--btn-primary-text,#fff)", icon: "▶", sec: "var(--aqua)" },
     pending: { bg: "var(--surface-2)", ink: "var(--ink-soft)", icon: "",  sec: "var(--ink-faint)" }
   };
   const NAME_INK = {
@@ -605,7 +606,7 @@ export function buildSessionVM(state) {
         jumpAction: explore && sess.running && !sessionDone && !isCur,
         cardStyle: "display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:12px;margin:2px 0;box-sizing:border-box;"
           + (isCur ? "background:var(--aqua-wash);box-shadow:inset 0 0 0 2px var(--aqua-light);" : ""),
-        numStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;"
+        numStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;"
           + "background:" + pill.bg + ";color:" + pill.ink + ";",
         nameStyle: "flex:1;min-width:0;font-weight:800;color:" + NAME_INK[state],
         statusIcon: pill.icon,

@@ -139,4 +139,8 @@
   --btn-stop-edge:    var(--stop-ink);
   /* Recovery (grape) button */
   --btn-grape-bg:     var(--grape-deep);          /* white 5.4 */
+  /* Go / Done button: white on mint-ink, 6.6 */
+  --btn-go-bg:        var(--mint-ink);
+  --btn-go-text:      #FFFFFF;
+  --btn-go-edge:      #04342C;
 }

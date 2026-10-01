@@ -1,4 +1,9 @@
-# Plan v1 — Splash redesign: six paired PRs, validated against the code — Approved 2026-09-30
+# Plan v3 — Splash redesign: six paired PRs, validated against the code — Approved 2026-09-30 (v1 approved 2026-09-30; v2 = user's instruction after the PR 1 merge)
+
+🟩 **Rev 2** · Changes in this version (v3, user's choice 2026-09-30): the Go/Done button (and "Keep going", and the green-light Start button in PR 3) becomes Deep green — white text on `mint-ink` with a darker edge (6.6 swim / 6.4 skate) — through new slots `btn-go-bg / btn-go-edge / btn-go-text` with fallbacks equal to the PR 2 look; the size test reads the new slot. Applied on the open PR 2 branch.
+
+🟦 **Rev 1** · Changes in v2: the journey/level map colour work (K7, slots instead of swim literals, white text → hero-text, "You are here" pill) moves from PR 4 into PR 2, because the skate map shows swim colours today and the user wants it fixed first. Nothing else changes.
+
 
 Written by Fable 5.1 (the session model; the planner hint to switch to Fable already applies).
 
@@ -74,7 +79,7 @@ Each PR stage = branch from `main` in both repos, change, `npm test` in both, `d
 
 1. **Claude** — opus-worker · Level: Complex — PR 1 tokens, slots, stylesheet fix, docs copy (both repos).
 2. **You** — merge PR pair 1.
-3. **Claude** — opus-worker · Complex — PR 2 Session screen + size-floor test.
+3. **Claude** — opus-worker · Complex — PR 2 Session screen + size-floor test 🟦 **Rev 1** + journey map colours (K7, moved from PR 4).
 4. **You** — merge PR pair 2.
 5. **Claude** — opus-worker · Complex — PR 3 Body Check.
 6. **You** — merge PR pair 3.
@@ -119,6 +124,7 @@ Baseline: swim `main@8de0bbe`, skate `main@3570e44` (core identical today). `sw.
 - `exList` 615–646: row becomes a button element with `data-action="openDetailAt"`, the same `data-arg` (ci|ei) and `min-height:56px`; ⓘ 643 becomes a plain span with `aria-hidden="true"`; marks, `statusNote` and `secColor` unchanged; legend 627–628 `var(--ink-soft)` 13px; headers 630–632 use `-ink` shades via `BLOCK_COLORS` (vm 489: warmup `coral-ink`, main `sea-ink`, prep/recovery `grape-ink`; others already `-ink`); `PILL.current` (vm 549) `bg: var(--btn-primary-bg,var(--aqua))`, `ink: var(--btn-primary-text,#fff)`.
 - Ring: add `RING_ZONE_INK` beside `RING_ZONE_COLOR` (line 10); label at 29 uses ink map (urgent `stop-ink`), 13px on all ring sizes; arc keeps colour. Rep ring 40–43: dose and labels `var(--grape-ink)`, hint 13px.
 - `railToggle` 663–670: 48px. Estimate lines 723 and 758: `var(--ink-soft)`, 13px, text unchanged.
+- 🟦 **Rev 1** K7 journey map colours (the "Journey" bullet under PR 4) are done in this PR.
 - New `core/test/design.mjs`: size-floor scan over session/today/readiness/progress/finish (kid) and grownup (adult) HTML; per-PR allowlist shrinks to empty by PR 6. Add to the runner's discovery (no `CORE_SHELL` change needed; tests aren't precached).
 
 ### PR 3 — Body Check
@@ -131,7 +137,7 @@ Baseline: swim `main@8de0bbe`, skate `main@3570e44` (core identical today). `sw.
 
 ### PR 4 — Today (`core/screens/today.js`, `core/vm/today.js`, `core/gate.js`, both `js/data.js`)
 - Day card 364 and 393: `linear-gradient(165deg,var(--hero-from,var(--aqua-light)) 0%,var(--hero-to,var(--aqua)) 70%)`, `color:var(--hero-text,#fff)`; chips 157–164, focus box 177–181, block rows (`rowBg`, vm 467) → `var(--hero-chip, …)` with today's rgba value as the fallback; block button 218 min-height 56; `ctaButtonStyle` (vm 741) `color:var(--ink)`; `practiceBtnStyle` (vm 749) border/text `var(--hero-text,#fff)` (keeps `min-height:48px`).
-- Journey 59–87, 114–147: gradient stops → `var(--hero-from,#0E4A73)`, `var(--hero-to,#1B7FAD)`, `var(--journey-via,#4FC3D9)`, `var(--journey-to,#F2D9A6)` (80% stop folded into `journey-to`); ellipse `#0A3E63` and header overlay 119/136 keep today's rgba as fallbacks; header text 120/137 `var(--hero-text,#fff)`; rank name/caption/pips (vm 151–221) `var(--hero-text,#fff)`; current rank name + "YOU ARE HERE" (vm 160–167) on a `rgba(255,255,255,0.6)` pill, text `ink` / `aqua-ink`; path, pips, ranks kept.
+- 🟦 **Rev 1** Moved to PR 2: Journey 59–87, 114–147: gradient stops → `var(--hero-from,#0E4A73)`, `var(--hero-to,#1B7FAD)`, `var(--journey-via,#4FC3D9)`, `var(--journey-to,#F2D9A6)` (80% stop folded into `journey-to`); ellipse `#0A3E63` and header overlay 119/136 keep today's rgba as fallbacks; header text 120/137 `var(--hero-text,#fff)`; rank name/caption/pips (vm 151–221) `var(--hero-text,#fff)`; current rank name + "YOU ARE HERE" (vm 160–167) on a `rgba(255,255,255,0.6)` pill, text `ink` / `aqua-ink`; path, pips, ranks kept.
 - Order: `todayWide` tight path (327–366) → greeting, day card, week + legend, stats, Quiz Deck, journey; `todayNarrow` (369–401) → greeting, day card, week, stats, Quiz Deck, journey.
 - Phone fold: in `dayPane(vm,false)` a button `See the ${n} blocks ▾` / `Hide the blocks ▴`, `data-action="toggleBlocks"`, min-height 56; list rendered when `state.blocksOpen`; action added to `UNGATED_ACTIONS` (`core/gate.js:61`) and `actionNames`; wide always open, no button.
 - Sizes: week strip 18/20 → 13px label, 15px date; `cellStyle` (vm 486) min-height 88; legend and stat labels 13px.
