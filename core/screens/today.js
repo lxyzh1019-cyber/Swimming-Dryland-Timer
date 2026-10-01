@@ -156,7 +156,7 @@ function dayPane(vm, wide) {
 
   const chips = dv.showChips ? `
     <div style="display:flex;gap:${wide ? 10 : 8}px;margin-bottom:14px;flex-wrap:wrap;">
-      <span style="display:inline-flex;align-items:center;gap:6px;background:var(--hero-chip,rgba(255,255,255,0.18));border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>⏱</span> ${dv.minsLabel || (dv.mins + " min")}</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;background:var(--hero-chip,rgba(255,255,255,0.18));border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>${emojiPresentation("⏱")}</span> ${dv.minsLabel || (dv.mins + " min")}</span>
       <span style="display:inline-flex;align-items:center;gap:6px;background:var(--hero-chip,rgba(255,255,255,0.18));border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>${emojiPresentation("⚡")}</span> ${dv.movesLabel}</span>
       ${dv.roundsLabel ? `<span style="display:inline-flex;align-items:center;gap:6px;background:var(--hero-chip,rgba(255,255,255,0.18));border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>🔁</span> ${escapeHtml(dv.roundsLabel)}</span>` : ""}
       ${vm.gearLabel ? `<span style="display:inline-flex;align-items:center;gap:6px;background:var(--hero-chip,rgba(255,255,255,0.18));border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>🎒</span> ${vm.gearLabel}</span>` : ""}
@@ -286,7 +286,7 @@ function dayPane(vm, wide) {
       ${dv.partialSkipLabel ? `
         <div style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;padding-top:8px;text-align:center;">
           <span style="font-size:${wide ? 14 : 13}px;font-weight:700;">${dv.partialSkipLabel}</span>
-          <button type="button" data-action="goSessionRedo" data-arg="${vm.selectedKey}" style="min-height:44px;border-radius:var(--radius-pill);border:2px solid var(--hero-text,rgba(255,255,255,0.55));background:rgba(255,255,255,0.16);color:var(--hero-text,#fff);font-family:inherit;font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;">+ Add them back</button>
+          <button type="button" data-action="goSessionRedo" data-arg="${vm.selectedKey}" style="min-height:56px;border-radius:var(--radius-pill);border:2px solid var(--hero-text,rgba(255,255,255,0.55));background:rgba(255,255,255,0.16);color:var(--hero-text,#fff);font-family:inherit;font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;">+ Add them back</button>
         </div>` : ""}` : ""}
     ${dv.startNote ? `<div role="status" style="margin-bottom:10px;background:rgba(255,255,255,0.18);border:2px solid rgba(255,255,255,0.55);border-radius:var(--radius-lg);padding:10px 14px;font-size:13px;font-weight:800;line-height:1.4;">ℹ️ ${dv.startNote}</div>` : ""}
     ${dv.showExplore ? `

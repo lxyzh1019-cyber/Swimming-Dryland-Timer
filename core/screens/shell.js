@@ -40,11 +40,11 @@ export function shellWithRail(vm, contentHtml, { minHeight = 800 } = {}) {
 
 function railBtn(nav, icon, label, r) {
   return `
-  <button type="button" data-action="nav" data-arg="${nav}" style="background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;">
+  <button type="button" data-action="nav" data-arg="${nav}" style="min-height:56px;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;">
     <div style="${r.iconWrap}${nav === "grownup" ? "position:relative;" : ""}">
       <span style="font-size:22px;">${icon}</span>
     </div>
-    <span style="font-size:11px;font-weight:900;color:${r.labelColor};">${label}</span>
+    <span style="font-size:13px;font-weight:900;color:${r.labelColor};">${label}</span>
     <span style="${r.dotStyle}"></span>
   </button>`;
 }
@@ -52,9 +52,9 @@ function railBtn(nav, icon, label, r) {
 /* Bottom nav (portrait; hidden mid-session). */
 export function bottomNav(vm) {
   const tab = (nav, icon, label, r) => `
-    <button type="button" data-action="nav" data-arg="${nav}" style="background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:84px;min-height:48px;">
+    <button type="button" data-action="nav" data-arg="${nav}" style="background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:84px;min-height:56px;">
       <span style="${r.tabIconWrap}">${icon}</span>
-      <span style="font-size:11px;font-weight:900;color:${r.labelColor};">${label}</span>
+      <span style="font-size:13px;font-weight:900;color:${r.labelColor};">${label}</span>
     </button>`;
   return `
   <div style="height:78px;"></div>

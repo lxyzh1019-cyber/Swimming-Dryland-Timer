@@ -16,7 +16,7 @@
    skipped moves) are still read off the sittings the record carries.
    ============================================================ */
 
-import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, BODY_ZONES, videoSearchUrl, fmtXp, doseLines } from "../data.js";
+import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, BLOCK_ORDER, BODY_ZONES, videoSearchUrl, fmtXp, doseLines } from "../data.js";
 import { redeemedPrizesForReview } from "../store.js";
 import { ATHLETE_DEFAULT, CSV_FILE_PREFIX } from "../sport.js";
 import { gateUnlocked, GATE_REASON } from "../gate.js";
@@ -28,6 +28,9 @@ import { estimateSessionSecs } from "../engine.js";
 import { edmontonWeekISODates, edmontonDayKey, edmontonISO, todayISODate, exercisePhotoUrl } from "../util.js";
 import { effortSummary, EFFORT_CAVEAT } from "../effort.js";
 import { isTrainingRecord } from "./today.js";
+/* The week table on Analytics is the Progress table, fed by the rows the
+   Progress view-model already builds (analyticsWeek) — one source, no copy. */
+import { buildProgressVM } from "./progress.js";
 
 const LIGHT_COLORS = { green: "var(--mint)", yellow: "var(--sun)", red: "var(--stop)", recovery: "var(--grape)" };
 
@@ -116,10 +119,10 @@ export function buildGrownupVM(state) {
 
   /* ---- tabs / scope chrome ---- */
   const gu = state.grownupTab || "overview";
-  const tabStyle = (active) => "flex-shrink:0;padding:8px 14px;border:none;border-radius:var(--radius-pill);font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;"
-    + (active ? "background:var(--aqua);color:white;" : "background:transparent;color:var(--ink-soft);");
-  const scopeTabStyle = (v) => "flex:1;min-height:36px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:12px;letter-spacing:0.03em;padding:0 14px;font-family:inherit;"
-    + (scope === v ? "background:var(--aqua);color:#fff;box-shadow:0 2px 6px rgba(6,182,212,0.35);" : "background:transparent;color:var(--ink-soft);");
+  const tabStyle = (active) => "flex-shrink:0;min-height:48px;padding:0 16px;border:none;border-radius:var(--radius-pill);font-weight:900;font-size:15px;cursor:pointer;font-family:inherit;"
+    + (active ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);" : "background:transparent;color:var(--ink-soft);");
+  const scopeTabStyle = (v) => "flex:1;min-height:48px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:15px;letter-spacing:0.03em;padding:0 14px;font-family:inherit;"
+    + (scope === v ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);box-shadow:0 2px 6px rgba(6,182,212,0.35);" : "background:transparent;color:var(--ink-soft);");
 
   /* ---- safety & flags ---- */
   const stops = safetyRows.filter(s => s.pain);
@@ -325,12 +328,12 @@ export function buildGrownupVM(state) {
       gridStyle: "display:grid;grid-template-columns:repeat(" + consistency.cols + ",1fr);gap:5px;",
       cells: consistency.cells.map(cell => ({
         d: cell.s === "rest" ? "🌙" : cell.label,
-        cellStyle: "height:" + (consistency.showDows ? "30px" : "46px") + ";border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:" + (consistency.showDows ? "11px" : "13px") + ";font-weight:900;"
-          + (cell.s === "done" ? "background:var(--mint);color:#fff;"
+        cellStyle: "height:" + (consistency.showDows ? "30px" : "46px") + ";border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;"
+          + (cell.s === "done" ? "background:var(--mint);color:var(--ink);"
           : cell.s === "partial" ? "background:var(--sun);color:var(--sun-ink);"
-          : cell.s === "rest" ? "background:var(--grape-wash);color:var(--grape-ink);font-size:12px;"
-          : cell.s === "missed" ? "background:color-mix(in srgb, var(--coral) 14%, #fff);color:var(--coral);"
-          : "background:var(--surface-2);color:var(--ink-faint);opacity:0.55;")
+          : cell.s === "rest" ? "background:var(--grape-wash);color:var(--grape-ink);"
+          : cell.s === "missed" ? "background:color-mix(in srgb, var(--coral) 14%, #fff);color:var(--coral-ink);"
+          : "background:var(--surface-2);color:var(--ink-soft);")
       }))
     };
   })();
@@ -380,8 +383,8 @@ export function buildGrownupVM(state) {
     return {
       total, unit: "min", hasDelta: d != null && prevTotal > 0,
       deltaLabel: d == null ? "" : ((d >= 0 ? "▲ +" : "▼ −") + Math.abs(d) + " vs previous period"),
-      deltaStyle: "font-size:12px;font-weight:900;border-radius:var(--radius-pill);padding:4px 11px;white-space:nowrap;"
-        + (d == null ? "background:var(--surface-2);color:var(--ink-faint);" : d >= 0 ? "background:var(--mint-wash);color:var(--mint-ink);" : "background:color-mix(in srgb, var(--coral) 12%, #fff);color:var(--coral);")
+      deltaStyle: "font-size:13px;font-weight:900;border-radius:var(--radius-pill);padding:4px 11px;white-space:nowrap;"
+        + (d == null ? "background:var(--surface-2);color:var(--ink-soft);" : d >= 0 ? "background:var(--mint-wash);color:var(--mint-ink);" : "background:color-mix(in srgb, var(--coral) 12%, #fff);color:var(--coral-ink);")
     };
   })();
   const loadMax = Math.max(...loadBars.map(x => Math.max(x.mins, x.prev || 0)), 1);
@@ -404,7 +407,7 @@ export function buildGrownupVM(state) {
   const oldestTraining = records.find(isTrainingRecord);
   const acwr = (chronicWeekly > 0 && oldestTraining && dayGap(oldestTraining.date, todayIso) >= 14) ? acute / chronicWeekly : null;
   const acwrView = acwr == null
-    ? { value: "—", label: "Needs 2 weeks of history", color: "var(--ink-faint)", note: "The acute:chronic workload ratio compares the last 7 days' training minutes to the 28-day weekly average. It fills in after two weeks of history." }
+    ? { value: "—", label: "Needs 2 weeks of history", color: "var(--ink-soft)", note: "The acute:chronic workload ratio compares the last 7 days' training minutes to the 28-day weekly average. It fills in after two weeks of history." }
     : {
       value: acwr.toFixed(2),
       label: acwr < 0.8 ? "Undertraining zone" : acwr <= 1.3 ? "Sweet spot (0.8–1.3)" : acwr <= 1.5 ? "Caution — ramping fast" : "High spike — back off",
@@ -503,7 +506,7 @@ export function buildGrownupVM(state) {
     const after = MOOD_EMOJI[moodOf(r)] || "🙂";
     const up = MOOD_RANK[after] > MOOD_RANK[before], same = MOOD_RANK[after] === MOOD_RANK[before];
     return { day: dstr(r.date).split(",")[0], before, after, up, same,
-      arrowColor: up ? "var(--mint)" : same ? "var(--ink-faint)" : "var(--coral)", arrow: up ? "↗" : same ? "→" : "↘" };
+      arrowColor: up ? "var(--mint)" : same ? "var(--ink-soft)" : "var(--coral)", arrow: up ? "↗" : same ? "→" : "↘" };
   });
   const moodUpPct = moodRows.length ? Math.round((moodRows.filter(m => m.up || m.same).length / moodRows.length) * 100) : 0;
 
@@ -526,7 +529,7 @@ export function buildGrownupVM(state) {
         done: finished, mins: wMins,
         rowBg: finished ? "var(--surface)" : "var(--surface-2)",
         statusChip: finished ? "✓ " + wMins + "m" : (shown ? (isTrainingRecord(r) ? "partial" : "recovery") : "—"),
-        statusStyle: "font-size:11px;font-weight:900;border-radius:var(--radius-pill);padding:3px 9px;white-space:nowrap;" + (finished ? "background:var(--mint-wash);color:var(--mint-ink);" : shown ? "background:var(--sun-wash);color:var(--sun-ink);" : "background:var(--surface-2);color:var(--ink-faint);")
+        statusStyle: "font-size:13px;font-weight:900;border-radius:var(--radius-pill);padding:3px 9px;white-space:nowrap;" + (finished ? "background:var(--mint-wash);color:var(--mint-ink);" : shown ? "background:var(--sun-wash);color:var(--sun-ink);" : "background:var(--surface-2);color:var(--ink-soft);")
       };
     });
   } else {
@@ -743,9 +746,9 @@ export function buildGrownupVM(state) {
       cardStyle: "border:2px solid " + (c.verdict === "pass" ? "var(--mint)" : c.verdict === "fail" ? "var(--coral)" : "var(--hairline)")
         + ";background:" + (c.verdict === "pass" ? "var(--mint-wash)" : c.verdict === "fail" ? "color-mix(in srgb, var(--coral) 10%, #fff)" : "var(--surface)")
         + ";border-radius:var(--radius-lg);padding:15px 16px;display:flex;flex-direction:column;gap:9px;",
-      passStyle: "flex:1;min-height:46px;border-radius:var(--radius-pill);border:2px solid var(--mint);cursor:pointer;font-weight:900;font-size:14px;font-family:inherit;"
+      passStyle: "flex:1;min-height:48px;border-radius:var(--radius-pill);border:2px solid var(--mint);cursor:pointer;font-weight:900;font-size:14px;font-family:inherit;"
         + (c.verdict === "pass" ? "background:var(--mint);color:#fff;" : "background:transparent;color:var(--mint-ink);"),
-      failStyle: "flex:1;min-height:46px;border-radius:var(--radius-pill);border:2px solid var(--coral);cursor:pointer;font-weight:900;font-size:14px;font-family:inherit;"
+      failStyle: "flex:1;min-height:48px;border-radius:var(--radius-pill);border:2px solid var(--coral);cursor:pointer;font-weight:900;font-size:14px;font-family:inherit;"
         + (c.verdict === "fail" ? "background:var(--coral);color:#fff;" : "background:transparent;color:var(--coral);")
     })),
     doneCount: fcDone, total: fcQueue.length,
@@ -764,9 +767,15 @@ export function buildGrownupVM(state) {
   const seen = {};
   const libraryList = [];
   Object.values(DAYS).forEach(day => {
-    Object.values(day.blocks || {}).flat().concat(day.prepMenu || [], day.recovery || []).forEach(ex => {
+    /* Each move keeps the block it is first met in: a day's own blocks, then
+       its prep pair, then its recovery list (the prep moves are built as
+       "main" moves, so the list they sit in names their block). */
+    Object.entries(day.blocks || {}).flatMap(([key, list]) => (list || []).map(ex => [key, ex]))
+      .concat((day.prepMenu || []).map(ex => ["prep", ex]), (day.recovery || []).map(ex => ["recovery", ex]))
+      .forEach(([block, ex]) => {
       if (!ex || !ex.name || seen[ex.name]) return; seen[ex.name] = true;
       libraryList.push({
+        block,
         name: ex.name, dose: ex.byReps ? doseLines(ex).full : (ex.dose || ""), cue: ex.cue || "",
         parentWatch: ex.parentWatch || "", fix: ex.redFlag || "", transfer: ex.transfer || "",
         photoUrl: exercisePhotoUrl(ex.name, "Demo"),
@@ -779,20 +788,32 @@ export function buildGrownupVM(state) {
       });
     });
   });
+  /* One fold per block, in the order a day runs them; the first one open.
+     Every move is in exactly one group, so the groups add up to the list. */
+  const blockRank = (b) => { const order = [...BLOCK_ORDER, "prep", "recovery"]; const i = order.indexOf(b); return i < 0 ? order.length : i; };
+  const libraryGroups = [...new Set(libraryList.map(m => m.block))]
+    .sort((a, b) => blockRank(a) - blockRank(b))
+    .map((block, i) => {
+      const moves = libraryList.filter(m => m.block === block);
+      return { block, label: BLOCK_LABEL[block] || block, moves, count: moves.length,
+               countLabel: moves.length + " move" + (moves.length === 1 ? "" : "s"), open: i === 0 };
+    });
 
   /* ---- settings ---- */
-  const onTrack = (on, onColor) => "width:38px;height:22px;border-radius:11px;display:inline-flex;align-items:center;padding:2px;flex-shrink:0;background:" + (on ? onColor : "var(--hairline)") + ";border:none;cursor:pointer;";
+  /* The switch is drawn 38×22 inside a 48px-tall button (toggleHit), so the
+     tap target meets the grown-up floor without a giant switch. */
+  const onTrack = (on, onColor) => "width:38px;height:22px;border-radius:11px;display:inline-flex;align-items:center;padding:2px;flex-shrink:0;box-sizing:content-box;background:" + (on ? onColor : "var(--hairline)") + ";";
   const onKnob = (on) => "width:18px;height:18px;border-radius:50%;background:#fff;display:block;transition:transform 0.15s;transform:translateX(" + (on ? "16px" : "0") + ");";
   const voiceStyleOpts = ["fun", "classic", "encouraging", "quiet"].map(v => ({
     key: v, label: v[0].toUpperCase() + v.slice(1),
-    style: "padding:9px 16px;border-radius:var(--radius-pill);border:2px solid " + ((settings.voiceStyle || "fun") === v ? "var(--aqua)" : "var(--hairline)") + ";background:" + ((settings.voiceStyle || "fun") === v ? "var(--aqua-wash)" : "var(--surface)") + ";color:" + ((settings.voiceStyle || "fun") === v ? "var(--aqua-ink)" : "var(--ink-soft)") + ";font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;"
+    style: "min-height:48px;padding:0 16px;border-radius:var(--radius-pill);border:2px solid " + ((settings.voiceStyle || "fun") === v ? "var(--aqua)" : "var(--hairline)") + ";background:" + ((settings.voiceStyle || "fun") === v ? "var(--aqua-wash)" : "var(--surface)") + ";color:" + ((settings.voiceStyle || "fun") === v ? "var(--aqua-ink)" : "var(--ink-soft)") + ";font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;"
   }));
   /* Speed, not style. Two options and no slider: this is a setting a grown-up
      changes once, and "Slow / Normal" is a decision they can make by ear. */
   const voiceSpeedOpts = [["slow", "Slow"], ["normal", "Normal"]].map(([v, label]) => {
     const on = (settings.voiceSpeed || "slow") === v;
     return { key: v, label,
-      style: "padding:9px 16px;border-radius:var(--radius-pill);border:2px solid " + (on ? "var(--aqua)" : "var(--hairline)") + ";background:" + (on ? "var(--aqua-wash)" : "var(--surface)") + ";color:" + (on ? "var(--aqua-ink)" : "var(--ink-soft)") + ";font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;" };
+      style: "min-height:48px;padding:0 16px;border-radius:var(--radius-pill);border:2px solid " + (on ? "var(--aqua)" : "var(--hairline)") + ";background:" + (on ? "var(--aqua-wash)" : "var(--surface)") + ";color:" + (on ? "var(--aqua-ink)" : "var(--ink-soft)") + ";font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;" };
   });
 
   /* ---- coaching tab ---- */
@@ -853,18 +874,21 @@ export function buildGrownupVM(state) {
     guAlerts,
     formCheck,
     standingRules: STANDING_RULES,
-    libraryList,
+    libraryList, libraryGroups,
+    /* Analytics › This week: the Progress week table, same rows (R4 PR 6). */
+    weekTableVm: gu === "analytics" ? (() => { const p = buildProgressVM(state); return { weekDays: p.analyticsWeek, dayStreakVal: p.dayStreakVal }; })() : null,
     settingsName: settings.athleteName || ATHLETE_DEFAULT,
     profiles: profileList().map(p => ({
       id: p.id, name: p.name, active: p.id === activeProfileId(),
-      style: "min-height:40px;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:14px;padding:0 16px;font-family:inherit;border:2px solid "
+      style: "min-height:48px;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:14px;padding:0 16px;font-family:inherit;border:2px solid "
         + (p.id === activeProfileId() ? "var(--aqua);background:var(--aqua);color:#fff;" : "var(--hairline);background:var(--surface-2);color:var(--ink);")
     })),
     multiProfile: profileList().length > 1,
     backupNote: state.backupNote || "", backupNoteOk: !!state.backupNoteOk,
     settingsExRest: settings.exerciseRestSeconds, settingsRndRest: settings.roundRestSeconds, settingsSecRest: settings.sectionRestSeconds,
-    stepperBtn: "width:44px;height:44px;border-radius:50%;background:var(--surface-2);border:2px solid var(--hairline);font-size:22px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;",
+    stepperBtn: "width:48px;height:48px;min-height:48px;border-radius:50%;background:var(--surface-2);border:2px solid var(--hairline);font-size:22px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;",
     voiceStyleOpts, voiceSpeedOpts,
+    toggleHit: "min-height:48px;min-width:56px;display:inline-flex;align-items:center;justify-content:flex-end;background:none;border:none;padding:0;cursor:pointer;flex-shrink:0;",
     // Three switches, not one. The old single 🎧 toggle silenced the timer
     // beeps and the safety cues along with the coach's chatter.
     coachVoiceOn: settings.coachSpeechOn !== false,

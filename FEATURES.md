@@ -1,4 +1,4 @@
-# FEATURES — Splash (Swim Dryland Timer) — manifest v1 (partial) — confirmed 2026-09-24, updated 2026-10-01 (R4 PR 1, R4 PR 2, R4 PR 3, R4 PR 4, R4 PR 5)
+# FEATURES — Splash (Swim Dryland Timer) — manifest v1 (partial) — confirmed 2026-09-24, updated 2026-10-01 (R4 PR 1, R4 PR 2, R4 PR 3, R4 PR 4, R4 PR 5, R4 PR 6)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -9,7 +9,7 @@ Locked features of the current version. Every edit is checked against this list 
 - Coach's Quiz: first tap locks the card; a second tap changes nothing; options go grey after the reveal.
 - Coach's Quiz: XP priced by the quiz ledger (+10 first attempt, +25 first correct), never twice; the question paid is the question shown.
 - Order (R4 PR 5, R3): pose, title, note, save-failed card (if any), level-up prize (if any), summary line (day · min · rounds · ⭐ XP), pace note, mantra, "How did it feel?", reflection (once a mood is picked), Coach's Quiz, the kid line, "See every move ▾", "🏠 Back to Today" last. Checked by `core/test/design.mjs` (part done, full, stopped, nothing logged, save failed, review open, all extras, explore).
-- Kid line (R4 PR 5, R2): when a round did not count or a move came in short or skipped, exactly "A few moves came in short — next time hold them all the way. 💪"; otherwise "Every move was done in full." when that is true. The `none` state (every move skipped) is one friendly line — its title and note — with no kid line.
+- Kid line (R4 PR 5, R2): when a round did not count or a move came in short or skipped, exactly "A few moves came in short — next time hold them all the way. 💪"; otherwise "Every move was done in full." only when the day finished (completion state complete) and nothing came in short — never after a pain stop or any early stop (R4 PR 6 fix; `allInFull` in `core/vm/session.js`; checked by `core/test/invariants.mjs` S11: pain stop, early stop, finished day). The `none` state (every move skipped) is one friendly line — its title and note — with no kid line.
 - "See every move ▾" / "Hide the moves ▴" (R4 PR 5, R1/R2): one 56px button (`data-action="toggleMoveReview"`, `aria-expanded`), only when there is something to review; state `state.moveReviewOpen` in `core/main.js` (closed until opened, not saved, reset to closed by `launchSession` so every session's finish screen opens folded), passed through the session VM as `moveReviewOpen`; `toggleMoveReview` is in `UNGATED_ACTIONS`. Behind it, and only when open: the `roundShortNotes` lines (exact counts, VM wording unchanged) and "Not done in full" (rows `ink-soft` with ⏭ skipped / ½ short, no coral) with "Redo these".
 - Exact round counts in the Grown-up Zone (R4 PR 5): Analytics › Main-set rounds lists the same round lines (date · line), newest first, the latest 10 and "…and N more earlier"; held word-for-word to the finish screen by `core/test/invariants.mjs` (S10).
 - "Redo these" (R4 PR 5, R4): `btn-primary` slots (`--btn-primary-bg` / `--btn-primary-text` / `--btn-primary-edge`, fallbacks aqua / white / aqua-deep), 56px, 17px weight 900 (swim: ink on aqua (4.9)).
@@ -19,7 +19,7 @@ Locked features of the current version. Every edit is checked against this list 
 ## Quiz Deck
 - An answer is shown once (R4 PR 5, G1): the line under an answered move card gives the paired fact — watch-out card → "Fix · " + fix; fix card → "👀 Watch for · " + watch-out; cue card → the sport's transfer heading (`COPY.transferHeading`, the move card's own label: swim "🏊 Swim transfer") + " · " + the move's transfer. No paired fact → `why: ""` and no line (question card and results list). The quiz move pool carries `transfer` (from the exercise's transfer field). Checked by `core/test/invariants.mjs` (no line repeats the answer; each line is its pair).
 - Kept: deck dealing (today card first, a training principle reserved, unlearned first), mastery ledger, daily paying round and cap, practice rounds, results screen.
-- Sizes (R4 PR 5): answer options 56px; tag and practice-round banner 13px; results "MOVES MASTERED" and its footnote 13px, level-up prize 56px. Scanned by `core/test/design.mjs` (question, answered, practice, results), no allowance. The ✕ exit stays a 44px round button (unsized; listed).
+- Sizes (R4 PR 5): answer options 56px; tag and practice-round banner 13px; results "MOVES MASTERED" and its footnote 13px, level-up prize 56px. Scanned by `core/test/design.mjs` (question, answered, practice, results), no allowance. The ✕ exit is a 48px round close, like the move card's ✕ (R4 PR 6; approved exception `exitQuizDeck: 48` in `core/test/design.mjs`).
 
 ## Session screen (during a workout)
 - Left panel (wide screens) can be hidden and shown by the kid with no grown-up PIN.
@@ -49,7 +49,11 @@ Locked features of the current version. Every edit is checked against this list 
 - Sizes (R4 PR 4, K3): block rows 56px; week strip day name 13px, date 15px, cell min-height 88px; legend dots, stat labels, chips, header pill, block hint/minutes, review legend/reasons/dots, transfer line, Explore hint all ≥ 13px. Today has no size allowance in `core/test/design.mjs` (roomy, tight, phone folded and open, a block expanded).
 - Emoji (R4 PR 4, K8): the moves chip uses `emojiPresentation("⚡")`; the energy answer reads "⚡️ Full" (U+FE0F) in `js/data.js`.
 - Quiz Deck launcher chevron in `grape-ink` (R4 PR 4, G2).
+- "+ Add them back" (partly skipped day) is 56px (R4 PR 6); the minutes chip asks for emoji ⏱️ (`emojiPresentation("⏱")`, R4 PR 6, K8 leftover).
 
+## Navigation (shared shell, R4 PR 6)
+- Rail (wide) and bottom nav (portrait/phone): three buttons (Today, Progress, Grown-up), each at least 56px tall; labels 13px (were 11px). Checked by `core/test/design.mjs`.
+- ▶ / ⏱ selectors (R4 PR 6): ⏱ on Today's minutes chip gets U+FE0F (it sits beside ⚡️ as an emoji). Kept as text glyphs on purpose: "▶ Go", "▶ Resume", "▶ Resume my session", "Next move ▶", "▶ Watch the move" (button-label arrows), the move list's ▶ current mark (one of the ✓ ½ ⏭ ▶ state glyphs) and the rep ring's ⏱ (drawn in grape-ink by design); the grown-up alert ⏱ is not a kid screen.
 ## Body Check (R4 PR 3)
 - Kept: the 4 questions and their words, scoring (3 yes Green, 2 Yellow, 1 Red, 0 Recovery; the body map and the questions combine to the more cautious), the pain gate (severity 3 needs "A grown-up said it's OK" before Start; the Start button is `disabled` until then and the handler checks the same rule), the grown-up override under 🔒, the body-map zones and their coordinates, yesterday shown beside today (never reused), "Nothing feels off now", all text.
 - Answers: each yes/no is 56px, 17px, weight 900; the pair is a two-column grid, full width under its question (mockup).
@@ -61,6 +65,20 @@ Locked features of the current version. Every edit is checked against this list 
 - Grown-up override: the "🔒 Grown-up only" summary is 48px, 13px; the light picker options are 48px, 15px; the chosen light has a 3px border in its colour on white with its title in its `-ink` shade (no white text on the light); the others a 3px hairline border, ink-soft.
 - Hero panel (questions step): `linear-gradient(165deg, var(--hero-from) 0%, var(--hero-to) 70%)`, text `--hero-text`, back button and step chips on `--hero-chip` (fallbacks = the old aqua/white look).
 - Sizes: every inline text on every Body Check step ≥ 13px; kid buttons ≥ 56px (answers, legend rows, back arrows 56px round, popup options, "Feels fine now", Cancel, "Rest 1–2 min, then re-check", "Nothing feels off now"); grown-up controls ≥ 48px. Enforced by `core/test/design.mjs` over 13 states × 2 layouts plus yesterday, no allowance.
+
+## Progress screen (R4 PR 6)
+- Week table: one function, `weekTable` (exported from `core/screens/progress.js`); same rows (Planned, Times done, Moves, Skipped, Main rounds, Ended early, Pace, Streak), bars in its header, the streak in the corner cell. Every text ≥ 13px (day names, row labels, cells, minutes, "for Mon", pace chips, legend, footnote; "DAY STREAK" kept, 13px); text in `ink` / `ink-soft` (no ink-faint; today's day name `ink`); pace chips in their `-ink` shades on their washes; streak number and "DAY STREAK" in coral-ink.
+- Progress table in both places (locked, plan "Done when"): the kid's Progress and Grown-up › Analytics draw the same `weekTable` from the same Progress view-model rows (`analyticsWeek` from `buildProgressVM`; Analytics card "This week · day by day", right after At a glance), with the exact counts (e.g. 32/32). No copied markup. Checked by `core/test/design.mjs`.
+- Prizes stack (K6): below 900px wide (`!isWide || tightColumn`; `stackPrizes` in the Progress VM, from the layout state `core/main.js` already passes) the prizes card sits under the week table, full width (`data-progress-top="stacked"`); landscape ≥ 900 keeps them side by side. At 834×1194 all seven days, SUN included, are visible without scrolling the table.
+- Sizes: card headings, micro labels, range and XP labels, log lines, light chips, rank badges, "LVL", chapter and "Did you know?" 13px; the period and log chips (`progressScope`, `logScope`) 56px / 15px (kid floor), the chosen one on the `btn-primary` slots; "Redeem" 56px / 15px; the prize-draw button 56px. Log chips for RED / PAIN STOP / RECOVERY / ENDED EARLY in their `-ink` shades, NOTHING LOGGED ink-soft. No allowance in `core/test/design.mjs` (empty and with data; roomy, tight and phone).
+- Kept: streak, period board (totals and averages), XP per day, milestones, training log (one row per day), prize wallet and its redeem/undo rule, rank story, all text.
+
+## Grown-up Zone (R4 PR 6)
+- Tabs and period chips 48px / 15px, the chosen one on the `btn-primary` slots. Every grown-up control ≥ 48px: Form Check month arrows (48px circles), Export CSV, passkey, add athlete, athlete chips, voice style / speed, rest steppers (48px circles), switches (the 38×22 track inside a 48px button), prize-pool ✕, add prize, reset pool, repair wallet, review used prizes, restore, done, backup download / restore, merge / cancel, valgus gate, save week, engagement choices, Unlock; text inputs 48px; the library's "▶ Watch the move" link 48px.
+- Analytics notes (A2): every subtitle, footnote, micro label, legend, bar label and chip on Analytics (and the report cards Overview shares with it) 13px in `ink-soft` (no ink-faint); small coloured text in its `-ink` shade (override note stop-ink, gap note / pauses coral-ink, rounds total aqua-ink); consistency cells 13px (done ink on mint, missed coral-ink, no faded cells). Checked by `core/test/design.mjs` (no text under 13px, no ink-faint on Analytics).
+- Move Library (A3): one native `<details data-lib-block>` per block, named by `BLOCK_LABEL`, in the order a day runs them (`BLOCK_ORDER`, then Prep Pair, then Recovery); each move sits in the block it is first met in (a day's blocks, its prep list → `prep`, its recovery list → `recovery`); the summary is 48px / 15px with "N moves ▾"; the first fold open, the rest closed. Same cards, same dedupe; total = the old flat count (55). Hostile strings stay escaped (invariants, all six tabs).
+- Coaching ladder (A4): rungs are 48px circles, 15px; earned rungs on the `btn-primary` slots.
+- Kept: all six tabs and their numbers, Export CSV, exact round lines (R4 PR 5), passkey, profiles, voice settings, rests, prize pool and wallet repair, backup/restore, valgus gate, PR board, engagement systems, all text.
 
 ## Design tokens and colour slots
 - Rule: screens read slots with fallbacks equal to the previous look; core stays byte-identical; skate fills its own slot values.
@@ -74,7 +92,15 @@ Locked features of the current version. Every edit is checked against this list 
 - Grown-up gate is deny-by-default: any action not in `UNGATED_ACTIONS` (or allowed by `CHILD_MAY`) asks for the PIN.
 - `core/` is byte-identical with the Figure-Skate-Dryland-Timer repo.
 - Every release that changes a precached shell file bumps `version` in `sw.js`.
-- Size-floor test `core/test/design.mjs` (R4 PR 2): kid screens no inline text < 13px, sized buttons ≥ 56 (session Done ≥ 64); grown-up buttons ≥ 48; buttons with no min-height are listed, not failed. Screens not yet redesigned carry a per-screen allowance (`ALLOW`) that PRs 4–6 shrink to empty; the session screen, the journey map, Body Check, Today, the finish screen and the Quiz Deck have none (R4 PR 3 removed the Body Check entries, R4 PR 4 the Today entries, R4 PR 5 the finish entry). Approved below-56 kid controls: Back a move 48, the move card's ✕ 48, the Body Check light picker 48 (grown-up control), Today's "🧪 Explore the moves" 48 (secondary action).
+- Size-floor test `core/test/design.mjs` (R4 PR 2): kid screens no inline text < 13px, sized buttons ≥ 56 (session Done ≥ 64); grown-up buttons ≥ 48; buttons with no min-height are listed, not failed. The per-screen allowance (`ALLOW`) is gone (R4 PR 6 removed the last entries, Progress and Grown-up): every scanned screen meets the floor outright — session, journey map, Body Check, Today, finish, Quiz Deck, Progress (empty and with data, three layouts), all six Grown-up tabs (with data and empty, wide and narrow) and the nav shell. Approved below-56 kid controls: Back a move 48, the move card's ✕ 48, the Quiz Deck's ✕ 48, the Body Check light picker 48 and its "🔒 Grown-up only" summary 48 (grown-up controls), Today's "🧪 Explore the moves" 48 (secondary action), the session rail toggle 48.
+
+## Locked by the redesign (plan "Done when", R4)
+- Colour slots — "Design tokens and colour slots".
+- Card A day card — "Today screen", Day card.
+- Portrait/phone order (day card first) — "Today screen", Order.
+- Phone fold "See the N blocks" — "Today screen", Phone fold.
+- Finish order (mood → quiz → one line → details) — "Session finish screen", Order.
+- Progress table in both places — "Progress screen (R4 PR 6)".
 
 ## Regression table format (paste at the end of every edit)
 | Feature | v<old> → v<new> | Note |
