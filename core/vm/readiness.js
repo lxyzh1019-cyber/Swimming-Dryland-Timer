@@ -10,7 +10,7 @@ import { settings, loadReadiness } from "../store.js";
 import { ATHLETE_DEFAULT } from "../sport.js";
 import { dayRecordFor } from "../outcome.js";
 import { planResume, roundsForLight } from "../engine.js";
-import { plural } from "../util.js";
+import { plural, kidButton } from "../util.js";
 
 export function newReadinessFlow(dayKey, practice) {
   return {
@@ -186,7 +186,10 @@ function lightWord(key) {
 export function buildReadinessVM(r, isWide) {
   const ans = r.answers;
   const step = r.step;
-  const baseBtn = "min-width:58px;min-height:56px;border-radius:var(--radius-pill);border:2px solid;font-weight:900;font-size:17px;cursor:pointer;background:var(--surface);";
+  /* Answers are the one calm answer button (R5); the picked one carries the
+     3px ring in the main button's edge colour — no green or yellow fill, since
+     neither answer is the right one. */
+  const answerBtn = (picked) => "min-width:58px;" + kidButton("neutral", { picked });
 
   /* Yesterday's answers, rendered with each question's OWN words — "😴 Good"
      rather than a bare yes, so the column reads as an answer and not as a
@@ -202,8 +205,8 @@ export function buildReadinessVM(r, isWide) {
       noLabel: q.noLabel || "✗ No",
       yesterday: prevV === "yes" ? (q.yesLabel || "✓ Yes")
         : prevV === "no" ? (q.noLabel || "✗ No") : "—",
-      yesStyle: baseBtn + (v === "yes" ? "border-color:var(--mint);background:var(--mint-wash);color:var(--mint-ink);" : "border-color:var(--hairline);color:var(--ink-soft);"),
-      noStyle: baseBtn + (v === "no" ? "border-color:var(--sun);background:var(--sun-wash);color:var(--sun-ink);" : "border-color:var(--hairline);color:var(--ink-soft);")
+      yesStyle: answerBtn(v === "yes"),
+      noStyle: answerBtn(v === "no")
     };
   });
 
@@ -224,7 +227,7 @@ export function buildReadinessVM(r, isWide) {
     const sev = zoneSev[z.n];
     zoneHighlight[key] = sev
       ? "background:color-mix(in srgb, " + SEV_COLOR[sev] + " 38%, transparent);border:3px solid " + SEV_COLOR[sev] + ";box-shadow:0 0 0 2px rgba(255,255,255,0.85);"
-      : "background:rgba(255,255,255,0.10);border:2px dashed rgba(20,59,74,0.65);box-shadow:0 0 0 1.5px rgba(255,255,255,0.75);";
+      : "background:rgba(255,255,255,0.10);border:2px dashed color-mix(in srgb, var(--ink) 65%, transparent);box-shadow:0 0 0 1.5px rgba(255,255,255,0.75);";
     zoneBadge[key] = sev ? "!" : String(z.n);
     zoneBadgeStyle[key] = badgeStyle(sev);
   });
@@ -242,7 +245,7 @@ export function buildReadinessVM(r, isWide) {
       isHeader: false,
       num: z.n,
       label: sev ? z.label + " — " + SEV_SHORT[sev] : z.label,
-      rowStyle: "display:flex;align-items:center;gap:10px;background:none;border:2px solid;border-radius:14px;padding:8px 10px;cursor:pointer;text-align:left;min-height:56px;"
+      rowStyle: "display:flex;align-items:center;gap:10px;background:none;border:2px solid;border-radius:var(--radius-md);padding:8px 10px;cursor:pointer;text-align:left;min-height:56px;"
         + (sev ? "border-color:" + SEV_COLOR[sev] + ";background:color-mix(in srgb, " + SEV_COLOR[sev] + " 14%, #fff);" : "border-color:transparent;"),
       badgeStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;" + badgeStyle(sev)
     });
@@ -361,7 +364,8 @@ export function buildReadinessVM(r, isWide) {
       // On the hero panel: text and chips read the hero slots (fallbacks = the old white look).
       circleStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;"
         + (done ? "background:var(--mint-wash);color:var(--mint-ink);box-shadow:inset 0 0 0 2px var(--mint);" : active ? "background:#fff;color:var(--aqua-ink);" : "background:var(--hero-chip,rgba(255,255,255,0.25));color:var(--hero-text,#fff);"),
-      labelStyle: "font-size:13px;font-weight:800;letter-spacing:0.02em;white-space:nowrap;color:var(--hero-text,#fff);",
+      // On the hero-chip, so the small words read on every part of the hero (R5).
+      labelStyle: "font-size:13px;font-weight:800;letter-spacing:0.02em;white-space:nowrap;color:var(--hero-text,#fff);background:var(--hero-chip,transparent);border-radius:var(--radius-pill);padding:2px 9px;",
       label: s.label
     };
   });
@@ -370,6 +374,7 @@ export function buildReadinessVM(r, isWide) {
 
   return {
     athleteName: settings.athleteName || ATHLETE_DEFAULT,
+    heroDecorOn: settings.heroDecorOn !== false,
     stepperRows,
     isWide, isNarrow: !isWide,
     cardDir: isWide ? "row" : "column",
@@ -377,8 +382,8 @@ export function buildReadinessVM(r, isWide) {
       ? "display:flex;gap:16px;align-items:stretch;"
       : "display:flex;flex-direction:column;gap:16px;",
     legendStyle: isWide
-      ? "width:250px;flex-shrink:0;background:var(--bg);border:2px solid var(--hairline);border-radius:22px;padding:12px 14px;display:flex;flex-direction:column;gap:5px;overflow-y:auto;max-height:560px;"
-      : "width:100%;box-sizing:border-box;background:var(--bg);border:2px solid var(--hairline);border-radius:22px;padding:12px 14px;display:flex;flex-direction:column;gap:5px;",
+      ? "width:250px;flex-shrink:0;background:var(--bg);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:12px 14px;display:flex;flex-direction:column;gap:5px;overflow-y:auto;max-height:560px;"
+      : "width:100%;box-sizing:border-box;background:var(--bg);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:12px 14px;display:flex;flex-direction:column;gap:5px;",
     bodyContentStyle: isWide
       ? "flex:1;min-width:0;padding:30px 36px;overflow-y:auto;display:flex;flex-direction:column;justify-content:center;align-items:center;"
       : "flex:1;min-width:0;padding:22px 18px 26px;display:flex;flex-direction:column;align-items:center;",

@@ -120,27 +120,54 @@
   --quality-watch:  var(--coral);    /* form watch-out */
   --quality-stop:   var(--stop);     /* hard stop / pain rule */
 
-  /* Splash redesign colour slots — screens read these with a fallback
-     equal to the previous look, e.g. var(--hero-text, #fff). */
-  /* Hero card (Today day card, Body Check panel) — Card A · Sunny pool */
-  --hero-from:        var(--aqua-light);
-  --hero-to:          var(--aqua);
-  --hero-text:        var(--ink);                 /* 4.9–7.9 */
-  --hero-chip:        rgba(255, 255, 255, 0.55);
-  /* Journey map gradient (after hero-from / hero-to) */
-  --journey-via:      #9FE6F3;
-  --journey-to:       #F6E7C1;
-  /* Primary kid button */
-  --btn-primary-bg:   var(--aqua);
-  --btn-primary-edge: var(--aqua-deep);
-  --btn-primary-text: var(--ink);                 /* 4.9 */
-  /* STOP button */
-  --btn-stop-bg:      var(--stop-deep);           /* white 5.0 */
-  --btn-stop-edge:    var(--stop-ink);
-  /* Recovery (grape) button */
+  /* Splash colour slots (R5, the girls' colours) — screens read these with a
+     fallback equal to the previous look, e.g. var(--hero-text, #fff). Every
+     value is a colour already in this file. */
+  /* Hero: Today day card, journey, Body Check panel, timer left rail,
+     Progress level card — sky blue fading to the palest pink. */
+  --hero-bg:          linear-gradient(180deg, #7CC4F2 0%, #D6EDFB 50%, #FFE7F0 100%);
+  --hero-text:        var(--ink);
+  --hero-chip:        rgba(255, 255, 255, 0.6);   /* small words on the hero sit on this */
+  --hero-text-shadow: none;                       /* skate only */
+  --hero-row-bg:      rgba(255, 255, 255, 0.7);
+  --hero-row-text:    var(--ink);
+  --hero-mantra:      var(--ink);
+  /* Journey map */
+  --journey-bg:       linear-gradient(180deg, #7CC4F2 0%, #D6EDFB 50%, #FFE7F0 100%);
+  --journey-text:     var(--ink);
+  --xp-bar:           #FF82AE;                    /* gum */
+  /* The one main-button colour (sea-light, edge sea, ink 6.3) */
+  --btn-primary-bg:   #7CC4F2;
+  --btn-primary-edge: #2393E0;
+  --btn-primary-text: var(--ink);
+  /* Go / Done: the same main colour */
+  --btn-go-bg:        var(--btn-primary-bg);
+  --btn-go-edge:      var(--btn-primary-edge);
+  --btn-go-text:      var(--btn-primary-text);
+  /* STOP and the destructive grown-up buttons: white 3.4, so 19px+ bold only */
+  --btn-stop-bg:      var(--stop);
+  --btn-stop-edge:    var(--stop-deep);
+  --btn-stop-text:    #FFFFFF;
+  /* Calm buttons: Pause/Resume, Skip, Cancel, Explore, answer choices */
+  --btn-neutral-bg:   var(--surface-2);
+  --btn-neutral-edge: var(--hairline);
+  --btn-neutral-text: var(--ink);
+  /* Recovery (grape) button — recovery only */
   --btn-grape-bg:     var(--grape-deep);          /* white 5.4 */
-  /* Go / Done: white on aqua-deep — swim 3.6, large text only (≥20px bold); skate 5.7 */
-  --btn-go-bg:        var(--aqua-deep);
-  --btn-go-edge:      var(--aqua-ink);
-  --btn-go-text:      #FFFFFF;
+  /* Timer ring zones: arc from -light to the colour, track -light, centre
+     -fill, zone word -ink. Get ready gum, work sea, rest mint. */
+  --ring-ready:       #FF82AE;
+  --ring-ready-light: #FFE7F0;
+  --ring-ready-fill:  #FFE7F0;
+  --ring-ready-ink:   #B02560;
+  --ring-work:        #7CC4F2;
+  --ring-work-light:  #D6EDFB;
+  --ring-work-fill:   #D6EDFB;
+  --ring-work-ink:    #0C4A86;
+  --ring-rest:        #A6ECCC;
+  --ring-rest-light:  #DFF7EC;
+  --ring-rest-fill:   #DFF7EC;
+  --ring-rest-ink:    #0B6A47;
+  /* Finish page: light pool blue */
+  --finish-bg:        #E2F8FE;
 }

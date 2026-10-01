@@ -20,6 +20,8 @@ Single working record for this repository. Updated by the main session at the en
 
 - 2026-10-01: all seven R4 PR pairs merged; live site checked by fetching sw.js (v31) and colors.css from GitHub Pages (merged, live files confirmed; device not yet checked).
 
+- Plan v2 approved 2026-10-01 (R5, kids' colours + one button style + ripples/snow; plan file `plans/2026-10-01-plan-v1-colours-decor.md` in the swim repo; branch `claude/splash-colours-decor` in both repos): colour slots per the user's "Splash-colour-prompt.md" (hero-bg, journey-bg/-text, xp-bar, btn-primary/go/stop/neutral, ring-ready/work/rest -light/-fill/-ink, finish-bg) with fallbacks equal to today's look; one filled-button style (no border, 4px edge, radius-md, font-ui 900, 22px/64 main or 18px/56 rest, STOP 20px); corner, border and shadow tokens tinted per app (--shadow-frame, --scrim); no purple on kid screens (recovery excepted); hero decoration setting `heroDecorOn` (default on, gated toggle, decor layer z-index -1). User decisions 2026-10-01: skate --hero-chip rose-700 at 80%; selected outline = btn-primary-edge; bright red STOP 20px and the two small grown-up red buttons 19px bold; make the last-3-seconds pulse show (pre-existing bug, failing test first). Exactly one PR per repo (user: "only one PR, not 4"). Supersedes Pool calm (plan v4 R4), "Let's go"/"Back to Today" on sun (R4 PR 4/5) and STOP on stop-deep (R4 PR 7).
+
 ## Pending
 - none
 
@@ -39,11 +41,13 @@ Single working record for this repository. Updated by the main session at the en
 | 11 | R4 2026-09-30 | "Take a look at update plan, validate and prepare a plan for the implementation" (Splash redesign handoff) | done | Plan v1: 11 corrections to the handoff's code references; all 13 non-cosmetic items kept by user choice |
 | 12 | R4 2026-09-30 | "Show me all the confliction with current app feature, function besides the style" | done | 13 items listed with user-facing effect; user: "keep all in the plan" |
 | 13 | R4 2026-09-30 | "The figure skate level block background colour is wrong, it can not use the same colour from swimming dryland timer" | done (in PR 2) | user 2026-09-30: "move the map color fix forward into pr2" → plan v2. Pre-existing (K7): the journey/level map gradient is literal swim hex in shared core; unchanged by PR 1 (before = after); fixed in PR 4 via the journey slots set in PR 1 (skate rose/sand) |
-| 14 | R4 2026-09-30 | "The Go button in the timer is ugly, I need a better option; contrast important, overall colour combo more important" | done (PR 2) | 4 options shown on both palettes; user chose Deep green (white on mint-ink) → plan v3 |
-| 15 | R4 2026-09-30 | Pasted decision "Option 1 Pool calm": Go/Done on aqua-deep with white text; Pause/Resume/Skip/Skip it white with hairline border; show screenshots before merge; "anything else we have not done?" | done (PR 2) | plan v4; supersedes Deep green (row 14) |
+| 14 | R4 2026-09-30 | "The Go button in the timer is ugly, I need a better option; contrast important, overall colour combo more important" | superseded (R5) | 4 options shown on both palettes; user chose Deep green (white on mint-ink) → plan v3 |
+| 15 | R4 2026-09-30 | Pasted decision "Option 1 Pool calm": Go/Done on aqua-deep with white text; Pause/Resume/Skip/Skip it white with hairline border; show screenshots before merge; "anything else we have not done?" | superseded (R5 — Go/Done and Pause/Skip restyled) | plan v4; supersedes Deep green (row 14) |
 | 16 | R4 2026-10-01 | Decision offered after PR 5: fix "Every move was done in full." showing after a pain stop | done (PR 6) | recommended fix offered with "say no to leave it"; user replied "merged, continue" → included in PR 6 |
 | 18 | R4 2026-10-01 | "I have other changes to implement, I will tag this as completed" | done | R4 redesign round closed by the user; device check not reported |
 | 17 | R4 2026-10-01 | PR 7 contrast and grown-up text sweep offered (finishes the plan's "Done when"; "say stop at PR 6" to skip) | done (PR 7) | user replied "merged, continue" |
+| 19 | R5 2026-10-01 | "Take a look at the new request, validate, and create the plan" (Splash-colour-prompt.md + Colour-combo-check.html: girls' colours, one button style, ripples/snow) | open | plan v1 → v2; 4 decisions answered (deep-rose chip, edge-colour ring, bright red with bigger words, make pulse show) |
+| 20 | R5 2026-10-01 | "only one PR, not 4" | done | plan v2: one build, exactly one PR per repo |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Regressions caused | Workarounds/exceptions | Last symptom | Rewrite-vs-repair reviewed? |
@@ -54,6 +58,8 @@ Single working record for this repository. Updated by the main session at the en
 | Test suite depends on the real date | 2 | 1 | 0 | 0 | Sunday-only failures (earlier: Monday-only assertion) | structural fix applied: pinned test clock |
 | Screen contrast and tap size (redesign R4) | 0 | 0 | 0 | 0 | 76 contrast fails, 185 texts <13px, controls 26–44px (handoff screen check) | n/a — redesign round, not a fix |
 | Finish kid line | 1 | 0 | 0 | 0 | full-round line after a pain stop | no — one-line condition fix, failing test first (invariants S11) |
+| Timer last-3-seconds pulse | 1 | 0 | 0 | 0 | pulse / red label never shown (tick only recolours the arc) | no — failing test first (R5) |
+| Kids' colours and button style (R5) | 0 | 0 | 0 | 0 | n/a — redesign round, not a fix | n/a |
 Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → no further patch until the comparison is presented.
 
 Structural option (not approved, not done): a test that renders every screen, collects every `data-action` a kid can reach during a session, and fails if any is gated without being named in an explicit "adult-only" list — so a new kid button cannot silently ship behind the PIN.
@@ -92,6 +98,14 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R4-13a PR 7 final contrast and grown-up text sweep | COMPLETE | opus-worker 2026-10-01 on `claude/splash-pr7-contrast-sweep`, uncommitted: contrast sweep across core screens/vm (session pills on washes with rings and -ink marks, Today strip/legend/review slots, Body Check chips/badges/title ✓, Quiz Deck, prize draw, Progress rank card, Grown-up tabs 13px and no ink-faint, gate dialog, storage banner), js/data.js pain Stop on btn-stop slots, sw.js v30 → v31, core/test/design.mjs (contrast rules + measured contrast through this app's tokens + grown-up 13px floor + prize draw + rule self-checks; 865 → 882), test/smoke.mjs:2122 regex (see checks), FEATURES.md; `npm test` exit 0 both TZs; `diff -rq core` empty; real contrast fails 0 in both apps. Remaining: commit, push, PR (main session); PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#74 |
 | R4-13b Merge PR pair 7 | COMPLETE | merged by user 2026-10-01; live GitHub Pages serves sw.js v31 and the btn-go slot (curl 2026-10-01) |
 | R4-14 iPad check by user | COMPLETE | closed by the user 2026-10-01 ("I will tag this as completed"); no device result was reported, so the device check itself is unverified |
+
+| R5-1 Records and plan saved | COMPLETE | both WORKING_RECORD.md updated 2026-10-01; plan copied to swim plans/2026-10-01-plan-v1-colours-decor.md |
+| R5-2 One build of both apps (pulse failing test first, slots, button style, corners, shadows, decor setting, tests) | COMPLETE | opus-worker (claude-opus-5-5) 2026-10-01, uncommitted on claude/splash-colours-decor; pulse test failed before fix ("pulse roomy: … round wrapper (undefined)"), passes after; design 882 → 2946, actions 322 → 333, shell +1; 4 mutants each fail a suite; rerun by main session: npm test exit 0 both repos, diff -rq core empty, no rgba(20,59,74 / rgba(6,182,212 in core, sw.js swim v32 / skate v28 |
+| R5-3 Screenshots + readability measurement (both apps, 2 sizes, decor on/off) | COMPLETE | opus-worker (escalated: sonnet-worker not registered) 2026-10-01: 8 runs × 18 states, all reached, 0 page errors, network blocked; first scan 2 real fails (swim urgent digits var(--stop) on ready-fill 2.95; skate level-card rank name over snow 1.81) → fixed (urgent digits var(--stop-deep) 4.27/4.66; rank name on --hero-chip 5.5) → rescan 0 real fails in all 4 decor-on runs; Let's go inside first viewport (swim 735–799, skate 765–829 of 834); decor layer on every hero host when on, 0 when off, never in the timer's right pane; contact sheets C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/9fa1f983-710d-4d7e-bd00-153161018037/scratchpad/shots-r5/swim-r5.png, C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/9fa1f983-710d-4d7e-bd00-153161018037/scratchpad/shots-r5/skate-r5.png |
+| R5-4 Review pass, FEATURES.md, regression table, one PR per repo | PARTIAL | review pass done (colour slots match the request + decisions; core identical; npm test exit 0 both repos after the contrast fixes); FEATURES.md updated by the worker; regression table below; PR pending |
+| R5-5 Merge both PRs | NOT STARTED | |
+| R5-6 Live site serves new version | NOT STARTED | |
+| R5-7 iPad check | NOT STARTED | |
 
 ## Checks and evidence
 - 2026-09-24 baseline `node core/test/run.mjs` → all suites green (before changes)
@@ -166,6 +180,12 @@ Structural option (not approved, not done): a test that renders every screen, co
 - 2026-10-01 R4 PR 7 FINAL whole-app scan (R4-13): final scan after PR 7 (shots/final-scan-pr7.json; 96 screens per app × 3 sizes; adds Quiz Deck results, move card, STOP, the grown-up check, prize draw): swim — text <13px 0 (kid 0 / grown-up 0), kid buttons <56 3 (the approved 48px "🔒 Grown-up only" summary, once per size), grown-up controls <48 0, real contrast fails 0 (gradients measured at each text's position: 1155, 0 fail; skipped 0), justified 15 (12 emoji 🐢, 3 disabled Form check ▶); skate — text <13px 0 (0 / 0), kid buttons <56 3 (same summary), grown-up controls <48 0, real contrast fails 0 (899 measured over gradients, 0 fail; skipped 0), justified 27 (24 emoji ❄️, 3 disabled ▶). Before (shots/final-scan.json, PR 6): swim text <13 183, contrast 1079 (+871 skipped); skate 171, 752 (+673 skipped). Scanner shots/shoot-pr7.mjs: same rules as PR 6, plus text over a CSS linear-gradient measured at its own corners and centre, and each fail tagged emoji / disabled / decorative / real
 - 2026-10-01 R4 PR 7 looked at (Playwright, 1194×834, shots/pr7/look/): session rail with ✓ done / ½ short / ▶ current pills, rep check (All of them on btn-go, Almost ink on sun), STOP card (keep going on btn-go), grown-up check dialog, Form check verdict pills, Today legend 24px circles and strip glyphs, Analytics consistency — nothing broken. Noted, not changed: the session photo box shows "Form photo coming soon" through transparent parts of the move photo (pre-existing, visible in PR 2 shots; hiding it is a behaviour change); Form check headline reads "She reports null% clean" when she has no self-checks (pre-existing text bug); the consistency legend's Done dot is still solid mint while done cells are mint-wash with a mint ring
 - 2026-10-01 R4 PR 7 live site / device → untested
+
+- 2026-10-01 R5 baseline: npm test exit 0 both repos (design 882, actions 322)
+- 2026-10-01 R5 failing test first: "pulse roomy: in the last seconds the tick pulses the ring on a round wrapper (undefined)" before the fix; passes after
+- 2026-10-01 R5 after changes: npm test exit 0 both repos, both TZs (design 2947, actions 333, shell +1; other suites unchanged); diff -rq core empty; mutants (Back to Today on sun, 3px edge, decor without aria-hidden, tick without pulse) each fail a suite; no rgba(20,59,74 / rgba(6,182,212 in core
+- 2026-10-01 R5 test changes: only plan items 1–19 (core/test/design.mjs, core/test/invariants.mjs:641 radius in the negative pattern, swim test/smoke.mjs:627 Explore 48 → 56); no other assertion removed or weakened
+- 2026-10-01 R5 not covered: grown-up red buttons (merge anyway, storage warning) at 19px not reached in a run (contrast by token: white on stop 3.45 swim / 3.70 skate, large text); phone size not in scope; live site and iPad untested
 
 ## Open questions / blockers
 - No visible deploy stamp on the page (rules require one) — flagged, out of scope this round.
@@ -344,3 +364,13 @@ Structural option (not approved, not done): a test that renders every screen, co
 | `core/` byte-identical with the other repo | kept | `diff -rq core` empty |
 | sw.js version bump on shell change | kept | v30 → v31 |
 | Missing | none | |
+
+## Regression table — R5 (R4 manifest → + kids' colours, one button style, ripples/snow)
+| Feature | Status |
+|---|---|
+| Finish order, kid line, move-review fold, round lines, Quiz Deck pairing, lead-ins, gate deny-by-default, Body Check scoring and gates, Progress table in both places, phone fold, Today order, size floors, 13px text floor, contrast rules | ✅ kept |
+| Week-strip status colours, readiness light colours, Wobbly on sun, recovery purple | ✅ kept |
+| One main-button colour; one filled-button style (4px edge, radius-md, font-ui 900, 22/64 or 18/56, STOP 20); red only STOP / destructive grown-up / ring warning; corner rule; card borders 2px; shadows and scrim from per-app tokens; no purple on kid screens; ring slots; finish background; hero decoration setting (gated, default on, old backups on); last-3-seconds pulse shows | ➕ added |
+| Pool-calm Go (aqua-deep, white) and white outlined Pause/Skip; Let's go / Back to Today / prize on sun; STOP on stop-deep; Card A day card; journey painted sky; XP bar sun; grape quiz chevron, rep ring, explore banner, evening ring; navy rank card; Explore 48px outline | ⚠️ intentionally replaced (approved R5 plan v2) |
+| --hero-from, --hero-to, --journey-via, --journey-to | ⚠️ intentionally removed (plan "Removes") |
+| Missing | none found |

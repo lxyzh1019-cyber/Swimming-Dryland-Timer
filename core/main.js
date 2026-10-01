@@ -7,7 +7,7 @@
    ============================================================ */
 
 import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS, migratePrizeAmnesty } from "./store.js";
-import { edmontonDayKey, escapeHtml } from "./util.js";
+import { edmontonDayKey, escapeHtml, kidButton } from "./util.js";
 import { APP_NAME, ATHLETE_DEFAULT, COPY } from "./sport.js";
 import { DAYS } from "./data.js";
 import { restoreFromCloud, publishJourney, publishReadiness } from "./sync.js";
@@ -137,7 +137,7 @@ function storageBannerHtml() {
   return `<div role="alert" style="position:fixed;left:0;right:0;bottom:0;z-index:200;background:var(--stop-wash);border-top:3px solid var(--stop);padding:12px 16px;display:flex;align-items:center;gap:12px;justify-content:center;font-family:var(--font-ui);">
     <span style="font-size:20px;">⚠️</span>
     <span style="font-weight:800;font-size:14px;color:var(--stop-ink);line-height:1.4;max-width:640px;">This device's storage is full, so the last thing ${escapeHtml(state.storageError.name)} did wasn't saved. Free up space on the device (or clear other sites' data) — sessions won't be recorded until then.</span>
-    <button type="button" data-action="dismissStorageError" style="min-height:56px;border:none;background:var(--btn-stop-bg,var(--stop));color:#fff;border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 14px;cursor:pointer;font-family:inherit;">Dismiss</button>
+    <button type="button" data-action="dismissStorageError" style="${kidButton("stop", { px: 19 })}padding:0 14px;">Dismiss</button>
   </div>`;
 }
 
@@ -149,9 +149,11 @@ function gateHtml() {
   const reason = GATE_REASON[state.gateAsk] || "continue";
   const mode = gateMode(state.gateWantsNewPin);
   const inputStyle = "width:100%;min-height:48px;border:2px solid var(--hairline);border-radius:12px;padding:0 14px;font-size:18px;font-weight:900;font-family:inherit;box-sizing:border-box;";
+  /* The one button look (R5) at the grown-up 48px: the main colour for the
+     action, the calm neutral slots for Cancel and the passkey set-up. */
   const btn = (action, label, primary) => `<button type="button" data-action="${action}"${state.gateBusy ? " disabled" : ""} style="${primary
-    ? "flex:1;min-height:48px;border:none;border-radius:var(--radius-pill);background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);font-weight:900;font-size:15px;cursor:pointer;font-family:inherit;"
-    : "min-height:48px;border:2px solid var(--hairline);border-radius:var(--radius-pill);background:transparent;color:var(--ink-soft);font-weight:900;font-size:14px;padding:0 16px;cursor:pointer;font-family:inherit;"}">${label}</button>`;
+    ? "flex:1;" + kidButton("primary", { minH: 48, px: 15 })
+    : kidButton("neutral", { minH: 48, px: 14 }) + "padding:0 16px;"}">${label}</button>`;
 
   /* Three shapes, one card: confirm with the device passkey, type the PIN, or
      choose one. There is no arithmetic question any more — see js/gate.js. */
@@ -193,8 +195,8 @@ function gateHtml() {
         : passkeySupported() ? btn("enrollPasskey", state.gateBusy ? "Waiting for the device…" : "🔐 Set up a passkey on this device", true) : ""}
       ${state.passkeyNote ? `<div style="margin-top:8px;font-size:13px;font-weight:800;line-height:1.45;color:${state.passkeyNoteOk ? "var(--mint-ink)" : "var(--stop-ink)"};">${escapeHtml(state.passkeyNote)}</div>` : ""}`;
 
-  return `<div style="position:fixed;inset:0;z-index:210;background:rgba(20,59,74,0.62);display:flex;align-items:center;justify-content:center;padding:24px;font-family:var(--font-ui);">
-    <div data-stop-propagation="1" style="background:var(--surface);border-radius:20px;padding:22px 24px;max-width:380px;width:100%;box-shadow:0 18px 40px rgba(20,59,74,0.3);">
+  return `<div style="position:fixed;inset:0;z-index:210;background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:24px;font-family:var(--font-ui);">
+    <div data-stop-propagation="1" style="background:var(--surface);border-radius:var(--radius-lg);padding:22px 24px;max-width:380px;width:100%;box-shadow:var(--shadow-pop);">
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--ink);margin-bottom:6px;">Grown-up check</div>
       <div style="font-size:13px;font-weight:800;color:var(--ink-soft);line-height:1.5;margin-bottom:14px;">A grown-up needs to be here to ${escapeHtml(reason)}.</div>
       ${body}
@@ -264,14 +266,14 @@ function paint() {
     const pvm = buildProgressVM(state);
     root.innerHTML = page(state.isWide
       ? shellWithRail(railVm, progressScreen(pvm))
-      : `<div style="display:flex;background:var(--surface);border-radius:24px;box-shadow:0 14px 34px rgba(20,59,74,0.16);overflow:hidden;">${progressScreen(pvm)}</div>` + bottomNav(railVm));
+      : `<div style="display:flex;background:var(--surface);border-radius:24px;box-shadow:var(--shadow-frame);overflow:hidden;">${progressScreen(pvm)}</div>` + bottomNav(railVm));
   }
   else if (state.nav === "grownup") {
     const railVm = buildTodayVM(state);
     const gvm = buildGrownupVM(state);
     root.innerHTML = page(state.isWide
       ? shellWithRail(railVm, grownupScreen(gvm))
-      : `<div style="display:flex;background:var(--surface);border-radius:24px;box-shadow:0 14px 34px rgba(20,59,74,0.16);overflow:hidden;">${grownupScreen(gvm)}</div>` + bottomNav(railVm));
+      : `<div style="display:flex;background:var(--surface);border-radius:24px;box-shadow:var(--shadow-frame);overflow:hidden;">${grownupScreen(gvm)}</div>` + bottomNav(railVm));
   }
   else { renderToday(); }
   const ov = overlaysHtml();
@@ -431,6 +433,10 @@ Object.assign(RAW, {
   },
   toggleTimerSounds() {
     updateSettings({ timerSoundsOn: settings.timerSoundsOn === false }); render();
+  },
+  /* The ripples / snow behind the hero cards (R5). On unless switched off. */
+  toggleHeroDecor() {
+    updateSettings({ heroDecorOn: settings.heroDecorOn === false }); render();
   },
   toggleSafetyVoice() {
     // Safety cues are the point of the readiness system, so turning them OFF is

@@ -9,7 +9,7 @@ import { COPY, IMAGES, EMOJI } from "../sport.js";
 import { settings, loadQuiz, saveQuiz, logEvent, addXp, addPrize, pendingDrawCount, drawIsWaitingOnSync,
          movePool, rankPool, questionBank, unlockedBank, quizPaidToday, quizBankStatus,
          quizQuestionKey, payQuizQuestion, payTodayQuestion, loadSessions } from "../store.js";
-import { todayISODate, escapeHtml, imgWithFallbacks, photoSources } from "../util.js";
+import { todayISODate, escapeHtml, imgWithFallbacks, photoSources, kidButton, markedAnswer } from "../util.js";
 
 /* ---- quiz engine (port of _movePool/_makeQ/_buildQuizDeck) ----
    The move pool, the question bank and the XP ledger rules live in store.js
@@ -294,9 +294,9 @@ export function quizDeckHtml(qd) {
     // Say plainly why a round paid nothing. A kid who taps "Play again" and
     // silently gets 0 XP learns that the app is broken or unfair; a kid who is
     // told it's a free practice round keeps playing for the right reason.
-    const noteBox = (bg, ink, text) => `<div style="width:100%;background:${bg};border-radius:14px;padding:11px 14px;box-sizing:border-box;font-size:13px;font-weight:800;color:${ink};line-height:1.4;text-align:left;">${text}</div>`;
+    const noteBox = (bg, ink, text) => `<div style="width:100%;background:${bg};border-radius:var(--radius-lg);padding:11px 14px;box-sizing:border-box;font-size:13px;font-weight:800;color:${ink};line-height:1.4;text-align:left;">${text}</div>`;
     const capNote = qd.hitDailyCap
-      ? noteBox("var(--grape-wash,#EFE9FB)", "var(--grape-ink,#4B3A78)", "🎯 <b>That’s today’s quiz XP maxed out.</b> The other new questions in this deck kept their full value — come back tomorrow and they’ll pay in full.")
+      ? noteBox("var(--ring-work-fill,var(--aqua-wash))", "var(--ring-work-ink,var(--aqua-ink))", "🎯 <b>That’s today’s quiz XP maxed out.</b> The other new questions in this deck kept their full value — come back tomorrow and they’ll pay in full.")
       : "";
     const xpNote = qd.xpEarned || qd.hitDailyCap ? ""
       : !qd.wasPaidRound
@@ -310,7 +310,7 @@ export function quizDeckHtml(qd) {
     return `
     <div style="position:fixed;inset:0;z-index:80;background:linear-gradient(180deg,var(--aqua-wash),var(--bg));display:flex;flex-direction:column;align-items:center;padding:20px;box-sizing:border-box;overflow-y:auto;">
       <div style="width:100%;max-width:620px;display:flex;flex-direction:column;gap:16px;">
-        <div style="background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-lift);padding:26px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;">
+        <div style="background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lift);padding:26px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;">
           ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:96px;height:96px;object-fit:contain;" alt=""`)}
           <div style="font-family:var(--font-display);font-weight:600;font-size:30px;color:var(--ink);">Quiz complete!</div>
           <div style="font-family:var(--font-display);font-weight:600;font-size:48px;color:var(--aqua-ink);line-height:1;">${score} / ${qd.qs.length} correct</div>
@@ -318,7 +318,7 @@ export function quizDeckHtml(qd) {
           ${qd.xpEarned ? `<div style="font-size:15px;font-weight:900;color:var(--sun-ink);background:var(--sun-wash);border-radius:var(--radius-pill);padding:7px 16px;">⭐ +${qd.xpEarned} XP${qd.newlyMastered ? ` · ${qd.newlyMastered} new move${qd.newlyMastered === 1 ? "" : "s"} learned` : ""}</div>` : ""}
           ${xpNote}${capNote}
           ${qd.bank ? `
-          <div style="width:100%;background:var(--surface-2);border-radius:14px;padding:12px 14px;box-sizing:border-box;">
+          <div style="width:100%;background:var(--surface-2);border-radius:var(--radius-lg);padding:12px 14px;box-sizing:border-box;">
             <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:7px;">
               <span style="font-size:13px;font-weight:900;letter-spacing:0.05em;color:var(--ink-soft);">MOVES MASTERED</span>
               <span style="font-size:13px;font-weight:900;color:var(--aqua-ink);">${qd.bank.mastered} / ${qd.bank.total}</span>
@@ -330,10 +330,10 @@ export function quizDeckHtml(qd) {
               ? qd.bank.left + " question" + (qd.bank.left === 1 ? "" : "s") + " left to learn. Each one pays XP the first time you get it right — after that it’s yours for keeps."
               : "You’ve mastered every question in the book. 🧠 Nothing left to learn here — the water is where the XP lives now."}</div>
           </div>` : ""}
-          ${qd.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="min-height:56px;background:var(--sun);color:var(--ink);border:none;border-radius:var(--radius-pill);padding:0 24px;font-family:var(--font-display);font-weight:600;font-size:18px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
+          ${qd.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="${kidButton("primary", { big: true })}padding:0 24px;">🎁 Level up! Pick your prize</button>` : ""}
           <div style="width:100%;display:flex;flex-direction:column;gap:8px;margin-top:6px;text-align:left;">
             ${qd.qs.map((q, ix) => `
-              <div style="display:flex;align-items:flex-start;gap:10px;background:var(--surface-2);border-radius:12px;padding:10px 12px;">
+              <div style="display:flex;align-items:flex-start;gap:10px;background:var(--surface-2);border-radius:var(--radius-md);padding:10px 12px;">
                 <span style="font-size:16px;flex-shrink:0;">${qd.picks[ix] != null && q.opts[qd.picks[ix]] && q.opts[qd.picks[ix]].ok ? "✓" : "✕"}</span>
                 <div>
                   <div style="font-weight:800;font-size:14px;color:var(--ink);line-height:1.35;">${q.prompt}</div>
@@ -342,19 +342,21 @@ export function quizDeckHtml(qd) {
               </div>`).join("")}
           </div>
           <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;justify-content:center;">
-            <button type="button" data-action="startQuizDeck" style="min-height:56px;background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);border:none;border-radius:var(--radius-pill);padding:0 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--btn-primary-edge,var(--aqua-deep));font-family:var(--font-display);">${againLabel}</button>
-            <button type="button" data-action="exitQuizDeck" style="min-height:56px;background:var(--sun);color:var(--ink);border:none;border-radius:var(--radius-pill);padding:0 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🏠 Done</button>
+            <button type="button" data-action="startQuizDeck" style="${kidButton("primary")}padding:0 26px;">${againLabel}</button>
+            <button type="button" data-action="exitQuizDeck" style="${kidButton("primary")}padding:0 26px;">🏠 Done</button>
           </div>
         </div>
       </div>
     </div>`;
   }
 
-  const optStyle = (o, i) => "display:flex;align-items:center;gap:11px;width:100%;min-height:56px;text-align:left;padding:14px 16px;border-radius:16px;border:3px solid;cursor:pointer;font-weight:800;font-size:16px;font-family:inherit;box-sizing:border-box;"
-    + (!answered ? "border-color:var(--hairline);background:var(--surface);color:var(--ink);"
-      : o.ok ? "border-color:var(--mint);background:var(--mint-wash);color:var(--mint-ink);"
-      : picked === i ? "border-color:var(--coral);background:color-mix(in srgb, var(--coral) 12%, #fff);color:var(--coral-ink);"
-      : "border-color:var(--hairline);background:var(--surface);color:var(--ink-soft);");
+  /* Answers are the one calm answer button (R5); once answered, the right
+     one is marked mint and a wrong pick coral, in the same shape. */
+  const optStyle = (o, i) => "display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:14px 16px;box-sizing:border-box;"
+    + (!answered ? kidButton("neutral")
+      : o.ok ? markedAnswer("mint")
+      : picked === i ? markedAnswer("coral")
+      : kidButton("neutral", { ink: "var(--ink-soft)" }));
 
   return `
   <div style="position:fixed;inset:0;z-index:80;background:linear-gradient(180deg,var(--aqua-wash),var(--bg));display:flex;flex-direction:column;align-items:center;padding:20px;box-sizing:border-box;overflow-y:auto;">
@@ -369,7 +371,7 @@ export function quizDeckHtml(qd) {
       ${qd.willPay === false ? `
       <div style="background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);padding:7px 15px;font-size:13px;font-weight:900;text-align:center;">🧠 PRACTICE ROUND · today’s quiz XP is already earned</div>` : ""}
 
-      <div style="background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-lift);padding:24px;display:flex;flex-direction:column;gap:16px;">
+      <div style="background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lift);padding:24px;display:flex;flex-direction:column;gap:16px;">
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:13px;font-weight:900;letter-spacing:0.06em;background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);padding:5px 12px;">${cur.tag}</span>
           <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${cur.label || cur.move}</span>
@@ -378,16 +380,16 @@ export function quizDeckHtml(qd) {
         <div style="display:flex;flex-direction:column;gap:10px;">
           ${(cur.opts || []).map((o, i) => `
             <button type="button" data-action="answerQuizDeck" data-arg="${i}" style="${optStyle(o, i)}">
-              <span style="width:28px;height:28px;border-radius:50%;background:var(--surface-2);display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;flex-shrink:0;">${answered ? (o.ok ? "✓" : (picked === i ? "✕" : "")) : String.fromCharCode(65 + i)}</span>
+              <span style="width:28px;height:28px;border-radius:50%;background:var(--surface);display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;flex-shrink:0;">${answered ? (o.ok ? "✓" : (picked === i ? "✕" : "")) : String.fromCharCode(65 + i)}</span>
               <span style="flex:1;">${o.t}</span>
             </button>`).join("")}
         </div>
         ${answered && cur.why ? `
-        <div style="background:var(--aqua-wash);border-radius:14px;padding:13px 15px;">
+        <div style="background:var(--aqua-wash);border-radius:var(--radius-lg);padding:13px 15px;">
           <div style="font-weight:900;font-size:15px;color:var(--aqua-ink);">${cur.why}</div>
         </div>` : ""}
         ${answered ? `
-        <button type="button" data-action="nextQuizDeck" style="min-height:56px;background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);border:none;border-radius:var(--radius-pill);padding:0 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--btn-primary-edge,var(--aqua-deep));align-self:flex-end;">Next →</button>` : ""}
+        <button type="button" data-action="nextQuizDeck" style="${kidButton("primary")}padding:0 26px;align-self:flex-end;">Next →</button>` : ""}
       </div>
     </div>
   </div>`;
@@ -420,13 +422,13 @@ export function claimPrize(pd) {
 export function prizeDrawHtml(pd) {
   const hasPicked = pd.picked != null;
   return `
-  <div style="position:fixed;inset:0;z-index:85;background:rgba(20,59,74,0.55);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;">
-    <div style="position:relative;background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-pop);padding:26px;width:100%;max-width:540px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;">
+  <div style="position:fixed;inset:0;z-index:85;background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;">
+    <div style="position:relative;background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-pop);padding:26px;width:100%;max-width:540px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;">
       <div style="font-size:13px;font-weight:900;letter-spacing:0.08em;color:var(--sun-ink);background:var(--sun-wash);border-radius:var(--radius-pill);padding:6px 14px;">🎉 LEVEL UP REWARD</div>
       <div style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);line-height:1.1;">Pick a prize envelope!</div>
       <button type="button" data-action="closePrizeDraw" aria-label="Close" style="position:absolute;top:12px;right:12px;width:48px;height:48px;min-height:48px;border-radius:50%;border:none;background:var(--surface-2);color:var(--ink-soft);font-size:18px;font-weight:900;cursor:pointer;">✕</button>
       ${hasPicked && !pd.waiting ? `<div style="font-family:var(--font-hand);font-size:22px;font-weight:700;color:var(--aqua-ink);">You picked — enjoy it! 🌟</div>` : ""}
-      ${pd.waiting ? `<div role="status" style="background:var(--sun-wash);border:2px solid var(--sun);border-radius:14px;padding:10px 14px;font-size:14px;font-weight:800;color:var(--sun-ink);line-height:1.45;max-width:420px;">Your prize is safe. The app is waiting to check in with your other device before it adds it — try again in a moment, or close this and pick it up later with the 🎁 prize-draw button on your Progress page.</div>` : ""}
+      ${pd.waiting ? `<div role="status" style="background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-lg);padding:10px 14px;font-size:14px;font-weight:800;color:var(--sun-ink);line-height:1.45;max-width:420px;">Your prize is safe. The app is waiting to check in with your other device before it adds it — try again in a moment, or close this and pick it up later with the 🎁 prize-draw button on your Progress page.</div>` : ""}
       <div style="display:flex;gap:12px;width:100%;justify-content:center;flex-wrap:wrap;">
         ${pd.cards.map((c, i) => {
           const revealed = pd.picked === i;
@@ -434,14 +436,14 @@ export function prizeDrawHtml(pd) {
              a 45% fade put "Tap to open" at 1.9:1 (R4 PR 7). */
           const dim = hasPicked && !revealed;
           return `
-          <button type="button" data-action="pickPrize" data-arg="${i}" style="width:140px;height:170px;border-radius:20px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:14px;box-sizing:border-box;transition:transform 0.2s;border:3px solid ${revealed ? "var(--sun)" : "var(--hairline)"};background:${revealed ? "var(--sun-wash)" : dim ? "var(--surface-2)" : "var(--aqua-wash)"};font-family:inherit;">
+          <button type="button" data-action="pickPrize" data-arg="${i}" style="width:140px;height:170px;border-radius:var(--radius-lg);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:14px;box-sizing:border-box;transition:transform 0.2s;border:${revealed ? "3px solid var(--sun)" : "2px solid var(--hairline)"};background:${revealed ? "var(--sun-wash)" : dim ? "var(--surface-2)" : "var(--aqua-wash)"};font-family:inherit;">
             ${revealed
               ? `<span style="font-size:46px;line-height:1;">${escapeHtml(c.icon)}</span><span style="font-size:14px;font-weight:900;color:var(--ink);line-height:1.25;">${escapeHtml(c.label)}</span>`
               : `<span style="font-size:46px;line-height:1;">✉️</span><span style="font-size:13px;font-weight:900;color:var(--ink-soft);">Tap to open</span>`}
           </button>`;
         }).join("")}
       </div>
-      ${hasPicked ? `<button type="button" data-action="claimPrize" style="min-height:56px;background:var(--sun);color:var(--ink);border:none;border-radius:var(--radius-pill);padding:0 34px;font-family:var(--font-display);font-weight:600;font-size:20px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">${pd.waiting ? "Try again" : "Add to my prizes ⭐"}</button>` : ""}
+      ${hasPicked ? `<button type="button" data-action="claimPrize" style="${kidButton("primary", { big: true })}padding:0 34px;">${pd.waiting ? "Try again" : "Add to my prizes ⭐"}</button>` : ""}
     </div>
   </div>`;
 }

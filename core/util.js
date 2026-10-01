@@ -98,8 +98,55 @@ export function escapeRegex(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-import { FEATURES } from "./sport.js";
+import { FEATURES, HERO_DECOR_SRC } from "./sport.js";
 import { repSeconds } from "./plan.js";
+
+/* ---- THE ONE KID BUTTON (R5) ---------------------------------------------
+   Every filled button a kid taps has one look: filled, no border, a 4px
+   darker bottom edge, the 16px corner and the bold UI font. Its colours come
+   from one of four slot families in the app's colors.css, each read with a
+   fallback equal to the look before the slots existed. Two sizes: a screen's
+   main action is 22px on 64px, everything else 18px on 56px (STOP keeps its
+   20px). A picked answer, mood or tab carries a 3px ring in the main button's
+   edge colour. Chips, tags and switches are not buttons of this kind: they
+   stay pills. */
+const BTN_SLOTS = {
+  primary: ["var(--btn-primary-bg,var(--action-bg))", "var(--btn-primary-text,var(--action-text))", "var(--btn-primary-edge,var(--action-edge))"],
+  go:      ["var(--btn-go-bg,var(--aqua-deep))", "var(--btn-go-text,#fff)", "var(--btn-go-edge,var(--aqua-ink))"],
+  stop:    ["var(--btn-stop-bg,var(--stop))", "var(--btn-stop-text,#fff)", "var(--btn-stop-edge,var(--stop-ink))"],
+  neutral: ["var(--btn-neutral-bg,var(--surface))", "var(--btn-neutral-text,var(--ink))", "var(--btn-neutral-edge,var(--hairline))"]
+};
+export const PICKED_RING = "inset 0 0 0 3px var(--btn-primary-edge,var(--action-edge))";
+export function kidButton(kind, { big = false, px = 0, minH = 0, picked = false, ink = "" } = {}) {
+  const [bg, text, edge] = BTN_SLOTS[kind] || BTN_SLOTS.primary;
+  return "min-height:" + (minH || (big ? 64 : 56)) + "px;border:none;border-radius:var(--radius-md);"
+    + "background:" + bg + ";color:" + (ink || text) + ";"
+    + "box-shadow:" + (picked ? PICKED_RING + "," : "") + "0 4px 0 " + edge + ";"
+    + "font-family:var(--font-ui);font-weight:900;font-size:" + (px || (big ? 22 : 18)) + "px;cursor:pointer;";
+}
+/* An answer that has been marked keeps its right (mint) or wrong (coral)
+   colours, in the same shape: the family's wash, its -ink words, a 3px ring in
+   the bright colour and the 4px edge in its -deep. */
+export function markedAnswer(family, { px = 0 } = {}) {
+  return "min-height:56px;border:none;border-radius:var(--radius-md);"
+    + "background:var(--" + family + "-wash);color:var(--" + family + "-ink);"
+    + "box-shadow:inset 0 0 0 3px var(--" + family + "),0 4px 0 var(--" + family + "-deep);"
+    + "font-family:var(--font-ui);font-weight:900;font-size:" + (px || 18) + "px;cursor:pointer;";
+}
+
+/* ---- THE HERO DECORATION (R5): water ripples in swim, snow in skate --------
+   One picture behind the content of a coloured hero card, drawn only while
+   the grown-up setting is on (settings.heroDecorOn, on unless switched off).
+   z-index -1 inside a container that isolates, so it sits under the words and
+   never takes a tap or a screen-reader stop. HERO_HOST goes on the container. */
+export const HERO_HOST = "position:relative;isolation:isolate;";
+export function heroDecor(on) {
+  if (!on) return "";
+  return `<div aria-hidden="true" data-hero-decor="1" style="position:absolute;inset:0;z-index:-1;pointer-events:none;background:url(${HERO_DECOR_SRC}) center top/cover;border-radius:inherit;"></div>`;
+}
+/* White words over the decoration get a soft shadow in the app that needs it
+   (skate); the slot is `none` elsewhere, so core never names the sport. */
+export function heroShadow(on) { return on ? "text-shadow:var(--hero-text-shadow,none);" : ""; }
 
 export function escapeHtml(text) {
   return String(text == null ? "" : text)

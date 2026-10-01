@@ -187,6 +187,7 @@ export const DEFAULT_SETTINGS = {
   coachSpeechOn: true,      // the coach's spoken cues and encouragement
   timerSoundsOn: true,      // beeps, rep ticks, round/rest cues
   safetyVoiceOn: true,      // pain checks, safety stops, form warnings
+  heroDecorOn: true,        // ripples / snow behind the hero cards; missing (an old backup) = on
   athleteName: ATHLETE_DEFAULT, // NEW: editable in Grown-up Settings
   prizePool: null,          // NEW: null = default PRIZE_POOL
   cloudMirror: true         // NEW: privacy — mirror completed sessions to Firestore

@@ -26,7 +26,7 @@ export function page(inner) {
    than Safari 16 falls back to exactly the behaviour it has today. */
 export function shellWithRail(vm, contentHtml, { minHeight = 800 } = {}) {
   return `
-  <div style="display:flex;background:var(--surface);border-radius:30px;box-shadow:0 18px 44px rgba(20,59,74,0.16);overflow:clip;min-height:${minHeight}px;position:relative;">
+  <div style="display:flex;background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-frame);overflow:clip;min-height:${minHeight}px;position:relative;">
     <div style="width:96px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:22px 0;border-right:2px solid var(--hairline);position:sticky;top:0;align-self:flex-start;height:100vh;max-height:${minHeight}px;box-sizing:border-box;">
       <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:26px;align-items:center;">
         ${railBtn("today", "🏠", "Today", vm.railToday)}
@@ -58,7 +58,7 @@ export function bottomNav(vm) {
     </button>`;
   return `
   <div style="height:78px;"></div>
-  <nav aria-label="Main" style="position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:2px solid var(--hairline);box-shadow:0 -8px 22px rgba(20,59,74,0.10);display:flex;justify-content:space-around;align-items:center;padding:6px 8px 10px;z-index:60;">
+  <nav aria-label="Main" style="position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:2px solid var(--hairline);box-shadow:0 -8px 22px color-mix(in srgb, var(--ink) 10%, transparent);display:flex;justify-content:space-around;align-items:center;padding:6px 8px 10px;z-index:60;">
     ${tab("today", "🏠", "Today", vm.railToday)}
     ${tab("progress", "📊", "Progress", vm.railProgress)}
     ${tab("grownup", "🧑", "Grown-up", vm.railGrownup)}

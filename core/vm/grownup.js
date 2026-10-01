@@ -25,7 +25,7 @@ import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQU
          monthKeyOf, formVerdicts, latestFormVerdicts, loadReadinessLog } from "../store.js";
 import { dayRecords, workoutDate } from "../outcome.js";
 import { estimateSessionSecs } from "../engine.js";
-import { edmontonWeekISODates, edmontonDayKey, edmontonISO, todayISODate, exercisePhotoUrl } from "../util.js";
+import { edmontonWeekISODates, edmontonDayKey, edmontonISO, todayISODate, exercisePhotoUrl, PICKED_RING } from "../util.js";
 import { effortSummary, EFFORT_CAVEAT } from "../effort.js";
 import { isTrainingRecord } from "./today.js";
 /* The week table on Analytics is the Progress table, fed by the rows the
@@ -120,9 +120,11 @@ export function buildGrownupVM(state) {
   /* ---- tabs / scope chrome ---- */
   const gu = state.grownupTab || "overview";
   const tabStyle = (active) => "flex-shrink:0;min-height:48px;padding:0 16px;border:none;border-radius:var(--radius-pill);font-weight:900;font-size:15px;cursor:pointer;font-family:inherit;"
-    + (active ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);" : "background:transparent;color:var(--ink-soft);");
+    + (active ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);box-shadow:" + PICKED_RING + ";" : "background:transparent;color:var(--ink-soft);");
+  /* The chosen tab or period: the main colour with the 3px picked ring (R5;
+     the cyan glow it had was swim's colour in both apps). */
   const scopeTabStyle = (v) => "flex:1;min-height:48px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:15px;letter-spacing:0.03em;padding:0 14px;font-family:inherit;"
-    + (scope === v ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);box-shadow:0 2px 6px rgba(6,182,212,0.35);" : "background:transparent;color:var(--ink-soft);");
+    + (scope === v ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);box-shadow:" + PICKED_RING + ";" : "background:transparent;color:var(--ink-soft);");
 
   /* ---- safety & flags ---- */
   const stops = safetyRows.filter(s => s.pain);
@@ -810,14 +812,14 @@ export function buildGrownupVM(state) {
   const onKnob = (on) => "width:18px;height:18px;border-radius:50%;background:#fff;display:block;transition:transform 0.15s;transform:translateX(" + (on ? "16px" : "0") + ");";
   const voiceStyleOpts = ["fun", "classic", "encouraging", "quiet"].map(v => ({
     key: v, label: v[0].toUpperCase() + v.slice(1),
-    style: "min-height:48px;padding:0 16px;border-radius:var(--radius-pill);border:2px solid " + ((settings.voiceStyle || "fun") === v ? "var(--aqua)" : "var(--hairline)") + ";background:" + ((settings.voiceStyle || "fun") === v ? "var(--aqua-wash)" : "var(--surface)") + ";color:" + ((settings.voiceStyle || "fun") === v ? "var(--aqua-ink)" : "var(--ink-soft)") + ";font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;"
+    style: "min-height:48px;padding:0 16px;border-radius:var(--radius-pill);border:2px solid " + ((settings.voiceStyle || "fun") === v ? "var(--btn-primary-bg,var(--aqua))" : "var(--hairline)") + ";background:" + ((settings.voiceStyle || "fun") === v ? "var(--btn-primary-bg,var(--aqua-wash))" : "var(--surface)") + ";color:" + ((settings.voiceStyle || "fun") === v ? "var(--btn-primary-text,var(--aqua-ink))" : "var(--ink-soft)") + ";" + ((settings.voiceStyle || "fun") === v ? "box-shadow:" + PICKED_RING + ";" : "") + "font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;"
   }));
   /* Speed, not style. Two options and no slider: this is a setting a grown-up
      changes once, and "Slow / Normal" is a decision they can make by ear. */
   const voiceSpeedOpts = [["slow", "Slow"], ["normal", "Normal"]].map(([v, label]) => {
     const on = (settings.voiceSpeed || "slow") === v;
     return { key: v, label,
-      style: "min-height:48px;padding:0 16px;border-radius:var(--radius-pill);border:2px solid " + (on ? "var(--aqua)" : "var(--hairline)") + ";background:" + (on ? "var(--aqua-wash)" : "var(--surface)") + ";color:" + (on ? "var(--aqua-ink)" : "var(--ink-soft)") + ";font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;" };
+      style: "min-height:48px;padding:0 16px;border-radius:var(--radius-pill);border:2px solid " + (on ? "var(--btn-primary-bg,var(--aqua))" : "var(--hairline)") + ";background:" + (on ? "var(--btn-primary-bg,var(--aqua-wash))" : "var(--surface)") + ";color:" + (on ? "var(--btn-primary-text,var(--aqua-ink))" : "var(--ink-soft)") + ";" + (on ? "box-shadow:" + PICKED_RING + ";" : "") + "font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;" };
   });
 
   /* ---- coaching tab ---- */
@@ -885,7 +887,7 @@ export function buildGrownupVM(state) {
     profiles: profileList().map(p => ({
       id: p.id, name: p.name, active: p.id === activeProfileId(),
       style: "min-height:48px;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:14px;padding:0 16px;font-family:inherit;border:2px solid "
-        + (p.id === activeProfileId() ? "var(--btn-primary-bg,var(--aqua));background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);" : "var(--hairline);background:var(--surface-2);color:var(--ink);")
+        + (p.id === activeProfileId() ? "var(--btn-primary-bg,var(--aqua));background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);box-shadow:" + PICKED_RING + ";" : "var(--hairline);background:var(--surface-2);color:var(--ink);")
     })),
     multiProfile: profileList().length > 1,
     backupNote: state.backupNote || "", backupNoteOk: !!state.backupNoteOk,
@@ -899,6 +901,9 @@ export function buildGrownupVM(state) {
     coachTrack: onTrack(settings.coachSpeechOn !== false, "var(--mint)"), coachKnob: onKnob(settings.coachSpeechOn !== false),
     timerSoundsOn: settings.timerSoundsOn !== false,
     timerTrack: onTrack(settings.timerSoundsOn !== false, "var(--aqua)"), timerKnob: onKnob(settings.timerSoundsOn !== false),
+    // The ripples / snow behind the hero cards (R5): on unless switched off.
+    heroDecorOn: settings.heroDecorOn !== false,
+    heroDecorTrack: onTrack(settings.heroDecorOn !== false, "var(--btn-primary-bg,var(--aqua))"), heroDecorKnob: onKnob(settings.heroDecorOn !== false),
     safetyVoiceOn: settings.safetyVoiceOn !== false,
     safetyTrack: onTrack(settings.safetyVoiceOn !== false, "var(--coral)"), safetyKnob: onKnob(settings.safetyVoiceOn !== false),
     prizePool: activePrizePool(),
