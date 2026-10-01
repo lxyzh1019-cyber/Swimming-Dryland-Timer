@@ -195,23 +195,33 @@ const STATES = {
   stop:         [snaps.timed, { stopOverlay: true }, {}],
   restartAsk:   [snaps.timed, { stopOverlay: true, confirmRestart: true }, {}]
 };
-let drawn = 0;
+let drawn = 0, skipsSeen = 0;
+const CALM = /^(?=.*border:3px solid var\(--hairline\))(?=.*background:var\(--surface\))(?=.*color:var\(--ink-soft\))/;
 for (const [st, [snap, extra, state]] of Object.entries(STATES)) {
   for (const layout of Object.keys(LAYOUTS)) {
     const html = draw(snap, layout, extra, state);
     clean("session " + st + " " + layout, html, { kid: true });
     drawn++;
-    /* Done is the one big action, white on the dark green Go fill; STOP keeps
-       white on the darker stop fill. */
+    /* Done is the one big action, white on the btn-go fill (aqua-deep: 3.6 on
+       swim, so large text only — 20px+ weight 900); STOP keeps white on the
+       darker stop fill; Pause, Resume and Skip are calm white buttons. */
     const done = tags(html).find(t => t.tag === "button" && t.action === "advance");
-    ok(done && pxOf(done.style, "min-height") >= DONE_TAP_MIN && /font-size:20px/.test(done.style)
+    ok(done && pxOf(done.style, "min-height") >= DONE_TAP_MIN && pxOf(done.style, "font-size") >= 20
+       && /font-weight:900/.test(done.style)
        && /background:var\(--btn-go-bg,/.test(done.style) && /color:var\(--btn-go-text,/.test(done.style),
-       "session " + st + " " + layout + ": Done is 64px, 20px, on the btn-go slots");
+       "session " + st + " " + layout + ": Done is 64px, 20px+ weight 900, on the btn-go slots");
     if (st === "skipAsk") {
       const keep = tags(html).find(t => t.tag === "button" && t.action === "cancelSkip");
-      ok(keep && /background:var\(--btn-go-bg,/.test(keep.style),
-         "session skipAsk " + layout + ": Keep going is on the btn-go slot");
+      ok(keep && /background:var\(--btn-go-bg,/.test(keep.style) && /color:var\(--btn-go-text,/.test(keep.style)
+         && pxOf(keep.style, "font-size") >= 19 && /font-weight:900/.test(keep.style),
+         "session skipAsk " + layout + ": Keep going is on the btn-go slots, 19px+ weight 900");
+      const skipIt = tags(html).find(t => t.tag === "button" && t.action === "confirmSkipEx");
+      ok(skipIt && CALM.test(skipIt.style), "session skipAsk " + layout + ": Skip it is white, 3px hairline, ink-soft");
     }
+    const pause = tags(html).find(t => t.tag === "button" && t.action === "pauseTimer");
+    ok(pause && CALM.test(pause.style), "session " + st + " " + layout + ": " + (st === "paused" ? "Resume" : "Pause") + " is white, 3px hairline, ink-soft");
+    const skip = tags(html).find(t => t.tag === "button" && t.action === "askSkip");
+    if (skip) { skipsSeen++; ok(CALM.test(skip.style), "session " + st + " " + layout + ": Skip is white, 3px hairline, ink-soft"); }
     const stop = tags(html).find(t => t.tag === "button" && t.action === "stopNow");
     ok(stop && /background:var\(--btn-stop-bg,var\(--stop\)\)/.test(stop.style) && pxOf(stop.style, "min-height") >= KID_TAP_MIN,
        "session " + st + " " + layout + ": STOP is 56px on the btn-stop slot");
@@ -292,5 +302,6 @@ for (const tab of ["overview", "analytics", "formcheck", "coaching", "library", 
 }
 
 ok(drawn >= 24, "drew the session screen in " + drawn + " state × layout combinations");
+ok(skipsSeen >= 3, "checked the Skip button style in " + skipsSeen + " drawn states");
 console.log("buttons with no min-height (listed, not failed):\n  " + [...unsized].join("\n  "));
 console.log("✓ design floor passed (" + passed + " assertions; " + unsized.size + " unsized buttons listed)");
