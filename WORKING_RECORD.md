@@ -73,8 +73,8 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R4-3 PR 2 Session screen + size-floor test + journey map colours (K7 moved from PR 4, plan v2) | COMPLETE | opus-worker 2026-09-30 on `claude/splash-pr2-session`: session controls/list/ring/rail/estimate, journey map slots, new `core/test/design.mjs`, sw.js v24 → v25; `npm test` exit 0 both TZs; `diff -rq core` empty; release-check ok on working tree; screenshots 26 per app + contact sheet; DOM heights at 1194×834 Done 64, STOP/Pause/Skip 56, row 56, Back 48, rail toggle 48. Not committed (executor rule) — main session completes it after the PR opens; PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#68; plan v3 Deep green applied (tests, screenshots); plan v4 Pool calm applied |
 | R4-4 Merge PR pair 2 | COMPLETE | merged by user 2026-09-30 (swim #68 → 32e7f83, skate #42 → 681756d) with the v3 Deep green look |
 | R4-3b PR 2b Pool calm session buttons (plan v4) | COMPLETE | code, tests (design 288), screenshots done on `claude/splash-pr2b-pool-calm`;  PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#69 |
-| R4-4b Merge PR pair 2b | WAITING ON YOU — merge PR pair 2b | |
-| R4-5 PR 3 Body Check | NOT STARTED | |
+| R4-4b Merge PR pair 2b | COMPLETE | merged by user 2026-09-30 |
+| R4-5 PR 3 Body Check (+ pop-up card sizes and rail-hidden label ink, leftovers from PR 2) | PARTIAL | opus-worker 2026-10-01 on `claude/splash-pr3-body-check`, uncommitted: code, data, tests (design 288 → 572, readiness allowance removed), sw.js v26 → v27, FEATURES.md; `npm test` exit 0 both TZs; `diff -rq core` empty; screenshots C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr3/pr3-swim.png. Remaining: commit, push, PR (main session) |
 | R4-6 Merge PR pair 3 | NOT STARTED | |
 | R4-7 PR 4 Today | NOT STARTED | |
 | R4-8 Merge PR pair 4 | NOT STARTED | |
@@ -109,6 +109,14 @@ Structural option (not approved, not done): a test that renders every screen, co
 - 2026-09-30 R4 PR 2 live site / device → untested
 - 2026-09-30 R4 PR 2 plan v3 Deep green (opus-worker): `npm test` exit 0, both TZs, all suites green (swim leadin-data 19, smoke 1401, core actions 302, dayrecords 251, design 224, integrity 48, interaction 18, invariants 569, landing 7, core leadin 42, session 325, shell 256; design 221 → 224: Keep going on btn-go checked in 3 layouts); `diff -rq core` → empty; sw.js still v25; computed style at 1194×834: Done and Keep going white on mint-ink, edge #04342C, Done 64px/20px, Keep going 56px; contrast white on mint-ink 6.6; screenshots timed, rep ring, skip confirm both apps: `C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr2b/pr2b-go-button.png`
 - 2026-09-30 R4 PR 2 plan v4 Pool calm (opus-worker, uncommitted): `npm test` exit 0, both TZs, all suites green (swim leadin-data 19, smoke 1401, core actions 302, dayrecords 251, design 288, integrity 48, interaction 18, invariants 569, landing 7, core leadin 42, session 325, shell 256; design 224 → 288: Done/Keep going size+weight, Pause/Resume, Skip, Skip it calm style); design suite fails on the pre-v4 session.js (Pause check); `diff -rq core` → empty; sw.js v25 → v26 (PR 2 had already merged; changes moved to `claude/splash-pr2b-pool-calm`); computed style at 1194×834: Go 64px, 20px/900, white on rgb(5,147,174) aqua-deep, edge rgb(6,95,115); Keep going 56px, 19px/900; STOP/Pause/Skip 56px; Pause/Resume/Skip/Skip it bg rgb(255,255,255), text rgb(74,107,120), border 3px rgb(210,234,242); screenshots timed, rep ring, skip confirm, paused at 1194×834 and 834×1194: `C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr2c/pr2c-swim.png`
+- 2026-10-01 R4 PR 3 baseline before changes (branch from origin/main): `npm test` exit 0 in both repos, all suites green (design 288)
+- 2026-10-01 R4 PR 3 after changes (opus-worker): `npm test` exit 0, both TZs, all suites green (swim: leadin-data 19, smoke 1401, core actions 302, dayrecords 251, design 572, integrity 48, interaction 18, invariants 569, landing 7, core leadin 42, session 325, shell 256; skate: leadin-data 11, smoke 317, actions 302, dayrecords 251, design 572, integrity 48, interaction 18, invariants 572, landing 15, core leadin 42, session 327, shell 176); design 288 → 572: Body Check 13 states × 2 layouts + yesterday, pop-up cards and move card in 3 layouts, rail-hidden label ink
+- 2026-10-01 R4 PR 3: design.mjs mutation check — rep-check buttons back to 52px, or the light title back to the bright colour, makes the suite fail
+- 2026-10-01 R4 PR 3: `diff -rq core` swim vs skate → empty
+- 2026-10-01 R4 PR 3: `node core/tools/release-check.mjs origin/main` → ok ("no shell files changed" — base...HEAD only, uncommitted); working-tree equivalent: precached js/data.js and core screens/vm/main changed, sw.js v26 → v27 → bump present. Re-run after commit.
+- 2026-10-01 R4 PR 3: screenshots (Playwright Chromium, touch, fake clock Wed 2026-09-23 12:00 Edmonton, every non-127.0.0.1 request aborted) at 1194×834, 834×1194, 390×844: questions, 3 answered, green result, body map, zone popup, sore result after the scroll, recovery (all three "no"); plus rep-check card and move card at 1194×834 (rep count set through the page's engine module: headless Chromium has no voices, so the coach count never moves); all reached; C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr3/pr3-swim.png
+- 2026-10-01 R4 PR 3: DOM at all three sizes: yes/no 56px / 17px; Start 64px / 24px / 900; grown-up summary 48px / 13px; light picker option 48px / 15px (chosen: text in mint-ink on white); green title in mint-ink; sore result card on screen after the answer (card top at 1194×834 / 834×1194 / 390×844: swim 350 / 710 / 221 px, skate 352 / 712 / 220 px); rep-check buttons 56 / 56 / 56 (17px); move card ✕ 48×48; Resume 56
+- 2026-10-01 R4 PR 3 live site / device → untested
 
 ## Open questions / blockers
 - No visible deploy stamp on the page (rules require one) — flagged, out of scope this round.
@@ -167,3 +175,26 @@ Structural option (not approved, not done): a test that renders every screen, co
 | Journey map dark navy header band and fixed 80% #CDEDE7 stop | intentionally removed | approved plan (K7); mockup Card A has no dark band |
 | Done / Keep going colour: ink on mint → white on mint-ink (`btn-go` slots) | changed (plan v3) | sizes and text kept; contrast 6.6; design suite checks the slots |
 | Go/Done colour: white on mint-ink → white on aqua-deep (plan v4); Pause/Resume fills: sun-wash/mint-wash → white with hairline border (plan v4) | changed (plan v4) | sizes, actions and text kept; Keep going 17 → 19px (bold large-text floor for swim 3.6); Skip / Skip it border 2 → 3px; design suite checks slots, sizes and the calm buttons || Missing | none | |
+
+## Regression table — R4 PR 3 (+ session sizes, journey map → + Body Check, pop-up cards)
+| Feature | R4-PR2b → R4-PR3 | Note |
+|---|---|---|
+| Coach's Quiz: question pinned / first tap locks / XP by ledger | kept | finish screen untouched; tests green |
+| Left panel hide/show without PIN | kept | actions suite green |
+| 👀 What to watch for without PIN | kept | actions suite green |
+| "I need to start over" asks for PIN | kept | untouched |
+| Left panel ✓ ½ ⏭ ▶ marks and reason lines | kept | untouched |
+| Bar-move 5s lead-in; estimate includes lead-in | kept | leadin suites green |
+| Session controls (Done 64, Pool calm buttons, STOP slot), move-list rows, ring label | kept | design suite assertions unchanged and green |
+| Session size floor with no allowance | kept | now also covers intent, micro-loop (open and answered), breath, form check, rep check, move card |
+| Rep check: exactly 3 `answerRepCheck` buttons, "Some" right before its closing tag | kept | session.mjs:665–666 green; only min-height 52 → 56 |
+| Today review dots and per-round reasons; journey map slots | kept | untouched |
+| Body Check: 4 questions, scoring, cautious combine, pain gate (`disabled` + handler), grown-up override, zones, yesterday shown, all text | kept | smoke + actions suites green; smoke.mjs:721, :795 unchanged and green |
+| Body Check answer size and grid; light title in -ink; Start 64/24 on the Go slots (green); result scrolled into view; grown-up 48px; picker outline style; hero slots | added | FEATURES.md "Body Check (R4 PR 3)" |
+| Pop-up card sizes; rail-hidden label ink-soft | added | FEATURES.md Session screen |
+| Light picker: white text on the selected light's fill | intentionally removed | approved plan correction 5 / C5 |
+| Body Check hero three-stop aqua gradient (aqua-deep end) | intentionally removed | approved plan: hero slots, 0 → 70% |
+| Gate deny-by-default | kept | `core/gate.js` untouched; no new action |
+| `core/` byte-identical with the other repo | kept | `diff -rq core` empty |
+| sw.js version bump on shell change | kept | v26 → v27 |
+| Missing | none | |

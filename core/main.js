@@ -96,9 +96,21 @@ function renderToday() {
   journeyPathScrollIntoView(root);
 }
 
+/* Set by a body-map answer: the next render brings the result card into view.
+   The card sits full width under the maps, below the fold on iPad portrait and
+   phone, so without this the answer she just gave seemed to do nothing. Only
+   after an answer — a tap inside the card (the grown-up tick, the light picker)
+   must not jump the page. */
+let showBodyResultNext = false;
+
 function renderReadiness() {
   const vm = buildReadinessVM(state.readiness, state.isWide);
   root.innerHTML = page(readinessScreen(vm));
+  if (showBodyResultNext && vm.showInlineBodyResult) {
+    const card = root.querySelector && root.querySelector("[data-body-result]");
+    if (card && typeof card.scrollIntoView === "function") card.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+  showBodyResultNext = false;
 }
 
 function renderSession() {
@@ -511,6 +523,7 @@ Object.assign(RAW, {
   rSetZoneSev(arg) {
     const [num, level] = arg.split("|").map(Number);
     setZoneSev(state.readiness, num, level);
+    showBodyResultNext = true;
     render();
   },
   rClosePopup() { state.readiness.pendingZone = null; render(); },

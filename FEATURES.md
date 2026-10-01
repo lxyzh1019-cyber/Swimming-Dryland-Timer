@@ -1,4 +1,4 @@
-# FEATURES — Splash (Swim Dryland Timer) — manifest v1 (partial) — confirmed 2026-09-24, updated 2026-09-30 (R4 PR 1, R4 PR 2)
+# FEATURES — Splash (Swim Dryland Timer) — manifest v1 (partial) — confirmed 2026-09-24, updated 2026-10-01 (R4 PR 1, R4 PR 2, R4 PR 3)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -22,16 +22,28 @@ Locked features of the current version. Every edit is checked against this list 
 - Timer ring (R4 PR 2): the zone label (TIMED / READY / REST …) is 13px in the zone's `-ink` shade (urgent: stop-ink); the arc keeps the bright zone colour. Rep ring: BY REPS, dose, ⏱ and hint in grape-ink, hint 13px, no fade.
 - Left-panel hide/show toggle 48px round, screen-reader text kept. Session-time estimate line `ink-soft` 13px, text "~N min · estimate" unchanged.
 - Size floor (R4 PR 2): on the live session screen (get ready, timed, rep ring, rest, main round 2, watch-for open, paused, skip confirm, STOP, start-over warning, rail hidden, explore; three layouts) no inline text is under 13px and every sized button is ≥ 56px (Done ≥ 64, Back a move 48). Enforced by `core/test/design.mjs` with no allowance.
+- Pop-up cards (R4 PR 3): intent word buttons, micro-loop answers, the rep check ("All of them / Almost / Some", exactly 3 `answerRepCheck` buttons), the clean-check strip (clean / wobbly / Skip) and "▶ Resume my session" are 56px; the move card's ✕ is a 48px round close; the move card's section labels (Coach tip, 👀 Watch for, transfer heading) are 13px. Breath and landing/form cards keep their text ≥ 13px. All drawn and scanned by `core/test/design.mjs` (three layouts).
+- Rail hidden (R4 PR 3): the vertical progress label is `ink-soft` (was ink-faint), 13px.
 
 ## Today screen
 - "Review what you did": per-move round dots (✓ / ½ / ⏭ / —) with a legend.
 - "Review what you did": every short round of a move has its own reason line; each round dot's label carries that round's reason.
 - Journey map (R4 PR 2, K7): painted from the slots `--hero-from` → `--hero-to` → `--journey-via` → `--journey-to` (fallbacks = the old swim colours), so each app shows its own map; header text, rank names, captions, pips and "More of the … awaits" in `--hero-text`; the current rank's name and "YOU ARE HERE" sit on a white 60% pill (name ink, caption aqua-ink); done ranks keep the mint circle; dashed/solid paths and pips kept. Header fade is a light neutral one (the dark navy band is gone, as in the mockup's Card A). Map text ≥ 13px; checked by `core/test/design.mjs` with no allowance.
 
+## Body Check (R4 PR 3)
+- Kept: the 4 questions and their words, scoring (3 yes Green, 2 Yellow, 1 Red, 0 Recovery; the body map and the questions combine to the more cautious), the pain gate (severity 3 needs "A grown-up said it's OK" before Start; the Start button is `disabled` until then and the handler checks the same rule), the grown-up override under 🔒, the body-map zones and their coordinates, yesterday shown beside today (never reused), "Nothing feels off now", all text.
+- Answers: each yes/no is 56px, 17px, weight 900; the pair is a two-column grid, full width under its question (mockup).
+- Result card: the light's title is in the light's `-ink` shade (`titleInk` in `LIGHT_META`: green mint-ink, yellow sun-ink, red stop-ink, recovery grape-ink); the bright colour stays on the top border and dot.
+- Start button (both paths, and "Back to Today" when the day is finished): 64px, 24px, weight 900. Green on the Go slots (`--btn-go-bg` / `--btn-go-edge` / `--btn-go-text`, white on aqua-deep), also body-check severity 1; yellow sun / sun-deep / sun-ink; red coral fill with `--text-on-coral` text (also severity 3); recovery `--btn-grape-bg` with grape-ink edge, white text.
+- After a body-map answer the result card is scrolled into view (`[data-body-result]`, `core/main.js`, only on the render that follows the answer; null-safe).
+- Grown-up override: the "🔒 Grown-up only" summary is 48px, 13px; the light picker options are 48px, 15px; the chosen light has a 3px border in its colour on white with its title in its `-ink` shade (no white text on the light); the others a 3px hairline border, ink-soft.
+- Hero panel (questions step): `linear-gradient(165deg, var(--hero-from) 0%, var(--hero-to) 70%)`, text `--hero-text`, back button and step chips on `--hero-chip` (fallbacks = the old aqua/white look).
+- Sizes: every inline text on every Body Check step ≥ 13px; kid buttons ≥ 56px (answers, legend rows, back arrows 56px round, popup options, "Feels fine now", Cancel, "Rest 1–2 min, then re-check", "Nothing feels off now"); grown-up controls ≥ 48px. Enforced by `core/test/design.mjs` over 13 states × 2 layouts plus yesterday, no allowance.
+
 ## Design tokens and colour slots
 - Rule: screens read slots with fallbacks equal to the previous look; core stays byte-identical; skate fills its own slot values.
 - Slots in `css/tokens/colors.css` (SEMANTIC ALIASES): `--hero-from` aqua-light · `--hero-to` aqua · `--hero-text` ink · `--hero-chip` white 55% · `--journey-via` #9FE6F3 · `--journey-to` #F6E7C1 · `--btn-primary-bg` aqua · `--btn-primary-edge` aqua-deep · `--btn-primary-text` ink · `--btn-stop-bg` stop-deep · `--btn-stop-edge` stop-ink · `--btn-grape-bg` grape-deep · `--btn-go-bg` aqua-deep · `--btn-go-text` #FFFFFF · `--btn-go-edge` aqua-ink.
-- Text-on tokens: `--text-on-aqua`, `--text-on-coral`, `--text-on-mint`, `--action-text`, `--go-text` = `var(--ink)` (were white). No screen in `core/` or `js/` reads them yet (grep 2026-09-30).
+- Text-on tokens: `--text-on-aqua`, `--text-on-coral`, `--text-on-mint`, `--action-text`, `--go-text` = `var(--ink)` (were white). Read since R4 PR 3: `--text-on-coral` by the red Start button (`js/data.js` LIGHT_META red, BODY_RESULTS 3); `--text-on-mint` only as the fallback inside the `btn-go` slots (session Go/Done, Keep going); the others unread (grep 2026-10-01).
 - `--border-card-color` (was the dead colour alias `--border-card`; `--border-card: 3px` in `spacing.css` is the live width and is unchanged).
 - `.candy` (unused by screens) falls back to `--action-edge` for its 3D edge (was the non-existent `--action-deep`).
 - Design reference copied in: `docs/DESIGN.md`, `docs/mockups/Splash-mockups.html` (handoff copies, not app code).
@@ -40,7 +52,7 @@ Locked features of the current version. Every edit is checked against this list 
 - Grown-up gate is deny-by-default: any action not in `UNGATED_ACTIONS` (or allowed by `CHILD_MAY`) asks for the PIN.
 - `core/` is byte-identical with the Figure-Skate-Dryland-Timer repo.
 - Every release that changes a precached shell file bumps `version` in `sw.js`.
-- Size-floor test `core/test/design.mjs` (R4 PR 2): kid screens no inline text < 13px, sized buttons ≥ 56 (session Done ≥ 64); grown-up buttons ≥ 48; buttons with no min-height are listed, not failed. Screens not yet redesigned carry a per-screen allowance (`ALLOW`) that PRs 3–6 shrink to empty; the session screen and the journey map have none.
+- Size-floor test `core/test/design.mjs` (R4 PR 2): kid screens no inline text < 13px, sized buttons ≥ 56 (session Done ≥ 64); grown-up buttons ≥ 48; buttons with no min-height are listed, not failed. Screens not yet redesigned carry a per-screen allowance (`ALLOW`) that PRs 4–6 shrink to empty; the session screen, the journey map and Body Check have none (R4 PR 3 removed the Body Check entries). Approved below-56 kid controls: Back a move 48, the move card's ✕ 48, the Body Check light picker 48 (grown-up control).
 
 ## Regression table format (paste at the end of every edit)
 | Feature | v<old> → v<new> | Note |
