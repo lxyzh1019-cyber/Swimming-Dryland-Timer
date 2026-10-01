@@ -72,8 +72,8 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R4-2 Merge PR pair 1 | COMPLETE | merged by user 2026-09-30: swim #67 → main 42f2fbd, skate #41 → main 58de412 |
 | R4-3 PR 2 Session screen + size-floor test + journey map colours (K7 moved from PR 4, plan v2) | COMPLETE | opus-worker 2026-09-30 on `claude/splash-pr2-session`: session controls/list/ring/rail/estimate, journey map slots, new `core/test/design.mjs`, sw.js v24 → v25; `npm test` exit 0 both TZs; `diff -rq core` empty; release-check ok on working tree; screenshots 26 per app + contact sheet; DOM heights at 1194×834 Done 64, STOP/Pause/Skip 56, row 56, Back 48, rail toggle 48. Not committed (executor rule) — main session completes it after the PR opens; PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#68; plan v3 Deep green applied (tests, screenshots); plan v4 Pool calm applied |
 | R4-4 Merge PR pair 2 | COMPLETE | merged by user 2026-09-30 (swim #68 → 32e7f83, skate #42 → 681756d) with the v3 Deep green look |
-| R4-3b PR 2b Pool calm session buttons (plan v4) | PARTIAL | code, tests (design 288), screenshots done on `claude/splash-pr2b-pool-calm`; PR pending |
-| R4-4b Merge PR pair 2b | NOT STARTED | |
+| R4-3b PR 2b Pool calm session buttons (plan v4) | COMPLETE | code, tests (design 288), screenshots done on `claude/splash-pr2b-pool-calm`;  PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#69 |
+| R4-4b Merge PR pair 2b | WAITING ON YOU — merge PR pair 2b | |
 | R4-5 PR 3 Body Check | NOT STARTED | |
 | R4-6 Merge PR pair 3 | NOT STARTED | |
 | R4-7 PR 4 Today | NOT STARTED | |
