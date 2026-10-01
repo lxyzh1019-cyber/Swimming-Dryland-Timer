@@ -66,8 +66,8 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R2 pinned test clock | PARTIAL | done + tests green locally on a real Sunday; awaiting CI on the PR + merge |
 | R4-1 PR 1 tokens, slots, stylesheet fix, docs copy (both repos) | COMPLETE | opus-worker 2026-09-30: changes made on `claude/splash-pr1-tokens-slots`; `npm test` exit 0; `diff -rq core` empty; release-check ok; Today screenshots 0 px diff at 3 sizes; commit/push/PR not run by the worker (executor rule) — COMPLETE once the PR is open; PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#67 |
 | R4-2 Merge PR pair 1 | COMPLETE | merged by user 2026-09-30: swim #67 → main 42f2fbd, skate #41 → main 58de412 |
-| R4-3 PR 2 Session screen + size-floor test + journey map colours (K7 moved from PR 4, plan v2) | PARTIAL | opus-worker 2026-09-30 on `claude/splash-pr2-session`: session controls/list/ring/rail/estimate, journey map slots, new `core/test/design.mjs`, sw.js v24 → v25; `npm test` exit 0 both TZs; `diff -rq core` empty; release-check ok on working tree; screenshots 26 per app + contact sheet; DOM heights at 1194×834 Done 64, STOP/Pause/Skip 56, row 56, Back 48, rail toggle 48. Not committed (executor rule) — main session completes it after the PR opens |
-| R4-4 Merge PR pair 2 | NOT STARTED | |
+| R4-3 PR 2 Session screen + size-floor test + journey map colours (K7 moved from PR 4, plan v2) | COMPLETE | opus-worker 2026-09-30 on `claude/splash-pr2-session`: session controls/list/ring/rail/estimate, journey map slots, new `core/test/design.mjs`, sw.js v24 → v25; `npm test` exit 0 both TZs; `diff -rq core` empty; release-check ok on working tree; screenshots 26 per app + contact sheet; DOM heights at 1194×834 Done 64, STOP/Pause/Skip 56, row 56, Back 48, rail toggle 48. Not committed (executor rule) — main session completes it after the PR opens; PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#68 |
+| R4-4 Merge PR pair 2 | WAITING ON YOU — merge PR pair 2 | |
 | R4-5 PR 3 Body Check | NOT STARTED | |
 | R4-6 Merge PR pair 3 | NOT STARTED | |
 | R4-7 PR 4 Today | NOT STARTED | |
