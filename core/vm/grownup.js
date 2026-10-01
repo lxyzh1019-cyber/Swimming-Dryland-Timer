@@ -66,6 +66,21 @@ const scheduledDays = (from, to) => isoRange(from, to).filter(d => !isSpaDate(d)
 const dstr = iso => new Date(String(iso).slice(0, 10) + "T12:00:00Z")
   .toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 
+/* Why a main round did not count, with the numbers — word for word the line
+   the finish screen keeps behind "See every move". */
+const roundShortSentence = (r) => {
+  if (r.skipped.length) return `Round ${r.round} wasn't a full round — ${r.skipped[0]} got skipped.`;
+  if (r.missing > 0)    return `Round ${r.round} wasn't a full round — you stopped partway through it.`;
+  const b = r.blockedBy;
+  if (!b || !Number.isFinite(Number(b.planned)) || Number(b.planned) <= 0)
+    return `Round ${r.round} wasn't a full round — it was a bit short.`;
+  const got = Math.round(Number(b.got) || 0), planned = Math.round(Number(b.planned));
+  return b.driver === "reps"
+    ? `Round ${r.round} wasn't a full round — ${b.name} was ${got} of ${planned} reps.`
+    : `Round ${r.round} wasn't a full round — ${b.name} was ${got}s of ${planned}s.`;
+};
+const ROUND_LINES_SHOWN = 10;
+
 const alertRow = (tone) => "display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:12px;margin-top:8px;background:" + (tone === "stop" ? "color-mix(in srgb, var(--stop) 9%, #fff)" : "var(--sun-wash)") + ";";
 
 export function buildGrownupVM(state) {
@@ -469,8 +484,15 @@ export function buildGrownupVM(state) {
   // took. A day that ended in a pain stop is not a training day here.
   const roundsDone = trainingRecs.reduce((a, r) => a + (Number(r.mainRoundsDone) || 0), 0);
   const roundsPlanned = trainingRecs.reduce((a, r) => a + (Number(r.roundsPlanned) || 0), 0);
+  /* THE EXACT COUNTS, here and not on the kid's finish screen (R4 PR 5): one
+     line per main round that did not count, newest day first, in the finish
+     screen's own words (roundShortNotes in core/vm/session.js — same record,
+     same sentence; core/test/invariants.mjs holds the two together). */
+  const shortLines = [...trainingRecs].reverse().flatMap(r => (r.mainRounds || []).filter(x => !x.counts)
+    .map(x => ({ date: dstr(r.date), text: roundShortSentence(x) })));
   const rounds = { done: roundsDone, planned: Math.max(roundsPlanned, roundsDone), practice: 0,
-    note: "Planned = the rounds each day actually asked for — green 3, yellow 2, red 1, mini 1 — as stamped on the day's record." };
+    note: "Planned = the rounds each day actually asked for — green 3, yellow 2, red 1, mini 1 — as stamped on the day's record.",
+    shortLines: shortLines.slice(0, ROUND_LINES_SHOWN), shortMore: Math.max(0, shortLines.length - ROUND_LINES_SHOWN) };
 
   /* ---- mood before → after ---- */
   // One answer per DAY: she is asked how it felt once, at the end. Counting

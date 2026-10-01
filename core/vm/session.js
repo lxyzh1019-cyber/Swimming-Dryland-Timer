@@ -627,10 +627,10 @@ export function buildSessionVM(state) {
 
   const moodOpts = MOOD_DEFS.map(m => ({
     ...m,
-    style: "display:flex;flex-direction:column;align-items:center;gap:5px;min-width:76px;padding:12px 14px;border-radius:16px;cursor:pointer;border:3px solid;background:var(--surface);font-family:inherit;"
+    style: "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:76px;min-height:72px;padding:12px 14px;border-radius:16px;cursor:pointer;border:3px solid;background:var(--surface);font-family:inherit;"
       + (sess.mood === m.key ? "border-color:var(--mint);background:#fff;box-shadow:0 4px 0 var(--mint-deep);" : "border-color:var(--hairline);")
   }));
-  const rChip = (sel) => "padding:9px 14px;border-radius:var(--radius-pill);border:2px solid " + (sel ? "var(--aqua)" : "var(--hairline)") + ";background:" + (sel ? "var(--aqua-wash)" : "var(--surface)") + ";color:" + (sel ? "var(--aqua-ink)" : "var(--ink-soft)") + ";font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;";
+  const rChip = (sel) => "min-height:56px;padding:9px 14px;border-radius:var(--radius-pill);border:2px solid " + (sel ? "var(--aqua)" : "var(--hairline)") + ";background:" + (sel ? "var(--aqua-wash)" : "var(--surface)") + ";color:" + (sel ? "var(--aqua-ink)" : "var(--ink-soft)") + ";font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;";
   const reflectWellOpts = REFLECT_WELL.map(t => ({ label: t, style: rChip(sess.wentWell === t) }));
   const reflectNextOpts = REFLECT_NEXT.map(t => ({ label: t, style: rChip(sess.nextTime === t) }));
 
@@ -641,7 +641,7 @@ export function buildSessionVM(state) {
     // One answer per question: the options go grey and dead after the reveal.
     disabled: quizAnswered,
     prefix: quizAnswered ? (o.ok ? "✓" : (sess.quizPick === i ? "✕" : "")) : String.fromCharCode(65 + i),
-    style: "display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px 16px;border-radius:16px;border:3px solid;font-weight:800;font-size:15px;font-family:inherit;box-sizing:border-box;"
+    style: "display:flex;align-items:center;gap:10px;width:100%;min-height:56px;text-align:left;padding:12px 16px;border-radius:16px;border:3px solid;font-weight:800;font-size:17px;font-family:inherit;box-sizing:border-box;"
       + (quizAnswered ? "cursor:default;" : "cursor:pointer;")
       + (!quizAnswered ? "border-color:var(--hairline);background:var(--surface);color:var(--ink);"
         : o.ok ? "border-color:var(--mint);background:var(--mint-wash);color:var(--mint-ink);"
@@ -861,6 +861,9 @@ export function buildSessionVM(state) {
     xpLine,
     // The per-move review, and whether she has opened it.
     notFull, notFullCount: notFull.length,
+    // "See every move ▾" — the fold that holds the list and the exact counts
+    // (state.moveReviewOpen in core/main.js; closed until she opens it).
+    moveReviewOpen: !!state.moveReviewOpen,
     allInFull: useRec && !!dayRec.plan && notFull.length === 0,
     redoDayKey: sess.dayKey || "",
     /* MOOD, REFLECTION AND THE QUIZ ONLY EXIST IF THERE IS A RECORD TO PUT

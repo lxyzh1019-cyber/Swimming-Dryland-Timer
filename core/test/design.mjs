@@ -14,7 +14,7 @@
    Each later PR deletes its own entries; when the redesign is done ALLOW is
    empty. The session screen and the journey map (PR 2) have no entries and
    must never get one. Today (PR 4) has none either. */
-import { engine, store, data, tvm, gvm, gscreen, rvm, rscreen, pvm, pscreen, svm, sscreen, tscreen, runSession } from "./harness.mjs";
+import { engine, store, data, tvm, gvm, gscreen, rvm, rscreen, pvm, pscreen, svm, sscreen, tscreen, overlays, runSession } from "./harness.mjs";
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
@@ -33,10 +33,6 @@ const DESIGN_TAP = { goBack: 48, closeDetail: 48, rPickLight: 48, goExplore: 48 
    element's opening tag that singles it out. Every entry is a known debt
    with an owner; none of them is on the session screen or the journey map. */
 const ALLOW = {
-  // PR 5 — finish screen
-  finish: [
-    { kind: "font", px: 12, has: "font-size:12px;font-weight:800;color:var(--ink-soft);" }   // Coach's Quiz intro line
-  ],
   // PR 6 — Progress
   progress: [
     { kind: "font", px: 12, has: "font-weight:900;font-size:12px;letter-spacing:0.05em;" },  // card headings
@@ -67,8 +63,8 @@ const ALLOW = {
   ]
 };
 
-ok(!Object.keys(ALLOW).some(k => /session|journey|readiness|today/.test(k)),
-   "the session screen, the journey map, Body Check and Today have no allowance — they meet the floor outright");
+ok(!Object.keys(ALLOW).some(k => /session|journey|readiness|today|finish|quiz/.test(k)),
+   "the session screen, the journey map, Body Check, Today, the finish screen and the Quiz Deck have no allowance — they meet the floor outright");
 
 /* ---- a tiny reader for the opening tags of rendered HTML ---------------- */
 const TAG = /<([a-zA-Z][\w-]*)((?:\s+[^\s=>"']+(?:="[^"]*")?)*)\s*\/?>/g;
@@ -301,9 +297,115 @@ for (const layout of Object.keys(LAYOUTS)) {
 }
 engine.exitSession();
 
-/* ---- 2. THE FINISH SCREEN (PR 5) --------------------------------------- */
+/* ---- 2. THE FINISH SCREEN (PR 5): every state, its order, the fold ----- */
 ok(finishVm.sessionDone, "the finished session draws its finish screen");
-clean("finish", sscreen.sessionScreen(finishVm), { kid: true, allow: ALLOW.finish });
+ok(finishVm.moveReviewOpen === false
+   && svm.buildSessionVM({ isWide: true, detailEx: {}, moveReviewOpen: true }).moveReviewOpen === true,
+   "the finish VM carries the fold's state from main.js (closed unless opened)");
+const SHORT_NOTE = "Round 2 wasn't a full round — Glute Bridge March was 4 of 16 reps.";
+const KID_LINE = "A few moves came in short — next time hold them all the way. 💪";
+const owedRows = [
+  { name: "Glute Bridge March", circuit: "", label: "round 2", anySkipped: false },
+  { name: "Dead Bug", circuit: "", label: "rounds 2 and 3", anySkipped: true }
+];
+const partDone = { ...finishVm, completionKey: "partial-short", completionState: "partial", completionNote: "",
+  notFull: owedRows, roundShortNotes: [SHORT_NOTE], allInFull: false, showRoundsLine: true, moveReviewOpen: false };
+const FINISH = {
+  "part done":      partDone,
+  "review open":    { ...partDone, moveReviewOpen: true },
+  full:             { ...finishVm, completionKey: "complete", completionState: "complete", completionNote: "",
+                      notFull: [], roundShortNotes: [], allInFull: true, moveReviewOpen: false },
+  stopped:          { ...partDone, completionKey: "safety-stop", completionState: "safety-stop" },
+  "nothing logged": { ...partDone, completionKey: "none", completionState: "none",
+                      notFull: owedRows.map(r => ({ ...r, anySkipped: true })) },
+  "save failed":    { ...partDone, completionKey: "save-failed", completionState: "save-failed", saveFailed: true,
+                      showCompletionExtras: false, showReflection: false, notFull: [], roundShortNotes: [] },
+  /* Mood picked (so the reflection shows), quiz answered, a level-up waiting. */
+  "all extras":     { ...partDone, moveReviewOpen: true, showReflection: true, leveledUp: true, quizAnswered: true,
+                      quizFeedback: "Nailed it!", quizFeedbackColor: "var(--mint-ink)", quizWhy: "Because." },
+  explore:          { ...finishVm, completionKey: "explore", completionState: "explore", explore: true, completionNote: "",
+                      showCompletionExtras: false, showReflection: false, showRoundsLine: false,
+                      notFull: [], roundShortNotes: [], allInFull: false, xpLine: "" }
+};
+const at = (html, marker) => html.indexOf(marker);
+for (const [st, vm] of Object.entries(FINISH)) {
+  const html = sscreen.sessionScreen(vm);
+  clean("finish " + st, html, { kid: true });
+  const back = tags(html).find(t => t.tag === "button" && t.action === "exitSession");
+  ok(back && pxOf(back.style, "min-height") >= KID_TAP_MIN && pxOf(back.style, "font-size") === 18 && /font-weight:900/.test(back.style)
+     && /background:var\(--sun\)/.test(back.style) && /color:var\(--(ink|sun-ink)\)/.test(back.style),
+     "finish " + st + ": the last button is 56px, 18px weight 900, on sun");
+  ok(at(html, 'data-action="exitSession"') > Math.max(at(html, "data-finish-summary"), at(html, "data-finish-kid-line"),
+       at(html, 'data-action="toggleMoveReview"'), at(html, "data-move-review"), at(html, "data-finish-quiz")),
+     "finish " + st + ": \"" + (vm.explore ? "Done looking" : "Back to Today") + "\" is last");
+  ok(!/var\(--coral\)/.test(section(html, "data-move-review")), "finish " + st + ": nothing in the move review is coral");
+  if (vm.showCompletionExtras) {
+    ok(at(html, "data-finish-summary") < at(html, "data-finish-mood") && at(html, "data-finish-mood") < at(html, "data-finish-quiz")
+       && (at(html, "data-finish-kid-line") < 0 || at(html, "data-finish-quiz") < at(html, "data-finish-kid-line"))
+       && at(html, "data-finish-quiz") < at(html, 'data-action="toggleMoveReview"') + (at(html, 'data-action="toggleMoveReview"') < 0 ? 1e9 : 0)
+       && (at(html, 'data-action="toggleMoveReview"') < 0 || at(html, "data-finish-kid-line") < at(html, 'data-action="toggleMoveReview"')),
+       "finish " + st + ": summary, then How did it feel?, then the Coach's Quiz, then the kid line, then See every move");
+    const moods = tags(html).filter(t => t.tag === "button" && t.action === "pickMood");
+    ok(moods.length > 0 && moods.every(t => pxOf(t.style, "min-height") >= 72), "finish " + st + ": the mood buttons are 72px tall");
+    const opts = tags(html).filter(t => t.tag === "button" && t.action === "quizPick");
+    ok(opts.length > 1 && opts.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN && pxOf(t.style, "font-size") >= 17),
+       "finish " + st + ": the quiz options are 56px, 17px");
+  }
+}
+{
+  const closed = sscreen.sessionScreen(FINISH["part done"]);
+  const open = sscreen.sessionScreen(FINISH["review open"]);
+  ok(closed.includes(KID_LINE) && open.includes(KID_LINE), "finish: a day with a round short says the one kid line");
+  ok(!closed.includes(SHORT_NOTE) && !/data-not-full/.test(closed) && !/data-action="goSessionRedo"/.test(closed),
+     "finish: the exact counts, the list and Redo are hidden until she opens See every move");
+  const fold = tags(closed).find(t => t.tag === "button" && t.action === "toggleMoveReview");
+  ok(fold && /See every move ▾/.test(closed) && /aria-expanded="false"/.test(fold.open) && pxOf(fold.style, "min-height") >= KID_TAP_MIN,
+     "finish: See every move ▾ is a 56px button, aria-expanded false");
+  ok(open.includes(SHORT_NOTE) && owedRows.every(r => open.includes('data-not-full="' + r.name + '"'))
+     && /Hide the moves ▴/.test(open) && /aria-expanded="true"/.test(open),
+     "finish: opened, it shows the round line and every row, and says Hide the moves ▴");
+  const review = section(open, "data-move-review");
+  const rowTags = tags(review).filter(t => /data-not-full="/.test(t.open));
+  ok(/⏭/.test(review) && /½/.test(review) && rowTags.length === owedRows.length
+     && rowTags.every(t => /color:var\(--ink-soft\)/.test(t.style)),
+     "finish: each row is ink-soft with its ⏭ or ½");
+  const redo = tags(open).find(t => t.tag === "button" && t.action === "goSessionRedo");
+  ok(redo && /background:var\(--btn-primary-bg,var\(--aqua\)\)/.test(redo.style) && /color:var\(--btn-primary-text,#fff\)/.test(redo.style)
+     && /box-shadow:0 4px 0 var\(--btn-primary-edge,var\(--aqua-deep\)\)/.test(redo.style)
+     && pxOf(redo.style, "min-height") >= KID_TAP_MIN && pxOf(redo.style, "font-size") >= 17,
+     "finish: Redo these is on the btn-primary slots, 56px, 17px");
+  const back = tags(open).find(t => t.tag === "button" && t.action === "exitSession");
+  ok(/color:var\(--ink\)/.test(back.style) && />🏠 Back to Today</.test(open), "finish: 🏠 Back to Today is ink on sun");
+  const full = sscreen.sessionScreen(FINISH.full);
+  ok(full.includes("Every move was done in full.") && !full.includes(KID_LINE) && !/data-action="toggleMoveReview"/.test(full),
+     "finish: a clean day says every move was done in full, with nothing to fold");
+  const none = sscreen.sessionScreen(FINISH["nothing logged"]);
+  ok(/Nothing logged this time\./.test(none) && /Every move got skipped, so there's nothing to record/.test(none)
+     && !/data-not-full/.test(none) && !none.includes(KID_LINE) && !/data-finish-kid-line/.test(none),
+     "finish: nothing logged is one friendly line — its title and note — with no kid line and no list of skipped rows");
+  const explore = sscreen.sessionScreen(FINISH.explore);
+  ok(/Done looking/.test(explore) && /Nothing was recorded/.test(explore) && !/data-action="toggleMoveReview"/.test(explore),
+     "finish: explore still says Done looking and Nothing was recorded");
+}
+
+/* ---- 2b. THE QUIZ DECK (PR 5): a question, its answer, the results ----- */
+{
+  const deck = overlays.buildQuizDeck(8);
+  ok(deck.qs.length > 0, "the Quiz Deck deals cards to draw");
+  for (const [st, qd] of [["question", { ...deck, idx: 0, picks: [] }],
+                          ["answered", { ...deck, idx: 0, picks: [deck.qs[0].opts.findIndex(o => o.ok)] }],
+                          ["practice", { ...deck, idx: 0, picks: [], willPay: false }],
+                          ["results", { ...deck, done: true, scored: true, picks: deck.qs.map(q => q.opts.findIndex(o => o.ok)),
+                                        bank: { mastered: 3, total: 40, left: 37 }, leveledUp: true, xpEarned: 20 }]]) {
+    const html = overlays.quizDeckHtml(qd);
+    clean("quiz deck " + st, html, { kid: true });
+    if (st !== "results") {
+      const opts = tags(html).filter(t => t.tag === "button" && t.action === "answerQuizDeck");
+      ok(opts.length > 1 && opts.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN),
+         "quiz deck " + st + ": its " + opts.length + " options are 56px");
+    }
+  }
+}
 
 /* ---- 3. TODAY, AND ITS JOURNEY MAP (map: PR 2, no entries) -------------- */
 const today = Object.keys(data.DAYS).find(k => !data.DAYS[k].spa);

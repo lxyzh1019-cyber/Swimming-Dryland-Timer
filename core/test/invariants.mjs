@@ -20,7 +20,7 @@
    Run by `npm test`.
    ============================================================ */
 
-import { data, util, store, engine, outcome, svm, tvm, pvm, gvm, gscreen, sscreen, tscreen, rvm, overlays,
+import { data, util, store, engine, outcome, svm, tvm, pvm, gvm, gscreen, sscreen, tscreen, rvm, overlays, sport,
          runSession, answerChecks } from "./harness.mjs";
 
 let passed = 0;
@@ -603,6 +603,46 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
     .concat(store.movePool().filter(m => m.fix && m.fix.length > 80));
   same(longAnswer.length, 0, "and no watch-out or fix is either");
 
+  /* G1 (R4 PR 5): AN ANSWER IS SHOWN ONCE. The line under a Quiz Deck answer
+     used to be "👀 Watch for · " + the very text on the green option. It now
+     gives the paired fact — watch-out → the fix, fix → what to watch for, cue →
+     what the move builds in the sport, under the move card's transfer heading —
+     and is empty (and not drawn) when there is nothing to pair. Every move
+     question is drawn: the ledger is set to "all mastered" so the tier-2 fix
+     cards are unlocked too. */
+  {
+    const pool = store.movePool();
+    const byName = Object.fromEntries(pool.map(m => [m.name, m]));
+    ok(pool.length > 0 && pool.every(m => typeof m.transfer === "string"), "G1: every quiz move carries a transfer field (empty when none)");
+    ok(pool.some(m => m.transfer), "G1: and some of them have one to give");
+    const quiz = store.loadQuiz();
+    quiz.qLedger = Object.fromEntries(store.questionBank(data.MAX_LEVEL)
+      .map(([t, k]) => [store.quizQuestionKey(t.name, k), { mastered: true }]));
+    store.saveQuiz(quiz);
+    const moveQs = overlays.buildQuizDeck(100000).qs.filter(q => ["cue", "watch", "fix"].includes(q.kind));
+    const kinds = new Set(moveQs.map(q => q.kind));
+    ok(kinds.has("cue") && kinds.has("watch") && kinds.has("fix"), "G1: the deck draws cue, watch-out and fix cards (" + [...kinds].join(", ") + ")");
+    const PAIR = { watch: ["Fix · ", "fix"], fix: ["👀 Watch for · ", "watch"], cue: [sport.COPY.transferHeading + " · ", "transfer"] };
+    let repeats = 0, unpaired = 0, emptyWhy = 0;
+    moveQs.forEach(q => {
+      const correct = q.opts.find(o => o.ok).t;
+      if (q.why === correct || (q.why && q.why.includes(correct))) repeats++;
+      const [lead, field] = PAIR[q.kind];
+      const fact = byName[q.move][field];
+      if (q.why !== (fact ? lead + fact : "")) unpaired++;
+      if (!q.why) emptyWhy++;
+    });
+    same(repeats, 0, "G1: no Quiz Deck line under an answer repeats the answer (" + moveQs.length + " cards)");
+    same(unpaired, 0, "G1: each one gives the paired fact under its own heading, or nothing");
+    /* The empty case is drawn without the line. */
+    const blank = moveQs.find(q => !q.why) || { ...moveQs[0], why: "" };
+    const qd = { qs: [blank], idx: 0, picks: [blank.opts.findIndex(o => o.ok)], done: false, scored: false, willPay: true };
+    const answeredHtml = overlays.quizDeckHtml(qd);
+    ok(/data-action="nextQuizDeck"/.test(answeredHtml) && !/background:var\(--aqua-wash\);border-radius:14px;padding:13px 15px;/.test(answeredHtml),
+       "G1: an answered card with nothing to pair draws no line under it (" + emptyWhy + " such cards), and still offers Next");
+    localStorage.clear(); store.migrate();
+  }
+
   // The Coach's Quiz and the training principles are authored, so check the
   // authored shape directly: one right answer, no dangling prerequisite, and no
   // wrong answer so much shorter than the right one that length gives it away.
@@ -1018,6 +1058,10 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
     const owed = [...outcome.shortRoundsByMoveFromPlan(rec.plan.moves).values()].filter(g => g.short.length);
     same(fv.notFull.length, owed.length, label + ": the finish screen lists exactly the moves with a round left undone");
     same(fv.allInFull, owed.length === 0, label + ": and says every move was done in full only when that is true");
+    /* R4 PR 5: the exact counts left the top of the kid's screen for the
+       Grown-up Zone — the same lines, word for word, from the same record. */
+    same(JSON.stringify(gv.analytics.rounds.shortLines.map(l => l.text)), JSON.stringify(fv.roundShortNotes),
+      label + ": Grown-up › Analytics lists the finish screen's round lines, with their counts");
     ok(fv.notFull.every(r => r.label && !/\bof\b/.test(r.label)),
        label + ": naming the rounds rather than counting them (" + JSON.stringify(fv.notFull.map(r => r.label).slice(0, 2)) + ")");
     return { rec, tv, pv, gv, fv };
@@ -1175,6 +1219,34 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
     });
     const html = tscreen.todayWide({ ...tv, blocks: tv.blocks.map(b => ({ ...b, bodyStyle: "" })) });
     (row.shortRounds || []).forEach(l => ok(html.includes(l.text), "S9: \"" + l.text + "\" is on the card"));
+  });
+
+  /* S10 (R4 PR 5): one main move cut early in round two (four seconds in, or
+     after one rep) — a round that does not count. The finish screen keeps the
+     exact count behind "See every move"; Grown-up › Analytics shows the same
+     line, word for word. */
+  let cutOnce = false;
+  const cutRoundTwo = (ms, s) => {
+    if (clean(s)) return;
+    if (s.phase === "repcheck") { engine.answerRepCheck("some"); return; }
+    if (cutOnce || s.round !== 2 || !s.currentEx || s.currentEx.block !== "main") return;
+    if ((s.phase === "work" && s.timerMax > 0 && !s.announceResolver && s.exElapsed >= 4)
+        || (s.phase === "reps" && s.byRepsResolver && s.repsTarget > 2 && s.repsCounted >= 1)) { cutOnce = true; engine.advance(); }
+  };
+  await scenario("S10", T.start, T.read, () => drive({ dayKey: DAY, light: "green" }, cutRoundTwo), () => {
+    ok(cutOnce, "S10: a main move in round two was cut short");
+    const fv = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+    ok(fv.roundShortNotes.length >= 1, "S10: the finish screen has a line for the round that did not count (" + fv.roundShortNotes.length + ")");
+    const closed = sscreen.sessionScreen(fv);
+    ok(!fv.roundShortNotes.some(n => closed.includes(n)) && /data-action="toggleMoveReview"/.test(closed),
+       "S10: on the kid's screen it waits behind \"See every move\"");
+    const open = sscreen.sessionScreen(svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {}, moveReviewOpen: true }));
+    ok(fv.roundShortNotes.every(n => open.includes(n)), "S10: and is there when she opens it");
+    const gv = gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics", isWide: true });
+    same(JSON.stringify(gv.analytics.rounds.shortLines.map(l => l.text)), JSON.stringify(fv.roundShortNotes),
+      "S10: Grown-up › Analytics lists the same lines, word for word");
+    const gHtml = gscreen.grownupScreen({ ...gv, grownupUnlocked: true });
+    ok(fv.roundShortNotes.every(n => gHtml.includes(util.escapeHtml(n))), "S10: and draws them on the Main-set rounds card");
   });
 
   fresh();

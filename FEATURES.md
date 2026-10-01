@@ -1,4 +1,4 @@
-# FEATURES — Splash (Swim Dryland Timer) — manifest v1 (partial) — confirmed 2026-09-24, updated 2026-10-01 (R4 PR 1, R4 PR 2, R4 PR 3, R4 PR 4)
+# FEATURES — Splash (Swim Dryland Timer) — manifest v1 (partial) — confirmed 2026-09-24, updated 2026-10-01 (R4 PR 1, R4 PR 2, R4 PR 3, R4 PR 4, R4 PR 5)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -8,6 +8,18 @@ Locked features of the current version. Every edit is checked against this list 
 - Coach's Quiz: one question per finished session; the question on screen does not change after she answers (right or wrong), until the session is closed.
 - Coach's Quiz: first tap locks the card; a second tap changes nothing; options go grey after the reveal.
 - Coach's Quiz: XP priced by the quiz ledger (+10 first attempt, +25 first correct), never twice; the question paid is the question shown.
+- Order (R4 PR 5, R3): pose, title, note, save-failed card (if any), level-up prize (if any), summary line (day · min · rounds · ⭐ XP), pace note, mantra, "How did it feel?", reflection (once a mood is picked), Coach's Quiz, the kid line, "See every move ▾", "🏠 Back to Today" last. Checked by `core/test/design.mjs` (part done, full, stopped, nothing logged, save failed, review open, all extras, explore).
+- Kid line (R4 PR 5, R2): when a round did not count or a move came in short or skipped, exactly "A few moves came in short — next time hold them all the way. 💪"; otherwise "Every move was done in full." when that is true. The `none` state (every move skipped) is one friendly line — its title and note — with no kid line.
+- "See every move ▾" / "Hide the moves ▴" (R4 PR 5, R1/R2): one 56px button (`data-action="toggleMoveReview"`, `aria-expanded`), only when there is something to review; state `state.moveReviewOpen` in `core/main.js` (closed until opened, not saved, reset to closed by `launchSession` so every session's finish screen opens folded), passed through the session VM as `moveReviewOpen`; `toggleMoveReview` is in `UNGATED_ACTIONS`. Behind it, and only when open: the `roundShortNotes` lines (exact counts, VM wording unchanged) and "Not done in full" (rows `ink-soft` with ⏭ skipped / ½ short, no coral) with "Redo these".
+- Exact round counts in the Grown-up Zone (R4 PR 5): Analytics › Main-set rounds lists the same round lines (date · line), newest first, the latest 10 and "…and N more earlier"; held word-for-word to the finish screen by `core/test/invariants.mjs` (S10).
+- "Redo these" (R4 PR 5, R4): `btn-primary` slots (`--btn-primary-bg` / `--btn-primary-text` / `--btn-primary-edge`, fallbacks aqua / white / aqua-deep), 56px, 17px weight 900 (swim: ink on aqua (4.9)).
+- "🏠 Back to Today" (R4 PR 5, R5): `ink` on sun, 18px weight 900, 56px (swim: ink on sun (7.4)). Explore's "🏠 Done looking" keeps sun-ink on sun at the same size; "Nothing was recorded" unchanged.
+- Sizes (R4 PR 5): mood buttons ≥ 72px tall; Coach's Quiz options 56px, 17px; reflection chips, "Try the full Quiz Deck" and the level-up prize 56px; every finish text ≥ 13px (quiz intro and reflection labels 12 → 13). The finish screen has no size allowance in `core/test/design.mjs`.
+
+## Quiz Deck
+- An answer is shown once (R4 PR 5, G1): the line under an answered move card gives the paired fact — watch-out card → "Fix · " + fix; fix card → "👀 Watch for · " + watch-out; cue card → the sport's transfer heading (`COPY.transferHeading`, the move card's own label: swim "🏊 Swim transfer") + " · " + the move's transfer. No paired fact → `why: ""` and no line (question card and results list). The quiz move pool carries `transfer` (from the exercise's transfer field). Checked by `core/test/invariants.mjs` (no line repeats the answer; each line is its pair).
+- Kept: deck dealing (today card first, a training principle reserved, unlearned first), mastery ledger, daily paying round and cap, practice rounds, results screen.
+- Sizes (R4 PR 5): answer options 56px; tag and practice-round banner 13px; results "MOVES MASTERED" and its footnote 13px, level-up prize 56px. Scanned by `core/test/design.mjs` (question, answered, practice, results), no allowance. The ✕ exit stays a 44px round button (unsized; listed).
 
 ## Session screen (during a workout)
 - Left panel (wide screens) can be hidden and shown by the kid with no grown-up PIN.
@@ -62,7 +74,7 @@ Locked features of the current version. Every edit is checked against this list 
 - Grown-up gate is deny-by-default: any action not in `UNGATED_ACTIONS` (or allowed by `CHILD_MAY`) asks for the PIN.
 - `core/` is byte-identical with the Figure-Skate-Dryland-Timer repo.
 - Every release that changes a precached shell file bumps `version` in `sw.js`.
-- Size-floor test `core/test/design.mjs` (R4 PR 2): kid screens no inline text < 13px, sized buttons ≥ 56 (session Done ≥ 64); grown-up buttons ≥ 48; buttons with no min-height are listed, not failed. Screens not yet redesigned carry a per-screen allowance (`ALLOW`) that PRs 4–6 shrink to empty; the session screen, the journey map, Body Check and Today have none (R4 PR 3 removed the Body Check entries, R4 PR 4 the Today entries). Approved below-56 kid controls: Back a move 48, the move card's ✕ 48, the Body Check light picker 48 (grown-up control), Today's "🧪 Explore the moves" 48 (secondary action).
+- Size-floor test `core/test/design.mjs` (R4 PR 2): kid screens no inline text < 13px, sized buttons ≥ 56 (session Done ≥ 64); grown-up buttons ≥ 48; buttons with no min-height are listed, not failed. Screens not yet redesigned carry a per-screen allowance (`ALLOW`) that PRs 4–6 shrink to empty; the session screen, the journey map, Body Check, Today, the finish screen and the Quiz Deck have none (R4 PR 3 removed the Body Check entries, R4 PR 4 the Today entries, R4 PR 5 the finish entry). Approved below-56 kid controls: Back a move 48, the move card's ✕ 48, the Body Check light picker 48 (grown-up control), Today's "🧪 Explore the moves" 48 (secondary action).
 
 ## Regression table format (paste at the end of every edit)
 | Feature | v<old> → v<new> | Note |
