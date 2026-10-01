@@ -104,8 +104,8 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R5-3 Screenshots + readability measurement (both apps, 2 sizes, decor on/off) | COMPLETE | opus-worker (escalated: sonnet-worker not registered) 2026-10-01: 8 runs × 18 states, all reached, 0 page errors, network blocked; first scan 2 real fails (swim urgent digits var(--stop) on ready-fill 2.95; skate level-card rank name over snow 1.81) → fixed (urgent digits var(--stop-deep) 4.27/4.66; rank name on --hero-chip 5.5) → rescan 0 real fails in all 4 decor-on runs; Let's go inside first viewport (swim 735–799, skate 765–829 of 834); decor layer on every hero host when on, 0 when off, never in the timer's right pane; contact sheets C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/9fa1f983-710d-4d7e-bd00-153161018037/scratchpad/shots-r5/swim-r5.png, C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/9fa1f983-710d-4d7e-bd00-153161018037/scratchpad/shots-r5/skate-r5.png |
 | R5-4 Review pass, FEATURES.md, regression table, one PR per repo | COMPLETE | review pass done (colour slots match the request + decisions; core identical; npm test exit 0 both repos after the contrast fixes); FEATURES.md updated by the worker; regression table below; PRs open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#76, lxyzh1019-cyber/Figure-Skate-Dryland-Timer#50 |
 | R5-5 Merge both PRs | WAITING ON YOU — review screenshots and merge swim #76 and skate #50 | |
-| R5-6 Live site serves new version | NOT STARTED | |
-| R5-7 iPad check | NOT STARTED | |
+| R5-6 Live site serves new version | BLOCKED — needs R5-5 (the user merges both PRs first); then fetch live sw.js for v32 / v28 | |
+| R5-7 iPad check | BLOCKED — needs the merge and the live check (R5-5, R5-6); done by the user on the iPad | |
 
 ## Checks and evidence
 - 2026-09-24 baseline `node core/test/run.mjs` → all suites green (before changes)
