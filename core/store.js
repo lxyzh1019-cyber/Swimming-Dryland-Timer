@@ -888,7 +888,10 @@ export function movePool() {
          the coach's voice still use the full one. */
       pool.push({ name: ex.name, cue: kid.cue || ex.cue || "",
                   watch: kid.watch || ex.parentWatch || "",
-                  fix: kid.fix || ex.redFlag || "", block: ex.block || "" });
+                  fix: kid.fix || ex.redFlag || "", block: ex.block || "",
+                  // The skill it builds (the move card's transfer line), so a
+                  // cue card can say why the cue matters instead of repeating it.
+                  transfer: ex.transfer || "" });
     });
   });
   _movePoolCache = pool; return pool;

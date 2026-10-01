@@ -1056,6 +1056,48 @@ engine.exitSession();
   resetGateState();
 }
 
+/* --- FINISH SCREEN: "See every move ▾" is hers (R4 PR 5) -----------------
+   The per-move list and the exact counts sit behind one button. It is a view
+   of her own finish screen and stores nothing, so it opens with no PIN; its
+   state lives in main.js, so a repaint (any other tap) does not shut it.
+   Tapped the real way, through the click dispatcher. */
+{
+  gate.lockGate(); resetGateState();
+  ok(gate.UNGATED_ACTIONS.includes("toggleMoveReview"), "toggleMoveReview is on the kid-safe list");
+  ok(main.state.moveReviewOpen === false, "the move review starts folded");
+  fireEvent("click", clickTarget("toggleMoveReview"));
+  ok(main.state.gateAsk === null, "opening it asks nobody");
+  ok(main.state.moveReviewOpen === true, "and it actually opens");
+  main.actions.toggleWatch(); main.actions.toggleWatch();
+  ok(main.state.moveReviewOpen === true, "another tap's repaint does not fold it");
+  fireEvent("click", clickTarget("toggleMoveReview"));
+  ok(main.state.moveReviewOpen === false, "and it folds again");
+  /* Left open, it does not follow her into the next session: every finish
+     screen opens folded. */
+  fireEvent("click", clickTarget("toggleMoveReview"));
+  ok(main.state.moveReviewOpen === true, "opened again and left open");
+  main.state.readiness = null; main.state.inSession = false; engine.exitSession();
+  // The stub DOM has no session ring; the per-second tick writes skip it.
+  const realGetById = document.getElementById;
+  document.getElementById = (id) => (/^s-/.test(id) ? null : realGetById(id));
+  main.actions.goSession("monday");
+  ["q_sleep", "q_light", "q_ready", "q_pain"].forEach(q => main.actions.rAnswer(q + "|yes"));
+  main.actions.rResultCta("continue");
+  ok(main.state.inSession === true && main.state.moveReviewOpen === false, "the next session starts with the move review folded");
+  // Let the runner reach its first await before stopping it, then wait for finalize.
+  await new Promise(r => setTimeout(r, 300));
+  engine.endFromStop("break");
+  for (let i = 0; i < 100 && engine.sess.phase !== "done"; i++) await new Promise(r => setTimeout(r, 100));
+  ok(engine.sess.phase === "done", "that session reaches its finish screen");
+  const nextFinish = sscreen.sessionScreen(svm.buildSessionVM(main.state));
+  ok(main.state.moveReviewOpen === false && !/data-move-review/.test(nextFinish),
+     "and its finish screen opens with See every move folded");
+  engine.exitSession(); main.state.inSession = false; main.state.pendingSession = null;
+  document.getElementById = realGetById;
+  localStorage.clear(); store.migrate();
+  resetGateState();
+}
+
 /* --- THE LIGHT AFTER THE FOUR QUESTIONS IS BROUGHT INTO VIEW, ONCE (R4 PR 4)
    The same one-shot as the body-map result: only the answer that completes the
    four scrolls; an answer changed afterwards does not jump the page. */

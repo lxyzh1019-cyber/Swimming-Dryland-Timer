@@ -3501,8 +3501,8 @@ ok(shortVm.roundShortNotes.length === 1 && /^Round 2 wasn't a full round/.test(s
    "and the screen names the round: " + JSON.stringify(shortVm.roundShortNotes));
 ok(shortVm.roundShortNotes[0].includes(shortMove),
    "and the move inside it, so she is told what happened instead of shown a bare number");
-ok(sscreen.sessionScreen(shortVm).includes(shortVm.roundShortNotes[0]),
-   "and the note is actually rendered onto the finish screen");
+ok(sscreen.sessionScreen(svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null, moveReviewOpen: true })).includes(shortVm.roundShortNotes[0]),
+   "and the note is actually rendered onto the finish screen (inside \"See every move\", opened)");
 
 /* --- 5. the Clean/Wobbly spot check changes nothing ----------------------- */
 /* It is offered on a couple of moves per session by design, and a grown-up

@@ -77,9 +77,9 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R4-5 PR 3 Body Check (+ pop-up card sizes and rail-hidden label ink, leftovers from PR 2) | COMPLETE | opus-worker 2026-10-01 on `claude/splash-pr3-body-check`, uncommitted: code, data, tests (design 288 → 572, readiness allowance removed), sw.js v26 → v27, FEATURES.md; `npm test` exit 0 both TZs; `diff -rq core` empty; screenshots C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr3/pr3-swim.png. Remaining: commit, push, PR (main session); PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#70 |
 | R4-6 Merge PR pair 3 | COMPLETE | merged by user 2026-10-01 (swim #70, skate #44) |
 | R4-7 PR 4 Today (+ journey XP bar, green-result scroll, Body Check leftover colours) | COMPLETE | opus-worker 2026-10-01 on `claude/splash-pr4-today`, uncommitted: code (core today screen/vm, main, gate, readiness, session clean button), `js/data.js` ⚡️, tests (design 572 → 682, Today allowance removed; actions 302 → 312), sw.js v27 → v28, FEATURES.md; `npm test` exit 0 both TZs; `diff -rq core` empty; screenshots C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr4/pr4-swim.png. Remaining: commit, push, PR (main session); PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#71 |
-| R4-8 Merge PR pair 4 | WAITING ON YOU — merge PR pair 4 | |
-| R4-9 PR 5 Finish screen and Quiz Deck | NOT STARTED | |
-| R4-10 Merge PR pair 5 | NOT STARTED | |
+| R4-8 Merge PR pair 4 | COMPLETE | merged by user 2026-10-01 (swim #71, skate #45) |
+| R4-9 PR 5 Finish screen and Quiz Deck | COMPLETE | opus-worker 2026-10-01 on `claude/splash-pr5-finish-quiz`, uncommitted: finish order + "See every move" fold + kid line + Redo/Back styles (core session screen/vm), Quiz Deck paired fact + `transfer` in the quiz pool + sizes (core overlays, store), exact round lines in Grown-up › Analytics (core grownup vm/screen), tests (design 682 → 750, finish allowance removed; invariants 569 → 585; actions 312 → 322); follow-up fixes (a) no kid line on "Nothing logged", (b) fold reset per session (`core/main.js` launchSession), sw.js v28 → v29, FEATURES.md; `npm test` exit 0 both TZs; `diff -rq core` empty; screenshots C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr5/pr5-swim.png. Remaining: commit, push, PR (main session); PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#72 |
+| R4-10 Merge PR pair 5 | WAITING ON YOU — merge PR pair 5 | |
 | R4-11 PR 6 Progress and Grown-up | NOT STARTED | |
 | R4-12 Merge PR pair 6 | NOT STARTED | |
 | R4-13 Final size test + screenshots, manifest lists locked items | NOT STARTED | |
@@ -126,6 +126,17 @@ Structural option (not approved, not done): a test that renders every screen, co
 - 2026-10-01 R4 PR 4: contrast hero-text on hero-from / hero-to: aqua-light → aqua, ink text (7.97 / 4.93); Let's go ink on sun swim 7.43 / skate 5.95
 - 2026-10-01 R4 PR 4 follow-up (coordinator): "✓ Clean" 14 → 19px weight 900 (DOM 56px / 19px in both apps; design.mjs asserts ≥ 19px, 900, 56px); faded day-card text measured in the browser (computed colour × opacity composited over the median background pixel of its box, 1194×834 and 390×844, Wed / Mon / Thu / Sun, blocks open and one expanded): swim before 3.50–4.81 (Explore hint, line under Let's go, cues, Pool lines down to 3.50; recovery note 4.15), after (full strength) 4.93–6.77; opacity removed from every failing site; the only faded text left (block-row count) re-measured ≥ 5.24, all pass; design.mjs asserts no other opacity on the day card (design 673 → 682); `npm test` exit 0 both repos, both TZs; `diff -rq core` empty; screenshots and contact sheets refreshed (Let's go still fully in the first viewport at all three sizes)
 - 2026-10-01 R4 PR 4 live site / device → untested
+- 2026-10-01 R4 PR 5 baseline before changes (branch from origin/main): `npm test` exit 0 in both repos, all suites green (actions 312, design 682; swim invariants 569 / skate 572)
+- 2026-10-01 R4 PR 5 after changes (opus-worker): `npm test` exit 0, both TZs, all suites green (leadin-data 19, smoke 1401, core actions 318, dayrecords 251, design 750, integrity 48, interaction 18, invariants 585, landing 7, core leadin 42, session 325, shell 257); design 682 → 750: finish states part done / review open / full / stopped / nothing logged / save failed / all extras / explore (size floor with no allowance, order summary → mood → quiz → kid line → See every move → Back last, kid line text, list and counts hidden until opened, rows ink-soft ⏭/½ no coral, Redo on btn-primary 56/17, Back ink 18/900/56, mood 72, quiz options 56/17, none keeps title and note, explore words kept), Quiz Deck question / answered / practice / results scanned; invariants +16: G1 (pool carries `transfer`, cue/watch/fix all drawn, no line repeats its answer, each line is its pair, empty line not drawn), Analytics round lines = finish round lines (shared check, and new S10 with a real short round: hidden until opened, shown when opened, same words in Analytics, drawn on the rounds card); actions +6: toggleMoveReview ungated, opens/closes through the click dispatcher, survives another tap's repaint
+- 2026-10-01 R4 PR 5 test changes: `test/smoke.mjs:3504` (swim only) now renders the finish screen from a VM built with `moveReviewOpen: true`; assertion and message otherwise kept. No assertion removed or weakened.
+- 2026-10-01 R4 PR 5: mutation check — finish review always open fails design.mjs ("hidden until she opens See every move"); restoring the old Quiz Deck `why` fails invariants (117 of 117 cards repeat the answer)
+- 2026-10-01 R4 PR 5: Grown-up › Analytics before this PR showed rounds only as totals (done / planned / %); the exact per-round lines were not there (the CSV had reasons without counts). Added: the finish screen's round lines on the Main-set rounds card, newest first, latest 10 + "…and N more earlier"
+- 2026-10-01 R4 PR 5: `diff -rq core` swim vs skate → empty
+- 2026-10-01 R4 PR 5: `node core/tools/release-check.mjs origin/main` → ok ("no shell files changed" — base...HEAD only, uncommitted); working-tree equivalent: precached core screens/vm/store changed, sw.js v28 → v29 → bump present. Re-run after commit.
+- 2026-10-01 R4 PR 5: screenshots (Playwright Chromium, touch, fake clock Wed 2026-09-23 12:00 Edmonton, service workers blocked, every non-127.0.0.1 request aborted) at 1194×834, 834×1194, 390×844, each finish reached by driving a real session (Let's go → 4 × yes → Start; coach speech off; rep counts set through the page's engine after ≥ 6 s of work): part done (first viewport + full page), review open (viewport + full page), full, stopped (pain), nothing logged (every move skipped); Quiz Deck question and answered; 54 shots, all reached, no page errors; C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr5/pr5-swim.png, C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr5/pr5-skate.png
+- 2026-10-01 R4 PR 5: DOM at 1194×834 part done: "How did it feel?" inside the first viewport (swim 608–672, skate 608–672); the Coach's Quiz question just below it (swim 855–877, skate 853–897; viewport 834); full / stopped / nothing logged: both inside. 834×1194: both inside in every state. Mood buttons 83 (swim) / 81 (skate) px; Coach's Quiz options 56px / 17px (iPad), 114–122px on phone (wrapped); See every move 56; Redo 56 / 17px (swim ink on aqua, skate white on rose-deep); Back 56 / 18px; no text under 13px; Quiz Deck options 62–94px
+- 2026-10-01 R4 PR 5 follow-up (coordinator request): (a) "Nothing logged" no longer draws the kid line — title and note only (design.mjs asserts no kid line there); (b) `state.moveReviewOpen = false` in `launchSession` (every session start, incl. explore and start-over), new actions assertions: opened and left open, the next session starts folded, its finish screen (reached by a real run stopped with "break") has no review section (actions 318 → 322); mutation — removing the reset fails actions. `npm test` exit 0 both repos, both TZs (actions 322, design 750, invariants unchanged); `diff -rq core` empty; nothing-logged screenshots re-shot at 3 sizes × 2 apps (kid line absent, title "Nothing logged this time.", See every move 56, no text < 13px) and contact sheets rebuilt
+- 2026-10-01 R4 PR 5 live site / device → untested
 
 ## Open questions / blockers
 - No visible deploy stamp on the page (rules require one) — flagged, out of scope this round.
@@ -233,4 +244,33 @@ Structural option (not approved, not done): a test that renders every screen, co
 | Gate deny-by-default | kept | one new kid action `toggleBlocks`, added to `UNGATED_ACTIONS` deliberately |
 | `core/` byte-identical with the other repo | kept | `diff -rq core` empty |
 | sw.js version bump on shell change | kept | v27 → v28 |
+| Missing | none | |
+
+## Regression table — R4 PR 5 (+ Today → + finish screen, Quiz Deck)
+| Feature | R4-PR4 → R4-PR5 | Note |
+|---|---|---|
+| Coach's Quiz: one question per session, pinned after the answer | kept | invariants N+5 and actions quiz tests green; question/opts code untouched |
+| Coach's Quiz: first tap locks, options go grey (`disabled`) | kept | invariants (rendered `disabled` count) green |
+| Coach's Quiz: XP by the ledger (+10 / +25), never twice | kept | pricing untouched; suites green |
+| Coach's Quiz options 15 → 17px, min-height 56; intro 12 → 13px | changed | sizes only |
+| XP, streak, completion states and their words | kept | COMPLETION table untouched; smoke partial/held/missed/resume copy green |
+| Finish order (summary moved above pace note/mantra; save-failed and level-up moved up; kid line; fold) | changed | correction 3 order; design.mjs asserts it |
+| "Not done in full" list, "Redo these", round lines: always shown → behind "See every move ▾" | changed | R1/R2; `toggleMoveReview` (existing state, ungated) |
+| Not-done rows coral / sun-ink labels → ink-soft with ⏭ / ½ | changed | R1 |
+| "Redo these" white on aqua 44px/14px → btn-primary slots 56px/17px | changed | R4 |
+| "🏠 Back to Today" sun-ink 20px/600 → ink 18px/900, 56px | changed | R5; Explore "Done looking" keeps sun-ink, same size |
+| Kid line "A few moves came in short — next time hold them all the way. 💪" | added | |
+| "Every move was done in full." | kept | now the kid line when nothing came in short |
+| `none` title and note; explore "Nothing was recorded" | kept | design.mjs asserts both; `none` shows no kid line (follow-up a) |
+| "See every move" folded on every new session's finish | added | follow-up b: reset in `launchSession`; actions.mjs asserts it |
+| Mood ≥ 72px, reflection chips / Quiz Deck launcher / level-up 56px, finish allowance removed | added | design.mjs, no allowance |
+| Exact round lines in Grown-up › Analytics | added | were not there (totals only) |
+| Quiz Deck line under the answer repeated the answer | intentionally removed | G1: now the paired fact, or no line |
+| Quiz Deck paired fact (Fix / 👀 Watch for / transfer heading); `transfer` in the quiz pool | added | label from `COPY.transferHeading` (per sport) |
+| Quiz Deck dealing, mastery ledger, daily paying round, cap, results | kept | invariants deck checks green |
+| Quiz Deck options 56px; tag, practice banner, results labels 13px; results level-up 56px | changed | sizes only |
+| Session screen, pop-up cards, Body Check, Today, journey map | kept | untouched; design assertions unchanged and green |
+| Gate deny-by-default | kept | no new action; `toggleMoveReview` was already ungated, now asserted |
+| `core/` byte-identical with the other repo | kept | `diff -rq core` empty |
+| sw.js version bump on shell change | kept | v28 → v29 |
 | Missing | none | |

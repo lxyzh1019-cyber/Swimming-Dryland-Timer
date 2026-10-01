@@ -447,7 +447,12 @@ function analyticsTab(vm) {
           <span style="font-size:15px;font-weight:800;color:var(--ink-soft);white-space:nowrap;">/ ${a.rounds.planned} planned · ${a.roundsDonePct}%</span>
         </div>
         <div style="height:10px;background:var(--surface-2);border-radius:10px;overflow:hidden;margin-bottom:10px;"><div style="width:${a.roundsDonePct}%;height:100%;background:var(--aqua);border-radius:10px;"></div></div>
-        <div style="font-size:12px;font-weight:700;color:var(--ink-faint);line-height:1.4;">${esc(a.rounds.note)}</div>`)}
+        <div style="font-size:12px;font-weight:700;color:var(--ink-faint);line-height:1.4;">${esc(a.rounds.note)}</div>
+        ${a.rounds.shortLines.length ? `
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px;" data-rounds-short="1">
+          ${a.rounds.shortLines.map(l => `<div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.4;"><strong style="color:var(--ink);">${esc(l.date)}</strong> · ${esc(l.text)}</div>`).join("")}
+          ${a.rounds.shortMore ? `<div style="font-size:13px;font-weight:700;color:var(--ink-soft);">…and ${a.rounds.shortMore} more earlier.</div>` : ""}
+        </div>` : ""}`)}
       ${card(`
         ${secTitle("Form quality")}
         ${a.hasForm ? `

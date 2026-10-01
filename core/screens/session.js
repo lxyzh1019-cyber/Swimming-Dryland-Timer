@@ -305,6 +305,16 @@ const COMPLETION = {
   }
 };
 
+/* THE FINISH SCREEN, in one order (R4 PR 5, docs/DESIGN.md "Finish screen"):
+   what happened (pose, title, note, a failed save, a level-up), the one summary
+   line, then the two things she DOES here — "How did it feel?" and the Coach's
+   Quiz — then one kid line, and the per-move detail folded behind "See every
+   move". The exact counts ("… was 4 of 16 reps") and the list of moves not done
+   in full are for looking up, not for the top of a kid's screen: they render
+   only when she opens the fold (state.moveReviewOpen, remembered across
+   re-renders, toggled by the ungated `toggleMoveReview`). */
+const KID_SHORT_LINE = "A few moves came in short — next time hold them all the way. 💪";
+
 function completeScreen(vm) {
   const c = COMPLETION[vm.completionKey] || COMPLETION[vm.completionState] || COMPLETION.none;
   // The note the VM built for this particular day — the percentage she reached,
@@ -315,11 +325,26 @@ function completeScreen(vm) {
   // Coming back to finish a day is harder than doing it in one go, and the
   // screen should say which one just happened.
   const title = vm.finishedAResume ? "You came back and finished it! 🎉" : c.title;
+  const shortNotes = vm.showRoundsLine ? (vm.roundShortNotes || []) : [];
+  const notFull = vm.notFull || [];
+  const hasReview = shortNotes.length > 0 || notFull.length > 0;
+  const reviewOpen = hasReview && !!vm.moveReviewOpen;
+  // "Nothing logged" already says it in one friendly line (its title and note).
+  const kidLine = vm.completionState === "none" ? ""
+    : hasReview ? KID_SHORT_LINE : vm.allInFull ? "Every move was done in full." : "";
   return `
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:16px;padding:40px;text-align:center;background:${c.bg};overflow-y:auto;">
     ${imgWithFallbacks(photoSources(POSES[c.pose]), `alt="" style="height:${c.poseH}px;object-fit:contain;flex-shrink:0;"`)}
     <div style="font-family:var(--font-display);font-weight:600;font-size:34px;color:${c.ink};">${title}</div>
     ${note ? `<div${c.alert ? ` role="alert"` : ""} style="font-size:15px;font-weight:800;${c.noteStyle || "color:var(--mint-ink);background:var(--mint-wash);"}border-radius:16px;padding:10px 16px;max-width:480px;line-height:1.45;">${note}</div>` : ""}
+    ${vm.saveFailed ? `
+    <div style="display:flex;flex-direction:column;gap:10px;background:var(--stop-wash, var(--surface));border:2px solid var(--stop);border-radius:20px;padding:18px 22px;max-width:600px;width:100%;box-sizing:border-box;text-align:left;">
+      <div style="font-family:var(--font-display);font-weight:600;font-size:19px;color:var(--stop-ink);">This one didn't save 😕</div>
+      <div style="font-size:14px;font-weight:700;color:var(--ink);line-height:1.5;">You did the work — the iPad just had no room left to write it down. Nothing has been counted for it yet, so there's no XP or streak from this session.</div>
+      <div style="font-size:14px;font-weight:700;color:var(--ink);line-height:1.5;"><strong>Show this to a grown-up.</strong> In the Grown-up Zone they can free up space, and your progress for today is still saved — you can pick this session back up where you left it.</div>
+    </div>` : ""}
+    ${vm.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="display:flex;align-items:center;gap:10px;min-height:56px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:14px 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
+    <div style="font-size:16px;font-weight:700;color:var(--ink-soft);" data-finish-summary="1">${vm.sessionDayTitle}${vm.explore ? "" : ` · ${vm.sessionMinutes} min`}${vm.showRoundsLine ? ` · ${vm.roundsLine}` : ""}${vm.xpLine ? ` · ⭐ ${escapeHtml(vm.xpLine)}` : ""}</div>
     ${vm.paceNote ? `
     <div style="display:flex;align-items:flex-start;gap:9px;max-width:480px;text-align:left;border-radius:16px;padding:10px 14px;font-size:14px;font-weight:800;line-height:1.45;${
       vm.paceBand === "red" ? "background:var(--stop-wash);color:var(--stop-ink);"
@@ -330,32 +355,8 @@ function completeScreen(vm) {
       <span>${escapeHtml(vm.paceNote)}</span>
     </div>` : ""}
     ${vm.sessionMantra && c.mantra ? `<div style="font-family:var(--font-hand);font-size:26px;font-weight:700;color:var(--aqua-ink);line-height:1.2;">${vm.sessionMantra}</div>` : ""}
-    <div style="font-size:16px;font-weight:700;color:var(--ink-soft);">${vm.sessionDayTitle}${vm.explore ? "" : ` · ${vm.sessionMinutes} min`}${vm.showRoundsLine ? ` · ${vm.roundsLine}` : ""}${vm.xpLine ? ` · ⭐ ${escapeHtml(vm.xpLine)}` : ""}</div>
-    ${vm.showRoundsLine && (vm.roundShortNotes || []).length ? `
-    <div style="font-size:14px;font-weight:700;color:var(--ink-soft);max-width:480px;line-height:1.5;">
-      ${vm.roundShortNotes.map(n => `<div>${n}</div>`).join("")}
-    </div>` : ""}
-    ${vm.notFull && vm.notFull.length ? `
-    <div style="max-width:520px;width:100%;box-sizing:border-box;text-align:left;background:var(--surface);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;" data-not-full-list="1">
-      <div style="font-family:var(--font-display);font-weight:600;font-size:17px;color:var(--ink);">Not done in full</div>
-      ${vm.notFull.map(r => `
-      <div style="display:flex;align-items:baseline;gap:10px;font-size:14px;font-weight:800;color:var(--ink);" data-not-full="${escapeHtml(r.name)}">
-        <span style="flex:1;min-width:0;">${escapeHtml(r.name)}</span>
-        <span style="font-weight:800;color:${r.anySkipped ? "var(--coral)" : "var(--sun-ink)"};white-space:nowrap;">${escapeHtml(r.label)}</span>
-      </div>`).join("")}
-      <button type="button" data-action="goSessionRedo" data-arg="${escapeHtml(vm.redoDayKey)}" style="align-self:flex-start;margin-top:4px;background:var(--aqua);color:#fff;border:none;border-radius:var(--radius-pill);padding:11px 20px;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;min-height:44px;box-shadow:0 4px 0 var(--aqua-ink,var(--sea));">Redo these</button>
-    </div>` : ""}
-    ${vm.allInFull ? `
-    <div style="font-size:14px;font-weight:800;color:var(--ink-soft);max-width:480px;line-height:1.5;">Every move was done in full.</div>` : ""}
-    ${vm.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="display:flex;align-items:center;gap:10px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:14px 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
-    ${vm.saveFailed ? `
-    <div style="display:flex;flex-direction:column;gap:10px;background:var(--stop-wash, var(--surface));border:2px solid var(--stop);border-radius:20px;padding:18px 22px;max-width:600px;width:100%;box-sizing:border-box;text-align:left;">
-      <div style="font-family:var(--font-display);font-weight:600;font-size:19px;color:var(--stop-ink);">This one didn't save 😕</div>
-      <div style="font-size:14px;font-weight:700;color:var(--ink);line-height:1.5;">You did the work — the iPad just had no room left to write it down. Nothing has been counted for it yet, so there's no XP or streak from this session.</div>
-      <div style="font-size:14px;font-weight:700;color:var(--ink);line-height:1.5;"><strong>Show this to a grown-up.</strong> In the Grown-up Zone they can free up space, and your progress for today is still saved — you can pick this session back up where you left it.</div>
-    </div>` : ""}
     ${vm.showCompletionExtras ? `
-    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;" data-finish-mood="1">
       <div style="display:flex;align-items:center;gap:10px;">
         ${imgWithFallbacks(photoSources(POSES.think), `alt="" style="height:64px;object-fit:contain;"`)}
         <div style="font-family:var(--font-hand);font-size:24px;font-weight:700;color:var(--ink);">How did it feel?</div>
@@ -373,24 +374,24 @@ function completeScreen(vm) {
     <div style="display:flex;flex-direction:column;gap:14px;background:var(--surface);border-radius:20px;padding:16px 22px;box-shadow:var(--shadow-soft);max-width:600px;">
       <div style="font-family:var(--font-display);font-weight:600;font-size:18px;color:var(--ink);">Think &amp; improve 💭</div>
       <div style="display:flex;flex-direction:column;gap:7px;align-items:center;">
-        <div style="font-size:12px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.05em;">What went well?</div>
+        <div style="font-size:13px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.05em;">What went well?</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
           ${vm.reflectWellOpts.map(rw => `<button type="button" data-action="reflectWell" data-arg="${rw.label}" style="${rw.style}">${rw.label}</button>`).join("")}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:7px;align-items:center;">
-        <div style="font-size:12px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.05em;">Next time I'll…</div>
+        <div style="font-size:13px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.05em;">Next time I'll…</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
           ${vm.reflectNextOpts.map(rn => `<button type="button" data-action="reflectNext" data-arg="${rn.label}" style="${rn.style}">${rn.label}</button>`).join("")}
         </div>
       </div>
     </div>` : ""}
-    <div style="display:flex;flex-direction:column;gap:12px;background:var(--surface);border-radius:20px;padding:18px 22px;box-shadow:var(--shadow-soft);max-width:600px;width:100%;box-sizing:border-box;text-align:left;">
+    <div style="display:flex;flex-direction:column;gap:12px;background:var(--surface);border-radius:20px;padding:18px 22px;box-shadow:var(--shadow-soft);max-width:600px;width:100%;box-sizing:border-box;text-align:left;" data-finish-quiz="1">
       <div style="display:flex;align-items:center;gap:10px;">
         ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:44px;height:44px;object-fit:contain;flex-shrink:0;" alt=""`)}
         <div>
           <div style="font-family:var(--font-display);font-weight:600;font-size:18px;color:var(--ink);">Coach's Quiz 🧠</div>
-          <div style="font-size:12px;font-weight:800;color:var(--ink-soft);">${vm.quizIntro || COPY.sessionQuizIntro}</div>
+          <div style="font-size:13px;font-weight:800;color:var(--ink-soft);">${vm.quizIntro || COPY.sessionQuizIntro}</div>
         </div>
       </div>
       <div style="font-weight:800;font-size:16px;color:var(--ink);line-height:1.4;">${vm.quizQuestion}</div>
@@ -406,9 +407,31 @@ function completeScreen(vm) {
         <div style="font-weight:900;font-size:15px;color:${vm.quizFeedbackColor};">${vm.quizFeedback}</div>
         <div style="font-size:14px;font-weight:700;color:var(--ink-soft);margin-top:4px;line-height:1.4;">${vm.quizWhy}</div>
       </div>` : ""}
-      <button type="button" data-action="startQuizDeck" style="align-self:flex-start;display:flex;align-items:center;gap:8px;background:var(--aqua-wash);border:2px solid var(--aqua-light);border-radius:var(--radius-pill);padding:9px 16px;cursor:pointer;font-weight:900;font-size:14px;color:var(--aqua-ink);font-family:inherit;">🧠 Try the full Quiz Deck (8 moves)</button>
+      <button type="button" data-action="startQuizDeck" style="align-self:flex-start;display:flex;align-items:center;gap:8px;min-height:56px;background:var(--aqua-wash);border:2px solid var(--aqua-light);border-radius:var(--radius-pill);padding:9px 16px;cursor:pointer;font-weight:900;font-size:14px;color:var(--aqua-ink);font-family:inherit;">🧠 Try the full Quiz Deck (8 moves)</button>
     </div>` : ""}
-    <button type="button" data-action="exitSession" style="margin-top:14px;display:flex;align-items:center;gap:10px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:16px 32px;font-family:var(--font-display);font-weight:600;font-size:20px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);flex-shrink:0;">🏠 ${vm.explore ? "Done looking" : "Back to Today"}</button>
+    ${kidLine ? `
+    <div style="font-size:14px;font-weight:800;color:var(--ink-soft);max-width:480px;line-height:1.5;" data-finish-kid-line="1">${kidLine}</div>` : ""}
+    ${hasReview ? `
+    <button type="button" data-action="toggleMoveReview" aria-expanded="${reviewOpen ? "true" : "false"}" style="min-height:56px;display:flex;align-items:center;gap:8px;background:var(--surface);border:3px solid var(--hairline);border-radius:var(--radius-pill);padding:0 24px;cursor:pointer;font-weight:900;font-size:17px;color:var(--ink);font-family:inherit;flex-shrink:0;">${reviewOpen ? "Hide the moves ▴" : "See every move ▾"}</button>` : ""}
+    ${reviewOpen ? `
+    <div style="max-width:520px;width:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:12px;" data-move-review="1">
+      ${shortNotes.length ? `
+      <div style="font-size:14px;font-weight:700;color:var(--ink-soft);line-height:1.5;">
+        ${shortNotes.map(n => `<div>${n}</div>`).join("")}
+      </div>` : ""}
+      ${notFull.length ? `
+      <div style="text-align:left;background:var(--surface);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;" data-not-full-list="1">
+        <div style="font-family:var(--font-display);font-weight:600;font-size:17px;color:var(--ink);">Not done in full</div>
+        ${notFull.map(r => `
+        <div style="display:flex;align-items:baseline;gap:10px;font-size:14px;font-weight:800;color:var(--ink-soft);" data-not-full="${escapeHtml(r.name)}">
+          <span aria-hidden="true" style="flex-shrink:0;">${r.anySkipped ? "⏭" : "½"}</span>
+          <span style="flex:1;min-width:0;">${escapeHtml(r.name)}</span>
+          <span style="font-weight:800;color:var(--ink-soft);white-space:nowrap;">${escapeHtml(r.label)}</span>
+        </div>`).join("")}
+        <button type="button" data-action="goSessionRedo" data-arg="${escapeHtml(vm.redoDayKey)}" style="align-self:flex-start;margin-top:4px;background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);border:none;border-radius:var(--radius-pill);padding:0 22px;font-weight:900;font-size:17px;cursor:pointer;font-family:inherit;min-height:56px;box-shadow:0 4px 0 var(--btn-primary-edge,var(--aqua-deep));">Redo these</button>
+      </div>` : ""}
+    </div>` : ""}
+    <button type="button" data-action="exitSession" style="margin-top:14px;display:flex;align-items:center;gap:10px;min-height:56px;background:var(--sun);color:${vm.explore ? "var(--sun-ink)" : "var(--ink)"};border:none;border-radius:var(--radius-pill);padding:0 32px;font-family:var(--font-display);font-weight:900;font-size:18px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);flex-shrink:0;">🏠 ${vm.explore ? "Done looking" : "Back to Today"}</button>
   </div>`;
 }
 

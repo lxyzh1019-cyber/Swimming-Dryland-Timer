@@ -81,8 +81,15 @@ function makeQ(move, kind, pool) {
     : kind === "watch" ? ("When you do “" + move.name + "”, what should you watch out for?")
     : ("If “" + move.name + "” feels wrong, what’s the fix?");
   const tag = kind === "cue" ? "KEY CUE" : kind === "watch" ? "WATCH-OUT" : "THE FIX";
+  /* The line under the answer gives the PAIRED fact, never the answer again
+     (the green option already shows it): a watch-out card says the fix, a fix
+     card says what to watch for, a cue card says what the move builds in the
+     sport — under the move card's own transfer heading. Nothing to pair, no
+     line. */
+  const paired = kind === "watch" ? move.fix : kind === "fix" ? move.watch : move.transfer;
+  const lead = kind === "watch" ? "Fix · " : kind === "fix" ? "👀 Watch for · " : COPY.transferHeading + " · ";
   return { move: move.name, block: move.block, kind, tag, prompt, opts,
-    why: (kind === "cue" ? "Cue · " : kind === "watch" ? "👀 Watch for · " : "Fix · ") + correct };
+    why: paired ? lead + paired : "" };
 }
 /* A training principle. Authored rather than generated: attitude, efficiency
    and "the same movement, not a similar one" have no sibling move to borrow a
@@ -313,24 +320,24 @@ export function quizDeckHtml(qd) {
           ${qd.bank ? `
           <div style="width:100%;background:var(--surface-2);border-radius:14px;padding:12px 14px;box-sizing:border-box;">
             <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:7px;">
-              <span style="font-size:12px;font-weight:900;letter-spacing:0.05em;color:var(--ink-soft);">MOVES MASTERED</span>
+              <span style="font-size:13px;font-weight:900;letter-spacing:0.05em;color:var(--ink-soft);">MOVES MASTERED</span>
               <span style="font-size:13px;font-weight:900;color:var(--aqua-ink);">${qd.bank.mastered} / ${qd.bank.total}</span>
             </div>
             <div style="height:10px;background:var(--surface);border-radius:10px;overflow:hidden;">
               <div style="width:${Math.round((qd.bank.mastered / qd.bank.total) * 100)}%;height:100%;background:var(--aqua);border-radius:10px;transition:width 0.4s;"></div>
             </div>
-            <div style="font-size:12px;font-weight:700;color:var(--ink-faint);margin-top:7px;line-height:1.35;">${qd.bank.left
+            <div style="font-size:13px;font-weight:700;color:var(--ink-faint);margin-top:7px;line-height:1.35;">${qd.bank.left
               ? qd.bank.left + " question" + (qd.bank.left === 1 ? "" : "s") + " left to learn. Each one pays XP the first time you get it right — after that it’s yours for keeps."
               : "You’ve mastered every question in the book. 🧠 Nothing left to learn here — the water is where the XP lives now."}</div>
           </div>` : ""}
-          ${qd.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="min-height:52px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:0 24px;font-family:var(--font-display);font-weight:600;font-size:18px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
+          ${qd.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="min-height:56px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:0 24px;font-family:var(--font-display);font-weight:600;font-size:18px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);">🎁 Level up! Pick your prize</button>` : ""}
           <div style="width:100%;display:flex;flex-direction:column;gap:8px;margin-top:6px;text-align:left;">
             ${qd.qs.map((q, ix) => `
               <div style="display:flex;align-items:flex-start;gap:10px;background:var(--surface-2);border-radius:12px;padding:10px 12px;">
                 <span style="font-size:16px;flex-shrink:0;">${qd.picks[ix] != null && q.opts[qd.picks[ix]] && q.opts[qd.picks[ix]].ok ? "✓" : "✕"}</span>
                 <div>
                   <div style="font-weight:800;font-size:14px;color:var(--ink);line-height:1.35;">${q.prompt}</div>
-                  <div style="font-size:13px;font-weight:700;color:var(--aqua-ink);margin-top:2px;">${q.why}</div>
+                  ${q.why ? `<div style="font-size:13px;font-weight:700;color:var(--aqua-ink);margin-top:2px;">${q.why}</div>` : ""}
                 </div>
               </div>`).join("")}
           </div>
@@ -343,7 +350,7 @@ export function quizDeckHtml(qd) {
     </div>`;
   }
 
-  const optStyle = (o, i) => "display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:14px 16px;border-radius:16px;border:3px solid;cursor:pointer;font-weight:800;font-size:16px;font-family:inherit;box-sizing:border-box;"
+  const optStyle = (o, i) => "display:flex;align-items:center;gap:11px;width:100%;min-height:56px;text-align:left;padding:14px 16px;border-radius:16px;border:3px solid;cursor:pointer;font-weight:800;font-size:16px;font-family:inherit;box-sizing:border-box;"
     + (!answered ? "border-color:var(--hairline);background:var(--surface);color:var(--ink);"
       : o.ok ? "border-color:var(--mint);background:var(--mint-wash);color:var(--mint-ink);"
       : picked === i ? "border-color:var(--coral);background:color-mix(in srgb, var(--coral) 12%, #fff);color:var(--coral);"
@@ -360,11 +367,11 @@ export function quizDeckHtml(qd) {
         <span style="font-weight:900;font-size:14px;color:var(--ink-soft);flex-shrink:0;">${qd.idx + 1}/${qd.qs.length}</span>
       </div>
       ${qd.willPay === false ? `
-      <div style="background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);padding:7px 15px;font-size:12px;font-weight:900;text-align:center;">🧠 PRACTICE ROUND · today’s quiz XP is already earned</div>` : ""}
+      <div style="background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);padding:7px 15px;font-size:13px;font-weight:900;text-align:center;">🧠 PRACTICE ROUND · today’s quiz XP is already earned</div>` : ""}
 
       <div style="background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-lift);padding:24px;display:flex;flex-direction:column;gap:16px;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:11px;font-weight:900;letter-spacing:0.06em;background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);padding:5px 12px;">${cur.tag}</span>
+          <span style="font-size:13px;font-weight:900;letter-spacing:0.06em;background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);padding:5px 12px;">${cur.tag}</span>
           <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${cur.label || cur.move}</span>
         </div>
         <div style="font-family:var(--font-display);font-weight:600;font-size:23px;color:var(--ink);line-height:1.25;">${cur.prompt}</div>
@@ -375,10 +382,11 @@ export function quizDeckHtml(qd) {
               <span style="flex:1;">${o.t}</span>
             </button>`).join("")}
         </div>
-        ${answered ? `
+        ${answered && cur.why ? `
         <div style="background:var(--aqua-wash);border-radius:14px;padding:13px 15px;">
           <div style="font-weight:900;font-size:15px;color:var(--aqua-ink);">${cur.why}</div>
-        </div>
+        </div>` : ""}
+        ${answered ? `
         <button type="button" data-action="nextQuizDeck" style="min-height:56px;background:var(--aqua);color:#fff;border:none;border-radius:var(--radius-pill);padding:0 26px;font-family:var(--font-display);font-weight:600;font-size:19px;cursor:pointer;box-shadow:0 5px 0 var(--aqua-deep);align-self:flex-end;">Next →</button>` : ""}
       </div>
     </div>

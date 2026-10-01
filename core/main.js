@@ -1018,6 +1018,8 @@ async function restartDay() {
 let sessionRun = null;
 function launchSession(pending) {
   state.pendingSession = pending;
+  // Every session's finish screen opens with "See every move" folded.
+  state.moveReviewOpen = false;
   state.inSession = true;
   render();
   /* Kept, because "start over" has to WAIT for this run to unwind before it
