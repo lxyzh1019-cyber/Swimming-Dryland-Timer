@@ -18,6 +18,8 @@ Single working record for this repository. Updated by the main session at the en
 - Plan v3 approved 2026-09-30 (user choice): Go/Done, Keep going and the green-light Start button use Deep green (white on mint-ink, darker edge) via slots `btn-go-bg/edge/text`; applied on the PR 2 branch.
 - Plan v4 approved 2026-09-30 (user's pasted decision "Pool calm"): `btn-go` slots = aqua-deep / aqua-ink / white in both apps (Go stays ≥64px, ≥20px weight 900: swim contrast 3.6 passes as large text only); Pause, Resume, Skip, Skip it white with 3px hairline border and ink-soft text. Supersedes v3 Deep green. On the PR 2 branch.
 
+- 2026-10-01: all seven R4 PR pairs merged; live site checked by fetching sw.js (v31) and colors.css from GitHub Pages (merged, live files confirmed; device not yet checked).
+
 ## Pending
 - none
 
@@ -87,8 +89,8 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R4-12 Merge PR pair 6 | COMPLETE | merged by user 2026-10-01 (swim #73, skate #47) |
 | R4-13 Final size test + screenshots, manifest lists locked items | COMPLETE | final scan after PR 7 (shots/final-scan-pr7.json; 96 screens per app × 3 sizes; adds Quiz Deck results, move card, STOP, the grown-up check, prize draw): swim — text <13px 0 (kid 0 / grown-up 0), kid buttons <56 3 (the approved 48px "🔒 Grown-up only" summary, once per size), grown-up controls <48 0, real contrast fails 0 (gradients measured at each text's position: 1155, 0 fail; skipped 0), justified 15 (12 emoji 🐢, 3 disabled Form check ▶); skate — text <13px 0 (0 / 0), kid buttons <56 3 (same summary), grown-up controls <48 0, real contrast fails 0 (899 measured over gradients, 0 fail; skipped 0), justified 27 (24 emoji ❄️, 3 disabled ▶). Before (shots/final-scan.json, PR 6): swim text <13 183, contrast 1079 (+871 skipped); skate 171, 752 (+673 skipped); FEATURES.md lists every locked "Done when" item plus the contrast rules and the grown-up 13px floor; contact sheets shots/pr7/pr7-swim.png, pr7-skate.png (state left for the main session); final scan on the PR 7 branch (shots/final-scan-pr7.json): text <13px 0, grown-up controls <48px 0, real contrast fails 0 both apps; FEATURES.md lists all Done-when locked items (worker confirmed) |
 | R4-13a PR 7 final contrast and grown-up text sweep | COMPLETE | opus-worker 2026-10-01 on `claude/splash-pr7-contrast-sweep`, uncommitted: contrast sweep across core screens/vm (session pills on washes with rings and -ink marks, Today strip/legend/review slots, Body Check chips/badges/title ✓, Quiz Deck, prize draw, Progress rank card, Grown-up tabs 13px and no ink-faint, gate dialog, storage banner), js/data.js pain Stop on btn-stop slots, sw.js v30 → v31, core/test/design.mjs (contrast rules + measured contrast through this app's tokens + grown-up 13px floor + prize draw + rule self-checks; 865 → 882), test/smoke.mjs:2122 regex (see checks), FEATURES.md; `npm test` exit 0 both TZs; `diff -rq core` empty; real contrast fails 0 in both apps. Remaining: commit, push, PR (main session); PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#74 |
-| R4-13b Merge PR pair 7 | WAITING ON YOU — merge PR pair 7 | |
-| R4-14 iPad check by user | NOT STARTED | |
+| R4-13b Merge PR pair 7 | COMPLETE | merged by user 2026-10-01; live GitHub Pages serves sw.js v31 and the btn-go slot (curl 2026-10-01) |
+| R4-14 iPad check by user | WAITING ON YOU — open both apps on the iPad (reload twice so the new version installs) and try Today, Body Check, a session, the finish screen, Progress and the Grown-up Zone | |
 
 ## Checks and evidence
 - 2026-09-24 baseline `node core/test/run.mjs` → all suites green (before changes)
