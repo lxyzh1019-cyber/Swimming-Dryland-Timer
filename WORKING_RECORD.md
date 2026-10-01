@@ -39,6 +39,7 @@ Single working record for this repository. Updated by the main session at the en
 | 13 | R4 2026-09-30 | "The figure skate level block background colour is wrong, it can not use the same colour from swimming dryland timer" | done (in PR 2) | user 2026-09-30: "move the map color fix forward into pr2" → plan v2. Pre-existing (K7): the journey/level map gradient is literal swim hex in shared core; unchanged by PR 1 (before = after); fixed in PR 4 via the journey slots set in PR 1 (skate rose/sand) |
 | 14 | R4 2026-09-30 | "The Go button in the timer is ugly, I need a better option; contrast important, overall colour combo more important" | done (PR 2) | 4 options shown on both palettes; user chose Deep green (white on mint-ink) → plan v3 |
 | 15 | R4 2026-09-30 | Pasted decision "Option 1 Pool calm": Go/Done on aqua-deep with white text; Pause/Resume/Skip/Skip it white with hairline border; show screenshots before merge; "anything else we have not done?" | done (PR 2) | plan v4; supersedes Deep green (row 14) |
+| 16 | R4 2026-10-01 | Decision offered after PR 5: fix "Every move was done in full." showing after a pain stop | done (PR 6) | recommended fix offered with "say no to leave it"; user replied "merged, continue" → included in PR 6 |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Regressions caused | Workarounds/exceptions | Last symptom | Rewrite-vs-repair reviewed? |
@@ -48,6 +49,7 @@ Single working record for this repository. Updated by the main session at the en
 | Move status list (session rail / Today review) | 1 | 0 | 0 | 0 | ½ gave no reason | no |
 | Test suite depends on the real date | 2 | 1 | 0 | 0 | Sunday-only failures (earlier: Monday-only assertion) | structural fix applied: pinned test clock |
 | Screen contrast and tap size (redesign R4) | 0 | 0 | 0 | 0 | 76 contrast fails, 185 texts <13px, controls 26–44px (handoff screen check) | n/a — redesign round, not a fix |
+| Finish kid line | 1 | 0 | 0 | 0 | full-round line after a pain stop | no — one-line condition fix, failing test first (invariants S11) |
 Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → no further patch until the comparison is presented.
 
 Structural option (not approved, not done): a test that renders every screen, collects every `data-action` a kid can reach during a session, and fails if any is gated without being named in an explicit "adult-only" list — so a new kid button cannot silently ship behind the PIN.
@@ -79,10 +81,12 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R4-7 PR 4 Today (+ journey XP bar, green-result scroll, Body Check leftover colours) | COMPLETE | opus-worker 2026-10-01 on `claude/splash-pr4-today`, uncommitted: code (core today screen/vm, main, gate, readiness, session clean button), `js/data.js` ⚡️, tests (design 572 → 682, Today allowance removed; actions 302 → 312), sw.js v27 → v28, FEATURES.md; `npm test` exit 0 both TZs; `diff -rq core` empty; screenshots C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr4/pr4-swim.png. Remaining: commit, push, PR (main session); PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#71 |
 | R4-8 Merge PR pair 4 | COMPLETE | merged by user 2026-10-01 (swim #71, skate #45) |
 | R4-9 PR 5 Finish screen and Quiz Deck | COMPLETE | opus-worker 2026-10-01 on `claude/splash-pr5-finish-quiz`, uncommitted: finish order + "See every move" fold + kid line + Redo/Back styles (core session screen/vm), Quiz Deck paired fact + `transfer` in the quiz pool + sizes (core overlays, store), exact round lines in Grown-up › Analytics (core grownup vm/screen), tests (design 682 → 750, finish allowance removed; invariants 569 → 585; actions 312 → 322); follow-up fixes (a) no kid line on "Nothing logged", (b) fold reset per session (`core/main.js` launchSession), sw.js v28 → v29, FEATURES.md; `npm test` exit 0 both TZs; `diff -rq core` empty; screenshots C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr5/pr5-swim.png. Remaining: commit, push, PR (main session); PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#72 |
-| R4-10 Merge PR pair 5 | WAITING ON YOU — merge PR pair 5 | |
-| R4-11 PR 6 Progress and Grown-up | NOT STARTED | |
-| R4-12 Merge PR pair 6 | NOT STARTED | |
-| R4-13 Final size test + screenshots, manifest lists locked items | NOT STARTED | |
+| R4-10 Merge PR pair 5 | COMPLETE | merged by user 2026-10-01 (swim #72, skate #46) |
+| R4-11 PR 6 Progress and Grown-up (+ leftovers: nav labels, ⏱/▶ selectors, Add-them-back and Quiz Deck ✕ sizes, pain-stop kid line) | COMPLETE | opus-worker 2026-10-01 on `claude/splash-pr6-progress-grownup`, uncommitted: Progress week table (exported `weekTable`, 13px, ink/ink-soft) + prizes stack below 900 + Progress sizes (core progress screen/vm), Analytics week table from `analyticsWeek` + A1 controls 48 + A2 notes 13px ink-soft + A3 library grouped by block + A4 rungs 48 (core grownup screen/vm), nav labels 13 / buttons 56 (core shell), Today ⏱️ + "+ Add them back" 56 (core today), Quiz Deck ✕ 48 (core overlays), pain-stop kid line (`allInFull` in core vm/session.js), tests (design 750 → 865, ALLOW removed; invariants 585 → 593 with S11), sw.js v29 → v30, FEATURES.md; `npm test` exit 0 both TZs; `diff -rq core` empty; screenshots C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr6/pr6-swim.png; final scan C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/final-scan.json. Remaining: commit, push, PR (main session); PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#73 |
+| R4-12 Merge PR pair 6 | WAITING ON YOU — merge PR pair 6 | |
+| R4-13 Final size test + screenshots, manifest lists locked items | PARTIAL | whole-app scan after PR 6 (shots/final-scan.json): kid text <13px 0 both apps; grown-up controls <48px 0; kid buttons <56px only the approved 48px grown-up override; NOT met: grown-up text <13px (Form check, Settings, Library, Coaching, Overview) and low-contrast pairs (mint ✓ marks and done-number pills, aqua ▶ marker, white ↺/⭐ on sun in the week strip, ink-faint done move names, prize-pool ✕) → PR 7 contrast sweep |
+| R4-13a PR 7 final contrast and grown-up text sweep | NOT STARTED | |
+| R4-13b Merge PR pair 7 | NOT STARTED | |
 | R4-14 iPad check by user | NOT STARTED | |
 
 ## Checks and evidence
@@ -137,6 +141,17 @@ Structural option (not approved, not done): a test that renders every screen, co
 - 2026-10-01 R4 PR 5: DOM at 1194×834 part done: "How did it feel?" inside the first viewport (swim 608–672, skate 608–672); the Coach's Quiz question just below it (swim 855–877, skate 853–897; viewport 834); full / stopped / nothing logged: both inside. 834×1194: both inside in every state. Mood buttons 83 (swim) / 81 (skate) px; Coach's Quiz options 56px / 17px (iPad), 114–122px on phone (wrapped); See every move 56; Redo 56 / 17px (swim ink on aqua, skate white on rose-deep); Back 56 / 18px; no text under 13px; Quiz Deck options 62–94px
 - 2026-10-01 R4 PR 5 follow-up (coordinator request): (a) "Nothing logged" no longer draws the kid line — title and note only (design.mjs asserts no kid line there); (b) `state.moveReviewOpen = false` in `launchSession` (every session start, incl. explore and start-over), new actions assertions: opened and left open, the next session starts folded, its finish screen (reached by a real run stopped with "break") has no review section (actions 318 → 322); mutation — removing the reset fails actions. `npm test` exit 0 both repos, both TZs (actions 322, design 750, invariants unchanged); `diff -rq core` empty; nothing-logged screenshots re-shot at 3 sizes × 2 apps (kid line absent, title "Nothing logged this time.", See every move 56, no text < 13px) and contact sheets rebuilt
 - 2026-10-01 R4 PR 5 live site / device → untested
+
+- 2026-10-01 R4 PR 6 baseline before changes (branch from origin/main): `npm test` exit 0, all suites green (leadin-data 19, smoke 1401, actions 322, dayrecords 251, design 750, integrity 48, interaction 18, invariants 585, landing 7, core leadin 42, session 325, shell 257)
+- 2026-10-01 R4 PR 6 failing test first: new invariants S11 (pain stop, early stop, finished day) failed before the fix — "S11 pain stop: the finish VM does not claim every move was done in full (got true, wanted false)" (both repos) — and passes after (`allInFull` now also needs completion state complete). Browser repro before the fix: pain stop and break stop at warm-up rest, round rest, first work, round 2 work, section rest all showed "Every move was done in full."
+- 2026-10-01 R4 PR 6 after changes (opus-worker): `npm test` exit 0, both TZs, all suites green (leadin-data 19, smoke 1401, actions 322, dayrecords 251, design 865, integrity 48, interaction 18, invariants 593, landing 7, core leadin 42, session 325, shell 259); design 750 → 865: ALLOW removed; Progress empty and with data × roomy/tight/narrow (no allowance, table ink/ink-soft, DAY STREAK, prizes stacked/side, scope chips 56/15); six Grown-up tabs with data and empty × wide/narrow (floor 48, tabs and period chips 48/15); Analytics week table = `weekTable(analyticsWeek)` with exact counts, near the top, no text < 13 / no ink-faint; library one fold per block, first open, total = old flat count (55); rungs 48/15; nav shell labels 13 / buttons 56; Quiz Deck ✕ 48; "+ Add them back" 56; ⏱️ chip. shell.mjs +2 = the two new import edges (grownup screen → progress screen, grownup vm → progress vm)
+- 2026-10-01 R4 PR 6 test changes: core/test/design.mjs (ALLOW and the `allow` option removed — the last Progress/Grown-up entries; `exitQuizDeck: 48` added to DESIGN_TAP; Progress and Grown-up sections rewritten to scan more states; new sections nav shell, Today Add-them-back), core/test/invariants.mjs (S11 added). No assertion removed or weakened; smoke.mjs:4653 (DAY STREAK) unchanged and green.
+- 2026-10-01 R4 PR 6: `diff -rq core` swim vs skate → empty
+- 2026-10-01 R4 PR 6: `node core/tools/release-check.mjs origin/main` → ok ("no shell files changed" — base...HEAD only, uncommitted); working-tree equivalent: precached core screens/vm changed, sw.js v29 → v30 → bump present. Re-run after commit.
+- 2026-10-01 R4 PR 6: screenshots (Playwright Chromium, touch, fake clock Wed 2026-09-23 12:00 Edmonton, service workers blocked, every non-127.0.0.1 request aborted; Grown-up opened with the app's own `unlockByPasskey` on a fresh local profile, no PIN, no cloud) at 1194×834, 834×1194, 390×844: Today with nav, Progress empty, Progress after a full session (viewport + full page), all six Grown-up tabs (Analytics and Library full page) — C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr6/, contact sheet pr6-swim.png; all states reached, no page errors
+- 2026-10-01 R4 PR 6 DOM: Progress 1194×834 prizes beside, 834×1194 stacked under the table with SUN visible and no table scroll, 390×844 stacked (table scrolls sideways, min-width 440); week-table min font 13; scope chips 56; nav buttons 86–88 (rail) / 56 (bottom), labels 13px; Quiz Deck ✕ 48×48; Grown-up tabs and period chips 48; Analytics week table present (SUN visible on iPad); library 7 folds, Warm-up open, summaries 48; rungs 48; real full session finish says "Every move was done in full."
+- 2026-10-01 R4 PR 6 FINAL whole-app scan (Today, Quiz Deck, Body Check, every session state reached, finish, Progress empty/data, six Grown-up tabs; 26 screens × 3 sizes; exceptions Back a move / rail toggle / Explore / move-card ✕ / Quiz Deck ✕ / light picker 48): kid text under 13px 0; kid buttons under 56 3 (the Body Check "🔒 Grown-up only" summary, 48px, approved in PR 3, once per size); grown-up controls under 48 0; grown-up text under 13px 183 (61 per size: Overview stat labels, Form Check, Coaching, Library photo placeholder, Settings labels — outside A2, Analytics 0); low contrast 1079 (Progress 0, Analytics 0, finish 0; the rest on session list marks/move names, Today week-strip glyphs, Form Check/Coaching/Settings), skipped 871 (gradient/image backgrounds). Raw: C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/final-scan.json
+- 2026-10-01 R4 PR 6 live site / device → untested
 
 ## Open questions / blockers
 - No visible deploy stamp on the page (rules require one) — flagged, out of scope this round.
@@ -273,4 +288,26 @@ Structural option (not approved, not done): a test that renders every screen, co
 | Gate deny-by-default | kept | no new action; `toggleMoveReview` was already ungated, now asserted |
 | `core/` byte-identical with the other repo | kept | `diff -rq core` empty |
 | sw.js version bump on shell change | kept | v28 → v29 |
+| Missing | none | |
+
+## Regression table — R4 PR 6 (+ finish screen, Quiz Deck → + Progress, Grown-up Zone, nav)
+| Feature | R4-PR5 → R4-PR6 | Note |
+|---|---|---|
+| Coach's Quiz, finish order, See every move fold, kid line wording | kept | design/invariants assertions unchanged and green |
+| "Every move was done in full." after a pain stop / early stop | intentionally removed (bug fix) | ledger row 16; only a finished day says it (invariants S11) |
+| Quiz Deck dealing, paired fact, sizes | kept | ✕ 44 → 48 (approved exception) |
+| Session screen, pop-up cards, Body Check, Today, journey map | kept | untouched except Today ⏱️ chip and "+ Add them back" 44 → 56 |
+| Progress week table rows, bars, streak corner, "DAY STREAK" | kept | sizes 8.5–12 → 13, ink-faint → ink-soft, today's name sea → ink; smoke.mjs:4653 green |
+| Progress table in both places (kid Progress + Grown-up › Analytics, one `weekTable`) | added | consolidates; `analyticsWeek` now read |
+| Prizes beside the table below 900px | intentionally removed | K6: stacked under the table, full width; landscape unchanged |
+| Progress period board, XP per day, milestones, log, wallet (redeem/undo), rank story | kept | sizes and -ink colours only; chips/Redeem 56px |
+| Grown-up six tabs, numbers, CSV, round lines, settings, backup, gate, PR board, engagement | kept | controls ≥ 48, notes 13px ink-soft on Analytics |
+| Move Library as one flat grid | intentionally removed | A3: grouped into one fold per block, every move kept (55) |
+| Ladder rungs 36px | changed | A4: 48px, 15px |
+| Nav labels 11px / bottom nav 48px | changed | 13px / 56px |
+| Size-floor allowance (ALLOW) | intentionally removed | plan: shrinks to empty by PR 6 |
+| Gate deny-by-default | kept | no new action |
+| Hostile strings escaped on all six Grown-up tabs | kept | invariants green (library fold labels from BLOCK_LABEL, escaped) |
+| `core/` byte-identical with the other repo | kept | `diff -rq core` empty |
+| sw.js version bump on shell change | kept | v29 → v30 |
 | Missing | none | |

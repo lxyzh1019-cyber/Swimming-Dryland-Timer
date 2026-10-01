@@ -1249,6 +1249,25 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
     ok(fv.roundShortNotes.every(n => gHtml.includes(util.escapeHtml(n))), "S10: and draws them on the Main-set rounds card");
   });
 
+  /* S11 (R4 PR 6): "Every move was done in full." is said only of a day she
+     actually finished. A pain stop or any early stop leaves no short row
+     behind (the moves she never reached are not short), and the line used to
+     read off that empty list alone — so a pain stop told her she did it all. */
+  const FULL_LINE = "Every move was done in full.";
+  for (const [label, reason] of [["pain stop", "pain"], ["early stop", null]]) {
+    await scenario("S11 " + label, T.start, T.read, () => drive({ dayKey: DAY, light: "green" }, stopAt(1, reason)), () => {
+      const fv = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+      ok(fv.sessionDone && fv.completionState !== "complete", "S11 " + label + ": the day did not finish (" + fv.completionState + ")");
+      same(fv.allInFull, false, "S11 " + label + ": the finish VM does not claim every move was done in full");
+      ok(!sscreen.sessionScreen(fv).includes(FULL_LINE), "S11 " + label + ": and the finish screen does not say it");
+    });
+  }
+  await scenario("S11 finished", T.start, T.read, () => drive({ dayKey: DAY, light: "green" }, honest), () => {
+    const fv = svm.buildSessionVM({ isWide: true, expanded: {}, detailEx: {} });
+    same(fv.completionState, "complete", "S11 finished: a day trained in full is complete");
+    ok(fv.allInFull && sscreen.sessionScreen(fv).includes(FULL_LINE), "S11 finished: and it still says every move was done in full");
+  });
+
   fresh();
 }
 

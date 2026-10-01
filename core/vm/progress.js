@@ -23,12 +23,12 @@ import { buildJourney, isTrainingRecord } from "./today.js";
 const LIGHT_CHIP = {
   GREEN: "var(--mint-wash);color:var(--mint-ink)",
   YELLOW: "var(--sun-wash);color:var(--sun-ink)",
-  RED: "color-mix(in srgb, var(--stop) 12%, #fff);color:var(--stop)",
-  RECOVERY: "color-mix(in srgb, var(--grape) 14%, #fff);color:var(--grape)",
+  RED: "color-mix(in srgb, var(--stop) 12%, #fff);color:var(--stop-ink)",
+  RECOVERY: "color-mix(in srgb, var(--grape) 14%, #fff);color:var(--grape-ink)",
   MINI: "var(--aqua-wash);color:var(--aqua-ink)",
-  "ENDED EARLY": "color-mix(in srgb, var(--coral) 14%, #fff);color:var(--coral)",
-  "NOTHING LOGGED": "var(--surface-2);color:var(--ink-faint)",
-  "PAIN STOP": "color-mix(in srgb, var(--stop) 12%, #fff);color:var(--stop)",
+  "ENDED EARLY": "color-mix(in srgb, var(--coral) 14%, #fff);color:var(--coral-ink)",
+  "NOTHING LOGGED": "var(--surface-2);color:var(--ink-soft)",
+  "PAIN STOP": "color-mix(in srgb, var(--stop) 12%, #fff);color:var(--stop-ink)",
   "TRY-IT": "var(--aqua-wash);color:var(--aqua-ink)"
 };
 const MOOD_EMOJI = { great: "😀", okay: "🙂", tired: "😴" };
@@ -79,7 +79,7 @@ export function logEntryView(r) {
     // She stopped for pain and came back: said, not hidden and not the verdict.
     painNote: r.hadPainStop && !r.safetyStop ? "paused for pain" : "",
     lightLabel, note,
-    lightChipStyle: "font-size:10px;font-weight:900;letter-spacing:0.04em;border-radius:var(--radius-pill);padding:4px 9px;white-space:nowrap;background:" + (LIGHT_CHIP[lightLabel] || LIGHT_CHIP.GREEN) + ";"
+    lightChipStyle: "font-size:13px;font-weight:900;letter-spacing:0.04em;border-radius:var(--radius-pill);padding:4px 9px;white-space:nowrap;background:" + (LIGHT_CHIP[lightLabel] || LIGHT_CHIP.GREEN) + ";"
   };
 }
 
@@ -146,8 +146,8 @@ export function buildProgressVM(state) {
         : isDone ? "background:var(--surface);border:2px solid var(--mint);box-shadow:var(--shadow-soft);"
         : "background:var(--surface-2);border:2px dashed var(--hairline);"),
       badge: isCurrent ? "YOU ARE HERE" : isDone ? "✓ UNLOCKED · LVL " + r.level : "LVL " + r.level,
-      badgeStyle: "font-size:10px;font-weight:900;letter-spacing:0.05em;border-radius:var(--radius-pill);padding:4px 10px;white-space:nowrap;"
-        + (isCurrent ? "background:var(--aqua);color:#fff;" : isDone ? "background:var(--mint-wash);color:var(--mint-ink);" : "background:var(--surface-2);color:var(--ink-soft);")
+      badgeStyle: "font-size:13px;font-weight:900;letter-spacing:0.05em;border-radius:var(--radius-pill);padding:4px 10px;white-space:nowrap;"
+        + (isCurrent ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);" : isDone ? "background:var(--mint-wash);color:var(--mint-ink);" : "background:var(--surface-2);color:var(--ink-soft);")
     };
   });
 
@@ -262,8 +262,8 @@ export function buildProgressVM(state) {
   const allLog = records.filter(r => !r.unsaved).slice().reverse().map(logEntryView);
   const logScope = state.logScope || "week";
   const logItems = logScope === "week" ? allLog.slice(0, 4) : allLog;
-  const logScopeTab = (v) => "min-height:32px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:12px;padding:0 14px;font-family:inherit;"
-    + (logScope === v ? "background:var(--aqua);color:#fff;" : "background:transparent;color:var(--ink-soft);");
+  const logScopeTab = (v) => "min-height:56px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:15px;padding:0 16px;font-family:inherit;"
+    + (logScope === v ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);" : "background:transparent;color:var(--ink-soft);");
   const logScopeTabs = [
     { label: "Recent", key: "week", style: logScopeTab("week") },
     { label: "All", key: "month", style: logScopeTab("month") }
@@ -279,9 +279,9 @@ export function buildProgressVM(state) {
       ...pz, canUndo, spent,
       cardStyle: "display:flex;align-items:center;gap:10px;background:" + (pz.redeemed ? "var(--surface-2)" : "var(--surface)") + ";border:2px" + (pz.redeemed ? " dashed var(--hairline)" : " solid var(--sun)") + ";border-radius:16px;padding:10px 12px;" + (pz.redeemed ? "opacity:0.65;" : ""),
       redeemLabel: canUndo ? "✓ Used · undo" : pz.redeemed ? "✓ Used" : "Redeem",
-      redeemBtnStyle: "flex-shrink:0;min-height:32px;border-radius:var(--radius-pill);border:none;cursor:" + (spent ? "default" : "pointer") + ";font-weight:900;font-size:12px;padding:0 12px;font-family:inherit;"
+      redeemBtnStyle: "flex-shrink:0;min-height:56px;border-radius:var(--radius-pill);border:none;cursor:" + (spent ? "default" : "pointer") + ";font-weight:900;font-size:15px;padding:0 16px;font-family:inherit;"
         + (canUndo ? "background:var(--surface);color:var(--ink-soft);border:1.5px solid var(--hairline);"
-          : pz.redeemed ? "background:transparent;color:var(--ink-faint);"
+          : pz.redeemed ? "background:transparent;color:var(--ink-soft);"
           : "background:var(--sun);color:var(--sun-ink);")
     };
   });
@@ -336,8 +336,8 @@ export function buildProgressVM(state) {
   const periodStats = {
     periodKey,
     tabs: PROGRESS_PERIODS.map(p => ({ ...p, style:
-      "min-height:36px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:12px;padding:0 15px;font-family:inherit;"
-      + (p.key === periodKey ? "background:var(--aqua);color:#fff;" : "background:transparent;color:var(--ink-soft);") })),
+      "min-height:56px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:15px;padding:0 16px;font-family:inherit;"
+      + (p.key === periodKey ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);" : "background:transparent;color:var(--ink-soft);") })),
     rangeLabel: pCount
       ? new Date(range.from + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Edmonton" })
         + " – " + new Date(range.to + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Edmonton" })
@@ -389,6 +389,10 @@ export function buildProgressVM(state) {
     pendingDraws: pendingDrawCount(),
     pendingDrawLabel: pendingDrawCount() > 1 ? "🎁 " + pendingDrawCount() + " prize draws waiting — pick one!" : "🎁 A prize draw is waiting — pick your envelope!",
     dayStreakVal: String(streak),
+    /* Below 900px wide (a phone, or an iPad held upright) the prizes stack
+       under the week table, full width, so the table keeps all seven days
+       (R4 PR 6, K6). */
+    stackPrizes: !state.isWide || !!state.tightColumn,
     /* The number and the word under it are the same fact. This tile printed a
        raw record count beside a workout-counted label, so a day trained in two
        goes rendered "2" directly above "1 session". */

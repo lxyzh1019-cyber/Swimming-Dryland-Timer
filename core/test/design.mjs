@@ -9,12 +9,13 @@
    A button with no min-height at all (a chip, an icon) is LISTED, not failed:
    its height comes from padding and is checked by screenshot.
 
-   The splash redesign lands in six PRs. Screens a PR has not reached yet still
-   carry their old sizes, so ALLOW below names every one of them, per screen.
-   Each later PR deletes its own entries; when the redesign is done ALLOW is
-   empty. The session screen and the journey map (PR 2) have no entries and
-   must never get one. Today (PR 4) has none either. */
+   The splash redesign landed in six PRs, each removing its screens from a
+   per-screen allowance. PR 6 (Progress and the Grown-up Zone) removed the
+   last entries, so there is no allowance any more: every screen scanned
+   here meets the floor outright, and a new exception has to be a named,
+   approved design exception in DESIGN_TAP below. */
 import { engine, store, data, tvm, gvm, gscreen, rvm, rscreen, pvm, pscreen, svm, sscreen, tscreen, overlays, runSession } from "./harness.mjs";
+const shell = await import(new URL("../screens/shell.js", import.meta.url).href);
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
@@ -24,47 +25,13 @@ const KID_FONT_MIN = 13, KID_TAP_MIN = 56, DONE_TAP_MIN = 64, ADULT_TAP_MIN = 48
    "◀ Back a move" link is 48px; the move card's ✕ is a 48px round close; the
    Body Check light picker is a grown-up control under 🔒 (grown-up floor, 48);
    Today's "🧪 Explore the moves" is the secondary action under "Let's go", kept
-   at 48 (plan v4, PR 4; test/smoke.mjs checks its 48px).
+   at 48 (plan v4, PR 4; test/smoke.mjs checks its 48px); the Quiz Deck's ✕ is
+   the same 48px round close as the move card's (R4 PR 6).
    Not temporary entries — the design itself. */
-const DESIGN_TAP = { goBack: 48, closeDetail: 48, rPickLight: 48, goExplore: 48 };
+const DESIGN_TAP = { goBack: 48, closeDetail: 48, rPickLight: 48, goExplore: 48, exitQuizDeck: 48 };
 
-/* ---- ALLOW: sizes still failing on screens later PRs redesign ----------
-   One entry = { kind: "font" | "tap", px, has } — `has` is a piece of the
-   element's opening tag that singles it out. Every entry is a known debt
-   with an owner; none of them is on the session screen or the journey map. */
-const ALLOW = {
-  // PR 6 — Progress
-  progress: [
-    { kind: "font", px: 12, has: "font-weight:900;font-size:12px;letter-spacing:0.05em;" },  // card headings
-    { kind: "font", px: 8.5, has: "font-size:8.5px;" },
-    { kind: "font", px: 9, has: "font-size:9px;font-weight:900;" },
-    { kind: "font", px: 9, has: "font-size:9px;font-weight:800;" },
-    { kind: "font", px: 11, has: 'scope="col"' },                                             // week table
-    { kind: "font", px: 12, has: 'scope="row"' },
-    { kind: "font", px: 12, has: "padding:6px 5px;text-align:center;font-size:12px;" },
-    { kind: "font", px: 11, has: "padding:2px 8px;border-radius:var(--radius-pill);font-size:11px;" },
-    { kind: "font", px: 11, has: "flex-wrap:wrap;margin-top:9px;font-size:11px;" },
-    { kind: "font", px: 11, has: "font-size:11px;color:var(--ink-soft);margin-top:5px;" },
-    { kind: "font", px: 11, has: "justify-content:space-between;font-size:11px;font-weight:700;" },
-    { kind: "font", px: 12, has: 'data-action="progressScope"' },  // 4w / month / quarter
-    { kind: "tap", px: 36, has: 'data-action="progressScope"' },
-    { kind: "font", px: 12, has: 'data-action="logScope"' },       // week / month
-    { kind: "tap", px: 32, has: 'data-action="logScope"' },
-    { kind: "font", px: 12, has: "font-size:12px;font-weight:700;" },
-    { kind: "font", px: 10, has: "font-size:10px;font-weight:900;letter-spacing:0.0" }        // micro labels and pace chips
-  ],
-  // PR 6 — Grown-up Zone (tap floor 48)
-  grownup: [
-    { kind: "tap", px: 36, has: "flex:1;min-height:36px;" },                                  // tab and scope pills
-    { kind: "tap", px: 38, has: 'data-action="formCheckMonth"' },                      // month arrows
-    { kind: "tap", px: 40, has: "min-height:40px;" },
-    { kind: "tap", px: 44, has: "min-height:44px;" },
-    { kind: "tap", px: 46, has: "flex:1;min-height:46px;" }
-  ]
-};
-
-ok(!Object.keys(ALLOW).some(k => /session|journey|readiness|today|finish|quiz/.test(k)),
-   "the session screen, the journey map, Body Check, Today, the finish screen and the Quiz Deck have no allowance — they meet the floor outright");
+/* No allowance: the per-screen ALLOW list that PRs 2–6 shrank is gone (PR 6
+   removed the Progress and Grown-up entries, the last ones). */
 
 /* ---- a tiny reader for the opening tags of rendered HTML ---------------- */
 const TAG = /<([a-zA-Z][\w-]*)((?:\s+[^\s=>"']+(?:="[^"]*")?)*)\s*\/?>/g;
@@ -103,8 +70,8 @@ function section(html, marker) {
 }
 
 const unsized = new Set();
-/* Scan one rendered screen; return the failures that ALLOW does not name. */
-function scan(screen, html, { kid, allow = [] }) {
+/* Scan one rendered screen; return every failure. */
+function scan(screen, html, { kid }) {
   const fails = [];
   for (const t of tags(html)) {
     if (kid) for (const px of fontSizes(t.style)) {
@@ -118,7 +85,7 @@ function scan(screen, html, { kid, allow = [] }) {
       : (DESIGN_TAP[t.action] || KID_TAP_MIN);
     if (mh < floor) fails.push({ kind: "tap", px: mh, floor, open: t.open });
   }
-  return fails.filter(f => !allow.some(a => a.kind === f.kind && a.px === f.px && f.open.includes(a.has)));
+  return fails;
 }
 const show = (fails) => fails.map(f => f.kind + " " + f.px + "px"
   + (f.floor ? " (floor " + f.floor + ")" : "") + " in " + f.open.slice(0, 160)).join("\n    ");
@@ -399,6 +366,9 @@ for (const [st, vm] of Object.entries(FINISH)) {
                                         bank: { mastered: 3, total: 40, left: 37 }, leveledUp: true, xpEarned: 20 }]]) {
     const html = overlays.quizDeckHtml(qd);
     clean("quiz deck " + st, html, { kid: true });
+    const exit = tags(html).find(t => t.tag === "button" && t.action === "exitQuizDeck" && /aria-label="Exit quiz"/.test(t.open));
+    if (st !== "results") ok(exit && pxOf(exit.style, "width") >= 48 && pxOf(exit.style, "height") >= 48 && pxOf(exit.style, "min-height") >= 48,
+       "quiz deck " + st + ": the ✕ exit is a 48px round close, like the move card's");
     if (st !== "results") {
       const opts = tags(html).filter(t => t.tag === "button" && t.action === "answerQuizDeck");
       ok(opts.length > 1 && opts.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN),
@@ -583,14 +553,131 @@ ok(data.LIGHT_META.red.btnText === "var(--text-on-coral)" && data.BODY_RESULTS[3
    && data.LIGHT_META.recovery.btnColor === "var(--btn-grape-bg)",
    "red Start text on text-on-coral, recovery on btn-grape-bg");
 
-/* ---- 4b. PROGRESS (PR 6) ----------------------------------------------- */
-clean("progress", pscreen.progressScreen(pvm.buildProgressVM({ progressScope: "4w", logScope: "week" })),
-  { kid: true, allow: ALLOW.progress });
+/* ---- 4b. PROGRESS (PR 6): empty and with data, three layouts ---------- */
+/* Every text on Progress ≥ 13px, every button ≥ 56; the week table in
+   ink / ink-soft; below 900px wide the prizes stack under the table. */
+const drawP = (layout, extra = {}) => {
+  const vm = pvm.buildProgressVM({ progressScope: "4w", logScope: "week", ...LAYOUTS[layout], ...extra });
+  return { vm, html: pscreen.progressScreen(vm) };
+};
+const progressChecks = (label) => {
+  for (const layout of Object.keys(LAYOUTS)) {
+    const { vm, html } = drawP(layout);
+    const name = "progress " + label + " " + layout;
+    clean(name, html, { kid: true });
+    const table = section(html, "<table");
+    ok(table.length > 0 && !/var\(--ink-faint\)/.test(table), name + ": the week table has no ink-faint text");
+    ok(/>DAY STREAK</.test(table), name + ": the streak corner still says DAY STREAK");
+    const stacked = layout !== "roomy";
+    ok(vm.stackPrizes === stacked && html.includes('data-progress-top="' + (stacked ? "stacked" : "side") + '"'),
+       name + ": the prizes " + (stacked ? "stack under the table (below 900px)" : "sit beside the table"));
+    const prizes = tags(html).find(t => /data-prizes="1"/.test(t.open));
+    ok(prizes && (stacked ? /^width:100%;/.test(prizes.style) : /^flex:1;min-width:220px;/.test(prizes.style)),
+       name + ": the prizes card is " + (stacked ? "full width" : "the side column"));
+    for (const act of ["progressScope", "logScope"]) {
+      const tabs = tags(html).filter(t => t.tag === "button" && t.action === act);
+      ok(tabs.length > 1 && tabs.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN && pxOf(t.style, "font-size") >= 15),
+         name + ": the " + act + " chips are 56px, 15px");
+    }
+  }
+};
+/* With data: the session section 1 saved last (dated today on the test
+   clock), plus a prize in the wallet and one already used. */
+store.saveJourney({ ...(store.loadJourney() || {}), prizesWon: [
+  { id: "pz-1", label: "Movie night", icon: "🎬", wonAt: Date.now(), redeemed: false },
+  { id: "pz-2", label: "Ice cream", icon: "🍦", wonAt: Date.now() - 86400000, redeemed: true, redeemedAt: Date.now() - 86400000 }] });
+const withData = drawP("roomy").vm;
+ok(withData.weekDays.some(d => d.hasWork) && withData.hasPrizes && withData.hasLog,
+   "progress with data: a trained day in the week, prizes and a log entry to draw");
+progressChecks("with data");
+ok(tags(drawP("roomy").html).filter(t => t.tag === "button" && t.action === "redeemPrize").every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN),
+   "progress with data: Redeem is a 56px button");
 
 /* ---- 5. THE GROWN-UP ZONE, every tab (PR 6; tap floor 48) --------------- */
-for (const tab of ["overview", "analytics", "formcheck", "coaching", "library", "settings"]) {
-  const html = gscreen.grownupScreen({ ...gvm.buildGrownupVM({ gsScope: "week", grownupTab: tab, isWide: true }), grownupUnlocked: true });
-  clean("grownup " + tab, html, { kid: false, allow: ALLOW.grownup });
+const GU_TABS = ["overview", "analytics", "formcheck", "coaching", "library", "settings"];
+const drawG = (tab, extra = {}) => gscreen.grownupScreen({ ...gvm.buildGrownupVM({ gsScope: "week", grownupTab: tab, isWide: true, ...extra }), grownupUnlocked: true });
+const guScan = (label) => { for (const tab of GU_TABS) {
+  for (const wide of [true, false]) {
+    const html = drawG(tab, { isWide: wide });
+    clean("grownup " + label + " " + tab + (wide ? " wide" : " narrow"), html, { kid: false });
+    const tabsBtns = tags(html).filter(t => t.tag === "button" && t.action === "setGuTab");
+    ok(tabsBtns.length === 6 && tabsBtns.every(t => pxOf(t.style, "min-height") >= ADULT_TAP_MIN && pxOf(t.style, "font-size") >= 15),
+       "grownup " + tab + ": the six tabs are 48px, 15px");
+    if (tab === "overview" || tab === "analytics") {
+      const scopes = tags(html).filter(t => t.tag === "button" && t.action === "setGsScope");
+      ok(scopes.length === 3 && scopes.every(t => pxOf(t.style, "min-height") >= ADULT_TAP_MIN && pxOf(t.style, "font-size") >= 15),
+         "grownup " + tab + ": the period chips are 48px, 15px");
+    }
+  }
+} };
+guScan("with data");
+{
+  /* Analytics carries the Progress week table — the same function, the same rows. */
+  const html = drawG("analytics");
+  const week = section(html, 'data-analytics-week="1"');
+  const pv = pvm.buildProgressVM({});
+  ok(week.length > 0 && week.includes(pscreen.weekTable({ weekDays: pv.analyticsWeek, dayStreakVal: pv.dayStreakVal })),
+     "grownup analytics: the Progress week table is drawn, from the Progress rows");
+  ok(html.indexOf('data-analytics-week="1"') < html.indexOf("Is she trying?"), "grownup analytics: near the top, after At a glance");
+  ok(pv.analyticsWeek.some(d => d.hasWork && /^\d+\/\d+$/.test(d.performancesLabel) && week.includes(">" + d.performancesLabel + "<")),
+     "grownup analytics: with the exact counts (" + pv.analyticsWeek.filter(d => d.hasWork).map(d => d.performancesLabel).join(", ") + ")");
+  /* A2: every note on Analytics is 13px+ and none of it is ink-faint. */
+  const body = html.slice(html.indexOf("Coach analytics"));
+  const small = tags(body).flatMap(t => fontSizes(t.style).filter(px => px < 13).map(px => px + "px in " + t.open.slice(0, 100)));
+  ok(small.length === 0, "grownup analytics: no text under 13px\n    " + small.join("\n    "));
+  ok(!/var\(--ink-faint\)/.test(body), "grownup analytics: no ink-faint text");
+}
+{
+  /* A3: the library, one fold per block, the first open, every move kept. */
+  const vm = gvm.buildGrownupVM({ gsScope: "week", grownupTab: "library", isWide: true });
+  const flat = new Set();
+  Object.values(data.DAYS).forEach(day => Object.values(day.blocks || {}).flat().concat(day.prepMenu || [], day.recovery || [])
+    .forEach(ex => { if (ex && ex.name) flat.add(ex.name); }));
+  const html = drawG("library");
+  const folds = (html.match(/<details data-lib-block="[^"]*"( open)?>/g) || []);
+  ok(vm.libraryGroups.length > 1 && folds.length === vm.libraryGroups.length,
+     "grownup library: one fold per block (" + vm.libraryGroups.map(g => g.label + " " + g.count).join(", ") + ")");
+  ok(/ open>$/.test(folds[0]) && folds.slice(1).every(f => !/ open>$/.test(f)), "grownup library: the first fold is open, the rest closed");
+  ok(vm.libraryGroups.reduce((n, g) => n + g.count, 0) === flat.size && vm.libraryList.length === flat.size
+     && (html.match(/▶ Watch the move</g) || []).length === flat.size,
+     "grownup library: every move is kept — " + flat.size + " moves, the old flat count");
+  ok(vm.libraryGroups.every(g => g.label === (data.BLOCK_LABEL[g.block] || g.block)), "grownup library: each fold is named by BLOCK_LABEL");
+  const order = [...data.BLOCK_ORDER, "prep", "recovery"];
+  ok(vm.libraryGroups.every((g, i, a) => i === 0 || order.indexOf(a[i - 1].block) < order.indexOf(g.block)),
+     "grownup library: folds in the order a day runs its blocks");
+  ok(/<summary style="min-height:48px;[^"]*font-size:15px;/.test(html), "grownup library: each fold's summary is 48px, 15px");
+}
+{
+  /* A4: the ladder rungs are 48px circles, 15px. */
+  const rungs = tags(drawG("coaching")).filter(t => t.tag === "button" && t.action === "setLadderRung");
+  ok(rungs.length > 0 && rungs.every(t => pxOf(t.style, "width") === 48 && pxOf(t.style, "height") === 48 && pxOf(t.style, "font-size") >= 15),
+     "grownup coaching: the " + rungs.length + " ladder rungs are 48px circles, 15px");
+}
+
+/* Empty: a fresh profile, Progress and every Grown-up tab again. */
+localStorage.clear(); store.migrate();
+progressChecks("empty");
+guScan("empty");
+
+/* ---- 6. THE NAV SHELL: rail and bottom nav labels 13px, buttons 56px ---- */
+{
+  const tv = tvm.buildTodayVM({ expanded: {}, isWide: true });
+  for (const [name, html] of [["rail", shell.shellWithRail(tv, "")], ["bottom nav", shell.bottomNav(tv)]]) {
+    clean("nav " + name, html, { kid: true });
+    const navs = tags(html).filter(t => t.tag === "button" && t.action === "nav");
+    ok(navs.length === 3 && navs.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN), "nav " + name + ": three 56px nav buttons");
+    ok((html.match(/font-size:13px;font-weight:900;color:var\(--(aqua-ink|ink-soft)\);">(Today|Progress|Grown-up)</g) || []).length === 3,
+       "nav " + name + ": labels 13px");
+  }
+}
+
+/* ---- 7. TODAY: "+ Add them back" on a partly skipped day is 56px -------- */
+{
+  const tv = tvm.buildTodayVM({ selectedDay: today, expanded: {}, isWide: true });
+  const html = tscreen.todayWide({ ...tv, dayView: { ...tv.dayView, partialSkipLabel: "2 moves skipped" } });
+  const redo = tags(html).find(t => t.tag === "button" && t.action === "goSessionRedo");
+  ok(redo && pxOf(redo.style, "min-height") >= KID_TAP_MIN && />\+ Add them back</.test(html), "today: + Add them back is 56px");
+  ok(tv.dayView.isActive ? html.includes("<span>⏱️</span> ") : true, "today: the minutes chip asks for emoji ⏱️");
 }
 
 /* Body Check with yesterday's answers beside today's (drawn last: it saves a check). */

@@ -864,7 +864,10 @@ export function buildSessionVM(state) {
     // "See every move ▾" — the fold that holds the list and the exact counts
     // (state.moveReviewOpen in core/main.js; closed until she opens it).
     moveReviewOpen: !!state.moveReviewOpen,
-    allInFull: useRec && !!dayRec.plan && notFull.length === 0,
+    /* Only a day she FINISHED can say every move was done in full. A pain stop
+       or an early stop leaves no short row (moves never reached are not
+       short), so the empty list alone used to claim a full day (R4 PR 6). */
+    allInFull: useRec && !!dayRec.plan && completionState === "complete" && notFull.length === 0,
     redoDayKey: sess.dayKey || "",
     /* MOOD, REFLECTION AND THE QUIZ ONLY EXIST IF THERE IS A RECORD TO PUT
        THEM ON.

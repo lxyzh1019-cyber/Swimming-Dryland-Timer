@@ -360,7 +360,7 @@ export function quizDeckHtml(qd) {
   <div style="position:fixed;inset:0;z-index:80;background:linear-gradient(180deg,var(--aqua-wash),var(--bg));display:flex;flex-direction:column;align-items:center;padding:20px;box-sizing:border-box;overflow-y:auto;">
     <div style="width:100%;max-width:620px;display:flex;flex-direction:column;gap:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-        <button type="button" data-action="exitQuizDeck" style="width:44px;height:44px;border-radius:50%;background:var(--surface);border:2px solid var(--hairline);font-size:20px;cursor:pointer;flex-shrink:0;" aria-label="Exit quiz">✕</button>
+        <button type="button" data-action="exitQuizDeck" style="width:48px;height:48px;min-height:48px;border-radius:50%;background:var(--surface);border:2px solid var(--hairline);font-size:20px;cursor:pointer;flex-shrink:0;" aria-label="Exit quiz">✕</button>
         <div style="flex:1;height:10px;background:var(--surface-2);border-radius:10px;overflow:hidden;">
           <div style="width:${Math.round(((qd.idx + (answered ? 1 : 0)) / qd.qs.length) * 100)}%;height:100%;background:var(--aqua);border-radius:10px;transition:width 0.3s;"></div>
         </div>
