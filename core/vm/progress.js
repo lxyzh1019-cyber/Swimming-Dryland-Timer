@@ -282,7 +282,7 @@ export function buildProgressVM(state) {
       redeemBtnStyle: "flex-shrink:0;min-height:56px;border-radius:var(--radius-pill);border:none;cursor:" + (spent ? "default" : "pointer") + ";font-weight:900;font-size:15px;padding:0 16px;font-family:inherit;"
         + (canUndo ? "background:var(--surface);color:var(--ink-soft);border:1.5px solid var(--hairline);"
           : pz.redeemed ? "background:transparent;color:var(--ink-soft);"
-          : "background:var(--sun);color:var(--sun-ink);")
+          : "background:var(--sun);color:var(--ink);")
     };
   });
 

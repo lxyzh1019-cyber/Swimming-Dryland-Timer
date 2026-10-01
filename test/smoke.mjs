@@ -2119,7 +2119,7 @@ store.saveSession(row({ isoDate: new Date().toISOString(), dayKey: thisDayKey, d
   completedFully: true, roundsDone: 0, roundsPlanned: 3, ledger: [{ name: "a", status: "skipped" }] }));
 // The view renders cells as styles, so count the trained colours.
 const trainedCells = vm => vm.analytics.consistency.cells
-  .filter(c => /background:var\(--mint\)|background:var\(--sun\)/.test(c.cellStyle)).length;
+  .filter(c => /var\(--mint\)|var\(--sun\)/.test(c.cellStyle)).length;
 const quitOnly = trainedCells(gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics" }));
 ok(quitOnly === 0, "a day whose only session was a GO-and-quit stays blank (" + quitOnly + " filled)");
 store.saveSession(row({ isoDate: new Date().toISOString(), dayKey: thisDayKey, durationSecs: 1500,

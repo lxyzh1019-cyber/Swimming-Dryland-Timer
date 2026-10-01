@@ -137,7 +137,7 @@ function storageBannerHtml() {
   return `<div role="alert" style="position:fixed;left:0;right:0;bottom:0;z-index:200;background:var(--stop-wash);border-top:3px solid var(--stop);padding:12px 16px;display:flex;align-items:center;gap:12px;justify-content:center;font-family:var(--font-ui);">
     <span style="font-size:20px;">⚠️</span>
     <span style="font-weight:800;font-size:14px;color:var(--stop-ink);line-height:1.4;max-width:640px;">This device's storage is full, so the last thing ${escapeHtml(state.storageError.name)} did wasn't saved. Free up space on the device (or clear other sites' data) — sessions won't be recorded until then.</span>
-    <button type="button" data-action="dismissStorageError" style="min-height:36px;border:none;background:var(--stop);color:#fff;border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 14px;cursor:pointer;font-family:inherit;">Dismiss</button>
+    <button type="button" data-action="dismissStorageError" style="min-height:56px;border:none;background:var(--btn-stop-bg,var(--stop));color:#fff;border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 14px;cursor:pointer;font-family:inherit;">Dismiss</button>
   </div>`;
 }
 
@@ -150,8 +150,8 @@ function gateHtml() {
   const mode = gateMode(state.gateWantsNewPin);
   const inputStyle = "width:100%;min-height:48px;border:2px solid var(--hairline);border-radius:12px;padding:0 14px;font-size:18px;font-weight:900;font-family:inherit;box-sizing:border-box;";
   const btn = (action, label, primary) => `<button type="button" data-action="${action}"${state.gateBusy ? " disabled" : ""} style="${primary
-    ? "flex:1;min-height:46px;border:none;border-radius:var(--radius-pill);background:var(--mint);color:#fff;font-weight:900;font-size:15px;cursor:pointer;font-family:inherit;"
-    : "min-height:46px;border:2px solid var(--hairline);border-radius:var(--radius-pill);background:transparent;color:var(--ink-soft);font-weight:900;font-size:14px;padding:0 16px;cursor:pointer;font-family:inherit;"}">${label}</button>`;
+    ? "flex:1;min-height:48px;border:none;border-radius:var(--radius-pill);background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);font-weight:900;font-size:15px;cursor:pointer;font-family:inherit;"
+    : "min-height:48px;border:2px solid var(--hairline);border-radius:var(--radius-pill);background:transparent;color:var(--ink-soft);font-weight:900;font-size:14px;padding:0 16px;cursor:pointer;font-family:inherit;"}">${label}</button>`;
 
   /* Three shapes, one card: confirm with the device passkey, type the PIN, or
      choose one. There is no arithmetic question any more — see js/gate.js. */

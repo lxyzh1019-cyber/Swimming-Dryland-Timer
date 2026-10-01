@@ -72,7 +72,7 @@ function bodyMap(vm, view) {
     <div style="position:relative;height:480px;width:fit-content;">
       ${imgWithFallbacks(photoSources(img), `alt="${view === "front" ? "Front" : "Back"} view ${COPY.bodyMapAlt}" style="height:100%;width:auto;display:block;pointer-events:none;"`)}
       ${rects.map(z => `<div style="position:absolute;left:${z.l}%;top:${z.t}%;width:${z.w}%;height:${z.h}%;border-radius:${z.r}px;pointer-events:none;${vm.zoneHighlight["n" + z.n]}"></div>`).join("")}
-      ${badges.map(b => `<div style="position:absolute;left:${b.l}%;top:${b.t}%;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;pointer-events:none;background:${vm.zoneBadgeBg["n" + b.n]};">${vm.zoneBadge["n" + b.n]}</div>`).join("")}
+      ${badges.map(b => `<div style="position:absolute;left:${b.l}%;top:${b.t}%;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;pointer-events:none;${vm.zoneBadgeStyle["n" + b.n]}">${vm.zoneBadge["n" + b.n]}</div>`).join("")}
       ${rects.map(z => `<button type="button" data-action="rPickZone" data-arg="${z.n}" style="position:absolute;left:${z.l}%;top:${z.t}%;width:${z.w}%;height:${z.h}%;background:none;border:none;padding:0;cursor:pointer;" aria-label="${z.label}"></button>`).join("")}
     </div>
   </div>`;
@@ -140,8 +140,8 @@ export function readinessScreen(vm) {
           ${backBtn}
           ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:56px;height:56px;object-fit:contain;flex-shrink:0;" alt=""`)}
           <div style="min-width:0;">
-            <div style="font-family:var(--font-display);font-weight:600;font-size:24px;line-height:1.1;display:flex;align-items:center;gap:8px;">Body Check <span style="width:24px;height:24px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:var(--hero-text,#fff);font-size:14px;font-weight:900;">✓</span></span></div>
-            <div style="font-size:13px;font-weight:700;opacity:0.9;margin-top:3px;line-height:1.3;">${COPY.readinessIntro}, ${name}!</div>
+            <div style="font-family:var(--font-display);font-weight:600;font-size:24px;line-height:1.1;display:flex;align-items:center;gap:8px;">Body Check <span style="width:24px;height:24px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:var(--hero-text,#fff);font-size:19px;font-weight:900;line-height:1;">✓</span></span></div>
+            <div style="font-size:13px;font-weight:700;margin-top:3px;line-height:1.3;">${COPY.readinessIntro}, ${name}!</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">${stepper(vm, 7)}</div>
@@ -149,8 +149,8 @@ export function readinessScreen(vm) {
       <div style="width:340px;flex-shrink:0;background:linear-gradient(165deg,var(--hero-from,var(--aqua-light)) 0%,var(--hero-to,var(--aqua)) 70%);color:var(--hero-text,#fff);display:flex;flex-direction:column;padding:26px 28px;">
         ${backBtn}
         ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:140px;height:140px;object-fit:contain;margin:22px 0 10px;" alt=""`)}
-        <div style="font-family:var(--font-display);font-weight:600;font-size:32px;line-height:1.1;display:flex;align-items:center;gap:12px;">Body Check <span style="width:30px;height:30px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:var(--hero-text,#fff);font-size:17px;font-weight:900;">✓</span></span></div>
-        <div style="font-size:15px;font-weight:700;opacity:0.9;margin-top:8px;line-height:1.4;">${COPY.readinessIntro}, ${name}!</div>
+        <div style="font-family:var(--font-display);font-weight:600;font-size:32px;line-height:1.1;display:flex;align-items:center;gap:12px;">Body Check <span style="width:30px;height:30px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:var(--hero-text,#fff);font-size:19px;font-weight:900;line-height:1;">✓</span></span></div>
+        <div style="font-size:15px;font-weight:700;margin-top:8px;line-height:1.4;">${COPY.readinessIntro}, ${name}!</div>
         <div style="margin-top:26px;display:flex;flex-direction:column;gap:12px;">${stepper(vm, 10)}</div>
         <div style="flex:1;"></div>
       </div>`}
@@ -165,7 +165,7 @@ export function readinessScreen(vm) {
           <div style="background:var(--bg);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:16px 18px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 16px;">
             <div style="flex:1 1 200px;font-weight:700;font-size:17px;line-height:1.4;color:var(--ink);">${q.text}</div>
             ${vm.hasYesterday ? `
-              <div style="flex-shrink:0;min-width:92px;text-align:center;opacity:0.62;">
+              <div style="flex-shrink:0;min-width:92px;text-align:center;">
                 <div style="font-size:13px;font-weight:900;letter-spacing:0.05em;text-transform:uppercase;color:var(--ink-soft);">Yesterday</div>
                 <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:2px;">${q.yesterday}</div>
               </div>` : ""}
@@ -175,7 +175,7 @@ export function readinessScreen(vm) {
             </div>
           </div>`).join("")}
         ${vm.hasYesterday && vm.yesterdayZoneLine ? `
-          <div style="font-size:13px;font-weight:700;color:var(--ink-soft);opacity:0.75;padding:0 4px;">${vm.yesterdayZoneLine}</div>` : ""}
+          <div style="font-size:13px;font-weight:700;color:var(--ink-soft);padding:0 4px;">${vm.yesterdayZoneLine}</div>` : ""}
         <div style="text-align:center;font-family:var(--font-hand);font-size:20px;font-weight:700;color:var(--ink-soft);padding-top:4px;">No wrong answers — Coach picks the right session for today.</div>
       </div>
       ${vm.showInlineReadinessResult ? resultCard(vm) : ""}

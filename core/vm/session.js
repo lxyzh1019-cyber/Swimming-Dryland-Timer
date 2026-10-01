@@ -547,16 +547,20 @@ export function buildSessionVM(state) {
   /* Five states, in the four colours the finish screen and the Grown-up Zone
      already use, so nobody has to learn a second vocabulary. Standing on a move
      outranks its history: she has to be able to find herself first. */
+  /* R4 PR 7 contrast: a done / short / skipped number sits on its family's
+     wash in the -ink shade, with a 2px ring in the bright colour (white on
+     mint and coral was 2.2–2.6:1); the marks ✓ ½ ⏭ ▶ are in the -ink shade.
+     The move she is standing on keeps the solid btn-primary pill. */
   const PILL = {
-    done:    { bg: "var(--mint)",      ink: "#fff",            icon: "✓", sec: "var(--mint)" },
-    partial: { bg: "var(--sun)",       ink: "var(--sun-ink)",  icon: "½", sec: "var(--sun-deep)" },
-    skipped: { bg: "var(--coral)",     ink: "#fff",            icon: "⏭", sec: "var(--coral)" },
-    current: { bg: "var(--btn-primary-bg,var(--aqua))", ink: "var(--btn-primary-text,#fff)", icon: "▶", sec: "var(--aqua)" },
-    pending: { bg: "var(--surface-2)", ink: "var(--ink-soft)", icon: "",  sec: "var(--ink-faint)" }
+    done:    { bg: "var(--mint-wash)",  ring: "var(--mint)",  ink: "var(--mint-ink)",  icon: "✓", sec: "var(--mint-ink)" },
+    partial: { bg: "var(--sun-wash)",   ring: "var(--sun)",   ink: "var(--sun-ink)",   icon: "½", sec: "var(--sun-ink)" },
+    skipped: { bg: "var(--coral-wash)", ring: "var(--coral)", ink: "var(--coral-ink)", icon: "⏭", sec: "var(--coral-ink)" },
+    current: { bg: "var(--btn-primary-bg,var(--aqua))", ink: "var(--btn-primary-text,#fff)", icon: "▶", sec: "var(--aqua-ink)" },
+    pending: { bg: "var(--surface-2)", ink: "var(--ink-soft)", icon: "",  sec: "var(--ink-soft)" }
   };
   const NAME_INK = {
-    done: "var(--ink-faint);text-decoration:line-through;",
-    partial: "var(--ink-soft);", skipped: "var(--ink-faint);",
+    done: "var(--ink-soft);text-decoration:line-through;",
+    partial: "var(--ink-soft);", skipped: "var(--ink-soft);",
     current: "var(--ink);", pending: "var(--ink-soft);"
   };
 
@@ -607,7 +611,7 @@ export function buildSessionVM(state) {
         cardStyle: "display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:12px;margin:2px 0;box-sizing:border-box;"
           + (isCur ? "background:var(--aqua-wash);box-shadow:inset 0 0 0 2px var(--aqua-light);" : ""),
         numStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;"
-          + "background:" + pill.bg + ";color:" + pill.ink + ";",
+          + "background:" + pill.bg + ";color:" + pill.ink + ";" + (pill.ring ? "box-shadow:inset 0 0 0 2px " + pill.ring + ";" : ""),
         nameStyle: "flex:1;min-width:0;font-weight:800;color:" + NAME_INK[state],
         statusIcon: pill.icon,
         statusNote,
@@ -645,8 +649,8 @@ export function buildSessionVM(state) {
       + (quizAnswered ? "cursor:default;" : "cursor:pointer;")
       + (!quizAnswered ? "border-color:var(--hairline);background:var(--surface);color:var(--ink);"
         : o.ok ? "border-color:var(--mint);background:var(--mint-wash);color:var(--mint-ink);"
-        : sess.quizPick === i ? "border-color:var(--coral);background:color-mix(in srgb, var(--coral) 12%, #fff);color:var(--coral);"
-        : "border-color:var(--hairline);background:var(--surface);color:var(--ink-faint);")
+        : sess.quizPick === i ? "border-color:var(--coral);background:color-mix(in srgb, var(--coral) 12%, #fff);color:var(--coral-ink);"
+        : "border-color:var(--hairline);background:var(--surface);color:var(--ink-soft);")
   }));
   const quizCorrect = quizAnswered && !!(QZ.opts[sess.quizPick] && QZ.opts[sess.quizPick].ok);
   // The XP line quotes what was ACTUALLY banked (main.js prices the answer off
@@ -812,8 +816,10 @@ export function buildSessionVM(state) {
     repCheckQuestion: "You counted " + (sess.repsCounted || 0) + " of " + (sess.repsTarget || 0) + ". Did you finish the rest?",
     repCheckRule: "All " + (sess.repsTarget || 0) + " counts the move.",
     repCheckOpts: [
-      { arg: "all",    label: "All of them", bg: "var(--mint)",    ink: "#fff",           edge: "var(--mint-deep)" },
-      { arg: "almost", label: "Almost",      bg: "var(--sun)",     ink: "var(--sun-ink)", edge: "var(--sun-deep)" },
+      /* "All of them" on the Go slots, like the clean check's ✓ Clean (white on
+         mint was 2.2:1); "Almost" ink on sun. 19px weight 900: large text. */
+      { arg: "all",    label: "All of them", bg: "var(--btn-go-bg,var(--mint))", ink: "var(--btn-go-text,#fff)", edge: "var(--btn-go-edge,var(--mint-deep))" },
+      { arg: "almost", label: "Almost",      bg: "var(--sun)",     ink: "var(--ink)",     edge: "var(--sun-deep)" },
       { arg: "some",   label: "Some",        bg: "var(--surface)", ink: "var(--ink)",     edge: "var(--hairline)" }
     ],
 

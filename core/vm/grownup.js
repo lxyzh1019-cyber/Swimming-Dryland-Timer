@@ -329,8 +329,10 @@ export function buildGrownupVM(state) {
       cells: consistency.cells.map(cell => ({
         d: cell.s === "rest" ? "🌙" : cell.label,
         cellStyle: "height:" + (consistency.showDows ? "30px" : "46px") + ";border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;"
-          + (cell.s === "done" ? "background:var(--mint);color:var(--ink);"
-          : cell.s === "partial" ? "background:var(--sun);color:var(--sun-ink);"
+          /* Done: mint-ink on mint-wash with a 2px mint ring (swim 5.9, skate 5.5;
+             skate's ink on solid mint is 4.4 at 13px). Partial: ink on sun (sun-ink was 3.5). */
+          + (cell.s === "done" ? "background:var(--mint-wash);color:var(--mint-ink);box-shadow:inset 0 0 0 2px var(--mint);"
+          : cell.s === "partial" ? "background:var(--sun);color:var(--ink);"
           : cell.s === "rest" ? "background:var(--grape-wash);color:var(--grape-ink);"
           : cell.s === "missed" ? "background:color-mix(in srgb, var(--coral) 14%, #fff);color:var(--coral-ink);"
           : "background:var(--surface-2);color:var(--ink-soft);")
@@ -747,9 +749,11 @@ export function buildGrownupVM(state) {
         + ";background:" + (c.verdict === "pass" ? "var(--mint-wash)" : c.verdict === "fail" ? "color-mix(in srgb, var(--coral) 10%, #fff)" : "var(--surface)")
         + ";border-radius:var(--radius-lg);padding:15px 16px;display:flex;flex-direction:column;gap:9px;",
       passStyle: "flex:1;min-height:48px;border-radius:var(--radius-pill);border:2px solid var(--mint);cursor:pointer;font-weight:900;font-size:14px;font-family:inherit;"
-        + (c.verdict === "pass" ? "background:var(--mint);color:#fff;" : "background:transparent;color:var(--mint-ink);"),
+        /* The chosen verdict is a white pill on its tinted card, raised on the bright
+           colour, its words in the -ink shade (white on mint / coral was 2.2–2.6:1). */
+        + (c.verdict === "pass" ? "background:var(--surface);color:var(--mint-ink);box-shadow:0 3px 0 var(--mint);" : "background:transparent;color:var(--mint-ink);"),
       failStyle: "flex:1;min-height:48px;border-radius:var(--radius-pill);border:2px solid var(--coral);cursor:pointer;font-weight:900;font-size:14px;font-family:inherit;"
-        + (c.verdict === "fail" ? "background:var(--coral);color:#fff;" : "background:transparent;color:var(--coral);")
+        + (c.verdict === "fail" ? "background:var(--surface);color:var(--coral-ink);box-shadow:0 3px 0 var(--coral);" : "background:transparent;color:var(--coral-ink);")
     })),
     doneCount: fcDone, total: fcQueue.length,
     selfPct: fcSelfPct, verifiedPct: fcVerifiedPct,
@@ -881,7 +885,7 @@ export function buildGrownupVM(state) {
     profiles: profileList().map(p => ({
       id: p.id, name: p.name, active: p.id === activeProfileId(),
       style: "min-height:48px;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:14px;padding:0 16px;font-family:inherit;border:2px solid "
-        + (p.id === activeProfileId() ? "var(--aqua);background:var(--aqua);color:#fff;" : "var(--hairline);background:var(--surface-2);color:var(--ink);")
+        + (p.id === activeProfileId() ? "var(--btn-primary-bg,var(--aqua));background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);" : "var(--hairline);background:var(--surface-2);color:var(--ink);")
     })),
     multiProfile: profileList().length > 1,
     backupNote: state.backupNote || "", backupNoteOk: !!state.backupNoteOk,

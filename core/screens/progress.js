@@ -125,7 +125,7 @@ export function progressScreen(vm) {
         <div data-prizes="1" style="${vm.stackPrizes ? "width:100%;box-sizing:border-box;" : "flex:1;min-width:220px;"}background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-xl);padding:16px 18px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;">
           <div style="font-weight:900;font-size:13px;letter-spacing:0.05em;color:var(--sun-ink);text-transform:uppercase;">My prizes 🎁</div>
           ${vm.pendingDraws > 0 ? `
-          <button type="button" data-action="openPrizeDraw" style="width:100%;flex-shrink:0;min-height:56px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:10px 16px;font-family:var(--font-display);font-weight:600;font-size:17px;cursor:pointer;box-shadow:0 4px 0 var(--sun-deep);">${escapeHtml(vm.pendingDrawLabel)}</button>` : ""}
+          <button type="button" data-action="openPrizeDraw" style="width:100%;flex-shrink:0;min-height:56px;background:var(--sun);color:var(--ink);border:none;border-radius:var(--radius-pill);padding:10px 16px;font-family:var(--font-display);font-weight:600;font-size:17px;cursor:pointer;box-shadow:0 4px 0 var(--sun-deep);">${escapeHtml(vm.pendingDrawLabel)}</button>` : ""}
           ${vm.hasPrizes ? `
           <div class="list-wrap" style="--fade-to:var(--sun-wash);flex:1 1 auto;min-height:260px;">
             <div data-list="1" style="position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;padding-bottom:8px;">
@@ -210,7 +210,7 @@ export function progressScreen(vm) {
       </div>
 
       <div style="background:linear-gradient(160deg,var(--aqua-wash),var(--surface));border:1.5px solid var(--aqua-light);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);">
-        <div style="display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,#143B4A,var(--aqua));border-radius:var(--radius-lg);padding:16px 18px;color:#fff;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,#143B4A,var(--aqua-ink));border-radius:var(--radius-lg);padding:16px 18px;color:#fff;flex-wrap:wrap;">
           <div style="width:66px;height:66px;border-radius:50%;background:rgba(255,255,255,0.18);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;border:3px solid rgba(255,255,255,0.5);">
             <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;opacity:0.85;">LVL</div>
             <div style="font-family:var(--font-display);font-size:28px;font-weight:600;line-height:1;">${vm.level.levelNum}</div>

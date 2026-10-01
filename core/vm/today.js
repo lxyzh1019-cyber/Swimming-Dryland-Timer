@@ -171,7 +171,7 @@ export function buildJourney() {
     waypoints.push({
       stateAttr: "done", rankLevel: r.level, habitat: r.habitat, name: r.name, caption: "",
       showIcon: false, showCheck: true, showAvatar: false, icon: r.icon, circleR: 16,
-      circleStyle: "width:32px;height:32px;border-radius:50%;background:var(--mint);color:#fff;border:2px solid rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;box-shadow:0 2px 6px rgba(10,30,40,0.3);",
+      circleStyle: "width:32px;height:32px;border-radius:50%;background:var(--mint);color:var(--ink);border:2px solid rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:900;box-shadow:0 2px 6px rgba(10,30,40,0.3);",
       nameStyle: "font-family:var(--font-display);font-weight:600;font-size:13px;color:var(--hero-text,#fff);",
       captionStyle: ""
     });
@@ -262,13 +262,13 @@ export function buildJourney() {
 }
 
 const STATUS = {
-  done:     { bg: "var(--mint-wash)",  border: "transparent", icon: "✓", iconBg: "var(--mint)", iconColor: "#fff", label: "var(--ink-soft)" },
-  today:    { bg: "var(--sun-wash)",   border: "var(--sun)",  icon: "⭐", iconBg: "var(--sun)",  iconColor: "#fff", label: "var(--sun-ink)" },
+  done:     { bg: "var(--mint-wash)",  border: "transparent", icon: "✓", iconBg: "var(--mint)", iconColor: "var(--ink)", iconSize: 19, label: "var(--ink-soft)" },
+  today:    { bg: "var(--sun-wash)",   border: "var(--sun)",  icon: "⭐", iconBg: "var(--sun)",  iconColor: "var(--ink)", label: "var(--sun-ink)" },
   // Reframed from a red ✕ (shame) to a gentle amber "catch up" nudge — a wall of
   // red X's discourages a kid; a forward-looking prompt invites them back.
-  missed:   { bg: "var(--sun-wash)", border: "transparent", icon: "↺", iconBg: "var(--sun)", iconColor: "#fff", label: "var(--sun-ink)" },
+  missed:   { bg: "var(--sun-wash)", border: "transparent", icon: "↺", iconBg: "var(--sun)", iconColor: "var(--ink)", label: "var(--sun-ink)" },
   // Trained, but ended early — a real ✓, visually softer than a full one.
-  partial:  { bg: "var(--mint-wash)", border: "transparent", icon: "✓", iconBg: "color-mix(in srgb, var(--mint) 55%, #fff)", iconColor: "#fff", label: "var(--ink-soft)" },
+  partial:  { bg: "var(--mint-wash)", border: "transparent", icon: "✓", iconBg: "color-mix(in srgb, var(--mint) 55%, #fff)", iconColor: "var(--ink)", label: "var(--ink-soft)" },
   upcoming: { bg: "var(--aqua-wash)",  border: "transparent", icon: "📋", iconBg: "transparent", iconColor: "var(--aqua-ink)", label: "var(--aqua-ink)" }
 };
 
@@ -310,7 +310,7 @@ export function buildTodayVM(state) {
     /* Days she has TRAINED, counted once each — one day record per day. This
        was `sessions.length`: every stored row, try-it rehearsals and GO-and-
        quits included, and a resumed day twice. */
-    { icon: EMOJI.sport, value: String(trainedDays), label: plural(trainedDays, "session").replace(/^\d+\s*/, ""), color: "var(--sea)" }
+    { icon: EMOJI.sport, value: String(trainedDays), label: plural(trainedDays, "session").replace(/^\d+\s*/, ""), color: "var(--sea-ink)" }
   ];
   const journey = buildJourney();
 
@@ -355,10 +355,12 @@ export function buildTodayVM(state) {
      reading a number. This is the screen that answers "how did the whole day
      go" — the finish screen deliberately answers only "what is still owed". */
   const REVIEW_PILL = {
-    done:    { icon: "✓", bg: "var(--mint)", ink: "#fff" },
-    banked:  { icon: "✓", bg: "var(--mint)", ink: "#fff" },
-    partial: { icon: "½", bg: "var(--sun)", ink: "var(--sun-ink)" },
-    skipped: { icon: "⏭", bg: "var(--coral)", ink: "#fff" },
+    /* R4 PR 7: the family wash, a 2px ring in the bright colour and the mark
+       in the -ink shade (white on mint / coral was 2.2–2.6:1). */
+    done:    { icon: "✓", bg: "var(--mint-wash)", ring: "var(--mint)", ink: "var(--mint-ink)" },
+    banked:  { icon: "✓", bg: "var(--mint-wash)", ring: "var(--mint)", ink: "var(--mint-ink)" },
+    partial: { icon: "½", bg: "var(--sun-wash)", ring: "var(--sun)", ink: "var(--sun-ink)" },
+    skipped: { icon: "⏭", bg: "var(--coral-wash)", ring: "var(--coral)", ink: "var(--coral-ink)" },
     missing: { icon: "—", bg: "rgba(255,255,255,0.28)", ink: "var(--hero-text,#fff)" }
   };
   /* What each slot SAYS when she holds it. The status is an internal enum, and
@@ -367,7 +369,7 @@ export function buildTodayVM(state) {
   const SLOT_WORDS = { done: "done in full", banked: "done in full", partial: "came up short",
                        skipped: "skipped", missing: "not reached" };
   const slotStyle = (pill) => "width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;"
-    + "align-items:center;justify-content:center;font-size:13px;font-weight:900;background:" + pill.bg + ";color:" + pill.ink + ";";
+    + "align-items:center;justify-content:center;font-size:13px;font-weight:900;background:" + pill.bg + ";color:" + pill.ink + ";" + (pill.ring ? "box-shadow:inset 0 0 0 2px " + pill.ring + ";" : "");
   const reviewRows = (b) => {
     if (!showActuals) return [];
     const rows = (planState.moves || []).filter(m => m.block === b.block && m.circuit === b.name);
@@ -483,7 +485,7 @@ export function buildTodayVM(state) {
     const s = STATUS[effStatus];
     const iconWrap = s.iconBg === "transparent"
       ? "width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:18px;color:" + (s.iconColor || "var(--ink-soft)") + ";margin:5px 0;"
-      : "width:30px;height:30px;border-radius:50%;background:" + s.iconBg + ";color:" + s.iconColor + ";display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;margin:5px 0;";
+      : "width:30px;height:30px;border-radius:50%;background:" + s.iconBg + ";color:" + s.iconColor + ";display:flex;align-items:center;justify-content:center;font-size:" + (s.iconSize || 15) + "px;font-weight:900;margin:5px 0;";
     const selected = key === selectedKey;
     return {
       key, short: DAY_SHORT[key], date: String(weekDates[key]), icon: s.icon, iconWrap,
@@ -493,9 +495,11 @@ export function buildTodayVM(state) {
     };
   });
 
-  const legendCircle = (bg) => "display:inline-flex;width:20px;height:20px;border-radius:50%;align-items:center;justify-content:center;font-size:13px;font-weight:900;background:" + bg + ";color:#fff;";
+  /* Ink glyphs (white on mint / sun was 1.6–2.2:1). The ✓ on solid mint is 19px
+     weight 900 — large text — because skate's ink on mint is 4.4:1. */
+  const legendCircle = (bg, px = 13) => "display:inline-flex;width:24px;height:24px;border-radius:50%;align-items:center;justify-content:center;font-size:" + px + "px;font-weight:900;line-height:1;background:" + bg + ";color:var(--ink);";
   const legend = [
-    { icon: "✓", iconStyle: legendCircle("var(--mint)"), label: "Done" },
+    { icon: "✓", iconStyle: legendCircle("var(--mint)", 19), label: "Done" },
     { icon: "⭐", iconStyle: legendCircle("var(--sun)"), label: "Today" },
     { icon: "✓", iconStyle: legendCircle("color-mix(in srgb, var(--mint) 55%, #fff)"), label: "Partly done" },
     { icon: "📋", iconStyle: "font-size:14px;", label: "Upcoming" },
@@ -748,7 +752,7 @@ export function buildTodayVM(state) {
     : "width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:var(--sun);color:var(--ink);border:none;border-radius:var(--radius-pill);padding:18px;font-family:var(--font-display);font-weight:600;font-size:24px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);";
 
   const coachIconBtnStyle = "width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;flex-shrink:0;font-size:15px;display:flex;align-items:center;justify-content:center;"
-    + (settings.coachVoiceOn ? "background:#fff;color:var(--aqua-deep);" : "background:rgba(255,255,255,0.18);color:#fff;");
+    + (settings.coachVoiceOn ? "background:#fff;color:var(--aqua-ink);" : "background:rgba(255,255,255,0.18);color:var(--hero-text,#fff);");
   const practiceLinkLabel = "🧪 Explore the moves";
   const practiceHintLine = "The session screen at your own pace — nothing counts down, nothing is recorded.";
   const practiceBtnStyle = "width:100%;min-height:48px;display:flex;align-items:center;justify-content:center;gap:9px;border-radius:var(--radius-pill);cursor:pointer;font-family:inherit;font-weight:900;font-size:14px;padding:0 18px;"
