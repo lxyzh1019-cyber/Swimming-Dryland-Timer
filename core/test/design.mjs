@@ -13,7 +13,7 @@
    carry their old sizes, so ALLOW below names every one of them, per screen.
    Each later PR deletes its own entries; when the redesign is done ALLOW is
    empty. The session screen and the journey map (PR 2) have no entries and
-   must never get one. */
+   must never get one. Today (PR 4) has none either. */
 import { engine, store, data, tvm, gvm, gscreen, rvm, rscreen, pvm, pscreen, svm, sscreen, tscreen, runSession } from "./harness.mjs";
 
 let passed = 0;
@@ -22,9 +22,11 @@ const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++
 const KID_FONT_MIN = 13, KID_TAP_MIN = 56, DONE_TAP_MIN = 64, ADULT_TAP_MIN = 48;
 /* Approved below the kid floor by docs/DESIGN.md (Session screen): the quiet
    "◀ Back a move" link is 48px; the move card's ✕ is a 48px round close; the
-   Body Check light picker is a grown-up control under 🔒 (grown-up floor, 48).
+   Body Check light picker is a grown-up control under 🔒 (grown-up floor, 48);
+   Today's "🧪 Explore the moves" is the secondary action under "Let's go", kept
+   at 48 (plan v4, PR 4; test/smoke.mjs checks its 48px).
    Not temporary entries — the design itself. */
-const DESIGN_TAP = { goBack: 48, closeDetail: 48, rPickLight: 48 };
+const DESIGN_TAP = { goBack: 48, closeDetail: 48, rPickLight: 48, goExplore: 48 };
 
 /* ---- ALLOW: sizes still failing on screens later PRs redesign ----------
    One entry = { kind: "font" | "tap", px, has } — `has` is a piece of the
@@ -34,18 +36,6 @@ const ALLOW = {
   // PR 5 — finish screen
   finish: [
     { kind: "font", px: 12, has: "font-size:12px;font-weight:800;color:var(--ink-soft);" }   // Coach's Quiz intro line
-  ],
-  // PR 4 — Today day card, week strip, stats, Quiz Deck button (never the journey map)
-  today: [
-    { kind: "font", px: 11, has: "font-size:11px;font-weight:900;letter-spacing:0.04em;" },  // week strip day names
-    { kind: "font", px: 12, has: "font-size:12px;font-weight:800;color:var(--ink-soft);" },  // week strip dates, Quiz Deck sub-line
-    { kind: "font", px: 11, has: "width:20px;height:20px;border-radius:50%;" },              // week strip status dots
-    { kind: "font", px: 10, has: "width:20px;height:20px;border-radius:50%;" },
-    { kind: "font", px: 11, has: "padding:6px 14px;font-size:11px;font-weight:900;letter-spacing:0.08em;" }, // day card label chip
-    { kind: "font", px: 11, has: "font-size:11px;font-weight:900;letter-spacing:0.08em;opacity:0.85;margin-bottom:9px;" },
-    { kind: "font", px: 12, has: "font-size:12px;font-weight:800;opacity:0.85;text-align:right;" },   // block row minutes
-    { kind: "font", px: 11, has: "font-size:11px;font-weight:800;opacity:0.85;line-height:1.35;" },   // block row move names
-    { kind: "font", px: 11, has: "width:22px;height:22px;border-radius:50%;" }               // review round dots
   ],
   // PR 6 — Progress
   progress: [
@@ -77,8 +67,8 @@ const ALLOW = {
   ]
 };
 
-ok(!Object.keys(ALLOW).some(k => /session|journey|readiness/.test(k)),
-   "the session screen, the journey map and Body Check have no allowance — they meet the floor outright");
+ok(!Object.keys(ALLOW).some(k => /session|journey|readiness|today/.test(k)),
+   "the session screen, the journey map, Body Check and Today have no allowance — they meet the floor outright");
 
 /* ---- a tiny reader for the opening tags of rendered HTML ---------------- */
 const TAG = /<([a-zA-Z][\w-]*)((?:\s+[^\s=>"']+(?:="[^"]*")?)*)\s*\/?>/g;
@@ -242,6 +232,13 @@ for (const [st, [snap, extra, state]] of Object.entries(STATES)) {
       const strip = tags(html).filter(t => t.tag === "button" && ["pickClean", "pickWobbly", "skipFormCheck"].includes(t.action));
       ok(strip.length === 3 && strip.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN),
          "session formcheck " + layout + ": the clean-check strip's three buttons are 56px");
+      const cleanBtn = strip.find(t => t.action === "pickClean");
+      ok(/background:var\(--btn-go-bg,var\(--mint\)\);color:var\(--btn-go-text,#fff\);/.test(cleanBtn.style)
+         && /box-shadow:0 3px 0 var\(--btn-go-edge,var\(--mint-deep\)\)/.test(cleanBtn.style),
+         "session formcheck " + layout + ": the clean button is on the Go slots");
+      /* Anything on the btn-go slots is large text: swim white on aqua-deep is 3.6. */
+      ok(pxOf(cleanBtn.style, "font-size") >= 19 && /font-weight:900/.test(cleanBtn.style) && pxOf(cleanBtn.style, "min-height") >= KID_TAP_MIN,
+         "session formcheck " + layout + ": the clean button is 19px+ weight 900, 56px");
     }
     if (st === "detail") {
       const close = tags(html).find(t => t.tag === "button" && t.action === "closeDetail");
@@ -312,7 +309,7 @@ clean("finish", sscreen.sessionScreen(finishVm), { kid: true, allow: ALLOW.finis
 const today = Object.keys(data.DAYS).find(k => !data.DAYS[k].spa);
 const tv = tvm.buildTodayVM({ selectedDay: today, expanded: {}, isWide: true });
 const wideHtml = tscreen.todayWide(tv);
-clean("today", wideHtml, { kid: true, allow: ALLOW.today });
+clean("today", wideHtml, { kid: true });
 for (const [name, html] of [["wide", wideHtml], ["narrow", tscreen.todayNarrow({ ...tvm.buildTodayVM({ selectedDay: today, expanded: {}, isWide: false }) })]]) {
   const map = section(html, 'id="journey-map-card"');
   ok(map.length > 0, "journey map " + name + ": found on Today");
@@ -323,6 +320,77 @@ for (const [name, html] of [["wide", wideHtml], ["narrow", tscreen.todayNarrow({
   ok(/color:var\(--hero-text,#fff\)/.test(map), "journey map " + name + ": its words take the hero-text slot");
   ok(/background:rgba\(255,255,255,0\.6\);border-radius:999px;padding:4px 10px;">\s*<span style="[^"]*color:var\(--ink\);">[^<]+<\/span>\s*<span style="[^"]*color:var\(--aqua-ink\);">YOU ARE HERE<\/span>/.test(map),
      "journey map " + name + ": \"You are here\" sits on a white pill");
+}
+
+/* ---- 3b. TODAY (PR 4): Card A day card, order, phone fold, sizes ------- */
+{
+  const todayKey = tvm.buildTodayVM({ expanded: {}, isWide: true }).todayKey;
+  const day = data.DAYS[todayKey] && !data.DAYS[todayKey].spa ? todayKey : today;
+  const T = (layout, extra = {}) => {
+    const vm = tvm.buildTodayVM({ selectedDay: day, expanded: {}, ...LAYOUTS[layout], ...extra });
+    return { vm, html: layout === "narrow" ? tscreen.todayNarrow(vm) : tscreen.todayWide(vm) };
+  };
+  const firstBlock = (T("roomy").vm.blocks[0] || {}).key;
+  const VIEWS = {
+    roomy: ["roomy", {}], tight: ["tight", {}],
+    "roomy block open": ["roomy", { expanded: { [firstBlock]: true } }],
+    "narrow closed": ["narrow", {}], "narrow open": ["narrow", { blocksOpen: true }],
+    "narrow open block open": ["narrow", { blocksOpen: true, expanded: { [firstBlock]: true } }]
+  };
+  const HERO = /background:linear-gradient\(165deg,var\(--hero-from,var\(--aqua-light\)\) 0%,var\(--hero-to,var\(--aqua\)\) 70%\);color:var\(--hero-text,#fff\);/;
+  for (const [name, [layout, extra]] of Object.entries(VIEWS)) {
+    const { vm, html } = T(layout, extra);
+    const label = "today " + name;
+    clean(label, html, { kid: true });
+    ok(vm.dayView.isActive && vm.dayView.showBlocksList && vm.dayView.showExplore, label + ": drawn on an active day (" + day + ")");
+    ok(HERO.test(html) && !/var\(--aqua-deep\) 100%/.test(html), label + ": the day card is Card A — hero slots, 0 → 70%, no aqua-deep end");
+    const n = vm.blocks.length;
+    const rows = tags(html).filter(t => t.tag === "button" && t.action === "toggleBlock");
+    const fold = tags(html).filter(t => t.tag === "button" && t.action === "toggleBlocks");
+    const open = layout !== "narrow" || !!extra.blocksOpen;
+    ok(n > 1 && rows.length === (open ? n : 0) && rows.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN),
+       label + ": " + (open ? "all " + n + " block rows, each 56px" : "no block rows while folded"));
+    if (layout === "narrow") {
+      ok(fold.length === 1 && pxOf(fold[0].style, "min-height") >= KID_TAP_MIN && /background:var\(--hero-chip,/.test(fold[0].style),
+         label + ": one 56px fold button on the hero-chip");
+      ok(open ? /<span>Hide the blocks<\/span><span aria-hidden="true"[^>]*>▴<\/span>/.test(html)
+              : new RegExp("<span>See the " + n + " blocks</span><span aria-hidden=\"true\"[^>]*>▾</span>").test(html),
+         label + ": the fold reads " + (open ? "\"Hide the blocks ▴\"" : "\"See the " + n + " blocks ▾\""));
+      ok(fold[0].open.includes('aria-expanded="' + open + '"'), label + ": aria-expanded=" + open);
+    } else {
+      ok(fold.length === 0, label + ": iPad keeps the blocks open, no fold button");
+    }
+    if (name.endsWith("block open")) ok(/padding:2px 15px 13px 56px;/.test(html), label + ": the tapped block shows its moves");
+    /* Order: portrait and phone put the day card straight after the greeting;
+       landscape keeps the left column (week … journey) and the card on the right. */
+    const at = (re) => html.search(re);
+    const [hi, card, week, map] = [at(/Hi, /), at(HERO), at(/data-action="selectDay"/), at(/id="journey-map-card"/)];
+    ok(layout === "roomy" ? hi < week && week < map && map < card : hi < card && card < week && week < map,
+       label + ": order " + (layout === "roomy" ? "greeting, week, journey | day card" : "greeting, day card, week, journey"));
+    /* Week strip: 7 cells 88px tall, day names 13px, dates 15px. */
+    const cells = tags(html).filter(t => t.tag === "button" && t.action === "selectDay" && /min-height:88px/.test(t.style));
+    ok(cells.length === 7, label + ": 7 week cells, each min-height 88px");
+    ok((html.match(/font-size:13px;font-weight:900;letter-spacing:0\.0[34]em;/g) || []).length === 7
+       && (html.match(/<div style="font-size:15px;font-weight:800;color:var\(--ink-soft\);">\d+<\/div>/g) || []).length === 7,
+       label + ": week day names 13px, dates 15px");
+    ok(/color:var\(--grape-ink\);flex-shrink:0;">›<\/span>/.test(html), label + ": the Quiz Deck chevron is grape-ink");
+    ok(html.includes("<span>⚡\uFE0F</span> " + vm.dayView.movesLabel), label + ": the moves chip asks for emoji ⚡️");
+    ok(/background:var\(--hero-chip,rgba\(255,255,255,0\.18\)\);border-radius:var\(--radius-pill\);/.test(html), label + ": chips on the hero-chip slot");
+    /* Faded words on the day card measured under 4.5:1 (PR 4) are full strength
+       now; only the block-row count (5.2+ measured) and the • bullet keep one. */
+    const dayCardHtml = section(html, "70%);color:var(--hero-text,#fff);");
+    const faded = tags(dayCardHtml).filter(t => /(?:^|;)opacity:/.test(t.style));
+    ok(dayCardHtml.length > 0 && faded.every(t => /text-align:right;/.test(t.style) || t.style === "opacity:0.7;flex-shrink:0;"),
+       label + ": no faded text on the day card except the block-row count and the bullet");
+    const go = tags(html).find(t => t.tag === "button" && t.action === vm.dayView.ctaAction);
+    ok(go && /background:var\(--sun\);color:var\(--ink\);/.test(go.style), label + ": \"Let's go\" is ink on sun");
+    const explore = tags(html).find(t => t.tag === "button" && t.action === "goExplore");
+    ok(explore && /color:var\(--hero-text,#fff\);border:2px solid var\(--hero-text,#fff\);/.test(explore.style) && pxOf(explore.style, "min-height") === 48,
+       label + ": Explore is a 48px hero-text outline");
+    const map2 = section(html, 'id="journey-map-card"');
+    ok(/background:rgba\(255,255,255,0\.55\);border-radius:9px;overflow:hidden;">\s*<div style="width:[\d.]+%;height:100%;background:var\(--sun\);/.test(map2),
+       label + ": the journey XP bar is sun on a white 55% track");
+  }
 }
 
 /* ---- 4. BODY CHECK (PR 3): every step, both layouts, no allowance ------ */
@@ -386,6 +454,20 @@ for (const wide of [true, false]) {
   const html = drawR(R_STATES.questions, wide);
   ok(/background:linear-gradient\(165deg,var\(--hero-from,var\(--aqua-light\)\) 0%,var\(--hero-to,var\(--aqua\)\) 70%\);color:var\(--hero-text,#fff\);/.test(html),
      "readiness " + (wide ? "wide" : "narrow") + ": the hero panel is painted from the hero slots");
+}
+/* Body Check leftovers (PR 4): popup words in -ink, legend headers ink-soft,
+   the view pills on the btn-primary slots. */
+for (const wide of [true, false]) {
+  const pop = drawR(R_STATES["zone popup"], wide);
+  ok(/color:var\(--sun-ink\);">Tired but controlled/.test(pop) && /color:var\(--coral-ink\);">Changed movement/.test(pop)
+     && /color:var\(--stop-ink\);">Pain \/ Stop/.test(pop) && !/font-size:16px;color:var\(--(sun|coral|stop)\);/.test(pop),
+     "readiness zone popup " + (wide ? "wide" : "narrow") + ": the severity words are in their -ink shades");
+  const map = drawR(R_STATES["body map"], wide);
+  ok(/text-transform:uppercase;color:var\(--ink-soft\);padding:10px 4px 2px;/.test(map) && !/color:var\(--ink-faint\)/.test(map),
+     "readiness body map " + (wide ? "wide" : "narrow") + ": legend headers are ink-soft");
+  ok(/background:var\(--btn-primary-bg,var\(--aqua\)\);color:var\(--btn-primary-text,#fff\);[^"]*">FRONT VIEW/.test(map)
+     && /background:var\(--btn-primary-bg,var\(--sea\)\);color:var\(--btn-primary-text,#fff\);[^"]*">BACK VIEW/.test(map),
+     "readiness body map " + (wide ? "wide" : "narrow") + ": FRONT/BACK VIEW pills on the btn-primary slots");
 }
 /* The result after a body-map answer is the element main.js scrolls to. */
 ok(/<div data-body-result /.test(drawR(R_STATES["sore result"], false)), "the body-map result card carries data-body-result");

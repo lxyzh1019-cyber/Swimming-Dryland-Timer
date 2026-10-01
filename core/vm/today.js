@@ -359,7 +359,7 @@ export function buildTodayVM(state) {
     banked:  { icon: "✓", bg: "var(--mint)", ink: "#fff" },
     partial: { icon: "½", bg: "var(--sun)", ink: "var(--sun-ink)" },
     skipped: { icon: "⏭", bg: "var(--coral)", ink: "#fff" },
-    missing: { icon: "—", bg: "rgba(255,255,255,0.28)", ink: "#fff" }
+    missing: { icon: "—", bg: "rgba(255,255,255,0.28)", ink: "var(--hero-text,#fff)" }
   };
   /* What each slot SAYS when she holds it. The status is an internal enum, and
      falling through to it put "Round 2 — partial" and "Round 3 — banked" into
@@ -367,7 +367,7 @@ export function buildTodayVM(state) {
   const SLOT_WORDS = { done: "done in full", banked: "done in full", partial: "came up short",
                        skipped: "skipped", missing: "not reached" };
   const slotStyle = (pill) => "width:22px;height:22px;border-radius:50%;flex-shrink:0;display:inline-flex;"
-    + "align-items:center;justify-content:center;font-size:11px;font-weight:900;background:" + pill.bg + ";color:" + pill.ink + ";";
+    + "align-items:center;justify-content:center;font-size:13px;font-weight:900;background:" + pill.bg + ";color:" + pill.ink + ";";
   const reviewRows = (b) => {
     if (!showActuals) return [];
     const rows = (planState.moves || []).filter(m => m.block === b.block && m.circuit === b.name);
@@ -466,8 +466,10 @@ export function buildTodayVM(state) {
         ? "padding:2px 15px 13px 56px;"
         : "max-height:0;overflow:hidden;padding:0 15px 0 56px;"
     };
+  /* Rows sit on the hero-chip slot (one even tint, as in the mockup); the old
+     alternating whites remain only as the fallback. */
   }).filter(Boolean).map((b, i) => ({
-    ...b, rowBg: i % 2 === 0 ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.12)"
+    ...b, rowBg: "var(--hero-chip," + (i % 2 === 0 ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.12)") + ")"
   }));
   const reviewLegend = showActuals ? moveReviewLegend() : "";
 
@@ -486,15 +488,15 @@ export function buildTodayVM(state) {
     return {
       key, short: DAY_SHORT[key], date: String(weekDates[key]), icon: s.icon, iconWrap,
       labelColor: s.label,
-      cellStyle: "display:flex;flex-direction:column;align-items:center;padding:9px 4px;border-radius:16px;background:none;cursor:pointer;font-family:inherit;width:100%;background:" + s.bg + ";border:2px solid " + s.border + ";"
+      cellStyle: "display:flex;flex-direction:column;align-items:center;padding:9px 4px;min-height:88px;border-radius:16px;background:none;cursor:pointer;font-family:inherit;width:100%;background:" + s.bg + ";border:2px solid " + s.border + ";"
         + (selected ? "box-shadow:0 0 0 3px var(--ink);" : "")
     };
   });
 
-  const legendCircle = (bg) => "display:inline-flex;width:20px;height:20px;border-radius:50%;align-items:center;justify-content:center;font-size:11px;font-weight:900;background:" + bg + ";color:#fff;";
+  const legendCircle = (bg) => "display:inline-flex;width:20px;height:20px;border-radius:50%;align-items:center;justify-content:center;font-size:13px;font-weight:900;background:" + bg + ";color:#fff;";
   const legend = [
     { icon: "✓", iconStyle: legendCircle("var(--mint)"), label: "Done" },
-    { icon: "⭐", iconStyle: legendCircle("var(--sun)") + "font-size:10px;", label: "Today" },
+    { icon: "⭐", iconStyle: legendCircle("var(--sun)"), label: "Today" },
     { icon: "✓", iconStyle: legendCircle("color-mix(in srgb, var(--mint) 55%, #fff)"), label: "Partly done" },
     { icon: "📋", iconStyle: "font-size:14px;", label: "Upcoming" },
     { icon: "↺", iconStyle: legendCircle("var(--sun)"), label: "Catch up" }
@@ -742,15 +744,15 @@ export function buildTodayVM(state) {
   dayView.blocksHint = dayView.isDone ? "REVIEW WHAT YOU DID 👀" : dayView.isPreview ? "PEEK AT WHAT'S COMING 👀" : dayView.isMissed ? "READY WHEN YOU ARE — PEEK INSIDE 👀" : "TAP A BLOCK TO PEEK INSIDE 👀";
   dayView.showFocus = !!(dayView.isActive || dayView.isPreview) && !isSpaDay;
   dayView.ctaButtonStyle = dayView.ctaVariant === "secondary"
-    ? "width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:rgba(255,255,255,0.16);color:#fff;border:2px solid rgba(255,255,255,0.55);border-radius:var(--radius-pill);padding:14px;font-family:var(--font-display);font-weight:600;font-size:18px;cursor:pointer;"
-    : "width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:var(--sun);color:var(--sun-ink);border:none;border-radius:var(--radius-pill);padding:18px;font-family:var(--font-display);font-weight:600;font-size:24px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);";
+    ? "width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:rgba(255,255,255,0.16);color:var(--hero-text,#fff);border:2px solid var(--hero-text,#fff);border-radius:var(--radius-pill);padding:14px;font-family:var(--font-display);font-weight:600;font-size:18px;cursor:pointer;"
+    : "width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:var(--sun);color:var(--ink);border:none;border-radius:var(--radius-pill);padding:18px;font-family:var(--font-display);font-weight:600;font-size:24px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);";
 
   const coachIconBtnStyle = "width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;flex-shrink:0;font-size:15px;display:flex;align-items:center;justify-content:center;"
     + (settings.coachVoiceOn ? "background:#fff;color:var(--aqua-deep);" : "background:rgba(255,255,255,0.18);color:#fff;");
   const practiceLinkLabel = "🧪 Explore the moves";
   const practiceHintLine = "The session screen at your own pace — nothing counts down, nothing is recorded.";
   const practiceBtnStyle = "width:100%;min-height:48px;display:flex;align-items:center;justify-content:center;gap:9px;border-radius:var(--radius-pill);cursor:pointer;font-family:inherit;font-weight:900;font-size:14px;padding:0 18px;"
-    + "background:rgba(255,255,255,0.14);color:#fff;border:2px solid rgba(255,255,255,0.45);";
+    + "background:rgba(255,255,255,0.14);color:var(--hero-text,#fff);border:2px solid var(--hero-text,#fff);";
 
   // Echo-back: her own last "next time" promise, remembered on the day card.
   const lastSaid = sessions.slice().reverse().map(h => h.nextTime).find(Boolean);
@@ -773,6 +775,7 @@ export function buildTodayVM(state) {
 
   return {
     tightColumn: !!state.tightColumn,
+    blocksOpen: !!state.blocksOpen,
     athleteName: settings.athleteName || ATHLETE_DEFAULT,
     dateLine, statChips, journey, blocks, reviewLegend, week, legend, dayView,
     gearLabel, focusCue, coachIconBtnStyle, practiceLinkLabel, practiceHintLine, practiceBtnStyle,

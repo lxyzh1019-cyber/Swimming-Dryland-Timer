@@ -64,8 +64,8 @@ function bodyMap(vm, view) {
   const badges = view === "front" ? FRONT_BADGES : BACK_BADGES;
   const img = view === "front" ? IMAGES.bodyFront : IMAGES.bodyBack;
   const pill = view === "front"
-    ? `<span style="background:var(--aqua);color:#fff;font-size:13px;font-weight:900;letter-spacing:0.06em;padding:6px 16px;border-radius:var(--radius-pill);margin-bottom:8px;">FRONT VIEW</span>`
-    : `<span style="background:var(--sea);color:#fff;font-size:13px;font-weight:900;letter-spacing:0.06em;padding:6px 16px;border-radius:var(--radius-pill);margin-bottom:8px;">BACK VIEW</span>`;
+    ? `<span style="background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);font-size:13px;font-weight:900;letter-spacing:0.06em;padding:6px 16px;border-radius:var(--radius-pill);margin-bottom:8px;">FRONT VIEW</span>`
+    : `<span style="background:var(--btn-primary-bg,var(--sea));color:var(--btn-primary-text,#fff);font-size:13px;font-weight:900;letter-spacing:0.06em;padding:6px 16px;border-radius:var(--radius-pill);margin-bottom:8px;">BACK VIEW</span>`;
   return `
   <div style="flex:1;background:var(--bg);border:2px solid var(--hairline);border-radius:22px;padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     ${pill}
@@ -200,7 +200,7 @@ export function readinessScreen(vm) {
         ${bodyMap(vm, "back")}
         <div style="${vm.legendStyle}">
           ${vm.legendRows.map(lg => lg.isHeader
-            ? `<div style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-faint);padding:10px 4px 2px;">${lg.label}</div>`
+            ? `<div style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);padding:10px 4px 2px;">${lg.label}</div>`
             : `<button type="button" data-action="rPickZone" data-arg="${lg.num}" style="${lg.rowStyle}">
                  <span style="${lg.badgeStyle}">${lg.num}</span>
                  <span style="font-size:14px;font-weight:800;color:var(--ink);text-align:left;line-height:1.2;">${lg.label}</span>
@@ -224,7 +224,7 @@ export function readinessScreen(vm) {
               <button type="button" data-action="rSetZoneSev" data-arg="${vm.pendingZone}|${po.level}" style="display:flex;align-items:center;gap:12px;background:var(--bg);border:3px solid ${po.color};border-radius:var(--radius-lg);padding:12px 14px;cursor:pointer;text-align:left;min-height:60px;">
                 <span style="font-size:28px;line-height:1;flex-shrink:0;">${po.emoji}</span>
                 <div>
-                  <div style="font-weight:900;font-size:16px;color:${po.color};">${po.label}</div>
+                  <div style="font-weight:900;font-size:16px;color:${po.labelColor};">${po.label}</div>
                   <div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.3;margin-top:2px;">${po.desc}</div>
                 </div>
               </button>`).join("")}

@@ -75,9 +75,9 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R4-3b PR 2b Pool calm session buttons (plan v4) | COMPLETE | code, tests (design 288), screenshots done on `claude/splash-pr2b-pool-calm`;  PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#69 |
 | R4-4b Merge PR pair 2b | COMPLETE | merged by user 2026-09-30 |
 | R4-5 PR 3 Body Check (+ pop-up card sizes and rail-hidden label ink, leftovers from PR 2) | COMPLETE | opus-worker 2026-10-01 on `claude/splash-pr3-body-check`, uncommitted: code, data, tests (design 288 → 572, readiness allowance removed), sw.js v26 → v27, FEATURES.md; `npm test` exit 0 both TZs; `diff -rq core` empty; screenshots C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr3/pr3-swim.png. Remaining: commit, push, PR (main session); PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#70 |
-| R4-6 Merge PR pair 3 | WAITING ON YOU — merge PR pair 3 | |
-| R4-7 PR 4 Today | NOT STARTED | |
-| R4-8 Merge PR pair 4 | NOT STARTED | |
+| R4-6 Merge PR pair 3 | COMPLETE | merged by user 2026-10-01 (swim #70, skate #44) |
+| R4-7 PR 4 Today (+ journey XP bar, green-result scroll, Body Check leftover colours) | COMPLETE | opus-worker 2026-10-01 on `claude/splash-pr4-today`, uncommitted: code (core today screen/vm, main, gate, readiness, session clean button), `js/data.js` ⚡️, tests (design 572 → 682, Today allowance removed; actions 302 → 312), sw.js v27 → v28, FEATURES.md; `npm test` exit 0 both TZs; `diff -rq core` empty; screenshots C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr4/pr4-swim.png. Remaining: commit, push, PR (main session); PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#71 |
+| R4-8 Merge PR pair 4 | WAITING ON YOU — merge PR pair 4 | |
 | R4-9 PR 5 Finish screen and Quiz Deck | NOT STARTED | |
 | R4-10 Merge PR pair 5 | NOT STARTED | |
 | R4-11 PR 6 Progress and Grown-up | NOT STARTED | |
@@ -117,6 +117,15 @@ Structural option (not approved, not done): a test that renders every screen, co
 - 2026-10-01 R4 PR 3: screenshots (Playwright Chromium, touch, fake clock Wed 2026-09-23 12:00 Edmonton, every non-127.0.0.1 request aborted) at 1194×834, 834×1194, 390×844: questions, 3 answered, green result, body map, zone popup, sore result after the scroll, recovery (all three "no"); plus rep-check card and move card at 1194×834 (rep count set through the page's engine module: headless Chromium has no voices, so the coach count never moves); all reached; C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr3/pr3-swim.png
 - 2026-10-01 R4 PR 3: DOM at all three sizes: yes/no 56px / 17px; Start 64px / 24px / 900; grown-up summary 48px / 13px; light picker option 48px / 15px (chosen: text in mint-ink on white); green title in mint-ink; sore result card on screen after the answer (card top at 1194×834 / 834×1194 / 390×844: swim 350 / 710 / 221 px, skate 352 / 712 / 220 px); rep-check buttons 56 / 56 / 56 (17px); move card ✕ 48×48; Resume 56
 - 2026-10-01 R4 PR 3 live site / device → untested
+- 2026-10-01 R4 PR 4 baseline before changes (branch from origin/main): `npm test` exit 0 in both repos, all suites green (actions 302, design 572, shell 256)
+- 2026-10-01 R4 PR 4 after changes (opus-worker): `npm test` exit 0, both TZs, all suites green (leadin-data 19, smoke 1401, core actions 312, dayrecords 251, design 682, integrity 48, interaction 18, invariants 569, landing 7, core leadin 42, session 325, shell 257); design 572 → 682: Today roomy / tight / phone folded / phone open / block expanded (sizes, Card A slots, order, fold, week cells, chevron, ⚡️, Let's go, Explore, XP bar), Body Check popup words / legend headers / view pills, clean button slots; actions 302 → 312: toggleBlocks ungated and survives a block tap, green-result scroll once and null-safe; shell +1 (sw.js version)
+- 2026-10-01 R4 PR 4: mutation check — removing the green-result flag, dropping toggleBlocks from the gate, restoring the old phone gradient, or always-open phone blocks each fails a suite
+- 2026-10-01 R4 PR 4: `diff -rq core` swim vs skate → empty
+- 2026-10-01 R4 PR 4: screenshots (Playwright Chromium, touch, fake clock Wed 2026-09-23 12:00 Edmonton, every non-127.0.0.1 request aborted) at 1194×834, 834×1194, 390×844: Today first screen + full page, phone blocks open, a block expanded, Body Check green result after the four questions, zone popup; clean-check card at 1194×834 drawn by setting the engine phase through the page's own modules (not reached by stepping the session in 300 steps); C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr4/pr4-swim.png
+- 2026-10-01 R4 PR 4: DOM — "Let's go" fully in the first viewport at all three sizes (top–bottom px: 1194×834 719–785, 834×1194 778–844, 390×844 521–587); block row 60 (iPad) / 56 (phone); week cell 100; phone fold 56; Explore 48; green result after the questions: card top 502 / 725 / 475 px, Start 698–762 / 962–1026 / 712–776, Start on screen at all three sizes
+- 2026-10-01 R4 PR 4: contrast hero-text on hero-from / hero-to: aqua-light → aqua, ink text (7.97 / 4.93); Let's go ink on sun swim 7.43 / skate 5.95
+- 2026-10-01 R4 PR 4 follow-up (coordinator): "✓ Clean" 14 → 19px weight 900 (DOM 56px / 19px in both apps; design.mjs asserts ≥ 19px, 900, 56px); faded day-card text measured in the browser (computed colour × opacity composited over the median background pixel of its box, 1194×834 and 390×844, Wed / Mon / Thu / Sun, blocks open and one expanded): swim before 3.50–4.81 (Explore hint, line under Let's go, cues, Pool lines down to 3.50; recovery note 4.15), after (full strength) 4.93–6.77; opacity removed from every failing site; the only faded text left (block-row count) re-measured ≥ 5.24, all pass; design.mjs asserts no other opacity on the day card (design 673 → 682); `npm test` exit 0 both repos, both TZs; `diff -rq core` empty; screenshots and contact sheets refreshed (Let's go still fully in the first viewport at all three sizes)
+- 2026-10-01 R4 PR 4 live site / device → untested
 
 ## Open questions / blockers
 - No visible deploy stamp on the page (rules require one) — flagged, out of scope this round.
@@ -197,4 +206,31 @@ Structural option (not approved, not done): a test that renders every screen, co
 | Gate deny-by-default | kept | `core/gate.js` untouched; no new action |
 | `core/` byte-identical with the other repo | kept | `diff -rq core` empty |
 | sw.js version bump on shell change | kept | v26 → v27 |
+| Missing | none | |
+
+## Regression table — R4 PR 4 (+ Body Check, pop-up cards → + Today)
+| Feature | R4-PR3 → R4-PR4 | Note |
+|---|---|---|
+| Coach's Quiz: question pinned / first tap locks / XP by ledger | kept | finish screen untouched; tests green |
+| Left panel hide/show, 👀 without PIN; start over asks for PIN | kept | actions suite green |
+| Left panel marks, reason lines; bar-move lead-in; estimate | kept | untouched; suites green |
+| Session controls, move-list rows, ring label, pop-up card sizes | kept | design assertions unchanged and green |
+| Clean-check "✓ Clean" colour: white on mint → Go slots | changed | 56px / 14px / text kept |
+| Today review dots and per-round reasons | kept | invariants S2, session copy guard green (todayWide); dots and reasons now 13px |
+| Journey map slots, "You are here" pill | kept | design journey checks unchanged and green |
+| Journey XP bar white on dark → sun on white 55% | changed | mockup Card A |
+| Today day card Card A (hero slots, ink text, hero-chip) | added | FEATURES.md |
+| Portrait/phone order: day card first | added | landscape order unchanged |
+| Phone fold "See the N blocks" (toggleBlocks, ungated, not saved) | added | iPad always open |
+| Today sizes (rows 56, week 13/15/88, all ≥ 13px), Today allowance removed | added | design.mjs |
+| ⚡️ selector (moves chip, "⚡️ Full"); Quiz Deck chevron grape-ink | added | |
+| Body Check: four questions, scoring, pain gate, override, zones, yesterday, all text | kept | smoke + actions green |
+| Body Check: result scrolled into view after the four questions | added | one-shot, same flag as the body map |
+| Body Check popup words -ink, legend headers ink-soft, view pills btn-primary | changed | colours only |
+| Day card aqua-deep end, white text, alternating row whites (with the slot set) | intentionally removed | approved plan v4 (K1; mockup has no alternation) |
+| "Let's go" sun-ink text → ink | changed | approved plan |
+| Explore 48px | kept | smoke.mjs:627 unchanged; design exception added |
+| Gate deny-by-default | kept | one new kid action `toggleBlocks`, added to `UNGATED_ACTIONS` deliberately |
+| `core/` byte-identical with the other repo | kept | `diff -rq core` empty |
+| sw.js version bump on shell change | kept | v27 → v28 |
 | Missing | none | |

@@ -553,7 +553,7 @@ function centerStack(vm, wide, tablet) {
   ${vm.showCleanCheck ? `
   <div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:2px solid var(--mint);border-radius:var(--radius-lg);padding:10px 16px;width:100%;max-width:480px;flex-shrink:0;box-sizing:border-box;box-shadow:var(--shadow-soft);">
     <span style="flex:1;font-weight:900;font-size:15px;color:var(--ink);">${vm.cleanCheckQuestion}</span>
-    <button type="button" data-action="pickClean" style="min-height:56px;border:none;border-radius:var(--radius-pill);padding:0 18px;background:var(--mint);color:#fff;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--mint-deep);">${vm.checkCleanLabel}</button>
+    <button type="button" data-action="pickClean" style="min-height:56px;border:none;border-radius:var(--radius-pill);padding:0 18px;background:var(--btn-go-bg,var(--mint));color:var(--btn-go-text,#fff);font-weight:900;font-size:19px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--btn-go-edge,var(--mint-deep));">${vm.checkCleanLabel}</button>
     <button type="button" data-action="pickWobbly" style="min-height:56px;border:none;border-radius:var(--radius-pill);padding:0 18px;background:var(--sun);color:var(--sun-ink);font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--sun-deep);">${vm.checkWobblyLabel}</button>
     <button type="button" data-action="skipFormCheck" style="min-height:56px;border:none;border-radius:var(--radius-pill);padding:0 14px;background:transparent;color:var(--ink-soft);font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;">Skip</button>
   </div>` : ""}`;
