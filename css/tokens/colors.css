@@ -139,8 +139,8 @@
   --btn-stop-edge:    var(--stop-ink);
   /* Recovery (grape) button */
   --btn-grape-bg:     var(--grape-deep);          /* white 5.4 */
-  /* Go / Done button: white on mint-ink, 6.6 */
-  --btn-go-bg:        var(--mint-ink);
+  /* Go / Done: white on aqua-deep — swim 3.6, large text only (≥20px bold); skate 5.7 */
+  --btn-go-bg:        var(--aqua-deep);
+  --btn-go-edge:      var(--aqua-ink);
   --btn-go-text:      #FFFFFF;
-  --btn-go-edge:      #04342C;
 }

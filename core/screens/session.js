@@ -584,7 +584,7 @@ function controls(vm, wide) {
   <button type="button" data-action="advance" style="width:100%;min-height:64px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--btn-go-bg,var(--mint));color:var(--btn-go-text,var(--text-on-mint,#fff));box-shadow:0 4px 0 var(--btn-go-edge,var(--mint-deep));font-family:inherit;">${vm.doneLabel}</button>
   <div style="display:flex;gap:${wide ? 14 : 8}px;">
     ${backBtn}
-    ${rowBtn("skipEx", "⏭ Skip", "border:2px solid var(--hairline);background:var(--surface);color:var(--ink-soft);")}
+    ${rowBtn("skipEx", "⏭ Skip", "border:3px solid var(--hairline);background:var(--surface);color:var(--ink-soft);")}
     ${rowBtn("exitExplore", "✕ Done looking", "border:2px solid var(--sun-deep);background:var(--sun-wash);color:var(--sun-ink);")}
   </div>`;
   }
@@ -598,18 +598,18 @@ function controls(vm, wide) {
   <div style="display:flex;gap:${wide ? 14 : 8}px;">
     <button type="button" data-action="stopNow" style="flex:1;min-height:56px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--btn-stop-bg,var(--stop));color:#fff;box-shadow:0 3px 0 var(--btn-stop-edge,var(--stop-ink));font-family:inherit;">🔴 STOP</button>
     ${vm.timerNotPaused
-      ? `<button type="button" data-action="pauseTimer" style="flex:1;min-height:56px;border-radius:var(--radius-md);border:2px solid var(--sun-deep);font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--sun-wash);color:var(--sun-ink);font-family:inherit;">❚❚ Pause</button>`
-      : `<button type="button" data-action="pauseTimer" style="flex:1;min-height:56px;border-radius:var(--radius-md);border:2px solid var(--mint-deep);font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--mint-wash);color:var(--mint-ink);font-family:inherit;">▶ Resume</button>`}
+      ? `<button type="button" data-action="pauseTimer" style="flex:1;min-height:56px;border-radius:var(--radius-md);border:3px solid var(--hairline);font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">❚❚ Pause</button>`
+      : `<button type="button" data-action="pauseTimer" style="flex:1;min-height:56px;border-radius:var(--radius-md);border:3px solid var(--hairline);font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">▶ Resume</button>`}
     ${vm.canSkipExercise
-      ? `<button type="button" data-action="askSkip" style="flex:1;min-height:56px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">⏭ Skip${wide ? " this move" : ""}</button>`
+      ? `<button type="button" data-action="askSkip" style="flex:1;min-height:56px;border-radius:var(--radius-md);border:3px solid var(--hairline);font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">⏭ Skip${wide ? " this move" : ""}</button>`
       : ""}
   </div>
   ${vm.confirmSkip ? `
   <div style="display:flex;${wide ? "align-items:center;gap:12px;" : "flex-direction:column;gap:8px;"}background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-md);padding:10px 14px;box-sizing:border-box;">
     <span style="${wide ? "flex:1;" : ""}font-weight:800;font-size:${wide ? 15 : 14}px;color:var(--sun-ink);">Skip this move? It won&#39;t count.</span>
     <div style="display:flex;gap:8px;flex-shrink:0;">
-      <button type="button" data-action="cancelSkip" style="${wide ? "" : "flex:1;"}min-height:56px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:17px;cursor:pointer;padding:0 18px;background:var(--btn-go-bg,var(--mint));color:var(--btn-go-text,var(--text-on-mint,#fff));box-shadow:0 3px 0 var(--btn-go-edge,var(--mint-deep));font-family:inherit;">Keep going</button>
-      <button type="button" data-action="confirmSkipEx" style="${wide ? "" : "flex:1;"}min-height:56px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:17px;cursor:pointer;padding:0 16px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">⏭ Skip it</button>
+      <button type="button" data-action="cancelSkip" style="${wide ? "" : "flex:1;"}min-height:56px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:19px;cursor:pointer;padding:0 18px;background:var(--btn-go-bg,var(--mint));color:var(--btn-go-text,var(--text-on-mint,#fff));box-shadow:0 3px 0 var(--btn-go-edge,var(--mint-deep));font-family:inherit;">Keep going</button>
+      <button type="button" data-action="confirmSkipEx" style="${wide ? "" : "flex:1;"}min-height:56px;border-radius:var(--radius-md);border:3px solid var(--hairline);font-weight:900;font-size:17px;cursor:pointer;padding:0 16px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">⏭ Skip it</button>
     </div>
   </div>` : ""}
   <div style="display:flex;align-items:center;gap:${wide ? 12 : 8}px;border-top:1.5px solid var(--hairline);padding-top:10px;${wide ? "" : "flex-direction:column;"}">

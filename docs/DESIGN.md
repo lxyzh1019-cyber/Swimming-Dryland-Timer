@@ -81,7 +81,7 @@ Surfaces: pool water `bg` (#E2F8FE; the Claude Design readme's #EAF7FB was a typ
 ## Contrast rules (approved 2026-09-30)
 
 1. **Buttons stay bright.** Text on `aqua`, `coral`, `mint` and `sun` is dark: `ink` (4.7–5.5:1), or `sun-ink` on sun. White text on those fills is not allowed (1.6–2.6:1).
-2. **STOP, grape and Go/Done buttons** keep white text on the darker fill: `stop-deep` (5.0:1), `grape-deep` (5.4:1) and `mint-ink` (6.6:1; skate 6.4:1).
+2. **STOP, grape and Go/Done buttons** keep white text on the darker fill: `stop-deep` (5.0:1), `grape-deep` (5.4:1) and `aqua-deep` for Go/Done (3.6:1, large text only — 20px+ bold; skate 5.7:1).
 3. **Coloured words** (light titles, ring zone labels, doses) use the family's **`-ink`** shade. The bright colour is only for borders, dots, arcs and fills.
 4. `ink-faint` and `hairline` are for lines, borders and disabled states only. They are never text.
 5. Every text/surface pair is at least 4.5:1, or 3:1 for text 24px+ (or 19px+ bold). Controls and focus rings are at least 3:1.
@@ -102,11 +102,11 @@ The screens are shared with the Figure-Skate app (rose palette under the same to
 | `text-on-mint`, `text-on-coral`, `text-on-aqua` | text on those fills | `ink` | mint/coral: `ink` (large text only); aqua: #fff |
 | `btn-stop-bg` / `-edge` | STOP | `stop-deep` / `stop-ink` | same (5.4) |
 | `btn-grape-bg` | grape buttons | `grape-deep` (5.4) | `grape-ink` (8.7) |
-| `btn-go-bg` | Go / Done, Keep going | `mint-ink` | `mint-ink` |
-| `btn-go-text` | text on btn-go-bg | #fff (6.6) | #fff (6.4) |
-| `btn-go-edge` | Go / Done 3D edge | #04342C | #0F3F2F |
+| `btn-go-bg` | Go / Done, Keep going | `aqua-deep` | `aqua-deep` |
+| `btn-go-text` | text on btn-go-bg | #fff (3.6, large text only) | #fff (5.7) |
+| `btn-go-edge` | Go / Done 3D edge | `aqua-ink` | `aqua-ink` |
 
-Start stays **20px+ bold** in both apps: skate's `ink` on `mint` is 4.4, which passes only as large text. Done/Go is white on `mint-ink` (6.6 / 6.4), so it has no size caveat.
+Start stays **20px+ bold** in both apps: skate's `ink` on `mint` is 4.4, which passes only as large text. Done/Go is white on aqua-deep: 3.6 on swim, so it stays 20px+ bold (Keep going 19px bold, the bold large-text floor); skate is 5.7.
 
 **Card A · Sunny pool** is the chosen Today look: the bright aqua kept, the darkest end of the old gradient dropped, dark navy text. The journey block matches it: the same bright aqua fading to sand, with navy text and the "You are here" label on a white pill.
 
@@ -131,7 +131,7 @@ Start stays **20px+ bold** in both apps: skate's `ink` on `mint` is 4.4, which p
 - **Move list on the LEFT** (32%; 38% on a tight iPad column). The kid can hide it with no PIN.
 - **Timer and controls on the RIGHT** (68%).
 - The timer ring is the biggest thing on screen.
-- Done is the one big full-width action (64px, 20px bold). STOP, Pause and Skip sit in a row under it (56px each).
+- Done is the one big full-width action (64px, 20px bold). STOP, Pause and Skip sit in a row under it (56px each); Pause, Resume and Skip are white with a 3px hairline border.
 - Each move-list row is one 56px tap target (it opens the detail); the ⓘ is only a picture.
 - The ring's zone label uses the zone's `-ink` shade; the arc keeps the bright colour.
 
@@ -251,9 +251,9 @@ Source of truth for values: each app's `css/tokens/*.css`. New and changed slots
 | `--sun-wash` | `#fff4d6` | Rewards ground; pause and warning banners (sun-ink text 5.2:1). |
 | `--sun-light` | `#ffde8a` | Light sunshine highlight. |
 | `--sun` | `#ffc23d` | Rewards, stars, highlights; warm-up ring. Text on it: sun-ink or ink. |
-| `--sun-deep` | `#e8a015` | Sun pressed / 3D edge; Pause button border. |
+| `--sun-deep` | `#e8a015` | Sun pressed / 3D edge. |
 | `--sun-ink` | `#8a5e00` | Text on sun-wash and on sun (3.5:1 on sun: large text only). |
-| `--mint-wash` | `#dff7ec` | Success ground; Resume button. |
+| `--mint-wash` | `#dff7ec` | Success ground. |
 | `--mint-light` | `#a6eccc` | Light success accent. |
 | `--mint` | `#2fc78c` | Success, clean rep, green light; Done button; rest ring. Text on it: ink (5.5:1). |
 | `--mint-deep` | `#18a372` | Mint pressed / 3D edge. |
@@ -319,9 +319,9 @@ Source of truth for values: each app's `css/tokens/*.css`. New and changed slots
 | `--btn-stop-bg` | `{stop-deep}` | STOP button fill, white text 5.0 (skate 5.4). |
 | `--btn-stop-edge` | `{stop-ink}` | STOP button edge. |
 | `--btn-grape-bg` | `{grape-deep}` | Grape button fill, white text 5.4. Skate: grape-ink (8.7). |
-| `--btn-go-bg` | `{mint-ink}` | Go / Done and Keep going fill. Skate: mint-ink (#1C6B50). |
-| `--btn-go-text` | `#ffffff` | Text on btn-go-bg (6.6). Skate: #ffffff (6.4). |
-| `--btn-go-edge` | `#04342c` | Go / Done 3D edge. Skate: #0F3F2F. |
+| `--btn-go-bg` | `{aqua-deep}` | Go / Done and Keep going fill. Skate: aqua-deep. |
+| `--btn-go-text` | `#ffffff` | Text on btn-go-bg (3.6, large text only: 20px+ bold). Skate: #ffffff (5.7). |
+| `--btn-go-edge` | `{aqua-ink}` | Go / Done 3D edge. Skate: aqua-ink. |
 
 ## Spacing
 
@@ -425,8 +425,8 @@ Fonts: Fredoka (display), Nunito (ui), Caveat (hand) — self-hosted variable wo
   --btn-stop-bg:      var(--stop-deep);           /* white 5.0 */
   --btn-stop-edge:    var(--stop-ink);
   --btn-grape-bg:     var(--grape-deep);          /* white 5.4 */
-  --btn-go-bg:        var(--mint-ink);             /* Go / Done: white 6.6 (added PR 2, plan v3) */
-  --btn-go-edge:      #04342C;
+  --btn-go-bg:        var(--aqua-deep);            /* Go / Done: white 3.6, large text only (≥20px bold) (PR 2, plan v4) */
+  --btn-go-edge:      var(--aqua-ink);
   --btn-go-text:      #FFFFFF;
 }
 
@@ -454,8 +454,8 @@ Fonts: Fredoka (display), Nunito (ui), Caveat (hand) — self-hosted variable wo
   --btn-stop-bg:      var(--stop-deep);           /* white 5.4 */
   --btn-stop-edge:    var(--stop-ink);
   --btn-grape-bg:     var(--grape-ink);           /* white 8.7 */
-  --btn-go-bg:        var(--mint-ink);             /* Go / Done: white 6.4 */
-  --btn-go-edge:      #0F3F2F;
+  --btn-go-bg:        var(--aqua-deep);            /* Go / Done: white 5.7 */
+  --btn-go-edge:      var(--aqua-ink);
   --btn-go-text:      #FFFFFF;
 }
 ```
