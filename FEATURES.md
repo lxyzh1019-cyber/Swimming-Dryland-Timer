@@ -1,4 +1,4 @@
-# FEATURES — Splash (Swim Dryland Timer) — manifest v1 (partial) — confirmed 2026-09-24, updated 2026-09-27 (R3)
+# FEATURES — Splash (Swim Dryland Timer) — manifest v1 (partial) — confirmed 2026-09-24, updated 2026-09-30 (R4 PR 1)
 
 Locked features of the current version. Every edit is checked against this list and ends with a regression table. Update this file in the same change that alters a feature. Over-list rather than under-list.
 
@@ -21,6 +21,14 @@ Locked features of the current version. Every edit is checked against this list 
 ## Today screen
 - "Review what you did": per-move round dots (✓ / ½ / ⏭ / —) with a legend.
 - "Review what you did": every short round of a move has its own reason line; each round dot's label carries that round's reason.
+
+## Design tokens and colour slots
+- Rule: screens read slots with fallbacks equal to the previous look; core stays byte-identical; skate fills its own slot values.
+- Slots in `css/tokens/colors.css` (SEMANTIC ALIASES): `--hero-from` aqua-light · `--hero-to` aqua · `--hero-text` ink · `--hero-chip` white 55% · `--journey-via` #9FE6F3 · `--journey-to` #F6E7C1 · `--btn-primary-bg` aqua · `--btn-primary-edge` aqua-deep · `--btn-primary-text` ink · `--btn-stop-bg` stop-deep · `--btn-stop-edge` stop-ink · `--btn-grape-bg` grape-deep.
+- Text-on tokens: `--text-on-aqua`, `--text-on-coral`, `--text-on-mint`, `--action-text`, `--go-text` = `var(--ink)` (were white). No screen in `core/` or `js/` reads them yet (grep 2026-09-30).
+- `--border-card-color` (was the dead colour alias `--border-card`; `--border-card: 3px` in `spacing.css` is the live width and is unchanged).
+- `.candy` (unused by screens) falls back to `--action-edge` for its 3D edge (was the non-existent `--action-deep`).
+- Design reference copied in: `docs/DESIGN.md`, `docs/mockups/Splash-mockups.html` (handoff copies, not app code).
 
 ## Rules / special cases
 - Grown-up gate is deny-by-default: any action not in `UNGATED_ACTIONS` (or allowed by `CHILD_MAY`) asks for the PIN.
