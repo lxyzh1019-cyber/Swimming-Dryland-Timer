@@ -118,7 +118,7 @@ function journeyMapWide(vm) {
     ${journeySvgBg("W")}
     <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.12) 0%,rgba(0,0,0,0.04) 32%,transparent 55%);pointer-events:none;"></div>
     <div style="position:relative;z-index:2;padding:18px 22px 10px;color:var(--hero-text,#fff);">
-      <div style="font-size:13px;font-weight:900;letter-spacing:0.08em;opacity:0.9;">${j.chapter}</div>
+      <div style="font-size:13px;font-weight:900;letter-spacing:0.08em;">${j.chapter}</div>
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;line-height:1.2;margin:4px 0 8px;">LVL ${j.level} · ${j.rankName}${j.atSummit ? " — top of the ladder 🏔️" : ` — ${j.xpToNextRank} XP to ${j.nextRankName}`}</div>
       <div style="height:9px;background:rgba(255,255,255,0.55);border-radius:9px;overflow:hidden;">
         <div style="width:${j.levelPct}%;height:100%;background:var(--sun);box-shadow:inset 0 0 0 2px var(--sun-deep);border-radius:9px;"></div>
@@ -135,9 +135,9 @@ function journeyMapNarrow(vm) {
     ${journeySvgBg("N")}
     <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.12) 0%,rgba(0,0,0,0.04) 32%,transparent 55%);pointer-events:none;"></div>
     <div style="position:relative;z-index:2;padding:16px 18px 8px;color:var(--hero-text,#fff);">
-      <div style="font-size:13px;font-weight:900;letter-spacing:0.08em;opacity:0.9;">${j.chapter}</div>
+      <div style="font-size:13px;font-weight:900;letter-spacing:0.08em;">${j.chapter}</div>
       <div style="font-family:var(--font-display);font-weight:600;font-size:17px;line-height:1.2;margin:4px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">LVL ${j.level} · ${j.rankName}</div>
-      <div style="font-size:13px;font-weight:800;opacity:0.9;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${j.atSummit ? COPY.summit : `${j.xpToNextRank} XP to ${j.nextRankName}`}</div>
+      <div style="font-size:13px;font-weight:800;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${j.atSummit ? COPY.summit : `${j.xpToNextRank} XP to ${j.nextRankName}`}</div>
       <div style="height:8px;background:rgba(255,255,255,0.55);border-radius:9px;overflow:hidden;">
         <div style="width:${j.levelPct}%;height:100%;background:var(--sun);box-shadow:inset 0 0 0 2px var(--sun-deep);border-radius:9px;"></div>
       </div>
@@ -257,7 +257,7 @@ function dayPane(vm, wide) {
             : b.moves.map(m => `
               <div style="padding:6px 0;">
                 <div style="display:flex;align-items:flex-start;gap:9px;font-size:${wide ? 15 : 14}px;font-weight:700;">
-                  <span style="opacity:0.7;flex-shrink:0;">•</span><span style="flex:1;min-width:0;">${m.text}</span>
+                  <span style="flex-shrink:0;">•</span><span style="flex:1;min-width:0;">${m.text}</span>
                 </div>
                 ${m.cue ? `<div style="font-family:var(--font-hand);font-size:14px;font-style:italic;margin:2px 0 0 18px;">"${m.cue}"</div>` : ""}
                 ${m.transfer ? `<div style="font-size:13px;font-weight:800;margin:2px 0 0 18px;">${COPY.transferMove} ${m.transfer}</div>` : ""}

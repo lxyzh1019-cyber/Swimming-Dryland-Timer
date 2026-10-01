@@ -155,19 +155,19 @@ function overviewTab(vm) {
     <div style="${vm.guStatsGrid}">
       <div style="background:var(--aqua-wash);border-radius:var(--radius-lg);padding:16px;text-align:center;">
         <div style="font-family:var(--font-display);font-size:28px;font-weight:600;color:var(--aqua-ink);line-height:1;">${a.adherence}%</div>
-        <div style="font-size:12px;font-weight:900;color:var(--aqua-ink);letter-spacing:0.04em;text-transform:uppercase;margin-top:5px;">Adherence · ${esc(vm.scopeLabel)}</div>
+        <div style="font-size:13px;font-weight:900;color:var(--aqua-ink);letter-spacing:0.04em;text-transform:uppercase;margin-top:5px;">Adherence · ${esc(vm.scopeLabel)}</div>
       </div>
       <div style="background:var(--surface-2);border-radius:var(--radius-lg);padding:16px;text-align:center;">
         <div style="font-family:var(--font-display);font-size:28px;font-weight:600;color:var(--ink);line-height:1;">${a.sessions}/${a.scheduled}</div>
-        <div style="font-size:12px;font-weight:900;color:var(--ink-soft);letter-spacing:0.04em;text-transform:uppercase;margin-top:5px;">Sessions done</div>
+        <div style="font-size:13px;font-weight:900;color:var(--ink-soft);letter-spacing:0.04em;text-transform:uppercase;margin-top:5px;">Sessions done</div>
       </div>
       <div style="background:var(--mint-wash);border-radius:var(--radius-lg);padding:16px;text-align:center;">
         <div style="font-family:var(--font-display);font-size:28px;font-weight:600;color:var(--mint-ink);line-height:1;">${a.avgMins}</div>
-        <div style="font-size:12px;font-weight:900;color:var(--mint-ink);letter-spacing:0.04em;text-transform:uppercase;margin-top:5px;">Avg min/session</div>
+        <div style="font-size:13px;font-weight:900;color:var(--mint-ink);letter-spacing:0.04em;text-transform:uppercase;margin-top:5px;">Avg min/session</div>
       </div>
       <div style="background:var(--surface-2);border-radius:var(--radius-lg);padding:16px;text-align:center;">
         <div style="font-family:var(--font-display);font-size:28px;font-weight:600;color:var(--ink);line-height:1;">${a.totalMins}</div>
-        <div style="font-size:12px;font-weight:900;color:var(--ink-soft);letter-spacing:0.04em;text-transform:uppercase;margin-top:5px;">Total minutes</div>
+        <div style="font-size:13px;font-weight:900;color:var(--ink-soft);letter-spacing:0.04em;text-transform:uppercase;margin-top:5px;">Total minutes</div>
       </div>
     </div>
     ${readinessCard(a, vm.scopeLabel, false)}
@@ -204,40 +204,40 @@ function formCheckTab(vm) {
       <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-top:10px;">
         <div style="display:flex;flex-direction:column;align-items:center;background:var(--surface-2);border-radius:16px;padding:11px 18px;">
           <span style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);line-height:1;">${f.selfPct == null ? "—" : f.selfPct + "%"}</span>
-          <span style="font-size:11px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;">she reports</span>
+          <span style="font-size:13px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;">she reports</span>
         </div>
-        <span style="font-size:20px;color:var(--ink-faint);">vs</span>
+        <span style="font-size:20px;color:var(--ink-soft);">vs</span>
         <div style="display:flex;flex-direction:column;align-items:center;background:${f.gap != null && f.gap <= -15 ? "color-mix(in srgb, var(--coral) 12%, #fff)" : "var(--mint-wash)"};border-radius:16px;padding:11px 18px;">
-          <span style="font-family:var(--font-display);font-weight:600;font-size:28px;color:${f.gap != null && f.gap <= -15 ? "var(--coral)" : "var(--mint-ink)"};line-height:1;">${f.verifiedPct == null ? "—" : f.verifiedPct + "%"}</span>
-          <span style="font-size:11px;font-weight:900;color:${f.gap != null && f.gap <= -15 ? "var(--coral)" : "var(--mint-ink)"};text-transform:uppercase;letter-spacing:0.04em;">you verified</span>
+          <span style="font-family:var(--font-display);font-weight:600;font-size:28px;color:${f.gap != null && f.gap <= -15 ? "var(--coral-ink)" : "var(--mint-ink)"};line-height:1;">${f.verifiedPct == null ? "—" : f.verifiedPct + "%"}</span>
+          <span style="font-size:13px;font-weight:900;color:${f.gap != null && f.gap <= -15 ? "var(--coral-ink)" : "var(--mint-ink)"};text-transform:uppercase;letter-spacing:0.04em;">you verified</span>
         </div>
         <div style="flex:1;min-width:220px;font-size:14px;font-weight:800;color:var(--ink);line-height:1.45;">${esc(f.headline)}</div>
       </div>
-      <div style="font-size:12px;font-weight:700;color:var(--ink-faint);margin-top:12px;">${f.doneCount} of ${f.total} checked this month.</div>`)}
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:12px;">${f.doneCount} of ${f.total} checked this month.</div>`)}
 
     ${divider("👁 Watch these")}
     ${f.queue.length ? f.queue.map(c => `
       <div style="${c.cardStyle}">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;">
           <span style="font-family:var(--font-display);font-weight:600;font-size:19px;color:var(--ink);">${escapeHtml(c.name)}</span>
-          <span style="font-size:12px;font-weight:800;color:var(--ink-soft);">${escapeHtml(c.selfLabel)}</span>
+          <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${escapeHtml(c.selfLabel)}</span>
         </div>
         <div style="display:flex;gap:9px;align-items:flex-start;background:var(--surface-2);border-radius:12px;padding:10px 12px;">
           <span style="font-size:15px;flex-shrink:0;">👁</span>
-          <div><span style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--ink-faint);text-transform:uppercase;">Watch for</span>
+          <div><span style="font-size:13px;font-weight:900;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;">Watch for</span>
           <div style="font-size:14px;font-weight:800;color:var(--ink);line-height:1.4;">${escapeHtml(c.watch)}</div></div>
         </div>
         ${c.fix ? `
         <div style="display:flex;gap:9px;align-items:flex-start;background:var(--aqua-wash);border-radius:12px;padding:10px 12px;">
           <span style="font-size:15px;flex-shrink:0;">🔧</span>
-          <div><span style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:var(--aqua-ink);text-transform:uppercase;">The fix</span>
+          <div><span style="font-size:13px;font-weight:900;letter-spacing:0.06em;color:var(--aqua-ink);text-transform:uppercase;">The fix</span>
           <div style="font-size:14px;font-weight:800;color:var(--aqua-ink);line-height:1.4;">${escapeHtml(c.fix)}</div></div>
         </div>` : ""}
         <div style="display:flex;gap:9px;">
           <button type="button" data-action="formCheckPass" data-arg="${escapeHtml(c.name)}" style="${c.passStyle}">✓ Meets criteria</button>
           <button type="button" data-action="formCheckFail" data-arg="${escapeHtml(c.name)}" style="${c.failStyle}">✗ Not yet</button>
         </div>
-        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);">Picked because: ${escapeHtml(c.why)}</div>
+        <div style="font-size:13px;font-weight:700;color:var(--ink-soft);">Picked because: ${escapeHtml(c.why)}</div>
       </div>`).join("")
       : `<div style="font-size:14px;font-weight:700;color:var(--ink-soft);line-height:1.5;">No moves with written criteria yet — once she has trained a few sessions they'll queue up here.</div>`}
 
@@ -246,7 +246,7 @@ function formCheckTab(vm) {
       <div style="font-size:14px;font-weight:800;color:var(--ink);line-height:1.5;margin-top:8px;">${f.flagged.map(escapeHtml).join(" · ")}</div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.45;margin-top:6px;">These go to the front of the next session's random spot-checks.</div>`) : ""}
 
-    <div style="font-size:12px;font-weight:700;color:var(--ink-faint);line-height:1.5;background:var(--surface-2);border-radius:12px;padding:11px 13px;">${esc(f.note)}</div>
+    <div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.5;background:var(--surface-2);border-radius:12px;padding:11px 13px;">${esc(f.note)}</div>
   </div>`;
 }
 
@@ -571,7 +571,7 @@ function libraryTab(vm) {
         <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);box-shadow:var(--shadow-soft);overflow:hidden;display:flex;flex-direction:column;">
           <div style="width:100%;height:180px;position:relative;overflow:hidden;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;">
             <span style="font-size:44px;" aria-hidden="true">${EMOJI.sport}</span>
-            <span style="font-size:12px;font-weight:800;color:var(--aqua-ink);opacity:0.75;">Demo photo coming soon</span>
+            <span style="font-size:13px;font-weight:800;color:var(--aqua-ink);">Demo photo coming soon</span>
             ${imgWithFallbacks([...photoSources(lib.photoUrl), ...photoSources(lib.photoFallbackUrl)].map(esc), `loading="lazy" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"`)}
           </div>
           <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
@@ -594,7 +594,7 @@ function settingsTab(vm) {
   return `
   <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:22px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:22px;max-width:520px;">
     <div>
-      <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Grown-up passkey 🔐</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Grown-up passkey 🔐</div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:9px;line-height:1.5;">${esc(vm.passkeyLine)}</div>
       ${vm.passkeySupported ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button type="button" data-action="${vm.hasPasskey ? "forgetPasskey" : "enrollPasskey"}" style="min-height:48px;border:2px solid var(--hairline);border-radius:var(--radius-pill);background:${vm.hasPasskey ? "transparent" : "var(--aqua-wash)"};color:${vm.hasPasskey ? "var(--ink-soft)" : "var(--aqua-ink)"};font-weight:900;font-size:14px;padding:0 16px;cursor:pointer;font-family:inherit;">${vm.hasPasskey ? "Remove the passkey" : "Set up a passkey"}</button>
@@ -602,49 +602,49 @@ function settingsTab(vm) {
       ${vm.passkeyNote ? `<div style="margin-top:8px;font-size:13px;font-weight:800;line-height:1.45;color:${vm.passkeyNoteOk ? "var(--mint-ink)" : "var(--stop-ink)"};">${escapeHtml(vm.passkeyNote)}</div>` : ""}
     </div>
     <div>
-      <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Athlete name</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Athlete name</div>
       <input type="text" value="${escapeHtml(vm.settingsName)}" data-input="athleteName" style="width:100%;min-height:48px;padding:13px 15px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:16px;font-weight:700;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">
     </div>
     <div>
-      <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Who's training 🧑‍🤝‍🧑</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Who's training 🧑‍🤝‍🧑</div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:9px;line-height:1.5;">Each athlete keeps her own sessions, XP, streak and prizes. Switching reloads the app.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         ${vm.profiles.map(p => `<button type="button" data-action="pickAthlete" data-arg="${escapeHtml(p.id)}" style="${p.style}">${p.active ? "✓ " : ""}${escapeHtml(p.name)}</button>`).join("")}
       </div>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <input type="text" placeholder="Add another athlete…" data-input="newProfile" style="flex:1;min-height:48px;padding:10px 13px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:14px;font-weight:700;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">
-        <button type="button" data-action="addAthlete" style="min-height:48px;border:none;background:var(--aqua);color:#fff;border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">Add</button>
+        <button type="button" data-action="addAthlete" style="min-height:48px;border:none;background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">Add</button>
       </div>
     </div>
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Coach voice 🎧</div>
+        <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Coach voice 🎧</div>
         <button type="button" data-action="toggleCoachVoice" aria-label="Toggle coach voice" style="${vm.toggleHit}"><span style="${vm.coachTrack}"><span style="${vm.coachKnob}"></span></span></button>
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The coach will: announce the next exercise · remind you to breathe · warn about common mistakes · prompt a self-check.</div>
     </div>
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Timer sounds 🔔</div>
+        <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Timer sounds 🔔</div>
         <button type="button" data-action="toggleTimerSounds" aria-label="Toggle timer sounds" style="${vm.toggleHit}"><span style="${vm.timerTrack}"><span style="${vm.timerKnob}"></span></span></button>
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The beeps and rep ticks she paces on. These stay on when the coach's voice is off.</div>
     </div>
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Safety voice 🛟</div>
+        <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Safety voice 🛟</div>
         <button type="button" data-action="toggleSafetyVoice" aria-label="Toggle safety voice" style="${vm.toggleHit}"><span style="${vm.safetyTrack}"><span style="${vm.safetyKnob}"></span></span></button>
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">Pain checks and stop confirmations. Spoken even in quiet mode — leave this on.</div>
     </div>
     <div>
-      <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Voice style</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Voice style</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         ${vm.voiceStyleOpts.map(vs => `<button type="button" data-action="setVoiceStyle" data-arg="${esc(vs.key)}" style="${vs.style}">${esc(vs.label)}</button>`).join("")}
       </div>
     </div>
     <div>
-      <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Voice speed</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Voice speed</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         ${vm.voiceSpeedOpts.map(vs => `<button type="button" data-action="setVoiceSpeed" data-arg="${esc(vs.key)}" style="${vs.style}">${esc(vs.label)}</button>`).join("")}
       </div>
@@ -654,7 +654,7 @@ function settingsTab(vm) {
        ["Rest between rounds", "roundRestSeconds", vm.settingsRndRest, 5, 10, 90],
        ["Rest between sections", "sectionRestSeconds", vm.settingsSecRest, 5, 10, 90]].map(([label, key, val, step, min, max]) => `
     <div>
-      <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">${label}</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">${label}</div>
       <div style="display:flex;align-items:center;gap:16px;">
         <button type="button" data-action="bumpRest" data-arg="${key}|-${step}|${min}|${max}" style="${vm.stepperBtn}">−</button>
         <span style="font-weight:900;font-size:20px;min-width:56px;text-align:center;color:var(--ink);">${val}s</span>
@@ -662,14 +662,14 @@ function settingsTab(vm) {
       </div>
     </div>`).join("")}
     <div>
-      <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Prize pool 🎁 ${vm.isDefaultPool ? '<span style="color:var(--ink-faint);">(default)</span>' : ""}</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Prize pool 🎁 ${vm.isDefaultPool ? '<span style="color:var(--ink-soft);">(default)</span>' : ""}</div>
       <div class="list-wrap">
         <div data-list="1" style="max-height:240px;display:flex;flex-direction:column;gap:6px;padding-bottom:8px;">
           ${vm.prizePool.map((p, i) => `
             <div style="display:flex;align-items:center;gap:10px;background:var(--surface-2);border-radius:12px;padding:8px 12px;">
               <span style="font-size:18px;">${esc(p.icon)}</span>
               <span style="flex:1;font-size:14px;font-weight:700;color:var(--ink);">${escapeHtml(p.label)}</span>
-              <button type="button" data-action="removePrizePoolItem" data-arg="${i}" style="min-height:48px;min-width:48px;border:none;background:none;color:var(--ink-faint);font-weight:900;cursor:pointer;font-size:15px;" aria-label="Remove prize">✕</button>
+              <button type="button" data-action="removePrizePoolItem" data-arg="${i}" style="min-height:48px;min-width:48px;border:none;background:none;color:var(--ink-soft);font-weight:900;cursor:pointer;font-size:15px;" aria-label="Remove prize">✕</button>
             </div>`).join("")}
         </div>
       </div>
@@ -681,27 +681,27 @@ function settingsTab(vm) {
         ${vm.walletRepairNote ? `<div style="margin-top:8px;font-size:13px;font-weight:800;color:var(--mint-ink);background:var(--mint-wash);border-radius:12px;padding:9px 12px;line-height:1.45;">${escapeHtml(vm.walletRepairNote)}</div>` : ""}
         ${vm.prizeReviewOpen ? `
         <div style="margin-top:10px;border:2px solid var(--hairline);border-radius:12px;padding:10px 12px;">
-          <div style="font-size:12px;font-weight:900;color:var(--ink-soft);line-height:1.45;margin-bottom:8px;">These prizes are marked used. The app can't tell which she actually spent, so it won't guess — restore only the ones you know are wrong.</div>
-          ${vm.noRedeemedPrizes ? `<div style="font-size:13px;font-weight:800;color:var(--ink-faint);">No prizes are marked used.</div>` : ""}
+          <div style="font-size:13px;font-weight:900;color:var(--ink-soft);line-height:1.45;margin-bottom:8px;">These prizes are marked used. The app can't tell which she actually spent, so it won't guess — restore only the ones you know are wrong.</div>
+          ${vm.noRedeemedPrizes ? `<div style="font-size:13px;font-weight:800;color:var(--ink-soft);">No prizes are marked used.</div>` : ""}
           ${vm.redeemedPrizes.map(p => `
           <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--hairline);">
             <div style="flex:1;min-width:0;">
               <div style="font-weight:900;font-size:14px;color:var(--ink);">${escapeHtml(p.label)}</div>
-              <div style="font-size:11px;font-weight:800;color:var(--ink-faint);">${escapeHtml(p.dateLine)}</div>
+              <div style="font-size:13px;font-weight:800;color:var(--ink-soft);">${escapeHtml(p.dateLine)}</div>
             </div>
-            <button type="button" data-action="restorePrize" data-arg="${escapeHtml(p.id)}" style="min-height:48px;border:none;border-radius:var(--radius-pill);padding:0 14px;background:var(--mint);color:#fff;font-weight:900;font-size:12px;cursor:pointer;font-family:inherit;">Restore</button>
+            <button type="button" data-action="restorePrize" data-arg="${escapeHtml(p.id)}" style="min-height:48px;border:2px solid var(--mint);border-radius:var(--radius-pill);padding:0 14px;background:var(--mint-wash);color:var(--mint-ink);font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;">Restore</button>
           </div>`).join("")}
-          <button type="button" data-action="closePrizeReview" style="margin-top:9px;min-height:48px;border:none;background:transparent;font-weight:900;font-size:12px;color:var(--ink-soft);cursor:pointer;font-family:inherit;">Done</button>
+          <button type="button" data-action="closePrizeReview" style="margin-top:9px;min-height:48px;border:none;background:transparent;font-weight:900;font-size:13px;color:var(--ink-soft);cursor:pointer;font-family:inherit;">Done</button>
         </div>` : ""}
       </div>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <input type="text" placeholder="Add a prize… (e.g. 🎨 Craft afternoon)" data-input="newPrize" style="flex:1;min-height:48px;padding:10px 13px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:14px;font-weight:700;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">
-        <button type="button" data-action="addPrizePoolItem" style="min-height:48px;border:none;background:var(--sun);color:var(--sun-ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">Add</button>
+        <button type="button" data-action="addPrizePoolItem" style="min-height:48px;border:none;background:var(--sun);color:var(--ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">Add</button>
       </div>
       ${!vm.isDefaultPool ? `<button type="button" data-action="resetPrizePool" style="margin-top:8px;min-height:48px;border:none;background:none;color:var(--ink-soft);font-weight:800;font-size:13px;text-decoration:underline;cursor:pointer;font-family:inherit;">Reset to default pool</button>` : ""}
     </div>
     <div style="border-top:1.5px solid var(--hairline);padding-top:16px;">
-      <div style="font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Backup &amp; restore 💾</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Backup &amp; restore 💾</div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:9px;line-height:1.5;">A full copy of <strong>${escapeHtml(vm.settingsName)}</strong>'s data — sessions, XP, prizes, quiz mastery, trackers. Restoring only adds; nothing already on this device is overwritten. Each athlete backs up separately.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <button type="button" data-action="downloadBackup" style="min-height:48px;border:2px solid var(--aqua);background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">⬇︎ Download backup</button>
@@ -712,12 +712,12 @@ function settingsTab(vm) {
       ${vm.backupNote ? `<div role="status" style="margin-top:10px;font-size:13px;font-weight:800;line-height:1.5;color:${vm.backupNoteOk ? "var(--mint-ink)" : "var(--stop-ink)"};background:${vm.backupNoteOk ? "var(--mint-wash)" : "var(--stop-wash)"};border-radius:12px;padding:9px 12px;">${escapeHtml(vm.backupNote)}</div>` : ""}
       ${vm.pendingRestore ? `
       <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-        <button type="button" data-action="confirmRestore" style="min-height:48px;border:none;border-radius:var(--radius-pill);background:var(--stop);color:#fff;font-weight:900;font-size:13px;padding:0 18px;cursor:pointer;font-family:inherit;">Merge ${escapeHtml(vm.pendingRestore.from)}’s data into ${escapeHtml(vm.pendingRestore.to)} anyway</button>
+        <button type="button" data-action="confirmRestore" style="min-height:48px;border:none;border-radius:var(--radius-pill);background:var(--btn-stop-bg,var(--stop));color:#fff;font-weight:900;font-size:13px;padding:0 18px;cursor:pointer;font-family:inherit;">Merge ${escapeHtml(vm.pendingRestore.from)}’s data into ${escapeHtml(vm.pendingRestore.to)} anyway</button>
         <button type="button" data-action="cancelRestore" style="min-height:48px;border:2px solid var(--hairline);border-radius:var(--radius-pill);background:var(--surface);color:var(--ink-soft);font-weight:900;font-size:13px;padding:0 18px;cursor:pointer;font-family:inherit;">Cancel</button>
       </div>` : ""}
     </div>
     <div style="border-top:1.5px solid var(--hairline);padding-top:16px;">
-      <div style="font-size:15px;color:var(--stop);line-height:1.5;font-weight:700;">🔴 Sharp pain, pinching, or numbness → STOP immediately and tell a grown-up.</div>
+      <div style="font-size:15px;color:var(--stop-ink);line-height:1.5;font-weight:700;">🔴 Sharp pain, pinching, or numbness → STOP immediately and tell a grown-up.</div>
     </div>
   </div>`;
 }
@@ -738,7 +738,7 @@ function coachingTab(vm) {
       </div>`)}
     ${card(`
       ${secTitle("Independence Ladder · Top 7")}
-      <div style="font-size:13px;color:var(--ink-faint);margin:4px 0 12px;line-height:1.3;">L1 guided → L5 fully independent. Tap the rung she's earned for each move.</div>
+      <div style="font-size:13px;color:var(--ink-soft);margin:4px 0 12px;line-height:1.3;">L1 guided → L5 fully independent. Tap the rung she's earned for each move.</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         ${c.ladderRows.map(r => `
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -748,7 +748,7 @@ function coachingTab(vm) {
       </div>`)}
     ${card(`
       ${secTitle("PR board · Week " + c.trackerWeek + " of 4")}
-      <div style="font-size:13px;color:var(--ink-faint);margin:4px 0 12px;line-height:1.3;">Each day's PR sentinel, tracked over a 4-week window. Enter this week's best.</div>
+      <div style="font-size:13px;color:var(--ink-soft);margin:4px 0 12px;line-height:1.3;">Each day's PR sentinel, tracked over a 4-week window. Enter this week's best.</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         ${c.prFields.map(f => {
           const cur = (c.tracker["week" + c.trackerWeek] || {})[f.key] || "";
@@ -756,15 +756,15 @@ function coachingTab(vm) {
           return `
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <span style="flex:1;min-width:220px;font-size:14px;font-weight:800;color:var(--ink);">${esc(f.label)}</span>
-            <span style="font-size:12px;font-weight:800;color:var(--ink-faint);">W1–4: ${history}</span>
+            <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">W1–4: ${history}</span>
             <input type="number" value="${escapeHtml(String(cur))}" data-input="pr" data-key="${esc(f.key)}" placeholder="—" style="width:80px;min-height:48px;padding:9px 11px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:15px;font-weight:800;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">
           </div>`;
         }).join("")}
       </div>
-      <button type="button" data-action="saveTrackerWeek" style="margin-top:12px;min-height:48px;border:none;background:var(--aqua);color:#fff;border-radius:var(--radius-pill);font-weight:900;font-size:14px;padding:0 20px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--aqua-deep);">Save week ${esc(c.trackerWeek)}</button>`)}
+      <button type="button" data-action="saveTrackerWeek" style="margin-top:12px;min-height:48px;border:none;background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);border-radius:var(--radius-pill);font-weight:900;font-size:14px;padding:0 20px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--btn-primary-edge,var(--aqua-deep));">Save week ${esc(c.trackerWeek)}</button>`)}
     ${card(`
       ${secTitle("Engagement system · this week")}
-      <div style="font-size:13px;color:var(--ink-faint);margin:4px 0 12px;line-height:1.3;">One shared game per week keeps a grown-up genuinely in it.</div>
+      <div style="font-size:13px;color:var(--ink-soft);margin:4px 0 12px;line-height:1.3;">One shared game per week keeps a grown-up genuinely in it.</div>
       <div style="display:flex;flex-direction:column;gap:8px;">
         ${Object.entries(c.engagementSystems).map(([key, sys]) => `
           <button type="button" data-action="pickEngagement" data-arg="${key}" style="min-height:48px;display:flex;align-items:flex-start;gap:10px;text-align:left;background:${c.engagement === key ? "var(--aqua-wash)" : "var(--surface-2)"};border:2px solid ${c.engagement === key ? "var(--aqua)" : "transparent"};border-radius:14px;padding:12px 14px;cursor:pointer;font-family:inherit;">
@@ -788,7 +788,7 @@ function lockedZone() {
       ${imgWithFallbacks(photoSources(POSES.remember), `alt="" style="height:150px;object-fit:contain;"`)}
       <div style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);">Grown-up Zone 🧑</div>
       <div style="font-size:15px;font-weight:800;color:var(--ink-soft);line-height:1.5;max-width:380px;">This part is for a grown-up. The unlock has timed out — tap 🧑 again and enter the PIN.</div>
-      <button type="button" data-action="nav" data-arg="grownup" style="min-height:48px;border:none;border-radius:var(--radius-pill);background:var(--aqua);color:#fff;font-weight:900;font-size:15px;padding:0 22px;cursor:pointer;font-family:inherit;">Unlock</button>
+      <button type="button" data-action="nav" data-arg="grownup" style="min-height:48px;border:none;border-radius:var(--radius-pill);background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);font-weight:900;font-size:15px;padding:0 22px;cursor:pointer;font-family:inherit;">Unlock</button>
     </div>`;
 }
 

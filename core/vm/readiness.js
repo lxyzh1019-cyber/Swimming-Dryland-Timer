@@ -213,7 +213,12 @@ export function buildReadinessVM(r, isWide) {
   // Words take the -ink shade; the bright colour stays on borders and badges.
   const SEV_INK = { 2: "var(--sun-ink)", 3: "var(--coral-ink)", 4: "var(--stop-ink)" };
   const SEV_SHORT = { 2: "Tired", 3: "Not right", 4: "Pain" };
-  const zoneHighlight = {}, zoneBadge = {}, zoneBadgeBg = {};
+  /* A marked zone's badge is white with a ring in the bright colour and its
+     "!" in the -ink shade (white on sun / coral / stop was 1.6–3.5:1). */
+  const badgeStyle = (sev) => sev
+    ? "background:var(--surface);color:" + SEV_INK[sev] + ";box-shadow:inset 0 0 0 2px " + SEV_COLOR[sev] + ";"
+    : "background:var(--ink);color:#fff;";
+  const zoneHighlight = {}, zoneBadge = {}, zoneBadgeStyle = {};
   BODY_ZONES.forEach(z => {
     const key = "n" + z.n;
     const sev = zoneSev[z.n];
@@ -221,7 +226,7 @@ export function buildReadinessVM(r, isWide) {
       ? "background:color-mix(in srgb, " + SEV_COLOR[sev] + " 38%, transparent);border:3px solid " + SEV_COLOR[sev] + ";box-shadow:0 0 0 2px rgba(255,255,255,0.85);"
       : "background:rgba(255,255,255,0.10);border:2px dashed rgba(20,59,74,0.65);box-shadow:0 0 0 1.5px rgba(255,255,255,0.75);";
     zoneBadge[key] = sev ? "!" : String(z.n);
-    zoneBadgeBg[key] = sev ? SEV_COLOR[sev] : "var(--ink)";
+    zoneBadgeStyle[key] = badgeStyle(sev);
   });
 
   const GROUP_HEADERS = { shared: "Both views", front: "Front only", back: "Back only" };
@@ -239,7 +244,7 @@ export function buildReadinessVM(r, isWide) {
       label: sev ? z.label + " — " + SEV_SHORT[sev] : z.label,
       rowStyle: "display:flex;align-items:center;gap:10px;background:none;border:2px solid;border-radius:14px;padding:8px 10px;cursor:pointer;text-align:left;min-height:56px;"
         + (sev ? "border-color:" + SEV_COLOR[sev] + ";background:color-mix(in srgb, " + SEV_COLOR[sev] + " 14%, #fff);" : "border-color:transparent;"),
-      badgeStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;background:" + (sev ? SEV_COLOR[sev] : "var(--ink)") + ";"
+      badgeStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;" + badgeStyle(sev)
     });
   });
 
@@ -355,8 +360,8 @@ export function buildReadinessVM(r, isWide) {
       icon: done ? "✓" : String(num),
       // On the hero panel: text and chips read the hero slots (fallbacks = the old white look).
       circleStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;"
-        + (done ? "background:var(--mint);color:var(--hero-text,#fff);" : active ? "background:#fff;color:var(--aqua-deep);" : "background:var(--hero-chip,rgba(255,255,255,0.25));color:var(--hero-text,#fff);"),
-      labelStyle: "font-size:13px;font-weight:800;letter-spacing:0.02em;white-space:nowrap;color:var(--hero-text,#fff);" + (active ? "" : "opacity:0.75;"),
+        + (done ? "background:var(--mint-wash);color:var(--mint-ink);box-shadow:inset 0 0 0 2px var(--mint);" : active ? "background:#fff;color:var(--aqua-ink);" : "background:var(--hero-chip,rgba(255,255,255,0.25));color:var(--hero-text,#fff);"),
+      labelStyle: "font-size:13px;font-weight:800;letter-spacing:0.02em;white-space:nowrap;color:var(--hero-text,#fff);",
       label: s.label
     };
   });
@@ -414,7 +419,7 @@ export function buildReadinessVM(r, isWide) {
     hasYesterday: !!prevCheck && step === "questions" && !showInlineReadinessResult,
     yesterdayZoneLine: yesterdayZoneLine(),
     areaLabel: BODY_ZONES.filter(z => zoneSev[z.n]).map(z => z.label + " — " + SEV_SHORT[zoneSev[z.n]]).join(" · "),
-    zoneHighlight, zoneBadge, zoneBadgeBg, legendRows,
+    zoneHighlight, zoneBadge, zoneBadgeStyle, legendRows,
     showZonePopup: !!pz,
     pendingZone,
     pendingZoneLabel: pz ? pz.label : "",

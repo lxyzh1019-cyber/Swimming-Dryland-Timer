@@ -14,21 +14,23 @@
    last entries, so there is no allowance any more: every screen scanned
    here meets the floor outright, and a new exception has to be a named,
    approved design exception in DESIGN_TAP below. */
+import fs from "node:fs";
 import { engine, store, data, tvm, gvm, gscreen, rvm, rscreen, pvm, pscreen, svm, sscreen, tscreen, overlays, runSession } from "./harness.mjs";
 const shell = await import(new URL("../screens/shell.js", import.meta.url).href);
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
 
-const KID_FONT_MIN = 13, KID_TAP_MIN = 56, DONE_TAP_MIN = 64, ADULT_TAP_MIN = 48;
+const KID_FONT_MIN = 13, KID_TAP_MIN = 56, DONE_TAP_MIN = 64, ADULT_TAP_MIN = 48, ADULT_FONT_MIN = 13;
 /* Approved below the kid floor by docs/DESIGN.md (Session screen): the quiet
    "◀ Back a move" link is 48px; the move card's ✕ is a 48px round close; the
    Body Check light picker is a grown-up control under 🔒 (grown-up floor, 48);
    Today's "🧪 Explore the moves" is the secondary action under "Let's go", kept
    at 48 (plan v4, PR 4; test/smoke.mjs checks its 48px); the Quiz Deck's ✕ is
-   the same 48px round close as the move card's (R4 PR 6).
+   the same 48px round close as the move card's (R4 PR 6); so is the prize
+   draw's ✕ (R4 PR 7, was 44).
    Not temporary entries — the design itself. */
-const DESIGN_TAP = { goBack: 48, closeDetail: 48, rPickLight: 48, goExplore: 48, exitQuizDeck: 48 };
+const DESIGN_TAP = { goBack: 48, closeDetail: 48, rPickLight: 48, goExplore: 48, exitQuizDeck: 48, closePrizeDraw: 48 };
 
 /* No allowance: the per-screen ALLOW list that PRs 2–6 shrank is gone (PR 6
    removed the Progress and Grown-up entries, the last ones). */
@@ -69,13 +71,83 @@ function section(html, marker) {
   return html.slice(from);
 }
 
-const unsized = new Set();
-/* Scan one rendered screen; return every failure. */
-function scan(screen, html, { kid }) {
+/* ---- THE CONTRAST RULES (docs/DESIGN.md, R4 PR 7) ----------------------
+   Read from each tag's own style (the last colour / background it sets):
+   - ink-faint (and hairline / text-faint) is never text;
+   - a bright family colour (aqua, sea, coral, sun, mint, grape, gum, stop,
+     their -light and -deep) is never text — coloured words use the -ink shade;
+   - white text never sits on a bright fill (aqua, sea, coral, sun, mint,
+     grape, gum, stop, their -light shades, or a mix of them): it belongs on
+     stop-deep / grape-deep / the btn-go and btn-primary slots only;
+   - a ✓ mark carries an -ink colour (or ink), never the bright one or white. */
+const FAMILY = "(?:aqua|sea|coral|sun|mint|grape|gum|stop)";
+const lastProp = (style, prop) => {
+  const all = [...style.matchAll(new RegExp("(?:^|;)\\s*" + prop + ":\\s*([^;]+)", "g"))];
+  return all.length ? all[all.length - 1][1].trim() : "";
+};
+const FAINT_TEXT = /^var\(--(?:ink-faint|text-faint|hairline)[,)]/;
+const BRIGHT_TEXT = new RegExp("^var\\(--" + FAMILY + "(?:-light|-deep)?[,)]");
+const WHITE = /^(?:#fff|#ffffff|white|var\(--text-on-grape\))$/i;
+const BRIGHT_FILL = new RegExp("^(?:var\\(--" + FAMILY + "(?:-light)?[,)]|color-mix\\(in srgb, var\\(--" + FAMILY + "(?:-light)?\\))", "i");
+const INK_MARK = /^var\(--(?:ink|[a-z]+-ink|hero-text|btn-primary-text)[,)]/;
+/* And measured: where one tag sets both its text colour and an opaque fill,
+   the pair is resolved through THIS app's colour tokens (css/tokens/colors.css
+   — swim and skate fill the same names with different values) and must reach
+   4.5:1, or 3:1 for large text (24px+, or 19px+ at weight 700+) as the tag
+   itself sizes it. A tag that fades itself (opacity) is a disabled state and
+   is left to the screenshot scan. */
+const TOKENS = Object.fromEntries([...fs.readFileSync(new URL("../../css/tokens/colors.css", import.meta.url), "utf8")
+  .matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(m => [m[1], m[2].trim()]));
+function rgbOf(v, depth = 0) {
+  v = String(v || "").trim();
+  if (depth > 12 || !v) return null;
+  let m = v.match(/^var\(\s*(--[\w-]+)\s*(?:,\s*(.+))?\)$/);
+  if (m) return TOKENS[m[1]] != null ? rgbOf(TOKENS[m[1]], depth + 1) : (m[2] ? rgbOf(m[2], depth + 1) : null);
+  if (/^#fff$/i.test(v) || /^white$/i.test(v)) return [255, 255, 255];
+  m = v.match(/^#([0-9a-f]{6})$/i);
+  if (m) return [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16));
+  m = v.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);
+  if (m) return [+m[1], +m[2], +m[3]];
+  m = v.match(/^color-mix\(in srgb,\s*(.+?)\s+(\d+)%\s*,\s*(.+)\)$/);
+  if (m) { const a = rgbOf(m[1], depth + 1), b = rgbOf(m[3], depth + 1), p = +m[2] / 100;
+    return a && b ? a.map((x, i) => x * p + b[i] * (1 - p)) : null; }
+  return null;
+}
+const lum = (c) => c.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); })
+  .reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+const ratioOf = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+function colourFails(html) {
   const fails = [];
   for (const t of tags(html)) {
-    if (kid) for (const px of fontSizes(t.style)) {
-      if (px < KID_FONT_MIN) fails.push({ kind: "font", px, open: t.open });
+    const color = lastProp(t.style, "color");
+    const bg = lastProp(t.style, "background(?:-color)?");
+    if (FAINT_TEXT.test(color)) fails.push({ kind: "faint text " + color, open: t.open });
+    else if (BRIGHT_TEXT.test(color)) fails.push({ kind: "bright text " + color, open: t.open });
+    else if (WHITE.test(color) && BRIGHT_FILL.test(bg)) fails.push({ kind: "white on " + bg, open: t.open });
+    else if (color && bg && !/(?:^|;)\s*opacity:/.test(t.style)) {
+      const fg = rgbOf(color), back = rgbOf(bg);
+      if (!fg || !back) continue;
+      const px = pxOf(t.style, "font-size"), weight = Number(lastProp(t.style, "font-weight")) || 400;
+      const large = px != null && (px >= 24 || (px >= 18.66 && weight >= 700));
+      const r = ratioOf(fg, back);
+      if (r < (large ? 3 : 4.5)) fails.push({ kind: "contrast " + r.toFixed(2) + (large ? " (large, needs 3)" : " (needs 4.5)") + " " + color + " on " + bg, open: t.open });
+    }
+  }
+  for (const m of String(html).matchAll(/<[a-zA-Z][\w-]*\s[^>]*style="([^"]*)"[^>]*>\s*✓\s*</g)) {
+    const color = lastProp(m[1], "color");
+    if (color && !INK_MARK.test(color)) fails.push({ kind: "✓ mark in " + color, open: m[0] });
+  }
+  return fails;
+}
+
+const unsized = new Set();
+/* Scan one rendered screen; return every failure. Text floor 13px on kid
+   AND grown-up screens (R4 PR 7: the grown-up tabs joined the floor). */
+function scan(screen, html, { kid }) {
+  const fails = colourFails(html);
+  for (const t of tags(html)) {
+    for (const px of fontSizes(t.style)) {
+      if (px < (kid ? KID_FONT_MIN : ADULT_FONT_MIN)) fails.push({ kind: "font", px, open: t.open });
     }
     if (t.tag !== "button") continue;
     const mh = pxOf(t.style, "min-height");
@@ -87,11 +159,11 @@ function scan(screen, html, { kid }) {
   }
   return fails;
 }
-const show = (fails) => fails.map(f => f.kind + " " + f.px + "px"
+const show = (fails) => fails.map(f => f.kind + (f.px != null ? " " + f.px + "px" : "")
   + (f.floor ? " (floor " + f.floor + ")" : "") + " in " + f.open.slice(0, 160)).join("\n    ");
 const clean = (screen, html, opts) => {
   const fails = scan(screen, html, opts);
-  ok(fails.length === 0, screen + ": nothing under the size floor\n    " + show(fails));
+  ok(fails.length === 0, screen + ": nothing under the size floor or against the contrast rules\n    " + show(fails));
 };
 
 /* ---- 1. THE SESSION SCREEN, in every state a kid sees mid-workout ------- */
@@ -374,6 +446,18 @@ for (const [st, vm] of Object.entries(FINISH)) {
       ok(opts.length > 1 && opts.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN),
          "quiz deck " + st + ": its " + opts.length + " options are 56px");
     }
+  }
+}
+
+/* ---- 2c. THE PRIZE DRAW (R4 PR 7): envelopes, then a picked prize ------ */
+{
+  const pd = overlays.newPrizeDraw();
+  for (const [st, d] of [["envelopes", pd], ["picked", { ...pd, picked: 0 }]]) {
+    const html = overlays.prizeDrawHtml(d);
+    clean("prize draw " + st, html, { kid: true });
+    const close = tags(html).find(t => t.tag === "button" && t.action === "closePrizeDraw");
+    ok(close && pxOf(close.style, "width") >= 48 && pxOf(close.style, "height") >= 48 && pxOf(close.style, "min-height") >= 48,
+       "prize draw " + st + ": the ✕ is a 48px round close");
   }
 }
 
@@ -686,6 +770,31 @@ for (const wide of [true, false]) {
   const html = drawR(rvm.newReadinessFlow(today), wide);
   ok(/Yesterday/.test(html), "readiness yesterday " + (wide ? "wide" : "narrow") + ": yesterday's column is drawn");
   clean("readiness yesterday " + (wide ? "wide" : "narrow"), html, { kid: true });
+}
+
+/* ---- 8. THE CONTRAST RULES CATCH WHAT PR 7 FIXED (R4 PR 7) --------------
+   Each cluster the PR 7 scan found, as the markup that drew it, must still
+   fail the rules above — so the rules cannot quietly stop catching them. */
+{
+  const CAUGHT = {
+    "white ✓ in a mint week circle": '<div style="width:30px;height:30px;border-radius:50%;background:var(--mint);color:#fff;font-size:15px;">✓</div>',
+    "white number in a mint done pill": '<span style="width:24px;height:24px;font-size:13px;font-weight:900;background:var(--mint);color:#fff;">1</span>',
+    "white ↺ on a sun circle": '<div style="background:var(--sun);color:#fff;font-size:15px;">↺</div>',
+    "white ✓ on the mint-light partial circle": '<span style="font-size:13px;background:color-mix(in srgb, var(--mint) 55%, #fff);color:#fff;">✓</span>',
+    "mint ✓ mark on white": '<span style="font-size:17px;color:var(--mint);">✓</span>',
+    "aqua ▶ current mark": '<span style="font-size:17px;color:var(--aqua);">▶</span>',
+    "done move name in ink-faint": '<span style="font-weight:800;color:var(--ink-faint);text-decoration:line-through;font-size:17px;">Jump Rope</span>',
+    "prize-pool ✕ in ink-faint": '<button type="button" style="min-height:48px;color:var(--ink-faint);font-size:15px;">✕</button>',
+    "white Add on aqua": '<button type="button" style="min-height:48px;background:var(--aqua);color:#fff;font-size:13px;">Add</button>',
+    "small coral word": '<button type="button" style="min-height:48px;color:var(--coral);font-size:14px;">✗ Not yet</button>',
+    "small sun-ink on sun (3.5 swim, 4.0 skate)": '<button type="button" style="min-height:56px;background:var(--sun);color:var(--sun-ink);font-weight:900;font-size:14px;">Wobbly</button>'
+  };
+  for (const [name, html] of Object.entries(CAUGHT)) ok(colourFails(html).length > 0, "contrast rules: still catch " + name);
+  ok(colourFails('<span style="font-size:13px;background:var(--mint-wash);color:var(--mint-ink);">✓</span>').length === 0
+     && colourFails('<div style="font-size:15px;background:var(--sun);color:var(--ink);">↺</div>').length === 0,
+     "contrast rules: and pass the fixes (mint-ink on mint-wash, ink on sun)");
+  const fontFails = scan("grown-up probe", '<div style="font-size:12px;color:var(--ink-soft);">Settings label</div>', { kid: false });
+  ok(fontFails.some(f => f.kind === "font"), "grown-up screens have the 13px text floor too");
 }
 
 ok(drawn >= 24, "drew the session screen in " + drawn + " state × layout combinations");

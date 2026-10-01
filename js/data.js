@@ -1274,7 +1274,7 @@ export const BODY_RESULTS = {
   1: { emoji: "✅", color: "var(--mint)",  desc: "You are OK. Keep moving with control.",          cta: "Start training",    ctaIcon: "💪", ctaColor: "var(--btn-go-bg)", ctaDeep: "var(--btn-go-edge)", ctaText: "var(--btn-go-text)", action: "continue" },
   2: { emoji: "⏱️", color: "var(--sun)",   desc: "Take 1–2 min rest, then go easy — 2 rounds max, clean form.", cta: "Start easy — yellow light", ctaIcon: "💛", ctaColor: "var(--sun)", ctaDeep: "var(--sun-deep)", ctaText: "var(--sun-ink)", action: "continue", secondary: "retry", secondaryLabel: "Rest 1–2 min, then re-check" },
   3: { emoji: "🗣️", color: "var(--coral)", desc: "Tell your coach or parent first. If they say OK — light day only, 1 easy round.", cta: "Start light day — red light", ctaIcon: "💙", ctaColor: "var(--coral)", ctaDeep: "var(--coral-deep)", ctaText: "var(--text-on-coral)", action: "continue", secondary: "back", secondaryLabel: "Stop — back to Today", needsGrownup: true },
-  4: { emoji: "🛑", color: "var(--stop)",  desc: "Stop now. Tell your coach or parent right away.",   cta: "Stop — back to Today",    ctaIcon: "🛑", ctaColor: "var(--stop)", ctaDeep: "var(--stop-deep)", ctaText: "#fff", action: "back" }
+  4: { emoji: "🛑", color: "var(--stop)",  desc: "Stop now. Tell your coach or parent right away.",   cta: "Stop — back to Today",    ctaIcon: "🛑", ctaColor: "var(--btn-stop-bg)", ctaDeep: "var(--btn-stop-edge)", ctaText: "#fff", action: "back" }
 };
 
 /* Per-day mascot greeting rotates through the pose set. */
