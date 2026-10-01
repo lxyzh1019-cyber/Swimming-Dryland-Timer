@@ -74,8 +74,8 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R4-4 Merge PR pair 2 | COMPLETE | merged by user 2026-09-30 (swim #68 → 32e7f83, skate #42 → 681756d) with the v3 Deep green look |
 | R4-3b PR 2b Pool calm session buttons (plan v4) | COMPLETE | code, tests (design 288), screenshots done on `claude/splash-pr2b-pool-calm`;  PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#69 |
 | R4-4b Merge PR pair 2b | COMPLETE | merged by user 2026-09-30 |
-| R4-5 PR 3 Body Check (+ pop-up card sizes and rail-hidden label ink, leftovers from PR 2) | PARTIAL | opus-worker 2026-10-01 on `claude/splash-pr3-body-check`, uncommitted: code, data, tests (design 288 → 572, readiness allowance removed), sw.js v26 → v27, FEATURES.md; `npm test` exit 0 both TZs; `diff -rq core` empty; screenshots C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr3/pr3-swim.png. Remaining: commit, push, PR (main session) |
-| R4-6 Merge PR pair 3 | NOT STARTED | |
+| R4-5 PR 3 Body Check (+ pop-up card sizes and rail-hidden label ink, leftovers from PR 2) | COMPLETE | opus-worker 2026-10-01 on `claude/splash-pr3-body-check`, uncommitted: code, data, tests (design 288 → 572, readiness allowance removed), sw.js v26 → v27, FEATURES.md; `npm test` exit 0 both TZs; `diff -rq core` empty; screenshots C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr3/pr3-swim.png. Remaining: commit, push, PR (main session); PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#70 |
+| R4-6 Merge PR pair 3 | WAITING ON YOU — merge PR pair 3 | |
 | R4-7 PR 4 Today | NOT STARTED | |
 | R4-8 Merge PR pair 4 | NOT STARTED | |
 | R4-9 PR 5 Finish screen and Quiz Deck | NOT STARTED | |
