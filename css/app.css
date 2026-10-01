@@ -47,12 +47,12 @@ img { max-width: 100%; }
   border: none; border-radius: var(--radius-pill, 999px);
   font-family: var(--font-ui); font-weight: 900; font-size: 18px;
   cursor: pointer;
-  box-shadow: 0 var(--edge-depth, 4px) 0 var(--candy-deep, var(--action-deep));
+  box-shadow: 0 var(--edge-depth, 4px) 0 var(--candy-deep, var(--action-edge));
   transition: transform var(--dur-fast, 140ms) var(--ease-out, ease-out),
               box-shadow var(--dur-fast, 140ms) var(--ease-out, ease-out);
 }
-.candy:hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--candy-deep, var(--action-deep)); }
-.candy:active { transform: translateY(2px); box-shadow: 0 var(--edge-press, 2px) 0 var(--candy-deep, var(--action-deep)); }
+.candy:hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--candy-deep, var(--action-edge)); }
+.candy:active { transform: translateY(2px); box-shadow: 0 var(--edge-press, 2px) 0 var(--candy-deep, var(--action-edge)); }
 .candy:disabled { opacity: 0.55; cursor: default; transform: none; }
 
 /* Ghost/utility buttons reset */

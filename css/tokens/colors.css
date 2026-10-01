@@ -82,27 +82,27 @@
   --text-body:      var(--ink);
   --text-muted:     var(--ink-soft);
   --text-faint:     var(--ink-faint);
-  --text-on-aqua:   #FFFFFF;
-  --text-on-coral:  #FFFFFF;
+  --text-on-aqua:   var(--ink);      /* was #FFFFFF (2.4:1); ink 4.9 */
+  --text-on-coral:  var(--ink);      /* was #FFFFFF; ink 4.7 */
   --text-on-sun:    var(--sun-ink);
-  --text-on-mint:   #FFFFFF;
+  --text-on-mint:   var(--ink);      /* was #FFFFFF (2.2:1); ink 5.5 */
   --text-on-grape:  #FFFFFF;
 
   /* Surfaces */
   --surface-app:    var(--bg);
   --surface-card:   var(--surface);
   --surface-inset:  var(--surface-2);
-  --border-card:    var(--hairline);
+  --border-card-color: var(--hairline);  /* was --border-card (dead: spacing.css's 3px won) */
 
   /* Primary action (aqua candy button) */
   --action-bg:      var(--aqua);
   --action-edge:    var(--aqua-deep);
-  --action-text:    #FFFFFF;
+  --action-text:    var(--ink);
 
   /* GO / start (coral) */
   --go-bg:          var(--coral);
   --go-edge:        var(--coral-deep);
-  --go-text:        #FFFFFF;
+  --go-text:        var(--ink);
 
   /* Reward / star (sunshine) */
   --reward-bg:      var(--sun);
@@ -119,4 +119,24 @@
   --quality-good:   var(--mint);     /* clean rep */
   --quality-watch:  var(--coral);    /* form watch-out */
   --quality-stop:   var(--stop);     /* hard stop / pain rule */
+
+  /* Splash redesign colour slots — screens read these with a fallback
+     equal to the previous look, e.g. var(--hero-text, #fff). */
+  /* Hero card (Today day card, Body Check panel) — Card A · Sunny pool */
+  --hero-from:        var(--aqua-light);
+  --hero-to:          var(--aqua);
+  --hero-text:        var(--ink);                 /* 4.9–7.9 */
+  --hero-chip:        rgba(255, 255, 255, 0.55);
+  /* Journey map gradient (after hero-from / hero-to) */
+  --journey-via:      #9FE6F3;
+  --journey-to:       #F6E7C1;
+  /* Primary kid button */
+  --btn-primary-bg:   var(--aqua);
+  --btn-primary-edge: var(--aqua-deep);
+  --btn-primary-text: var(--ink);                 /* 4.9 */
+  /* STOP button */
+  --btn-stop-bg:      var(--stop-deep);           /* white 5.0 */
+  --btn-stop-edge:    var(--stop-ink);
+  /* Recovery (grape) button */
+  --btn-grape-bg:     var(--grape-deep);          /* white 5.4 */
 }
