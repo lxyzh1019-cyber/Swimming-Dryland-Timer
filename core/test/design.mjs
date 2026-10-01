@@ -21,8 +21,10 @@ const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++
 
 const KID_FONT_MIN = 13, KID_TAP_MIN = 56, DONE_TAP_MIN = 64, ADULT_TAP_MIN = 48;
 /* Approved below the kid floor by docs/DESIGN.md (Session screen): the quiet
-   "◀ Back a move" link is 48px. Not a temporary entry — the design itself. */
-const DESIGN_TAP = { goBack: 48 };
+   "◀ Back a move" link is 48px; the move card's ✕ is a 48px round close; the
+   Body Check light picker is a grown-up control under 🔒 (grown-up floor, 48).
+   Not temporary entries — the design itself. */
+const DESIGN_TAP = { goBack: 48, closeDetail: 48, rPickLight: 48 };
 
 /* ---- ALLOW: sizes still failing on screens later PRs redesign ----------
    One entry = { kind: "font" | "tap", px, has } — `has` is a piece of the
@@ -44,11 +46,6 @@ const ALLOW = {
     { kind: "font", px: 12, has: "font-size:12px;font-weight:800;opacity:0.85;text-align:right;" },   // block row minutes
     { kind: "font", px: 11, has: "font-size:11px;font-weight:800;opacity:0.85;line-height:1.35;" },   // block row move names
     { kind: "font", px: 11, has: "width:22px;height:22px;border-radius:50%;" }               // review round dots
-  ],
-  // PR 3 — Body Check
-  readiness: [
-    { kind: "font", px: 12, has: "width:24px;height:24px;border-radius:50%;" },              // question number circles
-    { kind: "tap", px: 44, has: 'data-action="rAnswer"' }                                     // yes / no
   ],
   // PR 6 — Progress
   progress: [
@@ -80,8 +77,8 @@ const ALLOW = {
   ]
 };
 
-ok(!Object.keys(ALLOW).some(k => /session|journey/.test(k)),
-   "the session screen and the journey map have no allowance — they meet the floor outright");
+ok(!Object.keys(ALLOW).some(k => /session|journey|readiness/.test(k)),
+   "the session screen, the journey map and Body Check have no allowance — they meet the floor outright");
 
 /* ---- a tiny reader for the opening tags of rendered HTML ---------------- */
 const TAG = /<([a-zA-Z][\w-]*)((?:\s+[^\s=>"']+(?:="[^"]*")?)*)\s*\/?>/g;
@@ -151,13 +148,17 @@ const timedDay = dayWith(e => !e.byReps && e.work > 0);
 const repsDay = dayWith(e => e.byReps);
 ok(timedDay && repsDay, "the plan has a timed move and a rep move to draw");
 
-const answerChecks = () => {
-  if (engine.sess.phase === "formcheck") { engine.pickClean(); return true; }
-  if (engine.sess.phase === "repcheck") { engine.answerRepCheck("some"); return true; }
-  return false;
-};
 const snaps = {};
 const grab = (key) => { if (!snaps[key]) snaps[key] = { ...engine.sess, circuits: engine.sess.circuits }; };
+/* The pop-up cards are caught live (before they are answered) where the run
+   reaches them; any the run does not reach are drawn from a caught move with
+   the phase set (see STATES). */
+const answerChecks = () => {
+  if (engine.sess.phase === "formcheck") { grab("formcheck"); engine.pickClean(); return true; }
+  if (engine.sess.phase === "repcheck") { grab("repcheck"); engine.answerRepCheck("some"); return true; }
+  if (["intent", "microloop", "breath"].includes(engine.sess.phase)) grab(engine.sess.phase);
+  return false;
+};
 for (const dayKey of [timedDay, repsDay]) {
   await runSession({ dayKey, light: "green", gateUnlocked: true }, {
     onTick: () => {
@@ -193,7 +194,17 @@ const STATES = {
   paused:       [snaps.timed, { paused: true }, {}],
   skipAsk:      [snaps.timed, { confirmSkip: true }, {}],
   stop:         [snaps.timed, { stopOverlay: true }, {}],
-  restartAsk:   [snaps.timed, { stopOverlay: true, confirmRestart: true }, {}]
+  restartAsk:   [snaps.timed, { stopOverlay: true, confirmRestart: true }, {}],
+  /* The pop-up cards and the move card (R4 PR 3, leftovers from PR 2). */
+  intent:       [snaps.intent || snaps.timed, { phase: "intent" }, {}],
+  microloop:    [snaps.microloop || snaps.timed, { phase: "microloop", microLoop: null }, {}],
+  "microloop answered": [snaps.microloop || snaps.timed, { phase: "microloop", microLoop: { answer: "?", correct: false } }, {}],
+  breath:       [snaps.breath || snaps.timed, { phase: "breath" }, {}],
+  formcheck:    [snaps.formcheck || snaps.reps, { phase: "formcheck", pendingCleanCheck: true, cleanCheckMove: (snaps.reps.currentEx || {}).name || "" }, {}],
+  repcheck:     [snaps.repcheck || snaps.reps, { phase: "repcheck", repsCounted: 3, repsTarget: 8 }, {}],
+  detail:       [snaps.watch || snaps.timed, { running: true, paused: true },
+                 { detailOverlay: true, detailEx: { ...((snaps.watch || snaps.timed).currentEx || {}),
+                   cue: "Long and tall.", parentWatch: "Hips sag.", fix: "Squeeze the glutes.", transfer: "A stronger streamline." } }]
 };
 let drawn = 0, skipsSeen = 0;
 const CALM = /^(?=.*border:3px solid var\(--hairline\))(?=.*background:var\(--surface\))(?=.*color:var\(--ink-soft\))/;
@@ -222,6 +233,29 @@ for (const [st, [snap, extra, state]] of Object.entries(STATES)) {
     ok(pause && CALM.test(pause.style), "session " + st + " " + layout + ": " + (st === "paused" ? "Resume" : "Pause") + " is white, 3px hairline, ink-soft");
     const skip = tags(html).find(t => t.tag === "button" && t.action === "askSkip");
     if (skip) { skipsSeen++; ok(CALM.test(skip.style), "session " + st + " " + layout + ": Skip is white, 3px hairline, ink-soft"); }
+    if (st === "repcheck") {
+      const reps = tags(html).filter(t => t.tag === "button" && t.action === "answerRepCheck");
+      ok(reps.length === 3 && reps.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN),
+         "session repcheck " + layout + ": All of them / Almost / Some are three 56px buttons");
+    }
+    if (st === "formcheck") {
+      const strip = tags(html).filter(t => t.tag === "button" && ["pickClean", "pickWobbly", "skipFormCheck"].includes(t.action));
+      ok(strip.length === 3 && strip.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN),
+         "session formcheck " + layout + ": the clean-check strip's three buttons are 56px");
+    }
+    if (st === "detail") {
+      const close = tags(html).find(t => t.tag === "button" && t.action === "closeDetail");
+      ok(close && pxOf(close.style, "width") >= 48 && pxOf(close.style, "height") >= 48 && pxOf(close.style, "min-height") >= 48,
+         "session detail " + layout + ": the move card's close button is 48px");
+      const resume = tags(html).find(t => t.tag === "button" && t.action === "resumeFromDetail");
+      ok(resume && pxOf(resume.style, "min-height") >= KID_TAP_MIN, "session detail " + layout + ": Resume my session is 56px");
+    }
+    if (["intent", "microloop", "microloop answered"].includes(st)) {
+      const act = st === "intent" ? "pickIntent" : "answerMicro";
+      const opts = tags(html).filter(t => t.tag === "button" && t.action === act);
+      ok(opts.length > 0 && opts.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN),
+         "session " + st + " " + layout + ": its " + opts.length + " answers are 56px");
+    }
     const stop = tags(html).find(t => t.tag === "button" && t.action === "stopNow");
     ok(stop && /background:var\(--btn-stop-bg,var\(--stop\)\)/.test(stop.style) && pxOf(stop.style, "min-height") >= KID_TAP_MIN,
        "session " + st + " " + layout + ": STOP is 56px on the btn-stop slot");
@@ -253,6 +287,8 @@ ok(/data-action="toggleRail"[^>]*width:48px;height:48px/.test(draw(snaps.timed, 
 ok(/data-action="toggleRail"/.test(draw(snaps.timed, "roomy", {}, { railOpen: false })),
    "and with the rail hidden it is still there to bring it back");
 clean("session rail hidden", draw(snaps.timed, "roomy", {}, { railOpen: false }), { kid: true });
+ok(/writing-mode:vertical-rl;[^"]*color:var\(--ink-soft\);/.test(draw(snaps.timed, "roomy", {}, { railOpen: false })),
+   "with the rail hidden, its vertical label is ink-soft (was ink-faint)");
 engine.exitSession();
 
 /* Explore: the same controls, nothing counting down. */
@@ -289,9 +325,81 @@ for (const [name, html] of [["wide", wideHtml], ["narrow", tscreen.todayNarrow({
      "journey map " + name + ": \"You are here\" sits on a white pill");
 }
 
-/* ---- 4. BODY CHECK (PR 3) AND PROGRESS (PR 6) --------------------------- */
-clean("readiness", rscreen.readinessScreen(rvm.buildReadinessVM(rvm.newReadinessFlow(today), true)),
-  { kid: true, allow: ALLOW.readiness });
+/* ---- 4. BODY CHECK (PR 3): every step, both layouts, no allowance ------ */
+const flow = (steps) => { const r = rvm.newReadinessFlow(today); steps(r); return r; };
+const answerAll = (r, v) => ["q_sleep", "q_light", "q_ready", "q_pain"].forEach(q => rvm.answerQuestion(r, q, v[q] || "yes"));
+const R_STATES = {
+  "questions":         flow(() => {}),
+  "3 answered":        flow(r => { rvm.answerQuestion(r, "q_sleep", "yes"); rvm.answerQuestion(r, "q_light", "no"); rvm.answerQuestion(r, "q_ready", "yes"); }),
+  "green result":      flow(r => answerAll(r, {})),
+  "yellow result":     flow(r => answerAll(r, { q_light: "no" })),
+  "recovery result":   flow(r => answerAll(r, { q_sleep: "no", q_light: "no", q_ready: "no" })),
+  "overridden":        flow(r => { answerAll(r, {}); r.light = "yellow"; r.overridden = true; }),
+  "body map":          flow(r => answerAll(r, { q_pain: "no" })),
+  "zone popup":        flow(r => { answerAll(r, { q_pain: "no" }); r.pendingZone = 2; }),
+  "zone popup marked": flow(r => { answerAll(r, { q_pain: "no" }); rvm.setZoneSev(r, 2, 2); r.pendingZone = 2; }),
+  "sore result":       flow(r => { answerAll(r, { q_pain: "no" }); rvm.setZoneSev(r, 2, 2); }),
+  "sev3 result":       flow(r => { answerAll(r, { q_pain: "no" }); rvm.setZoneSev(r, 4, 3); }),
+  "sev3 confirmed":    flow(r => { answerAll(r, { q_pain: "no" }); rvm.setZoneSev(r, 4, 3); rvm.confirmGrownup(r); }),
+  "pain result":       flow(r => { answerAll(r, { q_pain: "no" }); rvm.setZoneSev(r, 6, 4); })
+};
+const drawR = (r, wide) => rscreen.readinessScreen(rvm.buildReadinessVM(r, wide));
+for (const [st, r] of Object.entries(R_STATES)) {
+  for (const wide of [true, false]) {
+    const name = "readiness " + st + (wide ? " wide" : " narrow");
+    const html = drawR(r, wide);
+    clean(name, html, { kid: true });
+    /* Answers: 56px, 17px, two equal columns under the question. */
+    if (r.step === "questions") {
+      const answers = tags(html).filter(t => t.tag === "button" && t.action === "rAnswer");
+      ok(answers.length === 8 && answers.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN && pxOf(t.style, "font-size") >= 17),
+         name + ": 8 yes/no answers, each 56px and 17px");
+      ok((html.match(/display:grid;grid-template-columns:1fr 1fr;/g) || []).length === 4,
+         name + ": each of the 4 answer pairs is a two-column grid");
+    }
+    /* The result card: title in the light's -ink; Start 64px / 24px / 900;
+       grown-up summary and light picker 48px. */
+    if (/data-body-result/.test(html)) {
+      const vm = rvm.buildReadinessVM(r, wide);
+      ok(vm.light.titleInk && html.includes("color:" + vm.light.titleInk + ";line-height:1.1;\">" + vm.light.label),
+         name + ": the light's title is in " + vm.light.titleInk);
+      const start = tags(html).find(t => t.tag === "button" && pxOf(t.style, "font-size") === 24
+        && (t.action === "rResultCta" || / disabled /.test(t.open)));
+      ok(start && pxOf(start.style, "min-height") >= DONE_TAP_MIN && /font-weight:900/.test(start.style),
+         name + ": Start is 64px, 24px, weight 900");
+      if (r.light === "green" && vm.mayStart)
+        ok(/background:var\(--btn-go-bg\);color:var\(--btn-go-text\);/.test(start.style) && /box-shadow:0 5px 0 var\(--btn-go-edge\)/.test(start.style),
+           name + ": green's Start is on the Go slots");
+      ok(/<summary style="[^"]*font-size:13px;[^"]*display:flex;align-items:center;[^"]*min-height:48px;/.test(html),
+         name + ": the grown-up summary is 48px, 13px");
+      const picks = tags(html).filter(t => t.tag === "button" && t.action === "rPickLight");
+      const chosen = picks.find(t => t.open.includes('data-arg="' + r.light + '"'));
+      ok(picks.length === 4 && picks.every(t => pxOf(t.style, "min-height") >= ADULT_TAP_MIN && /font-size:15px/.test(t.style))
+         && chosen && chosen.style.includes("border:3px solid " + vm.light.color + ";color:" + vm.light.titleInk + ";")
+         && /background:var\(--surface\)/.test(chosen.style) && !/color:#fff/.test(chosen.style),
+         name + ": the light picker is 48px / 15px, the chosen light outlined with its -ink title");
+    }
+  }
+}
+/* The hero panel reads the hero slots, with the old look as fallback. */
+for (const wide of [true, false]) {
+  const html = drawR(R_STATES.questions, wide);
+  ok(/background:linear-gradient\(165deg,var\(--hero-from,var\(--aqua-light\)\) 0%,var\(--hero-to,var\(--aqua\)\) 70%\);color:var\(--hero-text,#fff\);/.test(html),
+     "readiness " + (wide ? "wide" : "narrow") + ": the hero panel is painted from the hero slots");
+}
+/* The result after a body-map answer is the element main.js scrolls to. */
+ok(/<div data-body-result /.test(drawR(R_STATES["sore result"], false)), "the body-map result card carries data-body-result");
+/* The data side: every light has an -ink title; green on the Go slots; red text on text-on-coral. */
+ok(["green", "yellow", "red", "recovery"].every(k => /^var\(--[a-z]+-ink\)$/.test(data.LIGHT_META[k].titleInk || "")),
+   "every light has an -ink title shade");
+ok(data.LIGHT_META.green.btnColor === "var(--btn-go-bg)" && data.LIGHT_META.green.btnText === "var(--btn-go-text)"
+   && data.BODY_RESULTS[1].ctaColor === "var(--btn-go-bg)" && data.BODY_RESULTS[1].ctaText === "var(--btn-go-text)",
+   "green Start (both paths) uses the Go slots");
+ok(data.LIGHT_META.red.btnText === "var(--text-on-coral)" && data.BODY_RESULTS[3].ctaText === "var(--text-on-coral)"
+   && data.LIGHT_META.recovery.btnColor === "var(--btn-grape-bg)",
+   "red Start text on text-on-coral, recovery on btn-grape-bg");
+
+/* ---- 4b. PROGRESS (PR 6) ----------------------------------------------- */
 clean("progress", pscreen.progressScreen(pvm.buildProgressVM({ progressScope: "4w", logScope: "week" })),
   { kid: true, allow: ALLOW.progress });
 
@@ -299,6 +407,14 @@ clean("progress", pscreen.progressScreen(pvm.buildProgressVM({ progressScope: "4
 for (const tab of ["overview", "analytics", "formcheck", "coaching", "library", "settings"]) {
   const html = gscreen.grownupScreen({ ...gvm.buildGrownupVM({ gsScope: "week", grownupTab: tab, isWide: true }), grownupUnlocked: true });
   clean("grownup " + tab, html, { kid: false, allow: ALLOW.grownup });
+}
+
+/* Body Check with yesterday's answers beside today's (drawn last: it saves a check). */
+store.saveReadiness({ answers: { q_sleep: "yes", q_light: "no", q_ready: "yes", q_pain: "no" }, zoneSev: { 2: 2 }, light: "yellow" });
+for (const wide of [true, false]) {
+  const html = drawR(rvm.newReadinessFlow(today), wide);
+  ok(/Yesterday/.test(html), "readiness yesterday " + (wide ? "wide" : "narrow") + ": yesterday's column is drawn");
+  clean("readiness yesterday " + (wide ? "wide" : "narrow"), html, { kid: true });
 }
 
 ok(drawn >= 24, "drew the session screen in " + drawn + " state × layout combinations");

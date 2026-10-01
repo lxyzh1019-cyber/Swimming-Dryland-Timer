@@ -64,15 +64,15 @@ function bodyMap(vm, view) {
   const badges = view === "front" ? FRONT_BADGES : BACK_BADGES;
   const img = view === "front" ? IMAGES.bodyFront : IMAGES.bodyBack;
   const pill = view === "front"
-    ? `<span style="background:var(--aqua);color:#fff;font-size:12px;font-weight:900;letter-spacing:0.06em;padding:6px 16px;border-radius:var(--radius-pill);margin-bottom:8px;">FRONT VIEW</span>`
-    : `<span style="background:var(--sea);color:#fff;font-size:12px;font-weight:900;letter-spacing:0.06em;padding:6px 16px;border-radius:var(--radius-pill);margin-bottom:8px;">BACK VIEW</span>`;
+    ? `<span style="background:var(--aqua);color:#fff;font-size:13px;font-weight:900;letter-spacing:0.06em;padding:6px 16px;border-radius:var(--radius-pill);margin-bottom:8px;">FRONT VIEW</span>`
+    : `<span style="background:var(--sea);color:#fff;font-size:13px;font-weight:900;letter-spacing:0.06em;padding:6px 16px;border-radius:var(--radius-pill);margin-bottom:8px;">BACK VIEW</span>`;
   return `
   <div style="flex:1;background:var(--bg);border:2px solid var(--hairline);border-radius:22px;padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     ${pill}
     <div style="position:relative;height:480px;width:fit-content;">
       ${imgWithFallbacks(photoSources(img), `alt="${view === "front" ? "Front" : "Back"} view ${COPY.bodyMapAlt}" style="height:100%;width:auto;display:block;pointer-events:none;"`)}
       ${rects.map(z => `<div style="position:absolute;left:${z.l}%;top:${z.t}%;width:${z.w}%;height:${z.h}%;border-radius:${z.r}px;pointer-events:none;${vm.zoneHighlight["n" + z.n]}"></div>`).join("")}
-      ${badges.map(b => `<div style="position:absolute;left:${b.l}%;top:${b.t}%;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;pointer-events:none;background:${vm.zoneBadgeBg["n" + b.n]};">${vm.zoneBadge["n" + b.n]}</div>`).join("")}
+      ${badges.map(b => `<div style="position:absolute;left:${b.l}%;top:${b.t}%;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;pointer-events:none;background:${vm.zoneBadgeBg["n" + b.n]};">${vm.zoneBadge["n" + b.n]}</div>`).join("")}
       ${rects.map(z => `<button type="button" data-action="rPickZone" data-arg="${z.n}" style="position:absolute;left:${z.l}%;top:${z.t}%;width:${z.w}%;height:${z.h}%;background:none;border:none;padding:0;cursor:pointer;" aria-label="${z.label}"></button>`).join("")}
     </div>
   </div>`;
@@ -82,12 +82,12 @@ function bodyMap(vm, view) {
 function resultCard(vm, { areaLabel = "" } = {}) {
   const c = vm.resultCta;
   return `
-  <div style="width:100%;max-width:${areaLabel ? 680 : 720}px;box-sizing:border-box;margin-top:${areaLabel ? "18px" : "40px"};${areaLabel ? "margin-left:auto;margin-right:auto;" : ""}background:var(--surface);border-radius:var(--radius-xl);padding:24px;box-shadow:var(--shadow-lift);border-top:6px solid ${vm.light.color};">
-    ${areaLabel ? `<div style="font-size:12px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:10px;">${areaLabel}</div>` : ""}
+  <div data-body-result style="width:100%;max-width:${areaLabel ? 680 : 720}px;box-sizing:border-box;margin-top:${areaLabel ? "18px" : "40px"};${areaLabel ? "margin-left:auto;margin-right:auto;" : ""}background:var(--surface);border-radius:var(--radius-xl);padding:24px;box-shadow:var(--shadow-lift);border-top:6px solid ${vm.light.color};">
+    ${areaLabel ? `<div style="font-size:13px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:10px;">${areaLabel}</div>` : ""}
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
       <div style="font-size:56px;line-height:1;">${vm.light.emoji}</div>
       <div>
-        <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:${vm.light.color};line-height:1.1;">${vm.light.label}</div>
+        <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:${vm.light.titleInk || vm.light.color};line-height:1.1;">${vm.light.label}</div>
         <div style="font-size:15px;font-weight:700;color:var(--ink-soft);margin-top:5px;line-height:1.45;">${vm.resultDesc}</div>
       </div>
     </div>
@@ -100,12 +100,12 @@ function resultCard(vm, { areaLabel = "" } = {}) {
       <span style="font-size:13px;font-weight:800;color:var(--ink-soft);line-height:1.45;">${vm.suggestionLine}</span>
     </div>` : ""}
     <details style="background:var(--surface-2);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:18px;"${vm.wasOverridden ? " open" : ""}>
-      <summary style="font-size:12px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;min-height:28px;"><span aria-hidden="true">🔒</span> Grown-up only — change today's light</summary>
+      <summary style="font-size:13px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;min-height:48px;"><span aria-hidden="true">🔒</span> Grown-up only — change today's light</summary>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
         ${vm.lightOptions.map(lo => `
           <button type="button" data-action="rPickLight" data-arg="${lo.key}" style="${lo.style}">
             <span style="font-size:18px;line-height:1;">${lo.emoji}</span>
-            <span style="font-weight:800;font-size:13px;letter-spacing:0.02em;">${lo.label}</span>
+            <span style="font-weight:800;font-size:15px;letter-spacing:0.02em;">${lo.label}</span>
           </button>`).join("")}
       </div>
     </details>
@@ -114,10 +114,10 @@ function resultCard(vm, { areaLabel = "" } = {}) {
       <span style="font-size:24px;flex-shrink:0;">${vm.grownupConfirmed ? "☑️" : "⬜"}</span>
       <span style="font-weight:800;font-size:15px;color:var(--ink);line-height:1.35;">A grown-up said it's OK to do a light day. <span style="color:var(--ink-soft);font-weight:700;">Tap after you've checked in.</span></span>
     </button>` : ""}
-    <button type="button" ${vm.mayStart ? `data-action="rResultCta" data-arg="${c.action}"` : "disabled"} style="width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:${c.color};color:${c.text};border:none;border-radius:var(--radius-pill);padding:18px;font-family:var(--font-display);font-weight:600;font-size:22px;${vm.mayStart ? "cursor:pointer;box-shadow:0 5px 0 " + c.deep + ";" : "opacity:0.45;cursor:default;"}">
-      <span style="font-size:22px;">${c.icon}</span> ${c.label}
+    <button type="button" ${vm.mayStart ? `data-action="rResultCta" data-arg="${c.action}"` : "disabled"} style="width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:${c.color};color:${c.text};border:none;border-radius:var(--radius-pill);padding:12px 18px;min-height:64px;font-family:var(--font-display);font-weight:900;font-size:24px;${vm.mayStart ? "cursor:pointer;box-shadow:0 5px 0 " + c.deep + ";" : "opacity:0.45;cursor:default;"}">
+      <span style="font-size:24px;">${c.icon}</span> ${c.label}
     </button>
-    ${c.secondaryLabel ? `<button type="button" data-action="${c.secondaryAction === "retry" ? "rRetryCheck" : "rResultSecondary"}" data-arg="${c.secondaryAction}" style="width:100%;background:none;border:none;cursor:pointer;font-weight:800;font-size:14px;color:var(--ink-soft);text-decoration:underline;padding:12px 6px 2px;min-height:44px;">${c.secondaryLabel}</button>` : ""}
+    ${c.secondaryLabel ? `<button type="button" data-action="${c.secondaryAction === "retry" ? "rRetryCheck" : "rResultSecondary"}" data-arg="${c.secondaryAction}" style="width:100%;background:none;border:none;cursor:pointer;font-weight:800;font-size:14px;color:var(--ink-soft);text-decoration:underline;padding:12px 6px 2px;min-height:56px;">${c.secondaryLabel}</button>` : ""}
   </div>`;
 }
 
@@ -131,25 +131,25 @@ function stepper(vm, gap) {
 
 export function readinessScreen(vm) {
   const name = escapeHtml(vm.athleteName);
-  const backBtn = `<button type="button" data-action="rExit" style="width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,0.22);display:flex;align-items:center;justify-content:center;font-size:18px;border:none;cursor:pointer;color:#fff;flex-shrink:0;" aria-label="Back to Today">←</button>`;
+  const backBtn = `<button type="button" data-action="rExit" style="width:56px;height:56px;border-radius:50%;background:var(--hero-chip,rgba(255,255,255,0.22));display:flex;align-items:center;justify-content:center;font-size:20px;border:none;cursor:pointer;color:var(--hero-text,#fff);flex-shrink:0;" aria-label="Back to Today">←</button>`;
 
   const questionsStep = vm.isQuestionsStep ? `
     ${vm.isNarrow ? `
-      <div style="background:linear-gradient(165deg,var(--aqua-light) 0%,var(--aqua) 60%,var(--aqua-deep) 100%);color:#fff;padding:18px 20px 16px;display:flex;flex-direction:column;gap:12px;">
+      <div style="background:linear-gradient(165deg,var(--hero-from,var(--aqua-light)) 0%,var(--hero-to,var(--aqua)) 70%);color:var(--hero-text,#fff);padding:18px 20px 16px;display:flex;flex-direction:column;gap:12px;">
         <div style="display:flex;align-items:center;gap:12px;">
           ${backBtn}
           ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:56px;height:56px;object-fit:contain;flex-shrink:0;" alt=""`)}
           <div style="min-width:0;">
-            <div style="font-family:var(--font-display);font-weight:600;font-size:24px;line-height:1.1;display:flex;align-items:center;gap:8px;">Body Check <span style="width:24px;height:24px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:#fff;font-size:14px;font-weight:900;">✓</span></span></div>
+            <div style="font-family:var(--font-display);font-weight:600;font-size:24px;line-height:1.1;display:flex;align-items:center;gap:8px;">Body Check <span style="width:24px;height:24px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:var(--hero-text,#fff);font-size:14px;font-weight:900;">✓</span></span></div>
             <div style="font-size:13px;font-weight:700;opacity:0.9;margin-top:3px;line-height:1.3;">${COPY.readinessIntro}, ${name}!</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">${stepper(vm, 7)}</div>
       </div>` : `
-      <div style="width:340px;flex-shrink:0;background:linear-gradient(165deg,var(--aqua-light) 0%,var(--aqua) 60%,var(--aqua-deep) 100%);color:#fff;display:flex;flex-direction:column;padding:26px 28px;">
+      <div style="width:340px;flex-shrink:0;background:linear-gradient(165deg,var(--hero-from,var(--aqua-light)) 0%,var(--hero-to,var(--aqua)) 70%);color:var(--hero-text,#fff);display:flex;flex-direction:column;padding:26px 28px;">
         ${backBtn}
         ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:140px;height:140px;object-fit:contain;margin:22px 0 10px;" alt=""`)}
-        <div style="font-family:var(--font-display);font-weight:600;font-size:32px;line-height:1.1;display:flex;align-items:center;gap:12px;">Body Check <span style="width:30px;height:30px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:#fff;font-size:17px;font-weight:900;">✓</span></span></div>
+        <div style="font-family:var(--font-display);font-weight:600;font-size:32px;line-height:1.1;display:flex;align-items:center;gap:12px;">Body Check <span style="width:30px;height:30px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:var(--hero-text,#fff);font-size:17px;font-weight:900;">✓</span></span></div>
         <div style="font-size:15px;font-weight:700;opacity:0.9;margin-top:8px;line-height:1.4;">${COPY.readinessIntro}, ${name}!</div>
         <div style="margin-top:26px;display:flex;flex-direction:column;gap:12px;">${stepper(vm, 10)}</div>
         <div style="flex:1;"></div>
@@ -158,7 +158,7 @@ export function readinessScreen(vm) {
     <div style="${vm.bodyContentStyle}">
       <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:720px;">
         ${vm.hasYesterday ? `
-          <div style="display:flex;align-items:center;gap:8px;font-weight:900;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);padding:0 4px;">
+          <div style="display:flex;align-items:center;gap:8px;font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);padding:0 4px;">
             <span style="font-size:15px;">📋</span> Yesterday — for reference. Today still needs your answer.
           </div>` : ""}
         ${vm.questions.map(q => `
@@ -166,10 +166,10 @@ export function readinessScreen(vm) {
             <div style="flex:1 1 200px;font-weight:700;font-size:17px;line-height:1.4;color:var(--ink);">${q.text}</div>
             ${vm.hasYesterday ? `
               <div style="flex-shrink:0;min-width:92px;text-align:center;opacity:0.62;">
-                <div style="font-size:10px;font-weight:900;letter-spacing:0.05em;text-transform:uppercase;color:var(--ink-soft);">Yesterday</div>
+                <div style="font-size:13px;font-weight:900;letter-spacing:0.05em;text-transform:uppercase;color:var(--ink-soft);">Yesterday</div>
                 <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:2px;">${q.yesterday}</div>
               </div>` : ""}
-            <div style="display:flex;gap:8px;flex-shrink:0;">
+            <div style="flex:1 1 100%;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               <button type="button" data-action="rAnswer" data-arg="${q.id}|yes" style="${q.yesStyle}">${q.yesLabel}</button>
               <button type="button" data-action="rAnswer" data-arg="${q.id}|no" style="${q.noStyle}">${q.noLabel}</button>
             </div>
@@ -184,14 +184,14 @@ export function readinessScreen(vm) {
   const bodyStep = vm.showBodyArea ? `
     <div style="width:100%;display:flex;flex-direction:column;padding:24px 30px;box-sizing:border-box;">
       <div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px 16px;margin-bottom:12px;">
-        <button type="button" data-action="rGoBack" style="width:46px;height:46px;border-radius:50%;background:var(--bg);border:2px solid var(--hairline);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--aqua-ink);cursor:pointer;flex-shrink:0;" aria-label="Back">←</button>
+        <button type="button" data-action="rGoBack" style="width:56px;height:56px;border-radius:50%;background:var(--bg);border:2px solid var(--hairline);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--aqua-ink);cursor:pointer;flex-shrink:0;" aria-label="Back">←</button>
         <div style="text-align:center;flex:1;">
           <div style="font-family:var(--font-display);font-weight:600;font-size:34px;color:var(--ink);line-height:1.1;">Where does it feel different?</div>
           <div style="font-size:15px;font-weight:700;color:var(--ink-soft);margin-top:6px;">Tap each spot that feels off — Coach will ask how it feels. Tap again to change it.</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;background:var(--sun-wash);border:2px solid var(--sun);border-radius:18px;padding:10px 14px;flex-shrink:0;max-width:180px;">
           <span style="font-size:18px;">⭐</span>
-          <span style="font-size:12px;font-weight:800;color:var(--sun-ink);line-height:1.3;">If unsure, ask a coach or parent.</span>
+          <span style="font-size:13px;font-weight:800;color:var(--sun-ink);line-height:1.3;">If unsure, ask a coach or parent.</span>
         </div>
       </div>
 
@@ -200,7 +200,7 @@ export function readinessScreen(vm) {
         ${bodyMap(vm, "back")}
         <div style="${vm.legendStyle}">
           ${vm.legendRows.map(lg => lg.isHeader
-            ? `<div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-faint);padding:10px 4px 2px;">${lg.label}</div>`
+            ? `<div style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-faint);padding:10px 4px 2px;">${lg.label}</div>`
             : `<button type="button" data-action="rPickZone" data-arg="${lg.num}" style="${lg.rowStyle}">
                  <span style="${lg.badgeStyle}">${lg.num}</span>
                  <span style="font-size:14px;font-weight:800;color:var(--ink);text-align:left;line-height:1.2;">${lg.label}</span>
@@ -210,7 +210,7 @@ export function readinessScreen(vm) {
 
       ${vm.noZonesYet ? `<div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:16px;">
         <div style="text-align:center;font-family:var(--font-hand);font-size:22px;font-weight:700;color:var(--ink-soft);">Tap the spot that feels different — Coach will ask how it feels.</div>
-        <button type="button" data-action="rResultCta" data-arg="continue" style="display:flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:0 24px;border:2px solid var(--mint);background:var(--mint-wash);color:var(--mint-ink);border-radius:var(--radius-pill);font-weight:900;font-size:16px;cursor:pointer;font-family:inherit;">
+        <button type="button" data-action="rResultCta" data-arg="continue" style="display:flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:0 24px;border:2px solid var(--mint);background:var(--mint-wash);color:var(--mint-ink);border-radius:var(--radius-pill);font-weight:900;font-size:16px;cursor:pointer;font-family:inherit;">
           <span style="font-size:20px;" aria-hidden="true">✨</span> ${vm.noMarksCtaLabel} — go with ${vm.noMarksLight}
         </button>
       </div>` : ""}
@@ -228,8 +228,8 @@ export function readinessScreen(vm) {
                   <div style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.3;margin-top:2px;">${po.desc}</div>
                 </div>
               </button>`).join("")}
-            ${vm.popupHasMark ? `<button type="button" data-action="rSetZoneSev" data-arg="${vm.pendingZone}|0" style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--mint-wash);border:2px solid var(--mint);border-radius:var(--radius-pill);padding:12px;cursor:pointer;font-weight:900;font-size:14px;color:var(--mint-ink);min-height:48px;">✨ Feels fine now — remove mark</button>` : ""}
-            <button type="button" data-action="rClosePopup" style="background:none;border:none;cursor:pointer;font-weight:800;font-size:14px;color:var(--ink-soft);text-decoration:underline;padding:6px;">Cancel</button>
+            ${vm.popupHasMark ? `<button type="button" data-action="rSetZoneSev" data-arg="${vm.pendingZone}|0" style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--mint-wash);border:2px solid var(--mint);border-radius:var(--radius-pill);padding:12px;cursor:pointer;font-weight:900;font-size:14px;color:var(--mint-ink);min-height:56px;">✨ Feels fine now — remove mark</button>` : ""}
+            <button type="button" data-action="rClosePopup" style="background:none;border:none;cursor:pointer;font-weight:800;font-size:14px;color:var(--ink-soft);text-decoration:underline;padding:6px;min-height:56px;">Cancel</button>
           </div>
         </div>` : ""}
     </div>` : "";

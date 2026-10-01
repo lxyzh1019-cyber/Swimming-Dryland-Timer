@@ -58,7 +58,7 @@ function promptCard(vm, size) {
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--ink);text-align:center;">After Round 1 — pick ONE word</div>
       <div style="font-size:14px;font-weight:700;color:var(--ink-soft);text-align:center;">What fixes what you just felt? Say it out loud for the next rounds.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
-        ${vm.intentWords.map(w => `<button type="button" data-action="pickIntent" data-arg="${w}" style="min-height:48px;border-radius:var(--radius-pill);border:3px solid var(--sun);background:var(--surface);color:var(--sun-ink);font-weight:900;font-size:16px;padding:0 18px;cursor:pointer;font-family:inherit;">${w}</button>`).join("")}
+        ${vm.intentWords.map(w => `<button type="button" data-action="pickIntent" data-arg="${w}" style="min-height:56px;border-radius:var(--radius-pill);border:3px solid var(--sun);background:var(--surface);color:var(--sun-ink);font-weight:900;font-size:16px;padding:0 18px;cursor:pointer;font-family:inherit;">${w}</button>`).join("")}
       </div>
     </div>`;
   }
@@ -75,7 +75,7 @@ function promptCard(vm, size) {
             else if (o === vm.microPicked) style = "border-color:var(--coral);background:color-mix(in srgb, var(--coral) 12%, #fff);color:var(--coral);";
             else style = "border-color:var(--hairline);background:var(--surface);color:var(--ink-faint);";
           }
-          return `<button type="button" data-action="answerMicro" data-arg="${o}" style="min-height:48px;border-radius:16px;border:3px solid;font-weight:900;font-size:15px;cursor:pointer;font-family:inherit;${style}">${o}</button>`;
+          return `<button type="button" data-action="answerMicro" data-arg="${o}" style="min-height:56px;border-radius:16px;border:3px solid;font-weight:900;font-size:15px;cursor:pointer;font-family:inherit;${style}">${o}</button>`;
         }).join("")}
       </div>
     </div>`;
@@ -95,7 +95,7 @@ function promptCard(vm, size) {
     <div data-rep-check style="flex:0 1 ${size}px;max-width:${size}px;min-width:240px;min-height:${Math.round(size * 0.8)}px;border-radius:26px;background:var(--grape-wash);border:3px solid var(--grape);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;box-sizing:border-box;">
       <div style="font-family:var(--font-display);font-weight:600;font-size:24px;color:var(--ink);text-align:center;">${vm.repCheckQuestion}</div>
       <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
-        ${vm.repCheckOpts.map(o => `<button type="button" data-action="answerRepCheck" data-arg="${o.arg}" style="min-height:52px;border-radius:16px;border:3px solid ${o.edge};background:${o.bg};color:${o.ink};font-weight:900;font-size:17px;cursor:pointer;font-family:inherit;">${o.label}</button>`).join("")}
+        ${vm.repCheckOpts.map(o => `<button type="button" data-action="answerRepCheck" data-arg="${o.arg}" style="min-height:56px;border-radius:16px;border:3px solid ${o.edge};background:${o.bg};color:${o.ink};font-weight:900;font-size:17px;cursor:pointer;font-family:inherit;">${o.label}</button>`).join("")}
       </div>
       <div style="font-size:13px;font-weight:800;color:var(--grape-deep);text-align:center;">${vm.repCheckRule}</div>
     </div>`;
@@ -197,7 +197,7 @@ export function detailOverlayHtml(vm) {
           <span style="font-size:13px;font-weight:800;color:var(--aqua-ink);opacity:0.75;">Demo photo coming soon</span>
           ${imgWithFallbacks(vm.detailPhotoSources, `alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"`)}
         </div>
-        <button type="button" data-action="closeDetail" style="position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;border:none;background:rgba(20,59,74,0.55);color:#fff;font-size:16px;font-weight:900;cursor:pointer;" aria-label="Close">✕</button>
+        <button type="button" data-action="closeDetail" style="position:absolute;top:12px;right:12px;width:48px;height:48px;min-height:48px;border-radius:50%;border:none;background:rgba(20,59,74,0.55);color:#fff;font-size:18px;font-weight:900;cursor:pointer;" aria-label="Close">✕</button>
       </div>
       <div style="padding:22px 26px 26px;display:flex;flex-direction:column;gap:14px;">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">
@@ -207,24 +207,24 @@ export function detailOverlayHtml(vm) {
         <a href="${vm.detailVideoUrl}" target="_blank" rel="noopener" data-action="watchVideo" style="align-self:flex-start;display:flex;align-items:center;gap:8px;text-decoration:none;background:var(--aqua);color:#fff;font-weight:900;font-size:15px;border-radius:var(--radius-pill);padding:12px 22px;box-shadow:0 4px 0 var(--aqua-deep);">▶ Watch the move</a>
         ${vm.detailCue ? `
         <div style="background:var(--aqua-wash);border-radius:var(--radius-md);padding:12px 14px;">
-          <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--aqua-ink);margin-bottom:4px;">Coach tip</div>
+          <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--aqua-ink);margin-bottom:4px;">Coach tip</div>
           <div style="font-size:16px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.detailCue}</div>
         </div>` : ""}
         ${vm.detailWatchFor ? `
         <div style="background:var(--sun-wash);border-radius:var(--radius-md);padding:12px 14px;">
-          <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sun-ink);margin-bottom:4px;">👀 Watch for</div>
+          <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sun-ink);margin-bottom:4px;">👀 Watch for</div>
           <div style="font-size:15px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.detailWatchFor}</div>
           ${vm.detailFix ? `<div style="font-size:14px;color:var(--ink-soft);line-height:1.4;margin-top:5px;">🔧 ${vm.detailFix}</div>` : ""}
         </div>` : ""}
         ${vm.detailTransfer ? `
         <div style="background:var(--sea-wash);border-radius:var(--radius-md);padding:12px 14px;">
-          <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sea-ink);margin-bottom:4px;">${COPY.transferHeading}</div>
+          <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sea-ink);margin-bottom:4px;">${COPY.transferHeading}</div>
           <div style="font-size:15px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.detailTransfer}</div>
         </div>` : ""}
         ${vm.detailShowResume ? `
         <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch;border-top:1.5px solid var(--hairline);padding-top:14px;">
           <div style="font-size:13px;font-weight:800;color:var(--ink-soft);text-align:center;">⏸ Your session is paused while you read.</div>
-          <button type="button" data-action="resumeFromDetail" style="width:100%;min-height:54px;border:none;border-radius:var(--radius-pill);background:var(--mint);color:#fff;font-family:var(--font-display);font-weight:600;font-size:20px;cursor:pointer;box-shadow:0 5px 0 var(--mint-deep);">▶ Resume my session</button>
+          <button type="button" data-action="resumeFromDetail" style="width:100%;min-height:56px;border:none;border-radius:var(--radius-pill);background:var(--mint);color:#fff;font-family:var(--font-display);font-weight:600;font-size:20px;cursor:pointer;box-shadow:0 5px 0 var(--mint-deep);">▶ Resume my session</button>
         </div>` : ""}
       </div>
     </div>
@@ -553,9 +553,9 @@ function centerStack(vm, wide, tablet) {
   ${vm.showCleanCheck ? `
   <div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:2px solid var(--mint);border-radius:var(--radius-lg);padding:10px 16px;width:100%;max-width:480px;flex-shrink:0;box-sizing:border-box;box-shadow:var(--shadow-soft);">
     <span style="flex:1;font-weight:900;font-size:15px;color:var(--ink);">${vm.cleanCheckQuestion}</span>
-    <button type="button" data-action="pickClean" style="min-height:46px;border:none;border-radius:var(--radius-pill);padding:0 18px;background:var(--mint);color:#fff;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--mint-deep);">${vm.checkCleanLabel}</button>
-    <button type="button" data-action="pickWobbly" style="min-height:46px;border:none;border-radius:var(--radius-pill);padding:0 18px;background:var(--sun);color:var(--sun-ink);font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--sun-deep);">${vm.checkWobblyLabel}</button>
-    <button type="button" data-action="skipFormCheck" style="min-height:46px;border:none;border-radius:var(--radius-pill);padding:0 14px;background:transparent;color:var(--ink-soft);font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;">Skip</button>
+    <button type="button" data-action="pickClean" style="min-height:56px;border:none;border-radius:var(--radius-pill);padding:0 18px;background:var(--mint);color:#fff;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--mint-deep);">${vm.checkCleanLabel}</button>
+    <button type="button" data-action="pickWobbly" style="min-height:56px;border:none;border-radius:var(--radius-pill);padding:0 18px;background:var(--sun);color:var(--sun-ink);font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--sun-deep);">${vm.checkWobblyLabel}</button>
+    <button type="button" data-action="skipFormCheck" style="min-height:56px;border:none;border-radius:var(--radius-pill);padding:0 14px;background:transparent;color:var(--ink-soft);font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;">Skip</button>
   </div>` : ""}`;
 }
 
@@ -708,7 +708,7 @@ export function sessionScreen(vm) {
       ${vm.railOpen ? "" : `
       <div style="width:46px;flex-shrink:0;background:var(--surface-2);border-right:1.5px solid var(--hairline);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:12px;">
         ${railToggle(true)}
-        <span style="writing-mode:vertical-rl;font-size:13px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint);">${vm.progressLabel}</span>
+        <span style="writing-mode:vertical-rl;font-size:13px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-soft);">${vm.progressLabel}</span>
       </div>`}
       <div style="width:${railW};flex-shrink:0;overflow-y:auto;padding:18px 16px;background:var(--surface-2);border-right:1.5px solid var(--hairline);box-sizing:border-box;display:${vm.railOpen ? "flex" : "none"};flex-direction:column;gap:14px;">
         <div>

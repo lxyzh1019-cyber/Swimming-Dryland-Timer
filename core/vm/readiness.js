@@ -186,7 +186,7 @@ function lightWord(key) {
 export function buildReadinessVM(r, isWide) {
   const ans = r.answers;
   const step = r.step;
-  const baseBtn = "min-width:58px;min-height:44px;border-radius:var(--radius-pill);border:2px solid;font-weight:900;font-size:13px;cursor:pointer;background:var(--surface);";
+  const baseBtn = "min-width:58px;min-height:56px;border-radius:var(--radius-pill);border:2px solid;font-weight:900;font-size:17px;cursor:pointer;background:var(--surface);";
 
   /* Yesterday's answers, rendered with each question's OWN words — "😴 Good"
      rather than a bare yes, so the column reads as an answer and not as a
@@ -235,9 +235,9 @@ export function buildReadinessVM(r, isWide) {
       isHeader: false,
       num: z.n,
       label: sev ? z.label + " — " + SEV_SHORT[sev] : z.label,
-      rowStyle: "display:flex;align-items:center;gap:10px;background:none;border:2px solid;border-radius:14px;padding:8px 10px;cursor:pointer;text-align:left;min-height:44px;"
+      rowStyle: "display:flex;align-items:center;gap:10px;background:none;border:2px solid;border-radius:14px;padding:8px 10px;cursor:pointer;text-align:left;min-height:56px;"
         + (sev ? "border-color:" + SEV_COLOR[sev] + ";background:color-mix(in srgb, " + SEV_COLOR[sev] + " 14%, #fff);" : "border-color:transparent;"),
-      badgeStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;background:" + (sev ? SEV_COLOR[sev] : "var(--ink)") + ";"
+      badgeStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;background:" + (sev ? SEV_COLOR[sev] : "var(--ink)") + ";"
     });
   });
 
@@ -256,8 +256,11 @@ export function buildReadinessVM(r, isWide) {
   ];
   const lightOptions = LIGHT_OPTS.map(o => ({
     ...o,
-    style: "display:flex;align-items:center;gap:6px;border-radius:var(--radius-pill);padding:8px 14px;cursor:pointer;border:2px solid;background:var(--surface);"
-      + (o.key === lightKey ? "border-color:" + L.color + ";background:" + L.color + ";color:#fff;" : "border-color:var(--hairline);color:var(--ink-soft);")
+    /* Grown-up control: 48px. The chosen light is outlined in its colour with
+       its title in the light's -ink shade — never white text on the light
+       itself (white on yellow could not be read). */
+    style: "display:flex;align-items:center;gap:6px;border-radius:var(--radius-pill);padding:8px 14px;cursor:pointer;min-height:48px;font-size:15px;background:var(--surface);"
+      + (o.key === lightKey ? "border:3px solid " + L.color + ";color:" + (L.titleInk || "var(--ink)") + ";" : "border:3px solid var(--hairline);color:var(--ink-soft);")
   }));
 
   const sevLevel = r.severity || 1;
@@ -348,9 +351,10 @@ export function buildReadinessVM(r, isWide) {
     const active = num === currentStepNum;
     return {
       icon: done ? "✓" : String(num),
-      circleStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;"
-        + (done ? "background:var(--mint);color:#fff;" : active ? "background:#fff;color:var(--aqua-deep);" : "background:rgba(255,255,255,0.25);color:#fff;"),
-      labelStyle: "font-size:13px;font-weight:800;letter-spacing:0.02em;white-space:nowrap;" + (active ? "color:#fff;" : "color:rgba(255,255,255,0.75);"),
+      // On the hero panel: text and chips read the hero slots (fallbacks = the old white look).
+      circleStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;"
+        + (done ? "background:var(--mint);color:var(--hero-text,#fff);" : active ? "background:#fff;color:var(--aqua-deep);" : "background:var(--hero-chip,rgba(255,255,255,0.25));color:var(--hero-text,#fff);"),
+      labelStyle: "font-size:13px;font-weight:800;letter-spacing:0.02em;white-space:nowrap;color:var(--hero-text,#fff);" + (active ? "" : "opacity:0.75;"),
       label: s.label
     };
   });
