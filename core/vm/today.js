@@ -153,8 +153,8 @@ export function buildJourney() {
       caption: fmtXp(xpToNextRank) + " XP →",
       showIcon: true, showCheck: false, showAvatar: false, icon: nextRank.icon, circleR: 22,
       circleStyle: "width:44px;height:44px;border-radius:50%;border:2px dashed rgba(255,255,255,0.65);display:flex;align-items:center;justify-content:center;font-size:18px;opacity:0.8;background:rgba(20,59,74,0.2);",
-      nameStyle: "font-family:var(--font-display);font-weight:600;font-size:15px;color:rgba(255,255,255,0.85);text-shadow:0 1px 4px rgba(10,30,40,0.6);",
-      captionStyle: "font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);text-shadow:0 1px 4px rgba(10,30,40,0.6);"
+      nameStyle: "font-family:var(--font-display);font-weight:600;font-size:15px;color:var(--hero-text,#fff);",
+      captionStyle: "font-size:13px;font-weight:800;color:var(--hero-text,#fff);"
     });
   }
   waypoints.push({
@@ -162,15 +162,17 @@ export function buildJourney() {
     caption: "YOU ARE HERE",
     showIcon: false, showCheck: false, showAvatar: true, icon: currentRank.icon, circleR: 30,
     circleStyle: "width:60px;height:60px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 5px rgba(255,255,255,0.25),0 4px 10px rgba(10,30,40,0.35);overflow:hidden;animation:mapPulse 2.6s ease-in-out infinite;background:var(--aqua-deep);",
-    nameStyle: "font-family:var(--font-display);font-weight:600;font-size:18px;color:#fff;text-shadow:0 1px 4px rgba(10,30,40,0.6);",
-    captionStyle: "font-size:11px;font-weight:900;letter-spacing:0.07em;color:var(--sun);text-shadow:0 1px 4px rgba(10,30,40,0.6);"
+    nameStyle: "font-family:var(--font-display);font-weight:600;font-size:18px;color:var(--ink);",
+    captionStyle: "font-size:13px;font-weight:900;letter-spacing:0.07em;color:var(--aqua-ink);",
+    // "You are here" sits on a white pill, so it reads on any part of the map.
+    labelPill: "background:rgba(255,255,255,0.6);border-radius:999px;padding:4px 10px;"
   });
   doneRanks.slice().reverse().forEach(r => {
     waypoints.push({
       stateAttr: "done", rankLevel: r.level, habitat: r.habitat, name: r.name, caption: "",
       showIcon: false, showCheck: true, showAvatar: false, icon: r.icon, circleR: 16,
       circleStyle: "width:32px;height:32px;border-radius:50%;background:var(--mint);color:#fff;border:2px solid rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;box-shadow:0 2px 6px rgba(10,30,40,0.3);",
-      nameStyle: "font-family:var(--font-display);font-weight:600;font-size:13px;color:rgba(255,255,255,0.9);text-shadow:0 1px 4px rgba(10,30,40,0.6);",
+      nameStyle: "font-family:var(--font-display);font-weight:600;font-size:13px;color:var(--hero-text,#fff);",
       captionStyle: ""
     });
   });
@@ -188,7 +190,8 @@ export function buildJourney() {
     wp.labelPosStyle = "position:absolute;top:" + wp.cy + "px;display:flex;flex-direction:column;white-space:nowrap;z-index:2;line-height:1.25;"
       + (onRight
         ? "left:calc(" + wp.cx + "% - " + (wp.circleR + LABEL_GAP) + "px);transform:translate(-100%,-50%);align-items:flex-end;text-align:right;"
-        : "left:calc(" + wp.cx + "% + " + (wp.circleR + LABEL_GAP) + "px);transform:translateY(-50%);align-items:flex-start;text-align:left;");
+        : "left:calc(" + wp.cx + "% + " + (wp.circleR + LABEL_GAP) + "px);transform:translateY(-50%);align-items:flex-start;text-align:left;")
+      + (wp.labelPill || "");
   });
   const pathHeight = TOP_PAD + n * ROW_H + BOTTOM_PAD;
 
@@ -214,8 +217,8 @@ export function buildJourney() {
       const t = (L - lower.rankLevel) / span;
       const pt = bezierAt(lower, upper, t);
       levelPips.push({
-        style: "position:absolute;left:" + pt.x + "%;top:" + pt.y + "px;transform:translate(-50%,-50%);width:" + PIP_D + "px;height:" + PIP_D + "px;border-radius:50%;z-index:1;background:"
-          + (level >= L ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)") + ";"
+        style: "position:absolute;left:" + pt.x + "%;top:" + pt.y + "px;transform:translate(-50%,-50%);width:" + PIP_D + "px;height:" + PIP_D + "px;border-radius:50%;z-index:1;background:var(--hero-text,#fff);"
+          + "opacity:" + (level >= L ? "0.7" : "0.3") + ";"
       });
     }
   }

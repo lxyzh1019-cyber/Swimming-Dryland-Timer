@@ -10,6 +10,11 @@ import { COPY, IMAGES, EMOJI } from "../sport.js";
 const RING_ZONE_COLOR = {
   work: "var(--aqua)", warmup: "var(--sun)", rest: "var(--mint)", evening: "var(--grape)"
 };
+/* The zone LABEL is words, so it takes the family's -ink shade (docs/DESIGN.md,
+   contrast rule 3); the bright colour stays on the arc, where it is a fill. */
+const RING_ZONE_INK = {
+  work: "var(--aqua-ink)", warmup: "var(--sun-ink)", rest: "var(--mint-ink)", evening: "var(--grape-ink)"
+};
 
 /* Recreation of the DS TimerRing: SVG track + progress arc, big Fredoka time. */
 function timerRing(vm, size, capVh) {
@@ -17,6 +22,7 @@ function timerRing(vm, size, capVh) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const color = vm.timerUrgent ? "var(--stop)" : (RING_ZONE_COLOR[vm.timerZoneType] || "var(--aqua)");
+  const labelInk = vm.timerUrgent ? "var(--stop-ink)" : (RING_ZONE_INK[vm.timerZoneType] || "var(--aqua-ink)");
   const offset = c * (1 - Math.max(0, Math.min(1, vm.timerProgress)));
   return `
   <div data-action="advance" title="Tap the ring when you're done" style="flex:0 1 ${size}px;max-width:${capVh ? `min(${size}px, ${capVh}vh)` : `${size}px`};min-width:${size >= 300 ? 200 : 140}px;aspect-ratio:1;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;${vm.timerUrgent ? "animation:pulse-ring 1s ease-in-out infinite;" : ""}">
@@ -26,9 +32,9 @@ function timerRing(vm, size, capVh) {
         stroke-dasharray="${c}" stroke-dashoffset="${offset}" style="transition:stroke-dashoffset 0.9s linear;"></circle>
     </svg>
     <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;">
-      <span style="font-size:${size >= 300 ? 13 : 11}px;font-weight:900;letter-spacing:0.12em;color:${color};text-align:center;">${vm.timerZone}${vm.timerSideWord ? ` · ${vm.timerSideWord}` : ""}</span>
+      <span style="font-size:13px;font-weight:900;letter-spacing:0.12em;color:${labelInk};text-align:center;">${vm.timerZone}${vm.timerSideWord ? ` · ${vm.timerSideWord}` : ""}</span>
       <span id="s-timer-text" style="font-family:var(--font-display);font-weight:600;font-size:${size >= 300 ? "clamp(44px, 6.5vw, 76px)" : "46px"};line-height:1;color:${vm.timerUrgent ? "var(--stop)" : "var(--ink)"};">${vm.timerDisplay}</span>
-      ${vm.timerIsPaused ? `<span style="font-size:12px;font-weight:900;color:var(--sun-ink);">PAUSED</span>` : ""}
+      ${vm.timerIsPaused ? `<span style="font-size:13px;font-weight:900;color:var(--sun-ink);">PAUSED</span>` : ""}
     </div>
   </div>`;
 }
@@ -37,10 +43,10 @@ function repRing(vm, size, capVh) {
   const border = size >= 300 ? 10 : 8;
   return `
   <div data-action="advance" title="Tap the ring when you're done" style="cursor:pointer;flex:0 1 ${size}px;max-width:${capVh ? `min(${size}px, ${capVh}vh)` : `${size}px`};min-width:${size >= 300 ? 220 : 160}px;aspect-ratio:1;border-radius:50%;background:var(--grape-wash);border:${border}px solid var(--grape);display:flex;flex-direction:column;align-items:center;justify-content:center;box-sizing:border-box;padding:${size >= 300 ? 26 : 14}px;">
-    <div style="font-weight:900;font-size:${size >= 300 ? 15 : 11}px;letter-spacing:0.1em;color:var(--grape-deep);">BY REPS</div>
-    <div style="font-family:var(--font-display);font-size:${(String(vm.curExDose || "").length > 6 ? (size >= 300 ? 26 : 20) : (size >= 300 ? 50 : 32))}px;font-weight:600;color:var(--grape);text-align:center;line-height:1.05;margin:${size >= 300 ? 8 : 4}px 0;">${vm.curExDose}</div>
-    ${vm.showClock ? `<div style="font-weight:900;font-size:${size >= 300 ? 20 : 14}px;color:var(--grape-deep);">⏱ <span id="s-timer-text">${vm.exActualDisplay}</span></div>` : ""}
-    <div style="font-size:12px;font-weight:800;color:var(--grape-deep);opacity:0.8;margin-top:6px;">${vm.explore ? "No clock here — tap Next when you've had a look" : "Tap the ring when you're done"}</div>
+    <div style="font-weight:900;font-size:${size >= 300 ? 15 : 13}px;letter-spacing:0.1em;color:var(--grape-ink);">BY REPS</div>
+    <div style="font-family:var(--font-display);font-size:${(String(vm.curExDose || "").length > 6 ? (size >= 300 ? 26 : 20) : (size >= 300 ? 50 : 32))}px;font-weight:600;color:var(--grape-ink);text-align:center;line-height:1.05;margin:${size >= 300 ? 8 : 4}px 0;">${vm.curExDose}</div>
+    ${vm.showClock ? `<div style="font-weight:900;font-size:${size >= 300 ? 20 : 14}px;color:var(--grape-ink);">⏱ <span id="s-timer-text">${vm.exActualDisplay}</span></div>` : ""}
+    <div style="font-size:13px;font-weight:800;color:var(--grape-ink);margin-top:6px;">${vm.explore ? "No clock here — tap Next when you've had a look" : "Tap the ring when you're done"}</div>
   </div>`;
 }
 
@@ -113,7 +119,7 @@ function badge(variant, label) {
     grape:["var(--grape-wash)", "var(--grape-ink)"]
   };
   const [bg, ink] = map[variant] || map.aqua;
-  return `<span style="display:inline-flex;align-items:center;background:${bg};color:${ink};border-radius:var(--radius-pill);padding:4px 12px;font-size:12px;font-weight:900;letter-spacing:0.04em;">${label}</span>`;
+  return `<span style="display:inline-flex;align-items:center;background:${bg};color:${ink};border-radius:var(--radius-pill);padding:4px 12px;font-size:13px;font-weight:900;letter-spacing:0.04em;">${label}</span>`;
 }
 
 /* Exercise photo slot — photos land at assets/exercises/<name> - Timer Image.png;
@@ -129,7 +135,7 @@ function photoSlot(photoUrl, w, h, radius, fill) {   // photoUrl: the list of so
   return `
   <div style="${box}border-radius:${radius}px;overflow:hidden;position:relative;background:linear-gradient(165deg,var(--aqua-wash),var(--bg-deep));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
     <span style="font-size:${Math.round(w / 6)}px;" aria-hidden="true">${EMOJI.sport}</span>
-    <span style="font-size:12px;font-weight:800;color:var(--aqua-ink);opacity:0.75;text-align:center;padding:0 14px;">Form photo coming soon</span>
+    <span style="font-size:13px;font-weight:800;color:var(--aqua-ink);opacity:0.75;text-align:center;padding:0 14px;">Form photo coming soon</span>
     ${imgWithFallbacks(photoUrl, `alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"`)}
   </div>`;
 }
@@ -422,10 +428,10 @@ function nameHeadline(vm, wide, tablet) {
   <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;flex-shrink:0;text-align:center;">
     <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;">
       ${badge(vm.blockBadgeVariant, vm.blockLabel)}
-      ${vm.roundShort ? `<span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:900;color:var(--ink-soft);background:var(--surface-2);border-radius:var(--radius-pill);padding:4px 11px;">${vm.roundShort}${(vm.roundDots || []).length ? `<span style="display:inline-flex;gap:4px;">${vm.roundDots.map(rd => `<span style="${rd.style}"></span>`).join("")}</span>` : ""}</span>` : ""}
+      ${vm.roundShort ? `<span style="display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:900;color:var(--ink-soft);background:var(--surface-2);border-radius:var(--radius-pill);padding:4px 11px;">${vm.roundShort}${(vm.roundDots || []).length ? `<span style="display:inline-flex;gap:4px;">${vm.roundDots.map(rd => `<span style="${rd.style}"></span>`).join("")}</span>` : ""}</span>` : ""}
     </div>
     ${vm.canOpenDetail ? `
-    <button type="button" data-action="openDetailCur" title="See instructions &amp; video" style="display:flex;align-items:center;justify-content:center;gap:10px;background:none;border:none;padding:2px 6px;margin:0;cursor:pointer;font-family:inherit;min-height:44px;max-width:100%;">
+    <button type="button" data-action="openDetailCur" title="See instructions &amp; video" style="display:flex;align-items:center;justify-content:center;gap:10px;background:none;border:none;padding:2px 6px;margin:0;cursor:pointer;font-family:inherit;min-height:56px;max-width:100%;">
       ${title}
       <span aria-hidden="true" style="flex-shrink:0;width:30px;height:30px;border-radius:50%;background:var(--surface-2);color:var(--ink-soft);font-size:17px;font-weight:900;display:flex;align-items:center;justify-content:center;">ⓘ</span>
     </button>` : `<div style="max-width:100%;">${title}</div>`}
@@ -450,20 +456,20 @@ function coachStrip(vm, wide) {
     <div style="display:flex;align-items:stretch;gap:8px;">
       ${vm.curExCue ? `
       <div style="flex:1;min-width:0;background:var(--aqua-wash);border-radius:var(--radius-md);padding:10px 14px;box-sizing:border-box;">
-        <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--aqua-ink);margin-bottom:3px;">Coach tip</div>
+        <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--aqua-ink);margin-bottom:3px;">Coach tip</div>
         <div style="font-size:17px;font-weight:700;color:var(--ink);line-height:1.35;">${vm.curExCue}</div>
       </div>` : `<div style="flex:1;"></div>`}
       ${hasWarn ? `
       <button type="button" data-action="toggleWatch" aria-expanded="${open}" aria-controls="s-watch"
         title="${open ? "Hide what to watch for" : "What to watch for"}"
-        style="flex-shrink:0;width:52px;min-height:52px;border-radius:var(--radius-md);border:2px solid var(--sun);background:${open ? "var(--sun)" : "var(--sun-wash)"};color:var(--sun-ink);font-size:24px;font-weight:900;line-height:1;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;">
+        style="flex-shrink:0;width:56px;min-height:56px;border-radius:var(--radius-md);border:2px solid var(--sun);background:${open ? "var(--sun)" : "var(--sun-wash)"};color:var(--sun-ink);font-size:24px;font-weight:900;line-height:1;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;">
         <span aria-hidden="true">${open ? "×" : "❗"}</span>
         <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">What to watch for</span>
       </button>` : ""}
     </div>
     ${open ? `
     <div id="s-watch" style="background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-md);padding:12px 14px;box-sizing:border-box;text-align:left;">
-      <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sun-ink);margin-bottom:4px;">👀 Watch for</div>
+      <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sun-ink);margin-bottom:4px;">👀 Watch for</div>
       <div style="font-size:16px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.curExWatchFor}</div>
       ${vm.curExFix ? `<div style="font-size:15px;color:var(--ink-soft);line-height:1.4;margin-top:5px;">🔧 ${vm.curExFix}</div>` : ""}
     </div>` : ""}
@@ -476,7 +482,7 @@ function coachStrip(vm, wide) {
    photo empty. With no photo (a phone, an upright iPad) it goes back under
    the clock, because there is no other column to put it in. */
 function upNext(vm, wide) {
-  const label = wide ? 15 : 12;
+  const label = wide ? 15 : 13;
   return `
   <div style="width:100%;flex-shrink:0;display:flex;align-items:baseline;justify-content:center;gap:${wide ? 14 : 8}px;flex-wrap:wrap;text-align:center;${wide ? "border-top:1.5px solid var(--hairline);padding-top:10px;" : ""}">
     <span style="font-size:${label}px;font-weight:900;color:var(--aqua-ink);text-transform:uppercase;letter-spacing:0.08em;">Up next</span>
@@ -540,8 +546,8 @@ function centerStack(vm, wide, tablet) {
   ${vm.showCoachState ? `
   <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;width:100%;max-width:480px;flex-shrink:0;">
     ${[vm.coachSetLine, vm.coachSideLine, vm.coachDirectionLine, vm.coachRepLine].filter(Boolean).map(t =>
-      `<span style="font-size:11px;font-weight:900;letter-spacing:0.06em;border-radius:var(--radius-pill);padding:4px 11px;background:var(--surface-2);color:var(--ink-soft);white-space:nowrap;">${t}</span>`).join("")}
-    ${vm.coachNextLine ? `<span style="font-size:11px;font-weight:900;letter-spacing:0.06em;border-radius:var(--radius-pill);padding:4px 11px;background:var(--sun-wash);color:var(--sun-ink);white-space:nowrap;">${vm.coachNextLine}</span>` : ""}
+      `<span style="font-size:13px;font-weight:900;letter-spacing:0.06em;border-radius:var(--radius-pill);padding:4px 11px;background:var(--surface-2);color:var(--ink-soft);white-space:nowrap;">${t}</span>`).join("")}
+    ${vm.coachNextLine ? `<span style="font-size:13px;font-weight:900;letter-spacing:0.06em;border-radius:var(--radius-pill);padding:4px 11px;background:var(--sun-wash);color:var(--sun-ink);white-space:nowrap;">${vm.coachNextLine}</span>` : ""}
   </div>` : ""}
 
   ${vm.showCleanCheck ? `
@@ -566,16 +572,16 @@ function painRule(wide) {
 }
 
 function controls(vm, wide) {
-  const rowBtn = (action, label, extra) => `<button type="button" data-action="${action}" style="flex:1;min-height:${wide ? 44 : 46}px;border-radius:var(--radius-md);font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;font-family:inherit;${extra}">${label}</button>`;
+  const rowBtn = (action, label, extra, minH = 56) => `<button type="button" data-action="${action}" style="flex:1;min-height:${minH}px;border-radius:var(--radius-md);font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;font-family:inherit;${extra}">${label}</button>`;
   const backBtn = vm.canGoBack
-    ? rowBtn("goBack", "◀ Back a move", "border:2px solid var(--hairline);background:var(--surface);color:var(--ink-soft);")
+    ? rowBtn("goBack", "◀ Back a move", "border:2px solid var(--hairline);background:var(--surface);color:var(--ink-soft);", 48)
     : "";
 
   /* EXPLORE: Next, Back, Skip, Done looking. Nothing here pauses, stops or
      needs confirming, because nothing here is running or being saved. */
   if (vm.explore) {
     return `
-  <button type="button" data-action="advance" style="width:100%;min-height:${wide ? 44 : 50}px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--mint);color:#fff;box-shadow:0 4px 0 var(--mint-deep);font-family:inherit;">${vm.doneLabel}</button>
+  <button type="button" data-action="advance" style="width:100%;min-height:64px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--mint);color:var(--text-on-mint,#fff);box-shadow:0 4px 0 var(--mint-deep);font-family:inherit;">${vm.doneLabel}</button>
   <div style="display:flex;gap:${wide ? 14 : 8}px;">
     ${backBtn}
     ${rowBtn("skipEx", "⏭ Skip", "border:2px solid var(--hairline);background:var(--surface);color:var(--ink-soft);")}
@@ -588,26 +594,26 @@ function controls(vm, wide) {
   <div style="background:var(--sun-wash);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:8px;font-size:13px;font-weight:800;color:var(--sun-ink);line-height:1.4;text-align:center;">
     ⏸ You left the app, so I stopped the clock. Nothing was counted while you were away — tap Resume when you're ready.
   </div>` : ""}
-  <button type="button" data-action="advance" style="width:100%;min-height:${wide ? 48 : 52}px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--mint);color:#fff;box-shadow:0 4px 0 var(--mint-deep);font-family:inherit;">${vm.doneLabel}</button>
+  <button type="button" data-action="advance" style="width:100%;min-height:64px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--mint);color:var(--text-on-mint,#fff);box-shadow:0 4px 0 var(--mint-deep);font-family:inherit;">${vm.doneLabel}</button>
   <div style="display:flex;gap:${wide ? 14 : 8}px;">
-    <button type="button" data-action="stopNow" style="flex:1;min-height:${wide ? 44 : 46}px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--stop);color:#fff;box-shadow:0 3px 0 var(--stop-ink);font-family:inherit;">🔴 STOP</button>
+    <button type="button" data-action="stopNow" style="flex:1;min-height:56px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--btn-stop-bg,var(--stop));color:#fff;box-shadow:0 3px 0 var(--btn-stop-edge,var(--stop-ink));font-family:inherit;">🔴 STOP</button>
     ${vm.timerNotPaused
-      ? `<button type="button" data-action="pauseTimer" style="flex:1;min-height:${wide ? 44 : 46}px;border-radius:var(--radius-md);border:2px solid var(--sun-deep);font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--sun-wash);color:var(--sun-ink);font-family:inherit;">❚❚ Pause</button>`
-      : `<button type="button" data-action="pauseTimer" style="flex:1;min-height:${wide ? 44 : 46}px;border-radius:var(--radius-md);border:2px solid var(--mint-deep);font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--mint-wash);color:var(--mint-ink);font-family:inherit;">▶ Resume</button>`}
+      ? `<button type="button" data-action="pauseTimer" style="flex:1;min-height:56px;border-radius:var(--radius-md);border:2px solid var(--sun-deep);font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--sun-wash);color:var(--sun-ink);font-family:inherit;">❚❚ Pause</button>`
+      : `<button type="button" data-action="pauseTimer" style="flex:1;min-height:56px;border-radius:var(--radius-md);border:2px solid var(--mint-deep);font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--mint-wash);color:var(--mint-ink);font-family:inherit;">▶ Resume</button>`}
     ${vm.canSkipExercise
-      ? `<button type="button" data-action="askSkip" style="flex:1;min-height:${wide ? 44 : 46}px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:${wide ? 14 : 12}px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">⏭ Skip${wide ? " this move" : ""}</button>`
+      ? `<button type="button" data-action="askSkip" style="flex:1;min-height:56px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">⏭ Skip${wide ? " this move" : ""}</button>`
       : ""}
   </div>
   ${vm.confirmSkip ? `
   <div style="display:flex;${wide ? "align-items:center;gap:12px;" : "flex-direction:column;gap:8px;"}background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-md);padding:10px 14px;box-sizing:border-box;">
     <span style="${wide ? "flex:1;" : ""}font-weight:800;font-size:${wide ? 15 : 14}px;color:var(--sun-ink);">Skip this move? It won&#39;t count.</span>
     <div style="display:flex;gap:8px;flex-shrink:0;">
-      <button type="button" data-action="cancelSkip" style="${wide ? "" : "flex:1;"}min-height:44px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;padding:0 18px;background:var(--mint);color:#fff;box-shadow:0 3px 0 var(--mint-deep);font-family:inherit;">Keep going</button>
-      <button type="button" data-action="confirmSkipEx" style="${wide ? "" : "flex:1;"}min-height:44px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:${wide ? 14 : 13}px;cursor:pointer;padding:0 16px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">⏭ Skip it</button>
+      <button type="button" data-action="cancelSkip" style="${wide ? "" : "flex:1;"}min-height:56px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:17px;cursor:pointer;padding:0 18px;background:var(--mint);color:var(--text-on-mint,#fff);box-shadow:0 3px 0 var(--mint-deep);font-family:inherit;">Keep going</button>
+      <button type="button" data-action="confirmSkipEx" style="${wide ? "" : "flex:1;"}min-height:56px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:17px;cursor:pointer;padding:0 16px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">⏭ Skip it</button>
     </div>
   </div>` : ""}
   <div style="display:flex;align-items:center;gap:${wide ? 12 : 8}px;border-top:1.5px solid var(--hairline);padding-top:10px;${wide ? "" : "flex-direction:column;"}">
-    ${vm.canGoBack ? `<button type="button" data-action="goBack" style="flex:0 0 auto;min-height:44px;border-radius:var(--radius-pill);border:none;font-weight:900;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 16px;background:transparent;color:var(--ink-faint);font-family:inherit;">◀ Back a move</button>` : ""}
+    ${vm.canGoBack ? `<button type="button" data-action="goBack" style="flex:0 0 auto;min-height:48px;border-radius:var(--radius-pill);border:none;font-weight:900;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 16px;background:transparent;color:var(--ink-soft);font-family:inherit;">◀ Back a move</button>` : ""}
     ${painRule(wide)}
   </div>`;
 }
@@ -619,30 +625,30 @@ function exList(vm, wide, tablet) {
      flex:1 column so the note WRAPS inside the rail rather than widening it,
      and every other row renders exactly as it did. */
   const iconSize = tablet ? 24 : wide ? 26 : 24;
-  /* The number and the name are a BUTTON where the list is navigable — which
-     is explore only, where nothing is recorded and walking in order is not the
-     point. The number is the status pill, so the tap target is the thing she is
-     already reading. The ⓘ stays a sibling: a button cannot hold a button. */
-  const jumpOpen = "flex:1;min-width:0;display:flex;align-items:center;gap:9px;background:none;border:none;padding:0;margin:0;cursor:pointer;font-family:inherit;text-align:left;min-height:44px;";
+  /* THE WHOLE ROW IS ONE 56px BUTTON. It opens the move's detail (photo,
+     video, tips) — the ⓘ at its end is only a picture of that, because a 26px
+     circle was the only thing on the row you could tap. In explore a row she is
+     not standing on keeps its old job instead: the list is explore's navigation,
+     so tapping a move jumps to it (and the ⓘ under the move's name opens its
+     detail from there). A button cannot hold a button, so it is one or the other. */
+  const rowOpen = "width:100%;min-height:56px;border:none;background:none;color:inherit;text-align:left;font-family:inherit;cursor:pointer;";
   const legend = vm.exListLegend ? `
-    <div style="font-size:${wide ? 12 : 11}px;font-weight:800;color:var(--ink-faint);line-height:1.35;padding:${wide ? "2px 0 6px" : "2px 0 5px"};">${vm.exListLegend}</div>` : "";
+    <div style="font-size:13px;font-weight:800;color:var(--ink-soft);line-height:1.35;padding:${wide ? "2px 0 6px" : "2px 0 5px"};">${vm.exListLegend}</div>` : "";
   return legend + vm.sessionExList.map(sitem => sitem.isHeader ? `
     <div style="display:flex;align-items:center;gap:8px;padding:${wide ? "12px 0 4px" : "10px 0 4px"};">
       <span style="width:${wide ? 10 : 9}px;height:${wide ? 10 : 9}px;border-radius:50%;background:${sitem.color};flex-shrink:0;"></span>
-      <span style="font-weight:900;font-size:12px;letter-spacing:0.05em;text-transform:uppercase;color:${sitem.color};">${sitem.name}</span>
+      <span style="font-weight:900;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;color:${sitem.color};">${sitem.name}</span>
       ${(sitem.roundDots || []).length ? `<div style="display:flex;gap:4px;margin-left:auto;">${sitem.roundDots.map(rd => `<span style="${rd.style}"></span>`).join("")}</div>` : ""}
     </div>` : `
-    <div ${sitem.isCur ? 'data-ex-cur="1" ' : ""}style="${sitem.cardStyle}">
-      ${sitem.jumpAction ? `<button type="button" data-action="goToMove" data-arg="${sitem.ci}|${sitem.ei}" title="Jump to this move" style="${jumpOpen}">` : ""}
+    <button type="button" data-action="${sitem.jumpAction ? "goToMove" : "openDetailAt"}" data-arg="${sitem.ci}|${sitem.ei}" title="${sitem.jumpAction ? "Jump to this move" : "See detail photo &amp; video"}" ${sitem.isCur ? 'data-ex-cur="1" ' : ""}style="${rowOpen}${sitem.cardStyle}">
       <span style="${sitem.numStyle}">${sitem.num}</span>
       ${sitem.statusNote ? `<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;">
         <span style="${sitem.nameStyle}font-size:${nameSize}px;">${sitem.name}</span>
-        <span style="font-size:${wide ? 12 : 11}px;font-weight:700;color:var(--ink-soft);line-height:1.3;overflow-wrap:anywhere;">${escapeHtml(sitem.statusNote)}</span>
+        <span style="font-size:13px;font-weight:700;color:var(--ink-soft);line-height:1.3;overflow-wrap:anywhere;">${escapeHtml(sitem.statusNote)}</span>
       </span>` : `<span style="${sitem.nameStyle}font-size:${nameSize}px;">${sitem.name}</span>`}
-      ${sitem.jumpAction ? "</button>" : ""}
-      <button type="button" data-action="openDetailAt" data-arg="${sitem.ci}|${sitem.ei}" title="See detail photo &amp; video" style="flex-shrink:0;width:${iconSize}px;height:${iconSize}px;border-radius:50%;border:none;background:var(--surface-2);color:var(--ink-soft);font-size:${tablet ? 13 : wide ? 14 : 13}px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;">ⓘ</button>
+      <span aria-hidden="true" style="flex-shrink:0;width:${iconSize}px;height:${iconSize}px;border-radius:50%;background:var(--surface-2);color:var(--ink-soft);font-size:${tablet ? 13 : wide ? 14 : 13}px;font-weight:900;display:flex;align-items:center;justify-content:center;">ⓘ</span>
       <span style="font-size:${nameSize}px;flex-shrink:0;width:${wide ? 18 : 16}px;text-align:center;color:${sitem.secColor};">${sitem.statusIcon}</span>
-    </div>`).join("");
+    </button>`).join("");
 }
 
 /* What is LEFT for the rail once the cue, the warning and the pain rule have
@@ -663,7 +669,7 @@ function tipsSafety(vm) {
 function railToggle(collapsed) {
   return `<button type="button" data-action="toggleRail"
     aria-expanded="${!collapsed}" title="${collapsed ? "Show today’s moves" : "Hide this panel"}"
-    style="flex-shrink:0;width:32px;height:32px;border-radius:50%;border:1.5px solid var(--hairline);background:var(--surface);color:var(--ink-soft);font-size:14px;font-weight:900;line-height:1;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;padding:0;">
+    style="flex-shrink:0;width:48px;height:48px;border-radius:50%;border:1.5px solid var(--hairline);background:var(--surface);color:var(--ink-soft);font-size:14px;font-weight:900;line-height:1;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;padding:0;">
     <span aria-hidden="true">${collapsed ? "›" : "‹"}</span>
     <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">${collapsed ? "Show today’s moves" : "Hide today’s moves"}</span>
   </button>`;
@@ -683,7 +689,7 @@ export function sessionScreen(vm) {
   }
 
   const banner = vm.exploreBanner ? `
-    <div role="status" style="background:var(--grape,#7C5BC7);color:#fff;padding:10px 18px;display:flex;align-items:center;justify-content:center;gap:9px;font-weight:900;font-size:${vm.isWide ? 14 : 12}px;letter-spacing:0.02em;text-align:center;line-height:1.35;flex-shrink:0;">${vm.exploreBanner}</div>` : "";
+    <div role="status" style="background:var(--grape,#7C5BC7);color:#fff;padding:10px 18px;display:flex;align-items:center;justify-content:center;gap:9px;font-weight:900;font-size:${vm.isWide ? 14 : 13}px;letter-spacing:0.02em;text-align:center;line-height:1.35;flex-shrink:0;">${vm.exploreBanner}</div>` : "";
 
   if (vm.isWide) {
     /* An iPad held upright is wide enough for two columns and NOT wide enough
@@ -702,15 +708,15 @@ export function sessionScreen(vm) {
       ${vm.railOpen ? "" : `
       <div style="width:46px;flex-shrink:0;background:var(--surface-2);border-right:1.5px solid var(--hairline);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:12px;">
         ${railToggle(true)}
-        <span style="writing-mode:vertical-rl;font-size:11px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint);">${vm.progressLabel}</span>
+        <span style="writing-mode:vertical-rl;font-size:13px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint);">${vm.progressLabel}</span>
       </div>`}
       <div style="width:${railW};flex-shrink:0;overflow-y:auto;padding:18px 16px;background:var(--surface-2);border-right:1.5px solid var(--hairline);box-sizing:border-box;display:${vm.railOpen ? "flex" : "none"};flex-direction:column;gap:14px;">
         <div>
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
-            <span style="font-weight:900;font-size:12px;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;">${vm.sessionDayTitle}${vm.explore ? " · Explore" : ` · <span id="s-elapsed">${vm.elapsedDisplay}</span>`}</span>
+            <span style="font-weight:900;font-size:13px;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;">${vm.sessionDayTitle}${vm.explore ? " · Explore" : ` · <span id="s-elapsed">${vm.elapsedDisplay}</span>`}</span>
             ${railToggle(false)}
           </div>
-          <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:900;color:var(--ink-soft);margin-bottom:4px;"><span>MOVES</span><span>${vm.progressLabel}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:900;color:var(--ink-soft);margin-bottom:4px;"><span>MOVES</span><span>${vm.progressLabel}</span></div>
           <div style="height:8px;background:var(--surface);border:1px solid var(--hairline);border-radius:8px;overflow:hidden;">
             <div style="width:${Math.round(vm.progressValue / vm.progressMax * 100)}%;height:100%;background:var(--mint);border-radius:8px;"></div>
           </div>
@@ -719,8 +725,8 @@ export function sessionScreen(vm) {
         ${vm.showClock ? `
         <div style="flex-shrink:0;background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-lg);padding:12px 14px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;box-sizing:border-box;">
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
-            <span style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);">Session time</span>
-            <span style="font-weight:900;font-size:14px;color:var(--aqua-ink);"><span id="s-elapsed2">${vm.elapsedDisplay}</span> <span style="color:var(--ink-faint);font-weight:700;">/ ~${vm.sessionPlannedDisplay} · estimate</span></span>
+            <span style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);">Session time</span>
+            <span style="font-weight:900;font-size:14px;color:var(--aqua-ink);"><span id="s-elapsed2">${vm.elapsedDisplay}</span> <span style="color:var(--ink-soft);font-weight:700;font-size:13px;">/ ~${vm.sessionPlannedDisplay} · estimate</span></span>
           </div>
           <div style="height:8px;background:var(--surface-2);border-radius:8px;overflow:hidden;">
             <div id="s-sess-fill" style="width:${vm.sessionTimePct}%;height:100%;background:var(--aqua);border-radius:8px;transition:width 0.4s;"></div>
@@ -728,7 +734,7 @@ export function sessionScreen(vm) {
         </div>` : ""}
 
         <div style="flex:1 1 auto;min-height:220px;display:flex;flex-direction:column;background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-lg);box-shadow:var(--shadow-soft);box-sizing:border-box;padding:14px 16px;">
-          <div style="font-weight:900;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;flex-shrink:0;">Today's moves</div>
+          <div style="font-weight:900;font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;flex-shrink:0;">Today's moves</div>
           <div data-ex-list style="flex:1;min-height:0;overflow-y:auto;">${exList(vm, true, tablet)}</div>
         </div>
 
@@ -755,7 +761,7 @@ export function sessionScreen(vm) {
     <div style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;box-sizing:border-box;">
       <div style="padding:14px 16px 0;flex-shrink:0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-          <span style="font-weight:900;font-size:12px;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;">${vm.sessionDayTitle}${vm.explore ? ` · ${vm.progressLabel}` : ` · <span id="s-elapsed">${vm.elapsedDisplay}</span> / ~${vm.sessionPlannedDisplay} · estimate`}</span>
+          <span style="font-weight:900;font-size:13px;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;">${vm.sessionDayTitle}${vm.explore ? ` · ${vm.progressLabel}` : ` · <span id="s-elapsed">${vm.elapsedDisplay}</span> / ~${vm.sessionPlannedDisplay} · estimate`}</span>
         </div>
         <div style="height:8px;background:var(--surface-2);border-radius:8px;overflow:hidden;">
           <div id="s-sess-fill" style="width:${vm.explore ? Math.round(vm.progressValue / vm.progressMax * 100) : vm.sessionTimePct}%;height:100%;background:var(--aqua);border-radius:8px;"></div>
@@ -773,7 +779,7 @@ export function sessionScreen(vm) {
       <div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:10px;">
         ${tipsSafety(vm)}
         <div class="list-wrap" style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-lg);padding:12px 14px;--fade-to:var(--surface);">
-          <div style="font-weight:900;font-size:11px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;">Today's moves</div>
+          <div style="font-weight:900;font-size:13px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;">Today's moves</div>
           <div data-list data-ex-list style="max-height:46vh;">${exList(vm, false, false)}</div>
         </div>
       </div>

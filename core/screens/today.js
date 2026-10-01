@@ -61,11 +61,10 @@ function journeySvgBg(idSuffix) {
   <svg viewBox="0 0 400 1200" preserveAspectRatio="none" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;">
     <defs>
       <linearGradient id="mapGrad${idSuffix}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" style="stop-color:#0E4A73"></stop>
-        <stop offset="28%" style="stop-color:#1B7FAD"></stop>
-        <stop offset="56%" style="stop-color:#4FC3D9"></stop>
-        <stop offset="80%" style="stop-color:#CDEDE7"></stop>
-        <stop offset="100%" style="stop-color:#F2D9A6"></stop>
+        <stop offset="0%" style="stop-color:var(--hero-from,#0E4A73)"></stop>
+        <stop offset="28%" style="stop-color:var(--hero-to,#1B7FAD)"></stop>
+        <stop offset="56%" style="stop-color:var(--journey-via,#4FC3D9)"></stop>
+        <stop offset="100%" style="stop-color:var(--journey-to,#F2D9A6)"></stop>
       </linearGradient>
       <filter id="mapGrain${idSuffix}" x="-20%" y="-20%" width="140%" height="140%">
         <feTurbulence type="fractalNoise" baseFrequency="0.012 0.9" numOctaves="2" seed="11" result="n"></feTurbulence>
@@ -77,10 +76,10 @@ function journeySvgBg(idSuffix) {
     </defs>
     <rect x="0" y="0" width="400" height="1200" fill="url(#mapGrad${idSuffix})"></rect>
     <g filter="url(#mapBlur${idSuffix})" opacity="0.55">
-      <ellipse cx="90" cy="170" rx="150" ry="110"  fill="#0A3E63"></ellipse>
-      <ellipse cx="330" cy="430" rx="160" ry="120" fill="#2E9BC0"></ellipse>
-      <ellipse cx="110" cy="700" rx="170" ry="130" fill="#78CFC6"></ellipse>
-      <ellipse cx="300" cy="990" rx="160" ry="120" fill="#E9C88E"></ellipse>
+      <ellipse cx="90" cy="170" rx="150" ry="110"  style="fill:var(--hero-from,#0A3E63)"></ellipse>
+      <ellipse cx="330" cy="430" rx="160" ry="120" style="fill:var(--hero-to,#2E9BC0)"></ellipse>
+      <ellipse cx="110" cy="700" rx="170" ry="130" style="fill:var(--journey-via,#78CFC6)"></ellipse>
+      <ellipse cx="300" cy="990" rx="160" ry="120" style="fill:var(--journey-to,#E9C88E)"></ellipse>
     </g>
     <rect x="0" y="0" width="400" height="1200" fill="#ffffff" filter="url(#mapGrain${idSuffix})"></rect>
   </svg>`;
@@ -89,7 +88,7 @@ function journeySvgBg(idSuffix) {
 function journeyRail(j, headerOffset) {
   return `
   <div data-journey-rail="1" style="position:relative;z-index:2;height:calc(100% - ${headerOffset}px);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.4) transparent;">
-    <div style="text-align:center;font-size:11px;font-weight:900;color:rgba(255,255,255,0.75);letter-spacing:0.08em;padding:8px 0 4px;text-shadow:0 1px 4px rgba(10,30,40,0.6);">${COPY.journeyMore}</div>
+    <div style="text-align:center;font-size:13px;font-weight:900;color:var(--hero-text,#fff);letter-spacing:0.08em;padding:8px 0 4px;">${COPY.journeyMore}</div>
     <div style="position:relative;height:${j.pathHeight}px;">
       ${j.habitats.map(hb => `<div style="${hb.style}"></div>`).join("")}
       <svg viewBox="0 0 100 ${j.pathHeight}" preserveAspectRatio="none" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;z-index:1;">
@@ -114,11 +113,11 @@ function journeyRail(j, headerOffset) {
 function journeyMapWide(vm) {
   const j = vm.journey;
   return `
-  <div id="journey-map-card" data-action="nav" data-arg="progress" style="flex:1;min-height:420px;position:relative;border-radius:26px;overflow:hidden;cursor:pointer;box-shadow:var(--shadow-lift);background:#1B7FAD;transition:transform 0.2s var(--ease-out,ease),box-shadow 0.2s var(--ease-out,ease);">
+  <div id="journey-map-card" data-action="nav" data-arg="progress" style="flex:1;min-height:420px;position:relative;border-radius:26px;overflow:hidden;cursor:pointer;box-shadow:var(--shadow-lift);background:var(--hero-to,#1B7FAD);transition:transform 0.2s var(--ease-out,ease),box-shadow 0.2s var(--ease-out,ease);">
     ${journeySvgBg("W")}
-    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,62,99,0.55) 0%,rgba(10,62,99,0.15) 32%,transparent 55%);pointer-events:none;"></div>
-    <div style="position:relative;z-index:2;padding:18px 22px 10px;color:#fff;">
-      <div style="font-size:12px;font-weight:900;letter-spacing:0.08em;opacity:0.9;">${j.chapter}</div>
+    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.12) 0%,rgba(0,0,0,0.04) 32%,transparent 55%);pointer-events:none;"></div>
+    <div style="position:relative;z-index:2;padding:18px 22px 10px;color:var(--hero-text,#fff);">
+      <div style="font-size:13px;font-weight:900;letter-spacing:0.08em;opacity:0.9;">${j.chapter}</div>
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;line-height:1.2;margin:4px 0 8px;">LVL ${j.level} · ${j.rankName}${j.atSummit ? " — top of the ladder 🏔️" : ` — ${j.xpToNextRank} XP to ${j.nextRankName}`}</div>
       <div style="height:9px;background:rgba(255,255,255,0.28);border-radius:9px;overflow:hidden;">
         <div style="width:${j.levelPct}%;height:100%;background:#fff;border-radius:9px;"></div>
@@ -131,13 +130,13 @@ function journeyMapWide(vm) {
 function journeyMapNarrow(vm) {
   const j = vm.journey;
   return `
-  <div id="journey-map-card" data-action="nav" data-arg="progress" style="height:420px;flex-shrink:0;position:relative;border-radius:24px;overflow:hidden;cursor:pointer;box-shadow:var(--shadow-lift);background:#1B7FAD;">
+  <div id="journey-map-card" data-action="nav" data-arg="progress" style="height:420px;flex-shrink:0;position:relative;border-radius:24px;overflow:hidden;cursor:pointer;box-shadow:var(--shadow-lift);background:var(--hero-to,#1B7FAD);">
     ${journeySvgBg("N")}
-    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,62,99,0.55) 0%,rgba(10,62,99,0.15) 32%,transparent 55%);pointer-events:none;"></div>
-    <div style="position:relative;z-index:2;padding:16px 18px 8px;color:#fff;">
-      <div style="font-size:11px;font-weight:900;letter-spacing:0.08em;opacity:0.9;">${j.chapter}</div>
+    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.12) 0%,rgba(0,0,0,0.04) 32%,transparent 55%);pointer-events:none;"></div>
+    <div style="position:relative;z-index:2;padding:16px 18px 8px;color:var(--hero-text,#fff);">
+      <div style="font-size:13px;font-weight:900;letter-spacing:0.08em;opacity:0.9;">${j.chapter}</div>
       <div style="font-family:var(--font-display);font-weight:600;font-size:17px;line-height:1.2;margin:4px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">LVL ${j.level} · ${j.rankName}</div>
-      <div style="font-size:12px;font-weight:800;opacity:0.9;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${j.atSummit ? COPY.summit : `${j.xpToNextRank} XP to ${j.nextRankName}`}</div>
+      <div style="font-size:13px;font-weight:800;opacity:0.9;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${j.atSummit ? COPY.summit : `${j.xpToNextRank} XP to ${j.nextRankName}`}</div>
       <div style="height:8px;background:rgba(255,255,255,0.28);border-radius:9px;overflow:hidden;">
         <div style="width:${j.levelPct}%;height:100%;background:#fff;border-radius:9px;"></div>
       </div>
