@@ -19,7 +19,7 @@ import { settings, loadSessions, loadJourney, levelFromXp } from "../store.js";
    could read done, partly done, +450 and 🔥0 on one screen. Nothing here may
    re-derive completion, rounds, minutes, XP or the streak from a session row. */
 import { dayRecords, scheduleStreak, STREAK_WORK_FRACTION, moveReviewLegend } from "../outcome.js";
-import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, todayISODate, plural } from "../util.js";
+import { edmontonDayKey, edmontonWeekDates, edmontonWeekISODates, todayISODate, plural, kidButton } from "../util.js";
 import { assembleCircuits, estimateSessionSecs, planResume, dayPlanState } from "../engine.js";
 
 /* Whole-plan stats for a day card.
@@ -146,22 +146,26 @@ export function buildJourney() {
   if (nextRank) { for (let L = level + 1; L < nextRank.level; L++) xpToNextRank += levelCost(L); }
   const doneRanks = ladder.slice(0, curIdx);
 
+  const JOURNEY_LABEL_CHIP = "background:var(--hero-chip,transparent);border-radius:999px;padding:2px 9px;";
   const waypoints = [];
   if (nextRank) {
     waypoints.push({
       stateAttr: "next", rankLevel: nextRank.level, habitat: nextRank.habitat, name: nextRank.name,
       caption: fmtXp(xpToNextRank) + " XP →",
       showIcon: true, showCheck: false, showAvatar: false, icon: nextRank.icon, circleR: 22,
-      circleStyle: "width:44px;height:44px;border-radius:50%;border:2px dashed rgba(255,255,255,0.65);display:flex;align-items:center;justify-content:center;font-size:18px;opacity:0.8;background:rgba(20,59,74,0.2);",
-      nameStyle: "font-family:var(--font-display);font-weight:600;font-size:15px;color:var(--hero-text,#fff);",
-      captionStyle: "font-size:13px;font-weight:800;color:var(--hero-text,#fff);"
+      circleStyle: "width:44px;height:44px;border-radius:50%;border:2px dashed rgba(255,255,255,0.65);display:flex;align-items:center;justify-content:center;font-size:18px;opacity:0.8;background:color-mix(in srgb, var(--ink) 20%, transparent);",
+      nameStyle: "font-family:var(--font-display);font-weight:600;font-size:15px;color:var(--journey-text,#fff);",
+      captionStyle: "font-size:13px;font-weight:800;color:var(--journey-text,#fff);",
+      // Small words on the map sit on the hero-chip (R5), so they read on every
+      // part of the journey gradient.
+      labelPill: JOURNEY_LABEL_CHIP
     });
   }
   waypoints.push({
     stateAttr: "current", rankLevel: currentRank.level, habitat: currentRank.habitat, name: currentRank.name,
     caption: "YOU ARE HERE",
     showIcon: false, showCheck: false, showAvatar: true, icon: currentRank.icon, circleR: 30,
-    circleStyle: "width:60px;height:60px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 5px rgba(255,255,255,0.25),0 4px 10px rgba(10,30,40,0.35);overflow:hidden;animation:mapPulse 2.6s ease-in-out infinite;background:var(--aqua-deep);",
+    circleStyle: "width:60px;height:60px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 5px rgba(255,255,255,0.25),var(--shadow-lift);overflow:hidden;animation:mapPulse 2.6s ease-in-out infinite;background:var(--aqua-deep);",
     nameStyle: "font-family:var(--font-display);font-weight:600;font-size:18px;color:var(--ink);",
     captionStyle: "font-size:13px;font-weight:900;letter-spacing:0.07em;color:var(--aqua-ink);",
     // "You are here" sits on a white pill, so it reads on any part of the map.
@@ -171,9 +175,10 @@ export function buildJourney() {
     waypoints.push({
       stateAttr: "done", rankLevel: r.level, habitat: r.habitat, name: r.name, caption: "",
       showIcon: false, showCheck: true, showAvatar: false, icon: r.icon, circleR: 16,
-      circleStyle: "width:32px;height:32px;border-radius:50%;background:var(--mint);color:var(--ink);border:2px solid rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:900;box-shadow:0 2px 6px rgba(10,30,40,0.3);",
-      nameStyle: "font-family:var(--font-display);font-weight:600;font-size:13px;color:var(--hero-text,#fff);",
-      captionStyle: ""
+      circleStyle: "width:32px;height:32px;border-radius:50%;background:var(--mint);color:var(--ink);border:2px solid rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:900;box-shadow:var(--shadow-soft);",
+      nameStyle: "font-family:var(--font-display);font-weight:600;font-size:13px;color:var(--journey-text,#fff);",
+      captionStyle: "",
+      labelPill: JOURNEY_LABEL_CHIP
     });
   });
 
@@ -217,7 +222,7 @@ export function buildJourney() {
       const t = (L - lower.rankLevel) / span;
       const pt = bezierAt(lower, upper, t);
       levelPips.push({
-        style: "position:absolute;left:" + pt.x + "%;top:" + pt.y + "px;transform:translate(-50%,-50%);width:" + PIP_D + "px;height:" + PIP_D + "px;border-radius:50%;z-index:1;background:var(--hero-text,#fff);"
+        style: "position:absolute;left:" + pt.x + "%;top:" + pt.y + "px;transform:translate(-50%,-50%);width:" + PIP_D + "px;height:" + PIP_D + "px;border-radius:50%;z-index:1;background:var(--journey-text,#fff);"
           + "opacity:" + (level >= L ? "0.7" : "0.3") + ";"
       });
     }
@@ -361,7 +366,7 @@ export function buildTodayVM(state) {
     banked:  { icon: "✓", bg: "var(--mint-wash)", ring: "var(--mint)", ink: "var(--mint-ink)" },
     partial: { icon: "½", bg: "var(--sun-wash)", ring: "var(--sun)", ink: "var(--sun-ink)" },
     skipped: { icon: "⏭", bg: "var(--coral-wash)", ring: "var(--coral)", ink: "var(--coral-ink)" },
-    missing: { icon: "—", bg: "rgba(255,255,255,0.28)", ink: "var(--hero-text,#fff)" }
+    missing: { icon: "—", bg: "var(--surface-2)", ink: "var(--ink-soft)" }
   };
   /* What each slot SAYS when she holds it. The status is an internal enum, and
      falling through to it put "Round 2 — partial" and "Round 3 — banked" into
@@ -468,10 +473,11 @@ export function buildTodayVM(state) {
         ? "padding:2px 15px 13px 56px;"
         : "max-height:0;overflow:hidden;padding:0 15px 0 56px;"
     };
-  /* Rows sit on the hero-chip slot (one even tint, as in the mockup); the old
-     alternating whites remain only as the fallback. */
+  /* Rows sit on the see-through white row slot (R5: swim 70%, skate 78%,
+     never bare — ink on the bare dark rose is 1.9:1); the old alternating
+     whites remain only as the fallback. */
   }).filter(Boolean).map((b, i) => ({
-    ...b, rowBg: "var(--hero-chip," + (i % 2 === 0 ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.12)") + ")"
+    ...b, rowBg: "var(--hero-row-bg," + (i % 2 === 0 ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.12)") + ")"
   }));
   const reviewLegend = showActuals ? moveReviewLegend() : "";
 
@@ -490,7 +496,7 @@ export function buildTodayVM(state) {
     return {
       key, short: DAY_SHORT[key], date: String(weekDates[key]), icon: s.icon, iconWrap,
       labelColor: s.label,
-      cellStyle: "display:flex;flex-direction:column;align-items:center;padding:9px 4px;min-height:88px;border-radius:16px;background:none;cursor:pointer;font-family:inherit;width:100%;background:" + s.bg + ";border:2px solid " + s.border + ";"
+      cellStyle: "display:flex;flex-direction:column;align-items:center;padding:9px 4px;min-height:88px;border-radius:var(--radius-md);background:none;cursor:pointer;font-family:inherit;width:100%;background:" + s.bg + ";border:2px solid " + s.border + ";"
         + (selected ? "box-shadow:0 0 0 3px var(--ink);" : "")
     };
   });
@@ -747,16 +753,18 @@ export function buildTodayVM(state) {
   dayView.showBlocksList = !!(dayView.isActive || dayView.isDone || dayView.isPreview || dayView.isMissed) && !isSpaDay;
   dayView.blocksHint = dayView.isDone ? "REVIEW WHAT YOU DID 👀" : dayView.isPreview ? "PEEK AT WHAT'S COMING 👀" : dayView.isMissed ? "READY WHEN YOU ARE — PEEK INSIDE 👀" : "TAP A BLOCK TO PEEK INSIDE 👀";
   dayView.showFocus = !!(dayView.isActive || dayView.isPreview) && !isSpaDay;
+  /* "Let's go" is the screen's main action: the one main-button colour, 22px
+     on 64px. The secondary CTA (a finished day's "Look at the moves") is a
+     calm neutral button, 18px on 56px (R5). */
   dayView.ctaButtonStyle = dayView.ctaVariant === "secondary"
-    ? "width:100%;display:flex;align-items:center;justify-content:center;gap:10px;background:rgba(255,255,255,0.16);color:var(--hero-text,#fff);border:2px solid var(--hero-text,#fff);border-radius:var(--radius-pill);padding:14px;font-family:var(--font-display);font-weight:600;font-size:18px;cursor:pointer;"
-    : "width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:var(--sun);color:var(--ink);border:none;border-radius:var(--radius-pill);padding:18px;font-family:var(--font-display);font-weight:600;font-size:24px;cursor:pointer;box-shadow:0 5px 0 var(--sun-deep);";
+    ? "width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:0 18px;" + kidButton("neutral")
+    : "width:100%;display:flex;align-items:center;justify-content:center;gap:12px;padding:0 18px;" + kidButton("primary", { big: true });
 
   const coachIconBtnStyle = "width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;flex-shrink:0;font-size:15px;display:flex;align-items:center;justify-content:center;"
     + (settings.coachVoiceOn ? "background:#fff;color:var(--aqua-ink);" : "background:rgba(255,255,255,0.18);color:var(--hero-text,#fff);");
   const practiceLinkLabel = "🧪 Explore the moves";
   const practiceHintLine = "The session screen at your own pace — nothing counts down, nothing is recorded.";
-  const practiceBtnStyle = "width:100%;min-height:48px;display:flex;align-items:center;justify-content:center;gap:9px;border-radius:var(--radius-pill);cursor:pointer;font-family:inherit;font-weight:900;font-size:14px;padding:0 18px;"
-    + "background:rgba(255,255,255,0.14);color:var(--hero-text,#fff);border:2px solid var(--hero-text,#fff);";
+  const practiceBtnStyle = "width:100%;display:flex;align-items:center;justify-content:center;gap:9px;padding:0 18px;" + kidButton("neutral");
 
   // Echo-back: her own last "next time" promise, remembered on the day card.
   const lastSaid = sessions.slice().reverse().map(h => h.nextTime).find(Boolean);
@@ -784,6 +792,7 @@ export function buildTodayVM(state) {
     dateLine, statChips, journey, blocks, reviewLegend, week, legend, dayView,
     gearLabel, focusCue, coachIconBtnStyle, practiceLinkLabel, practiceHintLine, practiceBtnStyle,
     echoLine, weather,
+    heroDecorOn: settings.heroDecorOn !== false,
     selectedKey, todayKey,
     railToday: railNav(state.nav === "today"),
     railProgress: railNav(state.nav === "progress"),

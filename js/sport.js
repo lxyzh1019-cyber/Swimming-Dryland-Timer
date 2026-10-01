@@ -103,3 +103,9 @@ export const FEATURES = {
      Off in an app that ships PNGs alone. */
   webp: true
 };
+
+/* The hero decoration: a picture behind the coloured hero cards (Today, the
+   journey, Body Check, the timer's left panel, the Progress level card). The
+   grown-up switch in Settings is labelled with HERO_DECOR_LABEL. */
+export const HERO_DECOR_SRC = "./assets/hero-ripples.webp";
+export const HERO_DECOR_LABEL = "Water ripples";

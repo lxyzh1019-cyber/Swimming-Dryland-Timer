@@ -25,8 +25,9 @@ const KID_FONT_MIN = 13, KID_TAP_MIN = 56, DONE_TAP_MIN = 64, ADULT_TAP_MIN = 48
 /* Approved below the kid floor by docs/DESIGN.md (Session screen): the quiet
    "◀ Back a move" link is 48px; the move card's ✕ is a 48px round close; the
    Body Check light picker is a grown-up control under 🔒 (grown-up floor, 48);
-   Today's "🧪 Explore the moves" is the secondary action under "Let's go", kept
-   at 48 (plan v4, PR 4; test/smoke.mjs checks its 48px); the Quiz Deck's ✕ is
+   Today's "🧪 Explore the moves" is the secondary action under "Let's go" — a
+   56px calm button since R5 (it was 48, plan v4, PR 4; the 48 floor entry
+   stays, and test/smoke.mjs checks its 56px); the Quiz Deck's ✕ is
    the same 48px round close as the move card's (R4 PR 6); so is the prize
    draw's ✕ (R4 PR 7, was 44).
    Not temporary entries — the design itself. */
@@ -232,15 +233,16 @@ const STATES = {
                    cue: "Long and tall.", parentWatch: "Hips sag.", fix: "Squeeze the glutes.", transfer: "A stronger streamline." } }]
 };
 let drawn = 0, skipsSeen = 0;
-const CALM = /^(?=.*border:3px solid var\(--hairline\))(?=.*background:var\(--surface\))(?=.*color:var\(--ink-soft\))/;
+/* R5: the calm buttons are the neutral slots — filled, no border. */
+const CALM = /^(?=.*border:none;)(?=.*background:var\(--btn-neutral-bg,var\(--surface\)\))(?=.*color:var\(--btn-neutral-text,var\(--ink\)\))(?=.*box-shadow:0 4px 0 var\(--btn-neutral-edge,var\(--hairline\)\))/;
 for (const [st, [snap, extra, state]] of Object.entries(STATES)) {
   for (const layout of Object.keys(LAYOUTS)) {
     const html = draw(snap, layout, extra, state);
     clean("session " + st + " " + layout, html, { kid: true });
     drawn++;
-    /* Done is the one big action, white on the btn-go fill (aqua-deep: 3.6 on
-       swim, so large text only — 20px+ weight 900); STOP keeps white on the
-       darker stop fill; Pause, Resume and Skip are calm white buttons. */
+    /* Done is the one big action on the btn-go slots (22px weight 900); STOP
+       keeps white on the stop fill; Pause, Resume and Skip are calm buttons on
+       the neutral slots (R5). */
     const done = tags(html).find(t => t.tag === "button" && t.action === "advance");
     ok(done && pxOf(done.style, "min-height") >= DONE_TAP_MIN && pxOf(done.style, "font-size") >= 20
        && /font-weight:900/.test(done.style)
@@ -249,15 +251,15 @@ for (const [st, [snap, extra, state]] of Object.entries(STATES)) {
     if (st === "skipAsk") {
       const keep = tags(html).find(t => t.tag === "button" && t.action === "cancelSkip");
       ok(keep && /background:var\(--btn-go-bg,/.test(keep.style) && /color:var\(--btn-go-text,/.test(keep.style)
-         && pxOf(keep.style, "font-size") >= 19 && /font-weight:900/.test(keep.style),
-         "session skipAsk " + layout + ": Keep going is on the btn-go slots, 19px+ weight 900");
+         && pxOf(keep.style, "font-size") >= 18 && /font-weight:900/.test(keep.style),
+         "session skipAsk " + layout + ": Keep going is on the btn-go slots, 18px+ weight 900");
       const skipIt = tags(html).find(t => t.tag === "button" && t.action === "confirmSkipEx");
-      ok(skipIt && CALM.test(skipIt.style), "session skipAsk " + layout + ": Skip it is white, 3px hairline, ink-soft");
+      ok(skipIt && CALM.test(skipIt.style), "session skipAsk " + layout + ": Skip it is on the neutral slots, no border");
     }
     const pause = tags(html).find(t => t.tag === "button" && t.action === "pauseTimer");
-    ok(pause && CALM.test(pause.style), "session " + st + " " + layout + ": " + (st === "paused" ? "Resume" : "Pause") + " is white, 3px hairline, ink-soft");
+    ok(pause && CALM.test(pause.style), "session " + st + " " + layout + ": " + (st === "paused" ? "Resume" : "Pause") + " is on the neutral slots, no border");
     const skip = tags(html).find(t => t.tag === "button" && t.action === "askSkip");
-    if (skip) { skipsSeen++; ok(CALM.test(skip.style), "session " + st + " " + layout + ": Skip is white, 3px hairline, ink-soft"); }
+    if (skip) { skipsSeen++; ok(CALM.test(skip.style), "session " + st + " " + layout + ": Skip is on the neutral slots, no border"); }
     if (st === "repcheck") {
       const reps = tags(html).filter(t => t.tag === "button" && t.action === "answerRepCheck");
       ok(reps.length === 3 && reps.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN),
@@ -268,12 +270,12 @@ for (const [st, [snap, extra, state]] of Object.entries(STATES)) {
       ok(strip.length === 3 && strip.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN),
          "session formcheck " + layout + ": the clean-check strip's three buttons are 56px");
       const cleanBtn = strip.find(t => t.action === "pickClean");
-      ok(/background:var\(--btn-go-bg,var\(--mint\)\);color:var\(--btn-go-text,#fff\);/.test(cleanBtn.style)
-         && /box-shadow:0 3px 0 var\(--btn-go-edge,var\(--mint-deep\)\)/.test(cleanBtn.style),
+      ok(/background:var\(--btn-go-bg,var\(--aqua-deep\)\);color:var\(--btn-go-text,#fff\);/.test(cleanBtn.style)
+         && /box-shadow:0 4px 0 var\(--btn-go-edge,var\(--aqua-ink\)\)/.test(cleanBtn.style),
          "session formcheck " + layout + ": the clean button is on the Go slots");
-      /* Anything on the btn-go slots is large text: swim white on aqua-deep is 3.6. */
-      ok(pxOf(cleanBtn.style, "font-size") >= 19 && /font-weight:900/.test(cleanBtn.style) && pxOf(cleanBtn.style, "min-height") >= KID_TAP_MIN,
-         "session formcheck " + layout + ": the clean button is 19px+ weight 900, 56px");
+      /* R5: every normal kid button is 18px weight 900 on 56px. */
+      ok(pxOf(cleanBtn.style, "font-size") >= 18 && /font-weight:900/.test(cleanBtn.style) && pxOf(cleanBtn.style, "min-height") >= KID_TAP_MIN,
+         "session formcheck " + layout + ": the clean button is 18px+ weight 900, 56px");
     }
     if (st === "detail") {
       const close = tags(html).find(t => t.tag === "button" && t.action === "closeDetail");
@@ -302,23 +304,73 @@ for (const [st, [snap, extra, state]] of Object.entries(STATES)) {
        "session " + st + " " + layout + ": the ⓘ on each row is a hidden picture, not a button");
   }
 }
-/* The ring names the zone in the zone's -ink shade; the arc keeps the colour. */
+/* The ring names the zone in its ring slot's -ink shade (R5: ready / work /
+   rest slots); the arc is a gradient from the slot's -light to its colour. */
 for (const st of ["timed", "rest", "getready"].filter(k => snaps[k])) {
   for (const layout of Object.keys(LAYOUTS)) {
     const html = draw(snaps[st], layout);
     const label = (html.match(/letter-spacing:0\.12em;color:([^;]*);text-align:center;">/) || [])[1];
-    const arc = (html.match(/id="s-ring-arc"[^>]*stroke="([^"]*)"/) || [])[1];
-    ok(/^var\(--(aqua|sun|mint|grape|stop)-ink\)$/.test(label || "") && /font-size:13px;font-weight:900;letter-spacing:0\.12em;/.test(html),
-       st + " " + layout + ": the ring's zone label is 13px in an -ink shade (" + label + ")");
-    ok(arc && !/-ink\)$/.test(arc), st + " " + layout + ": and the arc keeps the bright zone colour (" + arc + ")");
+    const arc = (html.match(/id="s-ring-arc"[^>]*\sstroke="([^"]*)"/) || [])[1];
+    const zone = ((label || "").match(/^var\(--ring-(ready|work|rest)-ink,var\(--(?:aqua|sun|mint)-ink\)\)$/) || [])[1];
+    ok(zone && /font-size:13px;font-weight:900;letter-spacing:0\.12em;/.test(html),
+       st + " " + layout + ": the ring's zone label is 13px in its ring slot's -ink (" + label + ")");
+    ok(arc === "url(#s-ring-grad-" + zone + ")"
+       && new RegExp('<linearGradient id="s-ring-grad-' + zone + '"[^>]*>\\s*<stop offset="0" style="stop-color:var\\(--ring-' + zone + '-light,[^"]*"></stop>\\s*<stop offset="1" style="stop-color:var\\(--ring-' + zone + ',').test(html)
+       && new RegExp('fill="var\\(--ring-' + zone + '-fill,var\\(--surface\\)\\)" stroke="var\\(--ring-' + zone + '-light,var\\(--surface-2\\)\\)"').test(html),
+       st + " " + layout + ": and the arc is the " + zone + " gradient (-light → colour) on a -light track round a -fill centre (" + arc + ")");
   }
 }
-ok(/var\(--grape-ink\);">BY REPS/.test(draw(snaps.reps, "narrow")), "the rep ring says BY REPS in grape-ink");
+ok(/var\(--ring-work-ink,var\(--aqua-ink\)\);">BY REPS/.test(draw(snaps.reps, "narrow")), "the rep ring says BY REPS in the work ring's -ink");
 ok(/data-action="toggleRail"[^>]*width:48px;height:48px/.test(draw(snaps.timed, "roomy")),
    "the rail's hide/show toggle is 48px");
 ok(/data-action="toggleRail"/.test(draw(snaps.timed, "roomy", {}, { railOpen: false })),
    "and with the rail hidden it is still there to bring it back");
 clean("session rail hidden", draw(snaps.timed, "roomy", {}, { railOpen: false }), { kid: true });
+
+/* THE LAST THREE SECONDS (R5). The countdown ticks with targeted writes
+   (updateSessionTick), never a full render, so whatever "urgent" looks like
+   has to be written by the tick itself: the arc and the time go red, the zone
+   word goes stop-ink and the ring pulses on a ROUND wrapper — and all of it
+   goes back to the zone's own colours when the clock is not urgent. The DOM
+   here is the rendered page's own elements, read back by id. */
+{
+  const domOf = (html) => {
+    const els = {};
+    for (const m of html.matchAll(/<([a-zA-Z][\w-]*)\s([^>]*\bid="([^"]+)"[^>]*)>/g)) {
+      const attrs = Object.fromEntries([...m[2].matchAll(/([\w-]+)="([^"]*)"/g)].map(a => [a[1], a[2]]));
+      const style = {};
+      for (const decl of (attrs.style || "").split(";")) {
+        const at = decl.indexOf(":");
+        if (at > 0) style[decl.slice(0, at).trim().replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = decl.slice(at + 1).trim();
+      }
+      els[m[3]] = { id: m[3], attrs, style, textContent: "",
+        getAttribute: (k) => (k in attrs ? attrs[k] : null), setAttribute: (k, v) => { attrs[k] = String(v); } };
+    }
+    return els;
+  };
+  for (const layout of ["roomy", "narrow"]) {
+    engine.exitSession(); Object.assign(engine.sess, snaps.timed);
+    const vm = svm.buildSessionVM({ inSession: true, detailOverlay: false, detailEx: null, ...LAYOUTS[layout] });
+    const calm = { ...vm, timerUrgent: false };
+    const els = domOf(sscreen.sessionScreen(calm));
+    const realGet = document.getElementById;
+    document.getElementById = (id) => els[id] || null;
+    try {
+      const zoneStroke = (els["s-ring-arc"] || { attrs: {} }).attrs.stroke;
+      sscreen.updateSessionTick({ ...calm, timerUrgent: true });
+      const ring = els["s-ring"], label = els["s-ring-label"], time = els["s-timer-text"], arc = els["s-ring-arc"];
+      ok(ring && /pulse-ring/.test(ring.style.animation || "") && ring.style.borderRadius === "50%",
+         "pulse " + layout + ": in the last seconds the tick pulses the ring on a round wrapper (" + JSON.stringify(ring && ring.style) + ")");
+      ok(label && label.style.color === "var(--stop-ink)", "pulse " + layout + ": the zone word turns stop-ink");
+      ok(time && time.style.color === "var(--stop-deep)", "pulse " + layout + ": the time turns stop-deep red (≥ 3:1 on every ring fill)");
+      ok(arc && arc.getAttribute("stroke") === "var(--stop)", "pulse " + layout + ": the arc turns var(--stop)");
+      sscreen.updateSessionTick(calm);
+      ok(ring && !/pulse-ring/.test(ring.style.animation || "") && arc.getAttribute("stroke") === zoneStroke
+         && /^url\(#/.test(zoneStroke || "") && label.style.color === vm.timerZoneInk && time.style.color === "var(--ink)",
+         "pulse " + layout + ": and back to the zone's own gradient, ink and no pulse when not urgent (" + zoneStroke + ")");
+    } finally { document.getElementById = realGet; }
+  }
+}
 ok(/writing-mode:vertical-rl;[^"]*color:var\(--ink-soft\);/.test(draw(snaps.timed, "roomy", {}, { railOpen: false })),
    "with the rail hidden, its vertical label is ink-soft (was ink-faint)");
 engine.exitSession();
@@ -371,9 +423,9 @@ for (const [st, vm] of Object.entries(FINISH)) {
   const html = sscreen.sessionScreen(vm);
   clean("finish " + st, html, { kid: true });
   const back = tags(html).find(t => t.tag === "button" && t.action === "exitSession");
-  ok(back && pxOf(back.style, "min-height") >= KID_TAP_MIN && pxOf(back.style, "font-size") === 18 && /font-weight:900/.test(back.style)
-     && /background:var\(--sun\)/.test(back.style) && /color:var\(--(ink|sun-ink)\)/.test(back.style),
-     "finish " + st + ": the last button is 56px, 18px weight 900, on sun");
+  ok(back && pxOf(back.style, "min-height") >= DONE_TAP_MIN && pxOf(back.style, "font-size") === 22 && /font-weight:900/.test(back.style)
+     && /background:var\(--btn-primary-bg,var\(--action-bg\)\)/.test(back.style) && /color:var\(--btn-primary-text,var\(--action-text\)\)/.test(back.style),
+     "finish " + st + ": the last button is 64px, 22px weight 900, on the main-colour (btn-primary) slots");
   ok(at(html, 'data-action="exitSession"') > Math.max(at(html, "data-finish-summary"), at(html, "data-finish-kid-line"),
        at(html, 'data-action="toggleMoveReview"'), at(html, "data-move-review"), at(html, "data-finish-quiz")),
      "finish " + st + ": \"" + (vm.explore ? "Done looking" : "Back to Today") + "\" is last");
@@ -409,12 +461,13 @@ for (const [st, vm] of Object.entries(FINISH)) {
      && rowTags.every(t => /color:var\(--ink-soft\)/.test(t.style)),
      "finish: each row is ink-soft with its ⏭ or ½");
   const redo = tags(open).find(t => t.tag === "button" && t.action === "goSessionRedo");
-  ok(redo && /background:var\(--btn-primary-bg,var\(--aqua\)\)/.test(redo.style) && /color:var\(--btn-primary-text,#fff\)/.test(redo.style)
-     && /box-shadow:0 4px 0 var\(--btn-primary-edge,var\(--aqua-deep\)\)/.test(redo.style)
-     && pxOf(redo.style, "min-height") >= KID_TAP_MIN && pxOf(redo.style, "font-size") >= 17,
-     "finish: Redo these is on the btn-primary slots, 56px, 17px");
+  ok(redo && /background:var\(--btn-primary-bg,var\(--action-bg\)\)/.test(redo.style) && /color:var\(--btn-primary-text,var\(--action-text\)\)/.test(redo.style)
+     && /box-shadow:0 4px 0 var\(--btn-primary-edge,var\(--action-edge\)\)/.test(redo.style)
+     && pxOf(redo.style, "min-height") >= KID_TAP_MIN && pxOf(redo.style, "font-size") >= 18,
+     "finish: Redo these is on the btn-primary slots, 56px, 18px");
   const back = tags(open).find(t => t.tag === "button" && t.action === "exitSession");
-  ok(/color:var\(--ink\)/.test(back.style) && />🏠 Back to Today</.test(open), "finish: 🏠 Back to Today is ink on sun");
+  ok(/background:var\(--btn-primary-bg,/.test(back.style) && /color:var\(--btn-primary-text,/.test(back.style) && />🏠 Back to Today</.test(open),
+     "finish: 🏠 Back to Today is on the main-colour (btn-primary) slots");
   const full = sscreen.sessionScreen(FINISH.full);
   ok(full.includes("Every move was done in full.") && !full.includes(KID_LINE) && !/data-action="toggleMoveReview"/.test(full),
      "finish: a clean day says every move was done in full, with nothing to fold");
@@ -470,10 +523,10 @@ for (const [name, html] of [["wide", wideHtml], ["narrow", tscreen.todayNarrow({
   const map = section(html, 'id="journey-map-card"');
   ok(map.length > 0, "journey map " + name + ": found on Today");
   clean("journey map " + name, map, { kid: true });
-  ok(/stop-color:var\(--hero-from/.test(map) && /stop-color:var\(--journey-to/.test(map),
-     "journey map " + name + ": painted from the hero → journey slots");
+  ok(/background:var\(--journey-bg,/.test(map) && !/<linearGradient|<ellipse|rgba\(0,0,0,/.test(map),
+     "journey map " + name + ": painted from the journey-bg slot (no painted sky, ellipses or dark band)");
   ok(!/#CDEDE7/i.test(map), "journey map " + name + ": the old fixed 80% stop is gone");
-  ok(/color:var\(--hero-text,#fff\)/.test(map), "journey map " + name + ": its words take the hero-text slot");
+  ok(/color:var\(--journey-text,#fff\)/.test(map), "journey map " + name + ": its words take the journey-text slot");
   ok(/background:rgba\(255,255,255,0\.6\);border-radius:999px;padding:4px 10px;">\s*<span style="[^"]*color:var\(--ink\);">[^<]+<\/span>\s*<span style="[^"]*color:var\(--aqua-ink\);">YOU ARE HERE<\/span>/.test(map),
      "journey map " + name + ": \"You are here\" sits on a white pill");
 }
@@ -493,13 +546,13 @@ for (const [name, html] of [["wide", wideHtml], ["narrow", tscreen.todayNarrow({
     "narrow closed": ["narrow", {}], "narrow open": ["narrow", { blocksOpen: true }],
     "narrow open block open": ["narrow", { blocksOpen: true, expanded: { [firstBlock]: true } }]
   };
-  const HERO = /background:linear-gradient\(165deg,var\(--hero-from,var\(--aqua-light\)\) 0%,var\(--hero-to,var\(--aqua\)\) 70%\);color:var\(--hero-text,#fff\);/;
+  const HERO = /background:var\(--hero-bg,linear-gradient\(165deg,var\(--aqua-light\) 0%,var\(--aqua\) 70%\)\);color:var\(--hero-text,#fff\);/;
   for (const [name, [layout, extra]] of Object.entries(VIEWS)) {
     const { vm, html } = T(layout, extra);
     const label = "today " + name;
     clean(label, html, { kid: true });
     ok(vm.dayView.isActive && vm.dayView.showBlocksList && vm.dayView.showExplore, label + ": drawn on an active day (" + day + ")");
-    ok(HERO.test(html) && !/var\(--aqua-deep\) 100%/.test(html), label + ": the day card is Card A — hero slots, 0 → 70%, no aqua-deep end");
+    ok(HERO.test(html) && !/var\(--aqua-deep\) 100%/.test(html), label + ": the day card is on the hero-bg slot (fallback Card A 0 → 70%, no aqua-deep end)");
     const n = vm.blocks.length;
     const rows = tags(html).filter(t => t.tag === "button" && t.action === "toggleBlock");
     const fold = tags(html).filter(t => t.tag === "button" && t.action === "toggleBlocks");
@@ -529,23 +582,25 @@ for (const [name, html] of [["wide", wideHtml], ["narrow", tscreen.todayNarrow({
     ok((html.match(/font-size:13px;font-weight:900;letter-spacing:0\.0[34]em;/g) || []).length === 7
        && (html.match(/<div style="font-size:15px;font-weight:800;color:var\(--ink-soft\);">\d+<\/div>/g) || []).length === 7,
        label + ": week day names 13px, dates 15px");
-    ok(/color:var\(--grape-ink\);flex-shrink:0;">›<\/span>/.test(html), label + ": the Quiz Deck chevron is grape-ink");
+    ok(/color:var\(--ring-work-ink,var\(--aqua-ink\)\);flex-shrink:0;">›<\/span>/.test(html), label + ": the Quiz Deck chevron is the work ring's -ink");
     ok(html.includes("<span>⚡\uFE0F</span> " + vm.dayView.movesLabel), label + ": the moves chip asks for emoji ⚡️");
     ok(/background:var\(--hero-chip,rgba\(255,255,255,0\.18\)\);border-radius:var\(--radius-pill\);/.test(html), label + ": chips on the hero-chip slot");
     /* Faded words on the day card measured under 4.5:1 (PR 4) are full strength
        now; only the block-row count (5.2+ measured) and the • bullet keep one. */
-    const dayCardHtml = section(html, "70%);color:var(--hero-text,#fff);");
+    const dayCardHtml = section(html, "70%));color:var(--hero-text,#fff);");
     const faded = tags(dayCardHtml).filter(t => /(?:^|;)opacity:/.test(t.style));
     ok(dayCardHtml.length > 0 && faded.every(t => /text-align:right;/.test(t.style) || t.style === "opacity:0.7;flex-shrink:0;"),
        label + ": no faded text on the day card except the block-row count and the bullet");
     const go = tags(html).find(t => t.tag === "button" && t.action === vm.dayView.ctaAction);
-    ok(go && /background:var\(--sun\);color:var\(--ink\);/.test(go.style), label + ": \"Let's go\" is ink on sun");
+    ok(go && /background:var\(--btn-primary-bg,var\(--action-bg\)\);color:var\(--btn-primary-text,var\(--action-text\)\);/.test(go.style)
+       && pxOf(go.style, "font-size") === 22 && pxOf(go.style, "min-height") === 64,
+       label + ": \"Let's go\" is on the main-colour (btn-primary) slots, 22px, 64px");
     const explore = tags(html).find(t => t.tag === "button" && t.action === "goExplore");
-    ok(explore && /color:var\(--hero-text,#fff\);border:2px solid var\(--hero-text,#fff\);/.test(explore.style) && pxOf(explore.style, "min-height") === 48,
-       label + ": Explore is a 48px hero-text outline");
+    ok(explore && /background:var\(--btn-neutral-bg,/.test(explore.style) && /border:none;/.test(explore.style) && pxOf(explore.style, "min-height") === 56,
+       label + ": Explore is a 56px calm (neutral) filled button");
     const map2 = section(html, 'id="journey-map-card"');
-    ok(/background:rgba\(255,255,255,0\.55\);border-radius:9px;overflow:hidden;">\s*<div style="width:[\d.]+%;height:100%;background:var\(--sun\);/.test(map2),
-       label + ": the journey XP bar is sun on a white 55% track");
+    ok(/background:rgba\(255,255,255,0\.55\);border-radius:9px;overflow:hidden;">\s*<div style="width:[\d.]+%;height:100%;background:var\(--xp-bar,var\(--sun\)\);/.test(map2),
+       label + ": the journey XP bar is on the points-bar (xp-bar) slot on a white 55% track");
   }
 }
 
@@ -581,18 +636,18 @@ for (const [st, r] of Object.entries(R_STATES)) {
       ok((html.match(/display:grid;grid-template-columns:1fr 1fr;/g) || []).length === 4,
          name + ": each of the 4 answer pairs is a two-column grid");
     }
-    /* The result card: title in the light's -ink; Start 64px / 24px / 900;
+    /* The result card: title in the light's -ink; Start 64px / 22px / 900 (R5);
        grown-up summary and light picker 48px. */
     if (/data-body-result/.test(html)) {
       const vm = rvm.buildReadinessVM(r, wide);
       ok(vm.light.titleInk && html.includes("color:" + vm.light.titleInk + ";line-height:1.1;\">" + vm.light.label),
          name + ": the light's title is in " + vm.light.titleInk);
-      const start = tags(html).find(t => t.tag === "button" && pxOf(t.style, "font-size") === 24
+      const start = tags(html).find(t => t.tag === "button" && pxOf(t.style, "font-size") === 22
         && (t.action === "rResultCta" || / disabled /.test(t.open)));
       ok(start && pxOf(start.style, "min-height") >= DONE_TAP_MIN && /font-weight:900/.test(start.style),
-         name + ": Start is 64px, 24px, weight 900");
+         name + ": Start is 64px, 22px, weight 900");
       if (r.light === "green" && vm.mayStart)
-        ok(/background:var\(--btn-go-bg\);color:var\(--btn-go-text\);/.test(start.style) && /box-shadow:0 5px 0 var\(--btn-go-edge\)/.test(start.style),
+        ok(/background:var\(--btn-go-bg\);color:var\(--btn-go-text\);/.test(start.style) && /box-shadow:0 4px 0 var\(--btn-go-edge\)/.test(start.style),
            name + ": green's Start is on the Go slots");
       ok(/<summary style="[^"]*font-size:13px;[^"]*display:flex;align-items:center;[^"]*min-height:48px;/.test(html),
          name + ": the grown-up summary is 48px, 13px");
@@ -608,8 +663,8 @@ for (const [st, r] of Object.entries(R_STATES)) {
 /* The hero panel reads the hero slots, with the old look as fallback. */
 for (const wide of [true, false]) {
   const html = drawR(R_STATES.questions, wide);
-  ok(/background:linear-gradient\(165deg,var\(--hero-from,var\(--aqua-light\)\) 0%,var\(--hero-to,var\(--aqua\)\) 70%\);color:var\(--hero-text,#fff\);/.test(html),
-     "readiness " + (wide ? "wide" : "narrow") + ": the hero panel is painted from the hero slots");
+  ok(/background:var\(--hero-bg,linear-gradient\(165deg,var\(--aqua-light\) 0%,var\(--aqua\) 70%\)\);color:var\(--hero-text,#fff\);/.test(html),
+     "readiness " + (wide ? "wide" : "narrow") + ": the hero panel is painted from the hero-bg slot");
 }
 /* Body Check leftovers (PR 4): popup words in -ink, legend headers ink-soft,
    the view pills on the btn-primary slots. */
@@ -795,6 +850,153 @@ for (const wide of [true, false]) {
      "contrast rules: and pass the fixes (mint-ink on mint-wash, ink on sun)");
   const fontFails = scan("grown-up probe", '<div style="font-size:12px;color:var(--ink-soft);">Settings label</div>', { kid: false });
   ok(fontFails.some(f => f.kind === "font"), "grown-up screens have the 13px text floor too");
+}
+
+/* ---- 9. ONE BUTTON, ONE CORNER RULE, NO PURPLE, THE DECORATION (R5) ------
+   Every filled kid button on Today, the timer, the finish screen, Progress,
+   the Quiz Deck and the prize draw is ONE button: the primary, go, stop or
+   neutral slots (a marked quiz answer keeps its mint / coral, Wobbly its sun),
+   no border, the 16px corner, a 4px bottom edge, the UI font at 900, and two
+   sizes — 22px on 64px for a screen's main action, 18px on 56px for the rest
+   (STOP 20px). A "filled button" is any button with a candy bottom edge or a
+   btn slot fill, so a new one cannot drift by leaving the slots. */
+{
+  const KID_SCREENS = [];
+  const add = (name, html) => KID_SCREENS.push([name, html]);
+  store.updateSettings({ heroDecorOn: true });
+  for (const [st, [snap, extra, state]] of Object.entries(STATES))
+    for (const layout of Object.keys(LAYOUTS)) add("session " + st + " " + layout, draw(snap, layout, extra, state));
+  engine.exitSession();
+  for (const [st, vm] of Object.entries(FINISH)) add("finish " + st, sscreen.sessionScreen(vm));
+  for (const layout of Object.keys(LAYOUTS)) {
+    const vm = tvm.buildTodayVM({ selectedDay: today, expanded: {}, ...LAYOUTS[layout] });
+    add("today " + layout, layout === "narrow" ? tscreen.todayNarrow(vm) : tscreen.todayWide(vm));
+    add("progress " + layout, pscreen.progressScreen(pvm.buildProgressVM({ progressScope: "4w", logScope: "week", ...LAYOUTS[layout] })));
+  }
+  {
+    const tv = tvm.buildTodayVM({ selectedDay: today, expanded: {}, isWide: true });
+    add("today partly skipped", tscreen.todayWide({ ...tv, dayView: { ...tv.dayView, partialSkipLabel: "2 moves skipped" } }));
+    add("today finished day", tscreen.todayWide({ ...tv, dayView: { ...tv.dayView, ctaVariant: "secondary",
+      ctaButtonStyle: tvm.buildTodayVM({ selectedDay: today, expanded: {}, isWide: true }).dayView.ctaButtonStyle } }));
+  }
+  const deck = overlays.buildQuizDeck(8);
+  add("quiz deck question", overlays.quizDeckHtml({ ...deck, idx: 0, picks: [] }));
+  add("quiz deck answered", overlays.quizDeckHtml({ ...deck, idx: 0, picks: [deck.qs[0].opts.findIndex(o => !o.ok)] }));
+  add("quiz deck results", overlays.quizDeckHtml({ ...deck, done: true, scored: true, picks: deck.qs.map(q => q.opts.findIndex(o => o.ok)),
+    bank: { mastered: 3, total: 40, left: 37 }, leveledUp: true, xpEarned: 20 }));
+  add("prize draw picked", overlays.prizeDrawHtml({ ...overlays.newPrizeDraw(), picked: 0 }));
+
+  const EDGE = /box-shadow:(?:inset 0 0 0 3px [^,;]+,)?0 (\d+)px 0 /;
+  const SLOT = /background:var\(--btn-(primary|go|stop|neutral)-bg,/;
+  const MARKED = /background:var\(--(mint|coral)-wash\);color:var\(--\1-ink\);box-shadow:inset 0 0 0 3px var\(--\1\),0 4px 0 var\(--\1-deep\)/;
+  const BIG_ACTIONS = new Set(["advance", "exitSession", "openPrizeDraw", "claimPrize", "goSession", "goSessionResume", "startDay"]);
+  let filled = 0;
+  const kinds = new Set();
+  for (const [name, html] of KID_SCREENS) {
+    for (const t of tags(html)) {
+      if (!(t.tag === "button" || (t.tag === "a" && t.action))) continue;
+      const edge = t.style.match(EDGE), slot = t.style.match(SLOT);
+      if (!edge && !slot) continue;
+      // A chosen tab or chip (a pill on the main colour, no edge) is a tab, not a button.
+      if (!edge && /border-radius:var\(--radius-pill\)/.test(t.style)) continue;
+      filled++;
+      const who = name + ": " + (t.action || t.open.slice(0, 60));
+      const marked = MARKED.test(t.style);
+      const wobbly = t.action === "pickWobbly" && /background:var\(--sun\);color:var\(--ink\);box-shadow:0 4px 0 var\(--sun-deep\);/.test(t.style);
+      ok(slot || marked || wobbly, who + " — a filled kid button is on the primary, go, stop or neutral slots (" + t.style.slice(0, 120) + ")");
+      if (slot) kinds.add(slot[1]);
+      ok(edge && edge[1] === "4", who + " — its bottom edge is 4px (" + (edge ? edge[1] : "none") + ")");
+      ok(/(?:^|;)border:none;/.test(t.style) && /border-radius:var\(--radius-md\);/.test(t.style),
+         who + " — no border and the 16px corner (var(--radius-md))");
+      ok(/font-family:var\(--font-ui\);font-weight:900;/.test(t.style), who + " — the UI font at weight 900");
+      const px = pxOf(t.style, "font-size"), mh = pxOf(t.style, "min-height");
+      const sized = t.action === "stopNow" ? px === 20
+        : px === 22 ? mh >= DONE_TAP_MIN
+        : px === 18 && mh >= KID_TAP_MIN;
+      ok(sized, who + " — 22px on 64px or 18px on 56px (STOP 20px); got " + px + "px on " + mh + "px");
+      if (/var\(--btn-stop-bg/.test(t.style)) ok(t.action === "stopNow", who + " — red (the stop slot) is only ever STOP on a kid screen");
+      if (BIG_ACTIONS.has(t.action) && slot) ok(px === 22, who + " — a screen's main action is the big size");
+    }
+  }
+  ok(filled > 150 && ["primary", "go", "stop", "neutral"].every(k => kinds.has(k)),
+     "checked " + filled + " filled kid buttons across " + KID_SCREENS.length + " screens, on all four slot families (" + [...kinds].join(", ") + ")");
+
+  /* No purple on kid screens: grape is recovery's colour, and none of these
+     screens is a recovery screen. */
+  for (const [name, html] of KID_SCREENS) {
+    if (name.startsWith("progress")) continue;   // Progress shows the recovery legend and care days
+    ok(!/var\(--(?:grape|btn-grape-bg)[,)-]/.test(html), name + ": no grape (purple) on a kid button, card or ring");
+  }
+
+  /* Corners: the frame is radius-xl, cards inside it radius-lg, rows radius-md. */
+  const sess = KID_SCREENS.find(([n]) => n === "session timed roomy")[1];
+  ok(/^\s*<div style="display:flex;flex-direction:column;background:var\(--surface\);border-radius:var\(--radius-xl\);box-shadow:var\(--shadow-frame\);/.test(sess),
+     "the session frame is radius-xl with the frame shadow token");
+  const rowsOk = tags(section(sess, "data-ex-list")).filter(t => t.action === "openDetailAt" || t.action === "goToMove");
+  ok(rowsOk.length > 0 && rowsOk.every(t => /border-radius:var\(--radius-md\);/.test(t.style)), "every timer move row is radius-md");
+  const tw = KID_SCREENS.find(([n]) => n === "today roomy")[1];
+  ok(/<div style="width:452px;flex-shrink:0;margin:14px;border-radius:var\(--radius-lg\);background:var\(--hero-bg,/.test(tw)
+     && /id="journey-map-card"[^>]*border-radius:var\(--radius-lg\);/.test(tw),
+     "the Today day card and the journey card are radius-lg");
+  ok((tw.match(/background:var\(--hero-row-bg,[^;]*\);color:var\(--hero-row-text,[^;]*\);border-radius:var\(--radius-md\);/g) || []).length > 1,
+     "the Today block rows are on the hero-row slots, radius-md");
+  const fin = KID_SCREENS.find(([n]) => n === "finish all extras")[1];
+  ok(/border-radius:var\(--radius-lg\);[^"]*data-finish-quiz|border-radius:var\(--radius-lg\);padding:18px 22px;[^"]*" data-finish-quiz/.test(fin)
+     && /background:var\(--finish-bg,/.test(fin), "the finish quiz card is radius-lg, on the finish-bg page");
+  for (const [name, html] of KID_SCREENS)
+    ok(!/border-radius:(?:12|14|20|26)px/.test(html), name + ": no hard-coded 12/14/20/26px card or row corner left");
+
+  /* The decoration: drawn on every hero when on — aria-hidden, untappable,
+     behind the content — never on the timer's right side, the finish screen
+     or the Grown-up Zone, and not drawn at all when off. */
+  const DECOR = /<div aria-hidden="true" data-hero-decor="1" style="position:absolute;inset:0;z-index:-1;pointer-events:none;background:url\(\.\/assets\/hero-(?:ripples|snow)\.webp\) center top\/cover;border-radius:inherit;"><\/div>/g;
+  const decorCount = (html) => (html.match(DECOR) || []).length;
+  const anyDecor = (html) => (html.match(/data-hero-decor/g) || []).length;
+  const heroes = () => {
+    const wide = tvm.buildTodayVM({ selectedDay: today, expanded: {}, isWide: true });
+    const narrow = tvm.buildTodayVM({ selectedDay: today, expanded: {}, isWide: false });
+    return {
+      "today wide (day card + journey)": [tscreen.todayWide(wide), 2],
+      "today narrow (day card + journey)": [tscreen.todayNarrow(narrow), 2],
+      "body check wide": [drawR(R_STATES.questions, true), 1],
+      "body check narrow": [drawR(R_STATES.questions, false), 1],
+      "progress level card": [pscreen.progressScreen(pvm.buildProgressVM({ progressScope: "4w", logScope: "week", ...LAYOUTS.roomy })), 1],
+      "timer rail open": [draw(snaps.timed, "roomy"), 1],
+      "timer rail folded": [draw(snaps.timed, "roomy", {}, { railOpen: false }), 1],
+      "timer phone (no rail)": [draw(snaps.timed, "narrow"), 0],
+      "finish": [sscreen.sessionScreen({ ...FINISH.full, heroDecorOn: true }), 0],
+      "grown-up settings": [drawG("settings"), 0]
+    };
+  };
+  store.updateSettings({ heroDecorOn: true });
+  for (const [name, [html, n]] of Object.entries(heroes())) {
+    ok(decorCount(html) === n && anyDecor(html) === n, name + ": " + n + " decoration layer(s), aria-hidden, pointer-events none, behind the content (" + anyDecor(html) + ")");
+    if (n) ok((html.match(/isolation:isolate;/g) || []).length >= n, name + ": its host isolates, so the layer stays behind the words");
+  }
+  const rail = draw(snaps.timed, "roomy");
+  const rightPane = rail.slice(rail.indexOf("justify-content:safe center"));
+  ok(!/data-hero-decor/.test(rightPane), "never behind the ring, the move name or the timer buttons");
+  const levelCard = heroes()["progress level card"][0];
+  ok(/<span style="display:inline-block;background:var\(--hero-chip,transparent\);border-radius:var\(--radius-pill\);[^"]*font-size:24px;[^"]*">[^<]+<\/span>/.test(levelCard),
+     "progress level card: the rank name sits on the hero-chip slot");
+  store.updateSettings({ heroDecorOn: false });
+  for (const [name, [html]] of Object.entries(heroes())) ok(anyDecor(html) === 0, name + ": switched off, no decoration layer at all");
+  store.updateSettings({ heroDecorOn: true });
+  engine.exitSession();
+}
+
+/* No hard-coded navy (swim's ink) or swim cyan in shared code: shadows and
+   backdrops come from each app's spacing tokens. */
+{
+  const dir = new URL("../", import.meta.url);
+  const files = [];
+  const walk = (u) => { for (const e of fs.readdirSync(u, { withFileTypes: true })) {
+    if (e.isDirectory()) { if (e.name !== "test" && e.name !== "tools") walk(new URL(e.name + "/", u)); }
+    else if (/\.js$/.test(e.name)) files.push(new URL(e.name, u)); } };
+  walk(dir);
+  const bad = files.flatMap(f => fs.readFileSync(f, "utf8").split("\n").map((l, i) => [f.pathname.split("/core/")[1] + ":" + (i + 1), l])
+    .filter(([, l]) => /rgba\(\s*20\s*,\s*59\s*,\s*74|rgba\(\s*6\s*,\s*182\s*,\s*212|rgba\(\s*10\s*,\s*(?:40|30)\s*,\s*(?:55|40)/.test(l)).map(([w]) => w));
+  ok(files.length > 20 && bad.length === 0, "core has no hard-coded rgba(20,59,74,…), rgba(6,182,212,…) or rgba(10,40,55 / 10,30,40,…) (" + files.length + " files; " + bad.join(", ") + ")");
 }
 
 ok(drawn >= 24, "drew the session screen in " + drawn + " state × layout combinations");

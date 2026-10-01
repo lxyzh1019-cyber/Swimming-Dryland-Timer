@@ -1,5 +1,5 @@
 import { POSES } from "../data.js";
-import { COPY, EMOJI } from "../sport.js";
+import { COPY, EMOJI, HERO_DECOR_LABEL } from "../sport.js";
 /* ============================================================
    GROWN-UP ZONE screen — Overview / Analytics / Coaching /
    Move Library / Settings. Transcribed from the design; the
@@ -7,7 +7,7 @@ import { COPY, EMOJI } from "../sport.js";
    gate, engagement systems — carried over from the old app).
    ============================================================ */
 
-import { escapeHtml, imgWithFallbacks, photoSources } from "../util.js";
+import { escapeHtml, imgWithFallbacks, photoSources, kidButton } from "../util.js";
 /* The week table is the Progress screen's own (R4 PR 6) — one function, so the
    kid's table and the grown-up's can never drift apart. */
 import { weekTable } from "./progress.js";
@@ -613,7 +613,7 @@ function settingsTab(vm) {
       </div>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <input type="text" placeholder="Add another athlete…" data-input="newProfile" style="flex:1;min-height:48px;padding:10px 13px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:14px;font-weight:700;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">
-        <button type="button" data-action="addAthlete" style="min-height:48px;border:none;background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">Add</button>
+        <button type="button" data-action="addAthlete" style="${kidButton("primary", { minH: 48, px: 15 })}padding:0 16px;">Add</button>
       </div>
     </div>
     <div>
@@ -629,6 +629,13 @@ function settingsTab(vm) {
         <button type="button" data-action="toggleTimerSounds" aria-label="Toggle timer sounds" style="${vm.toggleHit}"><span style="${vm.timerTrack}"><span style="${vm.timerKnob}"></span></span></button>
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The beeps and rep ticks she paces on. These stay on when the coach's voice is off.</div>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">${escapeHtml(HERO_DECOR_LABEL)} ✨</div>
+        <button type="button" data-action="toggleHeroDecor" aria-label="Toggle ${escapeHtml(HERO_DECOR_LABEL.toLowerCase())}" aria-pressed="${vm.heroDecorOn ? "true" : "false"}" style="${vm.toggleHit}"><span style="${vm.heroDecorTrack}"><span style="${vm.heroDecorKnob}"></span></span></button>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The picture behind the big coloured cards on Today, the journey, Body Check, the timer's side panel and the level card. Never behind the timer itself.</div>
     </div>
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
@@ -689,14 +696,14 @@ function settingsTab(vm) {
               <div style="font-weight:900;font-size:14px;color:var(--ink);">${escapeHtml(p.label)}</div>
               <div style="font-size:13px;font-weight:800;color:var(--ink-soft);">${escapeHtml(p.dateLine)}</div>
             </div>
-            <button type="button" data-action="restorePrize" data-arg="${escapeHtml(p.id)}" style="min-height:48px;border:2px solid var(--mint);border-radius:var(--radius-pill);padding:0 14px;background:var(--mint-wash);color:var(--mint-ink);font-weight:900;font-size:13px;cursor:pointer;font-family:inherit;">Restore</button>
+            <button type="button" data-action="restorePrize" data-arg="${escapeHtml(p.id)}" style="${kidButton("primary", { minH: 48, px: 15 })}padding:0 14px;">Restore</button>
           </div>`).join("")}
           <button type="button" data-action="closePrizeReview" style="margin-top:9px;min-height:48px;border:none;background:transparent;font-weight:900;font-size:13px;color:var(--ink-soft);cursor:pointer;font-family:inherit;">Done</button>
         </div>` : ""}
       </div>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <input type="text" placeholder="Add a prize… (e.g. 🎨 Craft afternoon)" data-input="newPrize" style="flex:1;min-height:48px;padding:10px 13px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:14px;font-weight:700;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">
-        <button type="button" data-action="addPrizePoolItem" style="min-height:48px;border:none;background:var(--sun);color:var(--ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">Add</button>
+        <button type="button" data-action="addPrizePoolItem" style="${kidButton("primary", { minH: 48, px: 15 })}padding:0 16px;">Add</button>
       </div>
       ${!vm.isDefaultPool ? `<button type="button" data-action="resetPrizePool" style="margin-top:8px;min-height:48px;border:none;background:none;color:var(--ink-soft);font-weight:800;font-size:13px;text-decoration:underline;cursor:pointer;font-family:inherit;">Reset to default pool</button>` : ""}
     </div>
@@ -712,7 +719,7 @@ function settingsTab(vm) {
       ${vm.backupNote ? `<div role="status" style="margin-top:10px;font-size:13px;font-weight:800;line-height:1.5;color:${vm.backupNoteOk ? "var(--mint-ink)" : "var(--stop-ink)"};background:${vm.backupNoteOk ? "var(--mint-wash)" : "var(--stop-wash)"};border-radius:12px;padding:9px 12px;">${escapeHtml(vm.backupNote)}</div>` : ""}
       ${vm.pendingRestore ? `
       <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-        <button type="button" data-action="confirmRestore" style="min-height:48px;border:none;border-radius:var(--radius-pill);background:var(--btn-stop-bg,var(--stop));color:#fff;font-weight:900;font-size:13px;padding:0 18px;cursor:pointer;font-family:inherit;">Merge ${escapeHtml(vm.pendingRestore.from)}’s data into ${escapeHtml(vm.pendingRestore.to)} anyway</button>
+        <button type="button" data-action="confirmRestore" style="${kidButton("stop", { minH: 48, px: 19 })}padding:0 18px;">Merge ${escapeHtml(vm.pendingRestore.from)}’s data into ${escapeHtml(vm.pendingRestore.to)} anyway</button>
         <button type="button" data-action="cancelRestore" style="min-height:48px;border:2px solid var(--hairline);border-radius:var(--radius-pill);background:var(--surface);color:var(--ink-soft);font-weight:900;font-size:13px;padding:0 18px;cursor:pointer;font-family:inherit;">Cancel</button>
       </div>` : ""}
     </div>
@@ -761,7 +768,7 @@ function coachingTab(vm) {
           </div>`;
         }).join("")}
       </div>
-      <button type="button" data-action="saveTrackerWeek" style="margin-top:12px;min-height:48px;border:none;background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);border-radius:var(--radius-pill);font-weight:900;font-size:14px;padding:0 20px;cursor:pointer;font-family:inherit;box-shadow:0 3px 0 var(--btn-primary-edge,var(--aqua-deep));">Save week ${esc(c.trackerWeek)}</button>`)}
+      <button type="button" data-action="saveTrackerWeek" style="margin-top:12px;${kidButton("primary", { minH: 48, px: 15 })}padding:0 20px;">Save week ${esc(c.trackerWeek)}</button>`)}
     ${card(`
       ${secTitle("Engagement system · this week")}
       <div style="font-size:13px;color:var(--ink-soft);margin:4px 0 12px;line-height:1.3;">One shared game per week keeps a grown-up genuinely in it.</div>
@@ -788,7 +795,7 @@ function lockedZone() {
       ${imgWithFallbacks(photoSources(POSES.remember), `alt="" style="height:150px;object-fit:contain;"`)}
       <div style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);">Grown-up Zone 🧑</div>
       <div style="font-size:15px;font-weight:800;color:var(--ink-soft);line-height:1.5;max-width:380px;">This part is for a grown-up. The unlock has timed out — tap 🧑 again and enter the PIN.</div>
-      <button type="button" data-action="nav" data-arg="grownup" style="min-height:48px;border:none;border-radius:var(--radius-pill);background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);font-weight:900;font-size:15px;padding:0 22px;cursor:pointer;font-family:inherit;">Unlock</button>
+      <button type="button" data-action="nav" data-arg="grownup" style="${kidButton("primary", { minH: 48, px: 15 })}padding:0 22px;">Unlock</button>
     </div>`;
 }
 

@@ -110,6 +110,7 @@ export const GATE_REASON = {
   toggleGate:     "change the jump-landing gate",
   toggleCoachVoice: "change the coaching settings",
   toggleTimerSounds: "change the coaching settings",
+  toggleHeroDecor: "change the coaching settings",
   setVoiceStyle:  "change the coach's voice",
   setVoiceSpeed:  "change how fast the coach talks",
   bumpRest:       "change how long her rests are",

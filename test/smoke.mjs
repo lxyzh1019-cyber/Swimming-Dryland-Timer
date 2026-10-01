@@ -624,7 +624,7 @@ ok(exploreGaps.noButton.length === 0, "every day a run can start from offers a d
 ok(exploreGaps.notAButton.length === 0, "and it goes straight into explore for that day, with no mode to arm first");
 ok(exploreGaps.goHijacked.length === 0, "while the start button still starts the workout");
 const tryVM = tvm.buildTodayVM({ selectedDay: launchDays[0], expanded: {}, isWide: true });
-ok(/min-height:48px/.test(tryVM.practiceBtnStyle), "with a 48px tap target — the old link was ~16px");
+ok(/min-height:56px/.test(tryVM.practiceBtnStyle), "with a 56px tap target (R5: a calm filled button) — the old link was ~16px");
 ok(tryVM.practiceMode === undefined, "and there is no armed state left for a screen to read");
 /* ONE WAY IN, NOT TWO. On a day she had finished, the big button already WAS
    explore — "🧪 Look at the moves", or "🧘 Do it again" on a spa day — and the

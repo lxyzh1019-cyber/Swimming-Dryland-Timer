@@ -7,8 +7,8 @@ import { sess, refTime, pausedByBackground, canGoBack } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, BLOCK_LABEL, SESSION_QUIZ,
          TRAINING_QS, REFLECT_WELL, REFLECT_NEXT, exWork, doseLines, videoSearchUrl } from "../data.js";
 import { SKILL_BLOCK, COPY } from "../sport.js";
-import { fmtMMSS, exercisePhotoUrl, photoSources, plural } from "../util.js";
-import { loadSessions, loadQuiz, quizQuestionKey } from "../store.js";
+import { fmtMMSS, exercisePhotoUrl, photoSources, plural, kidButton, markedAnswer } from "../util.js";
+import { loadSessions, loadQuiz, quizQuestionKey, settings } from "../store.js";
 import { deriveSessionOutcome, outcomeOf, OUTCOME_VERSION, STREAK_WORK_FRACTION, paceBand,
          dayRecordFor,
          roundHistoryByMove, roundStatusOf, shortRoundsFrom,
@@ -380,8 +380,25 @@ export function buildSessionVM(state) {
   const timerZone = ({ work: "TIMED", rest: "REST", roundRest: "ROUND REST", sectionRest: "BLOCK REST",
     sideswitch: "SWITCH", getready: "READY", greeting: "READY", breath: "BREATHE" })[phase] || "TIMED";
   const timerUrgent = sess.urgent && phase !== "roundRest" && phase !== "sectionRest";
+  /* THE RING'S SLOTS (R5): warm-up and get ready are "ready", work is "work",
+     rest is "rest" — and the rest between rounds and blocks is "work" too
+     (it was grape, and purple is recovery's colour only). Each slot is read
+     with a fallback equal to the look before it existed. */
+  const RING_FALLBACK = { ready: ["var(--sun)", "var(--sun-ink)"], work: ["var(--aqua)", "var(--aqua-ink)"], rest: ["var(--mint)", "var(--mint-ink)"] };
+  const ringKey = ({ warmup: "ready", work: "work", rest: "rest", evening: "work" })[timerZoneType] || "work";
+  const [ringC, ringInk] = RING_FALLBACK[ringKey];
+  const timerRing = {
+    key: ringKey,
+    color: "var(--ring-" + ringKey + "," + ringC + ")",
+    light: "var(--ring-" + ringKey + "-light," + ringC + ")",
+    track: "var(--ring-" + ringKey + "-light,var(--surface-2))",
+    fill: "var(--ring-" + ringKey + "-fill,var(--surface))",
+    ink: "var(--ring-" + ringKey + "-ink," + ringInk + ")"
+  };
 
-  const bvMap = { warmup: "sun", coordination: "sun", main: "aqua", prep: "grape", finisher: "mint", [SKILL_BLOCK]: "sea", recovery: "grape" };
+  /* Block badges: prep is warm-up work, so it takes the work slots ("work");
+     only recovery keeps grape. */
+  const bvMap = { warmup: "sun", coordination: "sun", main: "aqua", prep: "work", finisher: "mint", [SKILL_BLOCK]: "sea", recovery: "grape" };
   const blockBadgeVariant = bvMap[circuit.block] || "aqua";
   /* ONE NAME AND ONE EMOJI PER BLOCK, FROM THE ONE PLACE THAT DEFINES THEM.
 
@@ -487,7 +504,7 @@ export function buildSessionVM(state) {
 
   // Exercise timeline (left pane list)
   // Block titles are words on white, so every block uses its family's -ink shade.
-  const BLOCK_COLORS = { warmup: "var(--coral-ink)", coordination: "var(--sun-ink)", main: "var(--sea-ink)", prep: "var(--grape-ink)", finisher: "var(--mint-ink)", [SKILL_BLOCK]: "var(--aqua-ink)", recovery: "var(--grape-ink)" };
+  const BLOCK_COLORS = { warmup: "var(--coral-ink)", coordination: "var(--sun-ink)", main: "var(--sea-ink)", prep: "var(--ring-work-ink,var(--aqua-ink))", finisher: "var(--mint-ink)", [SKILL_BLOCK]: "var(--aqua-ink)", recovery: "var(--grape-ink)" };
 
   /* ---- THE LIST IS THE DAY, AND THE PILL IS WHERE SHE PICKS UP -------------
 
@@ -608,8 +625,12 @@ export function buildSessionVM(state) {
            real session's ledger is one row per step, written in order, and a
            row that never arrives is a round she did not finish. */
         jumpAction: explore && sess.running && !sessionDone && !isCur,
-        cardStyle: "display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:12px;margin:2px 0;box-sizing:border-box;"
-          + (isCur ? "background:var(--aqua-wash);box-shadow:inset 0 0 0 2px var(--aqua-light);" : ""),
+        /* Rows sit on the see-through white row slot (the rail is the hero
+           now); the move she is on is solid white with the 3px ring in the
+           main button's edge colour (R5). */
+        cardStyle: "display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:var(--radius-md);margin:3px 0;box-sizing:border-box;"
+          + (isCur ? "background:var(--surface);box-shadow:inset 0 0 0 3px var(--btn-primary-edge,var(--aqua-light));"
+            : "background:var(--hero-row-bg,transparent);"),
         numStyle: "width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;"
           + "background:" + pill.bg + ";color:" + pill.ink + ";" + (pill.ring ? "box-shadow:inset 0 0 0 2px " + pill.ring + ";" : ""),
         nameStyle: "flex:1;min-width:0;font-weight:800;color:" + NAME_INK[state],
@@ -631,10 +652,14 @@ export function buildSessionVM(state) {
 
   const moodOpts = MOOD_DEFS.map(m => ({
     ...m,
-    style: "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:76px;min-height:72px;padding:12px 14px;border-radius:16px;cursor:pointer;border:3px solid;background:var(--surface);font-family:inherit;"
-      + (sess.mood === m.key ? "border-color:var(--mint);background:#fff;box-shadow:0 4px 0 var(--mint-deep);" : "border-color:var(--hairline);")
+    /* The one calm answer button, 72px tall; the picked mood carries the
+       3px ring in the main button's edge colour (R5). */
+    style: "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:76px;padding:12px 14px;"
+      + kidButton("neutral", { minH: 72, picked: sess.mood === m.key })
   }));
-  const rChip = (sel) => "min-height:56px;padding:9px 14px;border-radius:var(--radius-pill);border:2px solid " + (sel ? "var(--aqua)" : "var(--hairline)") + ";background:" + (sel ? "var(--aqua-wash)" : "var(--surface)") + ";color:" + (sel ? "var(--aqua-ink)" : "var(--ink-soft)") + ";font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;";
+  /* Chips stay pills; the picked one carries the 3px ring in the main
+     button's edge colour (2px border + 1px ring, so nothing moves). */
+  const rChip = (sel) => "min-height:56px;padding:9px 14px;border-radius:var(--radius-pill);border:2px solid " + (sel ? "var(--btn-primary-edge,var(--aqua))" : "var(--hairline)") + ";background:var(--surface);color:" + (sel ? "var(--ink)" : "var(--ink-soft)") + ";" + (sel ? "box-shadow:0 0 0 1px var(--btn-primary-edge,var(--aqua));" : "") + "font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;";
   const reflectWellOpts = REFLECT_WELL.map(t => ({ label: t, style: rChip(sess.wentWell === t) }));
   const reflectNextOpts = REFLECT_NEXT.map(t => ({ label: t, style: rChip(sess.nextTime === t) }));
 
@@ -645,12 +670,12 @@ export function buildSessionVM(state) {
     // One answer per question: the options go grey and dead after the reveal.
     disabled: quizAnswered,
     prefix: quizAnswered ? (o.ok ? "✓" : (sess.quizPick === i ? "✕" : "")) : String.fromCharCode(65 + i),
-    style: "display:flex;align-items:center;gap:10px;width:100%;min-height:56px;text-align:left;padding:12px 16px;border-radius:16px;border:3px solid;font-weight:800;font-size:17px;font-family:inherit;box-sizing:border-box;"
-      + (quizAnswered ? "cursor:default;" : "cursor:pointer;")
-      + (!quizAnswered ? "border-color:var(--hairline);background:var(--surface);color:var(--ink);"
-        : o.ok ? "border-color:var(--mint);background:var(--mint-wash);color:var(--mint-ink);"
-        : sess.quizPick === i ? "border-color:var(--coral);background:color-mix(in srgb, var(--coral) 12%, #fff);color:var(--coral-ink);"
-        : "border-color:var(--hairline);background:var(--surface);color:var(--ink-soft);")
+    style: "display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px 16px;box-sizing:border-box;"
+      + (!quizAnswered ? kidButton("neutral")
+        : o.ok ? markedAnswer("mint")
+        : sess.quizPick === i ? markedAnswer("coral")
+        : kidButton("neutral", { ink: "var(--ink-soft)" }))
+      + (quizAnswered ? "cursor:default;" : "")
   }));
   const quizCorrect = quizAnswered && !!(QZ.opts[sess.quizPick] && QZ.opts[sess.quizPick].ok);
   // The XP line quotes what was ACTUALLY banked (main.js prices the answer off
@@ -720,7 +745,8 @@ export function buildSessionVM(state) {
 
     timerIsTime, timerIsReps, isPrompt, phase,
     timerDisplay: fmtMMSS(sess.timerSecs || 0),
-    timerZone, timerZoneType, timerUrgent,
+    timerZone, timerZoneType, timerUrgent, timerRing, timerZoneInk: timerRing.ink,
+    heroDecorOn: settings.heroDecorOn !== false,
     /* The side is live on TIMED two-sided moves too (engine sets sideLabel to
        "15s first side"), but it only ever reached the small italic dose line —
        the LEFT/RIGHT chips are gated on phase === "reps". The ring label can
@@ -816,11 +842,11 @@ export function buildSessionVM(state) {
     repCheckQuestion: "You counted " + (sess.repsCounted || 0) + " of " + (sess.repsTarget || 0) + ". Did you finish the rest?",
     repCheckRule: "All " + (sess.repsTarget || 0) + " counts the move.",
     repCheckOpts: [
-      /* "All of them" on the Go slots, like the clean check's ✓ Clean (white on
-         mint was 2.2:1); "Almost" ink on sun. 19px weight 900: large text. */
-      { arg: "all",    label: "All of them", bg: "var(--btn-go-bg,var(--mint))", ink: "var(--btn-go-text,#fff)", edge: "var(--btn-go-edge,var(--mint-deep))" },
-      { arg: "almost", label: "Almost",      bg: "var(--sun)",     ink: "var(--ink)",     edge: "var(--sun-deep)" },
-      { arg: "some",   label: "Some",        bg: "var(--surface)", ink: "var(--ink)",     edge: "var(--hairline)" }
+      /* Three answers in the one calm answer-button style (R5): none of them
+         is the "right" one, so none of them gets a colour of its own. */
+      { arg: "all",    label: "All of them" },
+      { arg: "almost", label: "Almost" },
+      { arg: "some",   label: "Some" }
     ],
 
     // complete screen

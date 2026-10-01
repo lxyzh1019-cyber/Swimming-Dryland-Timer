@@ -17,7 +17,7 @@ import { COPY, EMOJI } from "../sport.js";
    values going into attributes.
    ============================================================ */
 
-import { escapeHtml } from "../util.js";
+import { escapeHtml, kidButton, heroDecor, heroShadow, HERO_HOST } from "../util.js";
 
 /* ============================================================
    THE WEEK, AS ONE TABLE
@@ -67,7 +67,7 @@ export function weekTable(vm) {
       <thead>
         <tr>
           <th scope="col" style="padding:0 6px 3px 0;vertical-align:bottom;text-align:left;">
-            <span style="display:inline-flex;align-items:center;gap:7px;background:var(--coral-wash);border-radius:14px;padding:7px 10px;">
+            <span style="display:inline-flex;align-items:center;gap:7px;background:var(--coral-wash);border-radius:var(--radius-md);padding:7px 10px;">
               <span style="font-size:20px;line-height:1;">🔥</span>
               <span style="display:inline-flex;flex-direction:column;align-items:flex-start;">
                 <span style="font-family:var(--font-display);font-weight:600;font-size:20px;color:var(--coral-ink);line-height:1;">${vm.dayStreakVal}</span>
@@ -115,17 +115,17 @@ export function progressScreen(vm) {
       <div style="font-family:var(--font-display);font-weight:600;font-size:32px;color:var(--ink);margin-bottom:18px;">Your Progress 🏅</div>
 
       <div data-progress-top="${vm.stackPrizes ? "stacked" : "side"}" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;${vm.stackPrizes ? "flex-direction:column;" : ""}">
-        <div style="${vm.stackPrizes ? "width:100%;box-sizing:border-box;" : "flex:2;min-width:280px;"}background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);">
+        <div style="${vm.stackPrizes ? "width:100%;box-sizing:border-box;" : "flex:2;min-width:280px;"}background:var(--surface);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow-soft);">
           <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:2px;">
             <span style="font-weight:900;font-size:13px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">This week</span>
             <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${vm.sessionsLabel} · ${vm.minAvgVal} min avg</span>
           </div>
           ${weekTable(vm)}
         </div>
-        <div data-prizes="1" style="${vm.stackPrizes ? "width:100%;box-sizing:border-box;" : "flex:1;min-width:220px;"}background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-xl);padding:16px 18px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;">
+        <div data-prizes="1" style="${vm.stackPrizes ? "width:100%;box-sizing:border-box;" : "flex:1;min-width:220px;"}background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-lg);padding:16px 18px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;">
           <div style="font-weight:900;font-size:13px;letter-spacing:0.05em;color:var(--sun-ink);text-transform:uppercase;">My prizes 🎁</div>
           ${vm.pendingDraws > 0 ? `
-          <button type="button" data-action="openPrizeDraw" style="width:100%;flex-shrink:0;min-height:56px;background:var(--sun);color:var(--ink);border:none;border-radius:var(--radius-pill);padding:10px 16px;font-family:var(--font-display);font-weight:600;font-size:17px;cursor:pointer;box-shadow:0 4px 0 var(--sun-deep);">${escapeHtml(vm.pendingDrawLabel)}</button>` : ""}
+          <button type="button" data-action="openPrizeDraw" style="width:100%;flex-shrink:0;${kidButton("primary", { big: true })}padding:10px 16px;">${escapeHtml(vm.pendingDrawLabel)}</button>` : ""}
           ${vm.hasPrizes ? `
           <div class="list-wrap" style="--fade-to:var(--sun-wash);flex:1 1 auto;min-height:260px;">
             <div data-list="1" style="position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;padding-bottom:8px;">
@@ -143,7 +143,7 @@ export function progressScreen(vm) {
         </div>
       </div>
 
-      <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);margin-bottom:16px;">
+      <div style="background:var(--surface);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow-soft);margin-bottom:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
           <div style="font-weight:900;font-size:13px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">How it's going</div>
           <div style="display:flex;background:var(--surface-2);border-radius:var(--radius-pill);padding:3px;gap:3px;">
@@ -173,14 +173,14 @@ export function progressScreen(vm) {
         <div style="font-size:14px;font-weight:700;color:var(--ink-soft);line-height:1.5;">No sessions in this window yet — train a day and the numbers land here. ${EMOJI.world}</div>`}
       </div>
 
-      <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);margin-bottom:16px;">
+      <div style="background:var(--surface);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow-soft);margin-bottom:16px;">
         <div style="font-weight:900;font-size:13px;letter-spacing:0.05em;color:var(--ink-soft);margin-bottom:14px;text-transform:uppercase;">Milestones</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;">
           ${vm.milestones.map(ms => `<div style="${ms.style}">${escapeHtml(ms.icon)} ${escapeHtml(ms.label)}</div>`).join("")}
         </div>
       </div>
 
-      <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);margin-bottom:16px;">
+      <div style="background:var(--surface);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow-soft);margin-bottom:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
           <div style="font-weight:900;font-size:13px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">Training log</div>
           <div style="display:flex;background:var(--surface-2);border-radius:var(--radius-pill);padding:3px;gap:3px;">
@@ -209,17 +209,21 @@ export function progressScreen(vm) {
         </div>
       </div>
 
-      <div style="background:linear-gradient(160deg,var(--aqua-wash),var(--surface));border:1.5px solid var(--aqua-light);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);">
-        <div style="display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,#143B4A,var(--aqua-ink));border-radius:var(--radius-lg);padding:16px 18px;color:#fff;flex-wrap:wrap;">
-          <div style="width:66px;height:66px;border-radius:50%;background:rgba(255,255,255,0.18);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;border:3px solid rgba(255,255,255,0.5);">
-            <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;opacity:0.85;">LVL</div>
+      <div style="background:linear-gradient(160deg,var(--aqua-wash),var(--surface));border:2px solid var(--aqua-light);border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow-soft);">
+        <!-- The level card is a hero card (R5): hero-bg and hero-text, the points
+             bar on the xp-bar slot over a white 60% track, the rank name and the
+             small words on the hero-chip, and the ripples / snow behind it when they are on. -->
+        <div data-level-card="1" style="display:flex;align-items:center;gap:16px;background:var(--hero-bg,linear-gradient(135deg,var(--ink),var(--aqua-ink)));border-radius:var(--radius-lg);padding:16px 18px;color:var(--hero-text,#fff);${HERO_HOST}overflow:hidden;flex-wrap:wrap;">
+          ${heroDecor(vm.heroDecorOn)}
+          <div style="width:66px;height:66px;border-radius:50%;background:var(--hero-chip,rgba(255,255,255,0.18));display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;border:3px solid rgba(255,255,255,0.5);">
+            <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;">LVL</div>
             <div style="font-family:var(--font-display);font-size:28px;font-weight:600;line-height:1;">${vm.level.levelNum}</div>
           </div>
           <div style="flex:1;min-width:200px;">
-            <div style="font-family:var(--font-display);font-size:24px;font-weight:600;line-height:1.1;">${vm.level.rankIcon} ${vm.level.rankName}</div>
-            <div style="font-size:14px;opacity:0.9;margin:3px 0 9px;font-weight:700;">${vm.level.xp} XP${vm.level.atSummit ? " · top of the ladder 🏔️" : ` · ${vm.level.xpToNext} XP to ${vm.level.nextRank} →`}</div>
-            <div style="height:10px;background:rgba(255,255,255,0.22);border-radius:10px;overflow:hidden;">
-              <div style="width:${vm.level.levelPct}%;height:100%;background:#fff;border-radius:10px;transition:width 0.5s;"></div>
+            <div><span style="display:inline-block;background:var(--hero-chip,transparent);border-radius:var(--radius-pill);padding:2px 12px;font-family:var(--font-display);font-size:24px;font-weight:600;line-height:1.1;${heroShadow(vm.heroDecorOn)}">${vm.level.rankIcon} ${vm.level.rankName}</span></div>
+            <div style="margin:3px 0 9px;"><span style="display:inline-block;background:var(--hero-chip,transparent);border-radius:var(--radius-pill);padding:2px 10px;font-size:14px;font-weight:700;">${vm.level.xp} XP${vm.level.atSummit ? " · top of the ladder 🏔️" : ` · ${vm.level.xpToNext} XP to ${vm.level.nextRank} →`}</span></div>
+            <div style="height:10px;background:rgba(255,255,255,0.6);border-radius:10px;overflow:hidden;">
+              <div style="width:${vm.level.levelPct}%;height:100%;background:var(--xp-bar,#fff);border-radius:10px;transition:width 0.5s;"></div>
             </div>
           </div>
         </div>
@@ -241,11 +245,11 @@ export function progressScreen(vm) {
                 <span style="${os.badgeStyle}margin-top:12px;align-self:flex-start;">${os.badge}</span>
                 <div style="font-size:14px;font-weight:700;color:var(--ink);line-height:1.5;margin-top:10px;flex:1;">${os.story}</div>
                 ${os.unlocked ? `
-                <div style="background:var(--aqua-wash);border-radius:12px;padding:9px 11px;margin-top:12px;display:flex;gap:8px;align-items:flex-start;">
+                <div style="background:var(--aqua-wash);border-radius:var(--radius-md);padding:9px 11px;margin-top:12px;display:flex;gap:8px;align-items:flex-start;">
                   <span style="font-size:15px;flex-shrink:0;">${COPY.transferIcon}</span>
                   <span style="font-size:13px;font-weight:800;color:var(--aqua-ink);line-height:1.4;">${os.transfer}</span>
                 </div>
-                <div style="background:var(--surface-2);border-radius:12px;padding:9px 11px;margin-top:8px;">
+                <div style="background:var(--surface-2);border-radius:var(--radius-md);padding:9px 11px;margin-top:8px;">
                   <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;">Did you know?</div>
                   <div style="font-size:13px;font-weight:700;color:var(--ink);line-height:1.4;margin-top:3px;">${os.fact}</div>
                 </div>` : ""}

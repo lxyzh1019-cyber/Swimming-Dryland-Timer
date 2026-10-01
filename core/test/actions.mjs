@@ -1121,5 +1121,42 @@ engine.exitSession();
   main.state.readiness = null;
 }
 
+/* --- THE RIPPLES / SNOW SWITCH (R5) ------------------------------------------
+   A grown-up setting like the other switches: behind the same gate, named in
+   GATE_REASON, on by default — and a backup written before the setting existed
+   restores with it ON (a missing key is on, never off). */
+{
+  gate.lockGate(); resetGateState();
+  store.updateSettings({ heroDecorOn: true });
+  ok(!gate.UNGATED_ACTIONS.includes("toggleHeroDecor") && typeof gate.GATE_REASON.toggleHeroDecor === "string",
+     "the ripples / snow switch is gated, with a reason the gate can name");
+  main.actions.toggleHeroDecor();
+  ok(store.settings.heroDecorOn === true && main.state.gateAsk === "toggleHeroDecor",
+     "a locked tap on the ripples / snow switch asks for a grown-up and changes nothing");
+  main.actions.answerGate(TEST_PIN);
+  ok(store.settings.heroDecorOn === false && store.loadSettings().heroDecorOn === false,
+     "after the grown-up check it is off, and saved off");
+  ok(tvm.buildTodayVM({ expanded: {}, isWide: true }).heroDecorOn === false, "and the screens read it as off");
+  main.actions.toggleHeroDecor();
+  ok(store.settings.heroDecorOn === true, "switched again (still unlocked), it is back on");
+  gate.lockGate(); resetGateState();
+
+  /* An old backup: its settings carry no heroDecorOn at all. */
+  localStorage.clear(); store.migrate();
+  ok(store.DEFAULT_SETTINGS.heroDecorOn === true && store.loadSettings().heroDecorOn === true, "a fresh device starts with it on");
+  store.updateSettings({ athleteName: "Old Backup" });
+  const payload = store.exportProfileData();
+  const sKey = sport.STORAGE_KEYS.settings;
+  delete payload.data[sKey].heroDecorOn;
+  localStorage.clear(); store.migrate();
+  store.importProfileData(payload, { force: true });
+  const raw = JSON.parse(localStorage.getItem(sKey) || "{}");
+  ok(raw.athleteName === "Old Backup" && !("heroDecorOn" in raw),
+     "the old backup's settings were restored as written, with no heroDecorOn in them");
+  ok(store.loadSettings().heroDecorOn === true, "and the restored settings read the ripples / snow as ON");
+  localStorage.clear(); store.migrate();
+  resetGateState();
+}
+
 console.log(`✓ action-layer tests passed (${passed} assertions)`);
 process.exit(0);

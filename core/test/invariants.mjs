@@ -638,7 +638,7 @@ ok(/CACHE_PREFIX/.test(swSrc) && /k\.startsWith\(CACHE_PREFIX\)/.test(swSrc),
     const blank = moveQs.find(q => !q.why) || { ...moveQs[0], why: "" };
     const qd = { qs: [blank], idx: 0, picks: [blank.opts.findIndex(o => o.ok)], done: false, scored: false, willPay: true };
     const answeredHtml = overlays.quizDeckHtml(qd);
-    ok(/data-action="nextQuizDeck"/.test(answeredHtml) && !/background:var\(--aqua-wash\);border-radius:14px;padding:13px 15px;/.test(answeredHtml),
+    ok(/data-action="nextQuizDeck"/.test(answeredHtml) && !/background:var\(--aqua-wash\);border-radius:var\(--radius-lg\);padding:13px 15px;/.test(answeredHtml),
        "G1: an answered card with nothing to pair draws no line under it (" + emptyWhy + " such cards), and still offers Next");
     localStorage.clear(); store.migrate();
   }

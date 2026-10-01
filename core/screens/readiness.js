@@ -6,7 +6,7 @@ import { COPY, IMAGES } from "../sport.js";
    front/back maps share one renderer.
    ============================================================ */
 
-import { escapeHtml, imgWithFallbacks, photoSources } from "../util.js";
+import { escapeHtml, imgWithFallbacks, photoSources, kidButton, heroDecor, heroShadow, HERO_HOST } from "../util.js";
 
 /* Zone hit-areas & highlights: percent coords per view. A zone can appear
    twice in a view (shoulders, arms). r = border-radius px. */
@@ -67,7 +67,7 @@ function bodyMap(vm, view) {
     ? `<span style="background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);font-size:13px;font-weight:900;letter-spacing:0.06em;padding:6px 16px;border-radius:var(--radius-pill);margin-bottom:8px;">FRONT VIEW</span>`
     : `<span style="background:var(--btn-primary-bg,var(--sea));color:var(--btn-primary-text,#fff);font-size:13px;font-weight:900;letter-spacing:0.06em;padding:6px 16px;border-radius:var(--radius-pill);margin-bottom:8px;">BACK VIEW</span>`;
   return `
-  <div style="flex:1;background:var(--bg);border:2px solid var(--hairline);border-radius:22px;padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+  <div style="flex:1;background:var(--bg);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     ${pill}
     <div style="position:relative;height:480px;width:fit-content;">
       ${imgWithFallbacks(photoSources(img), `alt="${view === "front" ? "Front" : "Back"} view ${COPY.bodyMapAlt}" style="height:100%;width:auto;display:block;pointer-events:none;"`)}
@@ -82,7 +82,7 @@ function bodyMap(vm, view) {
 function resultCard(vm, { areaLabel = "" } = {}) {
   const c = vm.resultCta;
   return `
-  <div data-body-result style="width:100%;max-width:${areaLabel ? 680 : 720}px;box-sizing:border-box;margin-top:${areaLabel ? "18px" : "40px"};${areaLabel ? "margin-left:auto;margin-right:auto;" : ""}background:var(--surface);border-radius:var(--radius-xl);padding:24px;box-shadow:var(--shadow-lift);border-top:6px solid ${vm.light.color};">
+  <div data-body-result style="width:100%;max-width:${areaLabel ? 680 : 720}px;box-sizing:border-box;margin-top:${areaLabel ? "18px" : "40px"};${areaLabel ? "margin-left:auto;margin-right:auto;" : ""}background:var(--surface);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-lift);border-top:6px solid ${vm.light.color};">
     ${areaLabel ? `<div style="font-size:13px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:10px;">${areaLabel}</div>` : ""}
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
       <div style="font-size:56px;line-height:1;">${vm.light.emoji}</div>
@@ -114,7 +114,9 @@ function resultCard(vm, { areaLabel = "" } = {}) {
       <span style="font-size:24px;flex-shrink:0;">${vm.grownupConfirmed ? "☑️" : "⬜"}</span>
       <span style="font-weight:800;font-size:15px;color:var(--ink);line-height:1.35;">A grown-up said it's OK to do a light day. <span style="color:var(--ink-soft);font-weight:700;">Tap after you've checked in.</span></span>
     </button>` : ""}
-    <button type="button" ${vm.mayStart ? `data-action="rResultCta" data-arg="${c.action}"` : "disabled"} style="width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:${c.color};color:${c.text};border:none;border-radius:var(--radius-pill);padding:12px 18px;min-height:64px;font-family:var(--font-display);font-weight:900;font-size:24px;${vm.mayStart ? "cursor:pointer;box-shadow:0 5px 0 " + c.deep + ";" : "opacity:0.45;cursor:default;"}">
+    <!-- The light keeps its own colours; the button takes the one shape (R5):
+         no border, 16px corner, 4px edge, 22px on 64px. -->
+    <button type="button" ${vm.mayStart ? `data-action="rResultCta" data-arg="${c.action}"` : "disabled"} style="width:100%;display:flex;align-items:center;justify-content:center;gap:12px;background:${c.color};color:${c.text};border:none;border-radius:var(--radius-md);padding:12px 18px;min-height:64px;font-family:var(--font-ui);font-weight:900;font-size:22px;${vm.mayStart ? "cursor:pointer;box-shadow:0 4px 0 " + c.deep + ";" : "opacity:0.45;cursor:default;"}">
       <span style="font-size:24px;">${c.icon}</span> ${c.label}
     </button>
     ${c.secondaryLabel ? `<button type="button" data-action="${c.secondaryAction === "retry" ? "rRetryCheck" : "rResultSecondary"}" data-arg="${c.secondaryAction}" style="width:100%;background:none;border:none;cursor:pointer;font-weight:800;font-size:14px;color:var(--ink-soft);text-decoration:underline;padding:12px 6px 2px;min-height:56px;">${c.secondaryLabel}</button>` : ""}
@@ -135,23 +137,26 @@ export function readinessScreen(vm) {
 
   const questionsStep = vm.isQuestionsStep ? `
     ${vm.isNarrow ? `
-      <div style="background:linear-gradient(165deg,var(--hero-from,var(--aqua-light)) 0%,var(--hero-to,var(--aqua)) 70%);color:var(--hero-text,#fff);padding:18px 20px 16px;display:flex;flex-direction:column;gap:12px;">
+      <div style="background:var(--hero-bg,linear-gradient(165deg,var(--aqua-light) 0%,var(--aqua) 70%));color:var(--hero-text,#fff);${HERO_HOST}padding:18px 20px 16px;display:flex;flex-direction:column;gap:12px;">
+        ${heroDecor(vm.heroDecorOn)}
         <div style="display:flex;align-items:center;gap:12px;">
           ${backBtn}
           ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:56px;height:56px;object-fit:contain;flex-shrink:0;" alt=""`)}
           <div style="min-width:0;">
-            <div style="font-family:var(--font-display);font-weight:600;font-size:24px;line-height:1.1;display:flex;align-items:center;gap:8px;">Body Check <span style="width:24px;height:24px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:var(--hero-text,#fff);font-size:19px;font-weight:900;line-height:1;">✓</span></span></div>
-            <div style="font-size:13px;font-weight:700;margin-top:3px;line-height:1.3;">${COPY.readinessIntro}, ${name}!</div>
+            <div style="font-family:var(--font-display);font-weight:600;font-size:24px;line-height:1.1;display:flex;align-items:center;gap:8px;${heroShadow(vm.heroDecorOn)}">Body Check <span style="width:24px;height:24px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:var(--ink);font-size:19px;font-weight:900;line-height:1;text-shadow:none;">✓</span></span></div>
+            <div style="margin-top:3px;"><span style="display:inline-block;background:var(--hero-chip,transparent);border-radius:var(--radius-md);padding:2px 8px;font-size:13px;font-weight:700;line-height:1.3;">${COPY.readinessIntro}, ${name}!</span></div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">${stepper(vm, 7)}</div>
       </div>` : `
-      <div style="width:340px;flex-shrink:0;background:linear-gradient(165deg,var(--hero-from,var(--aqua-light)) 0%,var(--hero-to,var(--aqua)) 70%);color:var(--hero-text,#fff);display:flex;flex-direction:column;padding:26px 28px;">
+      <div style="width:340px;flex-shrink:0;background:var(--hero-bg,linear-gradient(165deg,var(--aqua-light) 0%,var(--aqua) 70%));color:var(--hero-text,#fff);${HERO_HOST}display:flex;flex-direction:column;padding:26px 28px;">
+        ${heroDecor(vm.heroDecorOn)}
         ${backBtn}
-        ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:140px;height:140px;object-fit:contain;margin:22px 0 10px;" alt=""`)}
-        <div style="font-family:var(--font-display);font-weight:600;font-size:32px;line-height:1.1;display:flex;align-items:center;gap:12px;">Body Check <span style="width:30px;height:30px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:var(--hero-text,#fff);font-size:19px;font-weight:900;line-height:1;">✓</span></span></div>
-        <div style="font-size:15px;font-weight:700;margin-top:8px;line-height:1.4;">${COPY.readinessIntro}, ${name}!</div>
-        <div style="margin-top:26px;display:flex;flex-direction:column;gap:12px;">${stepper(vm, 10)}</div>
+        <!-- Title and subtitle at the top of the panel (R5), the mascot under them. -->
+        <div style="font-family:var(--font-display);font-weight:600;font-size:32px;line-height:1.1;display:flex;align-items:center;gap:12px;margin-top:18px;${heroShadow(vm.heroDecorOn)}">Body Check <span style="width:30px;height:30px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:var(--ink);font-size:19px;font-weight:900;line-height:1;text-shadow:none;">✓</span></span></div>
+        <div style="margin-top:8px;"><span style="display:inline-block;background:var(--hero-chip,transparent);border-radius:var(--radius-md);padding:4px 10px;font-size:15px;font-weight:700;line-height:1.4;">${COPY.readinessIntro}, ${name}!</span></div>
+        ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:140px;height:140px;object-fit:contain;margin:18px 0 0;" alt=""`)}
+        <div style="margin-top:18px;display:flex;flex-direction:column;gap:12px;">${stepper(vm, 10)}</div>
         <div style="flex:1;"></div>
       </div>`}
 
@@ -210,15 +215,15 @@ export function readinessScreen(vm) {
 
       ${vm.noZonesYet ? `<div style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:16px;">
         <div style="text-align:center;font-family:var(--font-hand);font-size:22px;font-weight:700;color:var(--ink-soft);">Tap the spot that feels different — Coach will ask how it feels.</div>
-        <button type="button" data-action="rResultCta" data-arg="continue" style="display:flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:0 24px;border:2px solid var(--mint);background:var(--mint-wash);color:var(--mint-ink);border-radius:var(--radius-pill);font-weight:900;font-size:16px;cursor:pointer;font-family:inherit;">
+        <button type="button" data-action="rResultCta" data-arg="continue" style="display:flex;align-items:center;justify-content:center;gap:10px;${kidButton("primary")}padding:0 24px;">
           <span style="font-size:20px;" aria-hidden="true">✨</span> ${vm.noMarksCtaLabel} — go with ${vm.noMarksLight}
         </button>
       </div>` : ""}
       ${vm.showInlineBodyResult ? resultCard(vm, { areaLabel: vm.areaLabel }) : ""}
 
       ${vm.showZonePopup ? `
-        <div data-action="rClosePopup" style="position:fixed;inset:0;background:rgba(20,59,74,0.45);z-index:50;display:flex;align-items:center;justify-content:center;">
-          <div data-stop-propagation="1" style="background:var(--surface);border-radius:22px;padding:22px 24px;width:420px;max-width:90vw;box-sizing:border-box;box-shadow:var(--shadow-pop);display:flex;flex-direction:column;gap:10px;">
+        <div data-action="rClosePopup" style="position:fixed;inset:0;background:var(--scrim);z-index:50;display:flex;align-items:center;justify-content:center;">
+          <div data-stop-propagation="1" style="background:var(--surface);border-radius:var(--radius-lg);padding:22px 24px;width:420px;max-width:90vw;box-sizing:border-box;box-shadow:var(--shadow-pop);display:flex;flex-direction:column;gap:10px;">
             <div style="font-family:var(--font-display);font-weight:600;font-size:24px;color:var(--ink);">${vm.pendingZoneLabel} — how does it feel?</div>
             ${vm.popupOptions.map(po => `
               <button type="button" data-action="rSetZoneSev" data-arg="${vm.pendingZone}|${po.level}" style="display:flex;align-items:center;gap:12px;background:var(--bg);border:3px solid ${po.color};border-radius:var(--radius-lg);padding:12px 14px;cursor:pointer;text-align:left;min-height:60px;">
@@ -235,7 +240,7 @@ export function readinessScreen(vm) {
     </div>` : "";
 
   return `
-  <div style="display:flex;flex-direction:${vm.cardDir};background:var(--surface);border-radius:30px;box-shadow:0 18px 44px rgba(20,59,74,0.16);overflow:hidden;min-height:800px;">
+  <div style="display:flex;flex-direction:${vm.cardDir};background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-frame);overflow:hidden;min-height:800px;">
     ${questionsStep}
     ${bodyStep}
   </div>`;

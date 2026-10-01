@@ -6,7 +6,7 @@
 
 import { LADDER, RANK_LORE, RANK_TEASE, DAYS, DAY_SHORT, fmtXp } from "../data.js";
 import { COPY, EMOJI, LORE_TRANSFER_FIELD } from "../sport.js";
-import { levelFromXp, loadJourney, redeemPrize, prizeUndoOpen, pendingDrawCount } from "../store.js";
+import { levelFromXp, loadJourney, redeemPrize, prizeUndoOpen, pendingDrawCount, settings } from "../store.js";
 /* EVERY DAY-LEVEL FACT ON THIS SCREEN IS A VIEW OF THE DAY RECORD (dayRecords
    in js/outcome.js): the week table, the period board, the training log and
    the streak. This file used to file sessions under the date they FINISHED,
@@ -15,7 +15,7 @@ import { levelFromXp, loadJourney, redeemPrize, prizeUndoOpen, pendingDrawCount 
    — which is how a ragged round read 3/3 in the table and "2 of 3" beneath it. */
 import { dayRecords, scheduleStreak } from "../outcome.js";
 import { estimateSessionSecs } from "../engine.js";
-import { edmontonWeekISODates, edmontonISO, todayISODate, DAY_MS } from "../util.js";
+import { edmontonWeekISODates, edmontonISO, todayISODate, DAY_MS, kidButton, PICKED_RING } from "../util.js";
 import { buildJourney, isTrainingRecord } from "./today.js";
 
 /* Every label logEntryView can produce has a chip here; "TRY-IT" fell through
@@ -263,7 +263,7 @@ export function buildProgressVM(state) {
   const logScope = state.logScope || "week";
   const logItems = logScope === "week" ? allLog.slice(0, 4) : allLog;
   const logScopeTab = (v) => "min-height:56px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:15px;padding:0 16px;font-family:inherit;"
-    + (logScope === v ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);" : "background:transparent;color:var(--ink-soft);");
+    + (logScope === v ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);box-shadow:" + PICKED_RING + ";" : "background:transparent;color:var(--ink-soft);");
   const logScopeTabs = [
     { label: "Recent", key: "week", style: logScopeTab("week") },
     { label: "All", key: "month", style: logScopeTab("month") }
@@ -277,12 +277,14 @@ export function buildProgressVM(state) {
     const spent = pz.redeemed && !canUndo;
     return {
       ...pz, canUndo, spent,
-      cardStyle: "display:flex;align-items:center;gap:10px;background:" + (pz.redeemed ? "var(--surface-2)" : "var(--surface)") + ";border:2px" + (pz.redeemed ? " dashed var(--hairline)" : " solid var(--sun)") + ";border-radius:16px;padding:10px 12px;" + (pz.redeemed ? "opacity:0.65;" : ""),
+      cardStyle: "display:flex;align-items:center;gap:10px;background:" + (pz.redeemed ? "var(--surface-2)" : "var(--surface)") + ";border:2px" + (pz.redeemed ? " dashed var(--hairline)" : " solid var(--sun)") + ";border-radius:var(--radius-md);padding:10px 12px;" + (pz.redeemed ? "opacity:0.65;" : ""),
       redeemLabel: canUndo ? "✓ Used · undo" : pz.redeemed ? "✓ Used" : "Redeem",
-      redeemBtnStyle: "flex-shrink:0;min-height:56px;border-radius:var(--radius-pill);border:none;cursor:" + (spent ? "default" : "pointer") + ";font-weight:900;font-size:15px;padding:0 16px;font-family:inherit;"
-        + (canUndo ? "background:var(--surface);color:var(--ink-soft);border:1.5px solid var(--hairline);"
-          : pz.redeemed ? "background:transparent;color:var(--ink-soft);"
-          : "background:var(--sun);color:var(--ink);")
+      /* Redeem is a main action (the main colour); "Used · undo" a calm one
+         (R5). A spent prize keeps the plain word, not a button look. */
+      redeemBtnStyle: "flex-shrink:0;padding:0 16px;"
+        + (canUndo ? kidButton("neutral", { ink: "var(--ink-soft)" })
+          : pz.redeemed ? "min-height:56px;border-radius:var(--radius-pill);border:none;cursor:default;font-weight:900;font-size:15px;font-family:inherit;background:transparent;color:var(--ink-soft);"
+          : kidButton("primary"))
     };
   });
 
@@ -337,7 +339,7 @@ export function buildProgressVM(state) {
     periodKey,
     tabs: PROGRESS_PERIODS.map(p => ({ ...p, style:
       "min-height:56px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:15px;padding:0 16px;font-family:inherit;"
-      + (p.key === periodKey ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);" : "background:transparent;color:var(--ink-soft);") })),
+      + (p.key === periodKey ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);box-shadow:" + PICKED_RING + ";" : "background:transparent;color:var(--ink-soft);") })),
     rangeLabel: pCount
       ? new Date(range.from + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Edmonton" })
         + " – " + new Date(range.to + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Edmonton" })
@@ -382,6 +384,7 @@ export function buildProgressVM(state) {
     periodStats,
     level, rankStory, analyticsWeek, weekDays, milestones,
     logItems, logScopeTabs, hasLog: allLog.length > 0,
+    heroDecorOn: settings.heroDecorOn !== false,
     prizesWon, hasPrizes: prizesWon.length > 0,
     /* A draw she is owed gets a real button here. The prize overlay tells her
        to "pick it up from Progress later" when a draw has to wait for sync;
