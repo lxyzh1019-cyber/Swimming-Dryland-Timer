@@ -581,7 +581,7 @@ function controls(vm, wide) {
      needs confirming, because nothing here is running or being saved. */
   if (vm.explore) {
     return `
-  <button type="button" data-action="advance" style="width:100%;min-height:64px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--mint);color:var(--text-on-mint,#fff);box-shadow:0 4px 0 var(--mint-deep);font-family:inherit;">${vm.doneLabel}</button>
+  <button type="button" data-action="advance" style="width:100%;min-height:64px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--btn-go-bg,var(--mint));color:var(--btn-go-text,var(--text-on-mint,#fff));box-shadow:0 4px 0 var(--btn-go-edge,var(--mint-deep));font-family:inherit;">${vm.doneLabel}</button>
   <div style="display:flex;gap:${wide ? 14 : 8}px;">
     ${backBtn}
     ${rowBtn("skipEx", "⏭ Skip", "border:2px solid var(--hairline);background:var(--surface);color:var(--ink-soft);")}
@@ -594,7 +594,7 @@ function controls(vm, wide) {
   <div style="background:var(--sun-wash);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:8px;font-size:13px;font-weight:800;color:var(--sun-ink);line-height:1.4;text-align:center;">
     ⏸ You left the app, so I stopped the clock. Nothing was counted while you were away — tap Resume when you're ready.
   </div>` : ""}
-  <button type="button" data-action="advance" style="width:100%;min-height:64px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--mint);color:var(--text-on-mint,#fff);box-shadow:0 4px 0 var(--mint-deep);font-family:inherit;">${vm.doneLabel}</button>
+  <button type="button" data-action="advance" style="width:100%;min-height:64px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--btn-go-bg,var(--mint));color:var(--btn-go-text,var(--text-on-mint,#fff));box-shadow:0 4px 0 var(--btn-go-edge,var(--mint-deep));font-family:inherit;">${vm.doneLabel}</button>
   <div style="display:flex;gap:${wide ? 14 : 8}px;">
     <button type="button" data-action="stopNow" style="flex:1;min-height:56px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:var(--btn-stop-bg,var(--stop));color:#fff;box-shadow:0 3px 0 var(--btn-stop-edge,var(--stop-ink));font-family:inherit;">🔴 STOP</button>
     ${vm.timerNotPaused
@@ -608,7 +608,7 @@ function controls(vm, wide) {
   <div style="display:flex;${wide ? "align-items:center;gap:12px;" : "flex-direction:column;gap:8px;"}background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-md);padding:10px 14px;box-sizing:border-box;">
     <span style="${wide ? "flex:1;" : ""}font-weight:800;font-size:${wide ? 15 : 14}px;color:var(--sun-ink);">Skip this move? It won&#39;t count.</span>
     <div style="display:flex;gap:8px;flex-shrink:0;">
-      <button type="button" data-action="cancelSkip" style="${wide ? "" : "flex:1;"}min-height:56px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:17px;cursor:pointer;padding:0 18px;background:var(--mint);color:var(--text-on-mint,#fff);box-shadow:0 3px 0 var(--mint-deep);font-family:inherit;">Keep going</button>
+      <button type="button" data-action="cancelSkip" style="${wide ? "" : "flex:1;"}min-height:56px;border-radius:var(--radius-md);border:none;font-weight:900;font-size:17px;cursor:pointer;padding:0 18px;background:var(--btn-go-bg,var(--mint));color:var(--btn-go-text,var(--text-on-mint,#fff));box-shadow:0 3px 0 var(--btn-go-edge,var(--mint-deep));font-family:inherit;">Keep going</button>
       <button type="button" data-action="confirmSkipEx" style="${wide ? "" : "flex:1;"}min-height:56px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-weight:900;font-size:17px;cursor:pointer;padding:0 16px;background:var(--surface);color:var(--ink-soft);font-family:inherit;">⏭ Skip it</button>
     </div>
   </div>` : ""}

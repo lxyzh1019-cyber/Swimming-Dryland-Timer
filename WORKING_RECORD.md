@@ -15,6 +15,7 @@ Single working record for this repository. Updated by the main session at the en
 
 - Plan v1 approved 2026-09-30 (R4, Splash redesign; plan file `plans/2026-09-30-plan-v1-splash-redesign.md` in the swim repo): six paired PRs (tokens/slots → Session → Body Check → Today → Finish + Quiz Deck → Progress + Grown-up) from the design handoff `splash-redesign-handoff.zip` (DESIGN.md, PROBLEMS.md, tokens-slots.css, mockups). Screens read colour slots with fallbacks equal to today's look; skate fills its own slot values. All 13 non-cosmetic items kept (row-tap move list, auto-scroll on Body Check, phone block fold, portrait/phone day-card-first, finish reorder with "See every move", kid line instead of exact counts, Quiz Deck paired fact, week table in Grown-up Analytics, library grouped by block, ⚡️ selector, prizes stack <900px, light/result colour data). New shared size-floor test. Stops after each PR pair for the user's merge. Screenshots via a one-off Playwright install outside the repos, network blocked.
 - Plan v2 approved 2026-09-30 (user instruction after the PR 1 merge): K7 journey map colours move from PR 4 into PR 2; no other change.
+- Plan v3 approved 2026-09-30 (user choice): Go/Done, Keep going and the green-light Start button use Deep green (white on mint-ink, darker edge) via slots `btn-go-bg/edge/text`; applied on the PR 2 branch.
 
 ## Pending
 - none
@@ -35,6 +36,7 @@ Single working record for this repository. Updated by the main session at the en
 | 11 | R4 2026-09-30 | "Take a look at update plan, validate and prepare a plan for the implementation" (Splash redesign handoff) | done | Plan v1: 11 corrections to the handoff's code references; all 13 non-cosmetic items kept by user choice |
 | 12 | R4 2026-09-30 | "Show me all the confliction with current app feature, function besides the style" | done | 13 items listed with user-facing effect; user: "keep all in the plan" |
 | 13 | R4 2026-09-30 | "The figure skate level block background colour is wrong, it can not use the same colour from swimming dryland timer" | done (in PR 2) | user 2026-09-30: "move the map color fix forward into pr2" → plan v2. Pre-existing (K7): the journey/level map gradient is literal swim hex in shared core; unchanged by PR 1 (before = after); fixed in PR 4 via the journey slots set in PR 1 (skate rose/sand) |
+| 14 | R4 2026-09-30 | "The Go button in the timer is ugly, I need a better option; contrast important, overall colour combo more important" | done (PR 2) | 4 options shown on both palettes; user chose Deep green (white on mint-ink) → plan v3 |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Regressions caused | Workarounds/exceptions | Last symptom | Rewrite-vs-repair reviewed? |
@@ -66,7 +68,7 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R2 pinned test clock | PARTIAL | done + tests green locally on a real Sunday; awaiting CI on the PR + merge |
 | R4-1 PR 1 tokens, slots, stylesheet fix, docs copy (both repos) | COMPLETE | opus-worker 2026-09-30: changes made on `claude/splash-pr1-tokens-slots`; `npm test` exit 0; `diff -rq core` empty; release-check ok; Today screenshots 0 px diff at 3 sizes; commit/push/PR not run by the worker (executor rule) — COMPLETE once the PR is open; PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#67 |
 | R4-2 Merge PR pair 1 | COMPLETE | merged by user 2026-09-30: swim #67 → main 42f2fbd, skate #41 → main 58de412 |
-| R4-3 PR 2 Session screen + size-floor test + journey map colours (K7 moved from PR 4, plan v2) | COMPLETE | opus-worker 2026-09-30 on `claude/splash-pr2-session`: session controls/list/ring/rail/estimate, journey map slots, new `core/test/design.mjs`, sw.js v24 → v25; `npm test` exit 0 both TZs; `diff -rq core` empty; release-check ok on working tree; screenshots 26 per app + contact sheet; DOM heights at 1194×834 Done 64, STOP/Pause/Skip 56, row 56, Back 48, rail toggle 48. Not committed (executor rule) — main session completes it after the PR opens; PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#68 |
+| R4-3 PR 2 Session screen + size-floor test + journey map colours (K7 moved from PR 4, plan v2) | COMPLETE | opus-worker 2026-09-30 on `claude/splash-pr2-session`: session controls/list/ring/rail/estimate, journey map slots, new `core/test/design.mjs`, sw.js v24 → v25; `npm test` exit 0 both TZs; `diff -rq core` empty; release-check ok on working tree; screenshots 26 per app + contact sheet; DOM heights at 1194×834 Done 64, STOP/Pause/Skip 56, row 56, Back 48, rail toggle 48. Not committed (executor rule) — main session completes it after the PR opens; PR open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#68; plan v3 Deep green applied (tests, screenshots) |
 | R4-4 Merge PR pair 2 | WAITING ON YOU — merge PR pair 2 | |
 | R4-5 PR 3 Body Check | NOT STARTED | |
 | R4-6 Merge PR pair 3 | NOT STARTED | |
@@ -101,6 +103,7 @@ Structural option (not approved, not done): a test that renders every screen, co
 - 2026-09-30 R4 PR 2: screenshots (Playwright Chromium, touch, fake clock Wed 2026-09-23 12:00 Edmonton, every non-127.0.0.1 request aborted) of Today + get ready, timed, rep ring, rest, paused, skip confirm, STOP, rail hidden (wide) at 1194×834, 834×1194, 390×844, driven through Let's go → Body Check (4 × yes) → Start training; all states reached; `C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr2/swim-pr2-contact-sheet.png`
 - 2026-09-30 R4 PR 2: DOM heights at 1194×834: Done 64, STOP 56, Pause 56, Skip 56, move-list row 56, Back a move 48, rail toggle 48
 - 2026-09-30 R4 PR 2 live site / device → untested
+- 2026-09-30 R4 PR 2 plan v3 Deep green (opus-worker): `npm test` exit 0, both TZs, all suites green (swim leadin-data 19, smoke 1401, core actions 302, dayrecords 251, design 224, integrity 48, interaction 18, invariants 569, landing 7, core leadin 42, session 325, shell 256; design 221 → 224: Keep going on btn-go checked in 3 layouts); `diff -rq core` → empty; sw.js still v25; computed style at 1194×834: Done and Keep going white on mint-ink, edge #04342C, Done 64px/20px, Keep going 56px; contrast white on mint-ink 6.6; screenshots timed, rep ring, skip confirm both apps: `C:/Users/HENGZ~1/AppData/Local/Temp/claude/D--User-Heng-Z-Documents-GitHub-Swimming-Dryland-Timer/59e66598-6ee2-474f-b662-9fef28e89c20/scratchpad/shots/pr2b/pr2b-go-button.png`
 
 ## Open questions / blockers
 - No visible deploy stamp on the page (rules require one) — flagged, out of scope this round.
@@ -157,4 +160,5 @@ Structural option (not approved, not done): a test that renders every screen, co
 | Size-floor test with shrinking allowance | added | `core/test/design.mjs` |
 | ⓘ as its own 26px button on each row | intentionally removed | approved plan (S3): the whole row opens the detail |
 | Journey map dark navy header band and fixed 80% #CDEDE7 stop | intentionally removed | approved plan (K7); mockup Card A has no dark band |
+| Done / Keep going colour: ink on mint → white on mint-ink (`btn-go` slots) | changed (plan v3) | sizes and text kept; contrast 6.6; design suite checks the slots |
 | Missing | none | |

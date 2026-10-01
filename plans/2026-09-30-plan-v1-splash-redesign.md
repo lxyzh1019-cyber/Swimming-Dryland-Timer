@@ -1,6 +1,8 @@
-# Plan v2 — Splash redesign: six paired PRs, validated against the code — Approved 2026-09-30 (v1 approved 2026-09-30; v2 = user's instruction after the PR 1 merge)
+# Plan v3 — Splash redesign: six paired PRs, validated against the code — Approved 2026-09-30 (v1 approved 2026-09-30; v2 = user's instruction after the PR 1 merge)
 
-🟦 **Rev 1** · Changes in this version: the journey/level map colour work (K7, slots instead of swim literals, white text → hero-text, "You are here" pill) moves from PR 4 into PR 2, because the skate map shows swim colours today and the user wants it fixed first. Nothing else changes.
+🟩 **Rev 2** · Changes in this version (v3, user's choice 2026-09-30): the Go/Done button (and "Keep going", and the green-light Start button in PR 3) becomes Deep green — white text on `mint-ink` with a darker edge (6.6 swim / 6.4 skate) — through new slots `btn-go-bg / btn-go-edge / btn-go-text` with fallbacks equal to the PR 2 look; the size test reads the new slot. Applied on the open PR 2 branch.
+
+🟦 **Rev 1** · Changes in v2: the journey/level map colour work (K7, slots instead of swim literals, white text → hero-text, "You are here" pill) moves from PR 4 into PR 2, because the skate map shows swim colours today and the user wants it fixed first. Nothing else changes.
 
 
 Written by Fable 5.1 (the session model; the planner hint to switch to Fable already applies).

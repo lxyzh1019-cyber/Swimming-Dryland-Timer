@@ -81,7 +81,7 @@ Surfaces: pool water `bg` (#E2F8FE; the Claude Design readme's #EAF7FB was a typ
 ## Contrast rules (approved 2026-09-30)
 
 1. **Buttons stay bright.** Text on `aqua`, `coral`, `mint` and `sun` is dark: `ink` (4.7–5.5:1), or `sun-ink` on sun. White text on those fills is not allowed (1.6–2.6:1).
-2. **STOP and grape buttons** keep white text on the darker fill: `stop-deep` (5.0:1) and `grape-deep` (5.4:1).
+2. **STOP, grape and Go/Done buttons** keep white text on the darker fill: `stop-deep` (5.0:1), `grape-deep` (5.4:1) and `mint-ink` (6.6:1; skate 6.4:1).
 3. **Coloured words** (light titles, ring zone labels, doses) use the family's **`-ink`** shade. The bright colour is only for borders, dots, arcs and fills.
 4. `ink-faint` and `hairline` are for lines, borders and disabled states only. They are never text.
 5. Every text/surface pair is at least 4.5:1, or 3:1 for text 24px+ (or 19px+ bold). Controls and focus rings are at least 3:1.
@@ -102,8 +102,11 @@ The screens are shared with the Figure-Skate app (rose palette under the same to
 | `text-on-mint`, `text-on-coral`, `text-on-aqua` | text on those fills | `ink` | mint/coral: `ink` (large text only); aqua: #fff |
 | `btn-stop-bg` / `-edge` | STOP | `stop-deep` / `stop-ink` | same (5.4) |
 | `btn-grape-bg` | grape buttons | `grape-deep` (5.4) | `grape-ink` (8.7) |
+| `btn-go-bg` | Go / Done, Keep going | `mint-ink` | `mint-ink` |
+| `btn-go-text` | text on btn-go-bg | #fff (6.6) | #fff (6.4) |
+| `btn-go-edge` | Go / Done 3D edge | #04342C | #0F3F2F |
 
-Done and Start stay **20px+ bold** in both apps: skate's `ink` on `mint` is 4.4, which passes only as large text.
+Start stays **20px+ bold** in both apps: skate's `ink` on `mint` is 4.4, which passes only as large text. Done/Go is white on `mint-ink` (6.6 / 6.4), so it has no size caveat.
 
 **Card A · Sunny pool** is the chosen Today look: the bright aqua kept, the darkest end of the old gradient dropped, dark navy text. The journey block matches it: the same bright aqua fading to sand, with navy text and the "You are here" label on a white pill.
 
@@ -316,6 +319,9 @@ Source of truth for values: each app's `css/tokens/*.css`. New and changed slots
 | `--btn-stop-bg` | `{stop-deep}` | STOP button fill, white text 5.0 (skate 5.4). |
 | `--btn-stop-edge` | `{stop-ink}` | STOP button edge. |
 | `--btn-grape-bg` | `{grape-deep}` | Grape button fill, white text 5.4. Skate: grape-ink (8.7). |
+| `--btn-go-bg` | `{mint-ink}` | Go / Done and Keep going fill. Skate: mint-ink (#1C6B50). |
+| `--btn-go-text` | `#ffffff` | Text on btn-go-bg (6.6). Skate: #ffffff (6.4). |
+| `--btn-go-edge` | `#04342c` | Go / Done 3D edge. Skate: #0F3F2F. |
 
 ## Spacing
 
@@ -419,6 +425,9 @@ Fonts: Fredoka (display), Nunito (ui), Caveat (hand) — self-hosted variable wo
   --btn-stop-bg:      var(--stop-deep);           /* white 5.0 */
   --btn-stop-edge:    var(--stop-ink);
   --btn-grape-bg:     var(--grape-deep);          /* white 5.4 */
+  --btn-go-bg:        var(--mint-ink);             /* Go / Done: white 6.6 (added PR 2, plan v3) */
+  --btn-go-edge:      #04342C;
+  --btn-go-text:      #FFFFFF;
 }
 
 /* ---------- Figure-Skate-Dryland-Timer (rose palette) ---------- */
@@ -445,5 +454,8 @@ Fonts: Fredoka (display), Nunito (ui), Caveat (hand) — self-hosted variable wo
   --btn-stop-bg:      var(--stop-deep);           /* white 5.4 */
   --btn-stop-edge:    var(--stop-ink);
   --btn-grape-bg:     var(--grape-ink);           /* white 8.7 */
+  --btn-go-bg:        var(--mint-ink);             /* Go / Done: white 6.4 */
+  --btn-go-edge:      #0F3F2F;
+  --btn-go-text:      #FFFFFF;
 }
 ```

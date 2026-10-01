@@ -201,11 +201,17 @@ for (const [st, [snap, extra, state]] of Object.entries(STATES)) {
     const html = draw(snap, layout, extra, state);
     clean("session " + st + " " + layout, html, { kid: true });
     drawn++;
-    /* Done is the one big action; STOP keeps white on the darker stop fill. */
+    /* Done is the one big action, white on the dark green Go fill; STOP keeps
+       white on the darker stop fill. */
     const done = tags(html).find(t => t.tag === "button" && t.action === "advance");
     ok(done && pxOf(done.style, "min-height") >= DONE_TAP_MIN && /font-size:20px/.test(done.style)
-       && /color:var\(--text-on-mint,#fff\)/.test(done.style),
-       "session " + st + " " + layout + ": Done is 64px, 20px, in the text-on-mint slot");
+       && /background:var\(--btn-go-bg,/.test(done.style) && /color:var\(--btn-go-text,/.test(done.style),
+       "session " + st + " " + layout + ": Done is 64px, 20px, on the btn-go slots");
+    if (st === "skipAsk") {
+      const keep = tags(html).find(t => t.tag === "button" && t.action === "cancelSkip");
+      ok(keep && /background:var\(--btn-go-bg,/.test(keep.style),
+         "session skipAsk " + layout + ": Keep going is on the btn-go slot");
+    }
     const stop = tags(html).find(t => t.tag === "button" && t.action === "stopNow");
     ok(stop && /background:var\(--btn-stop-bg,var\(--stop\)\)/.test(stop.style) && pxOf(stop.style, "min-height") >= KID_TAP_MIN,
        "session " + st + " " + layout + ": STOP is 56px on the btn-stop slot");
