@@ -1226,7 +1226,7 @@ export const TRAINING_QS = [
 export const READINESS_QS = [
   { id: "q_sleep", text: "How well did you sleep last night?", yesLabel: "😴 Good", noLabel: "🥱 Not great" },
   { id: "q_light", text: "How do your muscles feel from your last swim?", yesLabel: "💪 Fresh", noLabel: "😮‍💨 Tired" },
-  { id: "q_ready", text: "What's your energy like right now?", yesLabel: "⚡ Full", noLabel: "💤 Low" },
+  { id: "q_ready", text: "What's your energy like right now?", yesLabel: "⚡️ Full", noLabel: "💤 Low" },
   { id: "q_pain",  text: "Any aches or sore spots today?", isPain: true, yesLabel: "😊 All good", noLabel: "😣 A bit sore" }
 ];
 

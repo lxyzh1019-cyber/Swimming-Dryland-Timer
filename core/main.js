@@ -61,6 +61,7 @@ export const state = {
   detailOverlay: false,
   detailEx: null,
   moveReviewOpen: false,        // the finish screen's "See every move" list
+  blocksOpen: false,            // phone Today: the day card's blocks, folded until she opens them (not saved)
   weather: null,                // { icon, temp, caption } once fetched
   backupNote: "", backupNoteOk: false,   // result line under Backup & restore
   walletRepairNote: "",         // result line under the prize wallet repair
@@ -96,17 +97,18 @@ function renderToday() {
   journeyPathScrollIntoView(root);
 }
 
-/* Set by a body-map answer: the next render brings the result card into view.
-   The card sits full width under the maps, below the fold on iPad portrait and
-   phone, so without this the answer she just gave seemed to do nothing. Only
-   after an answer — a tap inside the card (the grown-up tick, the light picker)
-   must not jump the page. */
+/* Set by a body-map answer, or by the answer that completes the four
+   questions: the next render brings the result card (and its Start) into view.
+   The card sits under the maps or the questions, below the fold on iPad
+   portrait and phone, so without this the answer she just gave seemed to do
+   nothing. Only after an answer — a tap inside the card (the grown-up tick, the
+   light picker) must not jump the page. */
 let showBodyResultNext = false;
 
 function renderReadiness() {
   const vm = buildReadinessVM(state.readiness, state.isWide);
   root.innerHTML = page(readinessScreen(vm));
-  if (showBodyResultNext && vm.showInlineBodyResult) {
+  if (showBodyResultNext && (vm.showInlineBodyResult || vm.showInlineReadinessResult)) {
     const card = root.querySelector && root.querySelector("[data-body-result]");
     if (card && typeof card.scrollIntoView === "function") card.scrollIntoView({ block: "start", behavior: "smooth" });
   }
@@ -418,6 +420,8 @@ Object.assign(RAW, {
   },
   selectDay(arg) { state.selectedDay = arg; state.expanded = {}; state.startNote = ""; state.redoPartials = false; render(); },
   toggleBlock(arg) { state.expanded[arg] = !state.expanded[arg]; render(); },
+  // Phone Today: "See the N blocks ▾" / "Hide the blocks ▴". A view of her own card; stores nothing.
+  toggleBlocks() { state.blocksOpen = !state.blocksOpen; render(); },
   /* Every one of these lives in the Grown-up Zone and changes how her sessions
      run or what gets recorded. All of them were reachable by anyone holding the
      phone; the gate is on the ACTION, so hiding the control was never what was
@@ -516,7 +520,10 @@ Object.assign(RAW, {
   /* ---- readiness flow ---- */
   rAnswer(arg) {
     const [id, val] = arg.split("|");
+    const wasDone = !!(state.readiness && state.readiness.readinessDone);
     answerQuestion(state.readiness, id, val);
+    // The light has just appeared under the questions: show it once.
+    if (!wasDone && state.readiness && state.readiness.readinessDone) showBodyResultNext = true;
     render();
   },
   rPickZone(arg) { state.readiness.pendingZone = Number(arg); render(); },

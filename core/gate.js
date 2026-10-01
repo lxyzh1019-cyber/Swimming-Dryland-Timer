@@ -62,7 +62,7 @@ export const UNGATED_ACTIONS = [
   // moving around the app. NOTE `nav` is deliberately absent: whether it is
   // child-safe depends on WHERE she is navigating, so it is decided by
   // CHILD_MAY in js/main.js. An action named in both places would be a bug.
-  "selectDay", "toggleBlock", "logScope", "progressScope",
+  "selectDay", "toggleBlock", "toggleBlocks", "logScope", "progressScope",
   "setGuTab", "setGsScope", "formCheckMonth", "dismissStorageError",
   // her own session, start to finish
   "goSession", "goSessionRedo", "goExplore", "exitExplore", "goBack", "goToMove",

@@ -1035,5 +1035,49 @@ engine.exitSession();
   localStorage.clear(); store.migrate();
 }
 
+/* --- PHONE TODAY: "See the N blocks ▾" is hers (R4 PR 4) ------------------
+   The fold is a view of her own day card and stores nothing, so it opens with
+   no PIN; and because its state lives in main.js, the repaint that follows a
+   block tap does not snap it shut. Tapped the real way, through the click
+   dispatcher. */
+{
+  gate.lockGate(); resetGateState();
+  ok(gate.UNGATED_ACTIONS.includes("toggleBlocks"), "toggleBlocks is on the kid-safe list");
+  const was = !!main.state.blocksOpen;
+  ok(was === false, "the phone block list starts folded");
+  fireEvent("click", clickTarget("toggleBlocks"));
+  ok(main.state.gateAsk === null, "unfolding the blocks asks nobody");
+  ok(main.state.blocksOpen === true, "and the list actually opens");
+  fireEvent("click", clickTarget("toggleBlock", "warmup"));
+  fireEvent("click", clickTarget("toggleBlock", "warmup"));
+  ok(main.state.blocksOpen === true, "tapping a block inside it does not fold it again");
+  fireEvent("click", clickTarget("toggleBlocks"));
+  ok(main.state.blocksOpen === false, "and it folds again");
+  resetGateState();
+}
+
+/* --- THE LIGHT AFTER THE FOUR QUESTIONS IS BROUGHT INTO VIEW, ONCE (R4 PR 4)
+   The same one-shot as the body-map result: only the answer that completes the
+   four scrolls; an answer changed afterwards does not jump the page. */
+{
+  let scrolled = 0;
+  const card = { scrollIntoView() { scrolled++; } };
+  const qs = testRoot.querySelector;
+  testRoot.querySelector = (sel) => (sel === "[data-body-result]" ? card : null);
+  main.state.readiness = rvm.newReadinessFlow("wednesday");
+  ["q_sleep", "q_light", "q_ready"].forEach(q => main.actions.rAnswer(q + "|yes"));
+  ok(scrolled === 0, "no scroll while questions are still open");
+  main.actions.rAnswer("q_pain|yes");
+  ok(main.state.readiness.readinessDone && scrolled === 1, "the answer that completes the four brings the light into view");
+  main.actions.rAnswer("q_sleep|no");
+  ok(scrolled === 1, "changing an answer afterwards does not scroll again");
+  testRoot.querySelector = () => null;
+  main.state.readiness = rvm.newReadinessFlow("wednesday");
+  ["q_sleep", "q_light", "q_ready", "q_pain"].forEach(q => main.actions.rAnswer(q + "|yes"));
+  ok(main.state.readiness.readinessDone, "with no card in the page the scroll is skipped, nothing throws");
+  testRoot.querySelector = qs;
+  main.state.readiness = null;
+}
+
 console.log(`✓ action-layer tests passed (${passed} assertions)`);
 process.exit(0);

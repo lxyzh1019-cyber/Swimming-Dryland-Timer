@@ -210,6 +210,8 @@ export function buildReadinessVM(r, isWide) {
   const zoneSev = r.zoneSev || {};
   const selectedNums = Object.keys(zoneSev).map(Number);
   const SEV_COLOR = { 2: "var(--sun)", 3: "var(--coral)", 4: "var(--stop)" };
+  // Words take the -ink shade; the bright colour stays on borders and badges.
+  const SEV_INK = { 2: "var(--sun-ink)", 3: "var(--coral-ink)", 4: "var(--stop-ink)" };
   const SEV_SHORT = { 2: "Tired", 3: "Not right", 4: "Pain" };
   const zoneHighlight = {}, zoneBadge = {}, zoneBadgeBg = {};
   BODY_ZONES.forEach(z => {
@@ -243,7 +245,7 @@ export function buildReadinessVM(r, isWide) {
 
   const pendingZone = r.pendingZone;
   const pz = BODY_ZONES.find(z => z.n === pendingZone);
-  const popupOptions = SEVERITY_LEVELS.filter(s => s.level >= 2).map(sv => ({ ...sv }));
+  const popupOptions = SEVERITY_LEVELS.filter(s => s.level >= 2).map(sv => ({ ...sv, labelColor: SEV_INK[sv.level] || sv.color }));
 
   const lightKey = r.light;
   const L = LIGHT_META[lightKey];

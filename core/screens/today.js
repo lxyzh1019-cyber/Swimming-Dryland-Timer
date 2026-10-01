@@ -4,9 +4,10 @@
    values come from buildTodayVM.
    ============================================================ */
 
-import { escapeHtml, imgWithFallbacks, photoSources } from "../util.js";
+import { escapeHtml, imgWithFallbacks, photoSources, plural } from "../util.js";
 import { POSES } from "../data.js";
 import { COPY, IMAGES, EMOJI } from "../sport.js";
+import { emojiPresentation } from "../vm/today.js";
 
 /* ---- shared fragments (both layouts) ---- */
 
@@ -15,9 +16,9 @@ function weekStrip(vm, wide) {
   <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:${wide ? 8 : 5}px;">
     ${vm.week.map(d => `
       <button type="button" data-action="selectDay" data-arg="${d.key}" style="${d.cellStyle}">
-        <div style="font-size:${wide ? 11 : 10}px;font-weight:900;letter-spacing:0.0${wide ? 4 : 3}em;color:${d.labelColor};text-transform:uppercase;">${d.short}</div>
+        <div style="font-size:13px;font-weight:900;letter-spacing:0.0${wide ? 4 : 3}em;color:${d.labelColor};text-transform:uppercase;">${d.short}</div>
         <div style="${d.iconWrap}">${d.icon}</div>
-        <div style="font-size:${wide ? 12 : 11}px;font-weight:800;color:var(--ink-soft);">${d.date}</div>
+        <div style="font-size:15px;font-weight:800;color:var(--ink-soft);">${d.date}</div>
       </button>`).join("")}
   </div>`;
 }
@@ -31,7 +32,7 @@ function statChipsRow(vm, wide) {
           <span style="font-size:${wide ? 18 : 16}px;line-height:1;flex-shrink:0;">${sc.icon}</span>
           <span style="font-family:var(--font-display);font-weight:600;font-size:${wide ? 18 : 16}px;color:${sc.color};line-height:1;">${sc.value}</span>
         </div>
-        <span style="font-size:${wide ? 13 : 12}px;font-weight:800;color:var(--ink-soft);">${sc.label}</span>
+        <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${sc.label}</span>
       </div>`).join("")}
   </div>`;
 }
@@ -44,15 +45,15 @@ function quizDeckLaunch(wide) {
       <div style="font-family:var(--font-display);font-weight:600;font-size:17px;color:var(--ink);">Quiz Deck</div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);">8 quick questions on your moves — cues, watch-outs & fixes</div>
     </div>
-    <span style="font-size:20px;color:var(--grape,#8B6FC7);flex-shrink:0;">›</span>
+    <span style="font-size:20px;color:var(--grape-ink);flex-shrink:0;">›</span>
   </button>` : `
   <button type="button" data-action="startQuizDeck" style="display:flex;align-items:center;gap:11px;background:var(--grape-wash,#EFE9FB);border:2px solid var(--grape,#8B6FC7);border-radius:var(--radius-lg);padding:12px 14px;cursor:pointer;font-family:inherit;text-align:left;width:100%;box-sizing:border-box;">
     <span style="width:40px;height:40px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🧠</span>
     <div style="flex:1;min-width:0;">
       <div style="font-family:var(--font-display);font-weight:600;font-size:16px;color:var(--ink);">Quiz Deck</div>
-      <div style="font-size:12px;font-weight:700;color:var(--ink-soft);">8 questions on your moves</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink-soft);">8 questions on your moves</div>
     </div>
-    <span style="font-size:19px;color:var(--grape,#8B6FC7);flex-shrink:0;">›</span>
+    <span style="font-size:19px;color:var(--grape-ink);flex-shrink:0;">›</span>
   </button>`;
 }
 
@@ -119,8 +120,8 @@ function journeyMapWide(vm) {
     <div style="position:relative;z-index:2;padding:18px 22px 10px;color:var(--hero-text,#fff);">
       <div style="font-size:13px;font-weight:900;letter-spacing:0.08em;opacity:0.9;">${j.chapter}</div>
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;line-height:1.2;margin:4px 0 8px;">LVL ${j.level} · ${j.rankName}${j.atSummit ? " — top of the ladder 🏔️" : ` — ${j.xpToNextRank} XP to ${j.nextRankName}`}</div>
-      <div style="height:9px;background:rgba(255,255,255,0.28);border-radius:9px;overflow:hidden;">
-        <div style="width:${j.levelPct}%;height:100%;background:#fff;border-radius:9px;"></div>
+      <div style="height:9px;background:rgba(255,255,255,0.55);border-radius:9px;overflow:hidden;">
+        <div style="width:${j.levelPct}%;height:100%;background:var(--sun);box-shadow:inset 0 0 0 2px var(--sun-deep);border-radius:9px;"></div>
       </div>
     </div>
     ${journeyRail(j, 92)}
@@ -137,8 +138,8 @@ function journeyMapNarrow(vm) {
       <div style="font-size:13px;font-weight:900;letter-spacing:0.08em;opacity:0.9;">${j.chapter}</div>
       <div style="font-family:var(--font-display);font-weight:600;font-size:17px;line-height:1.2;margin:4px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">LVL ${j.level} · ${j.rankName}</div>
       <div style="font-size:13px;font-weight:800;opacity:0.9;margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${j.atSummit ? COPY.summit : `${j.xpToNextRank} XP to ${j.nextRankName}`}</div>
-      <div style="height:8px;background:rgba(255,255,255,0.28);border-radius:9px;overflow:hidden;">
-        <div style="width:${j.levelPct}%;height:100%;background:#fff;border-radius:9px;"></div>
+      <div style="height:8px;background:rgba(255,255,255,0.55);border-radius:9px;overflow:hidden;">
+        <div style="width:${j.levelPct}%;height:100%;background:var(--sun);box-shadow:inset 0 0 0 2px var(--sun-deep);border-radius:9px;"></div>
       </div>
     </div>
     ${journeyRail(j, 104)}
@@ -151,15 +152,15 @@ function dayPane(vm, wide) {
   const pad = wide ? "24px 26px 0" : "20px 20px 0";
   const titleSize = wide ? 38 : 30;
   const chipPad = wide ? "7px 14px" : "6px 12px";
-  const chipFs = wide ? 13 : 12;
+  const chipFs = 13;
 
   const chips = dv.showChips ? `
     <div style="display:flex;gap:${wide ? 10 : 8}px;margin-bottom:14px;flex-wrap:wrap;">
-      <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>⏱</span> ${dv.minsLabel || (dv.mins + " min")}</span>
-      <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>⚡</span> ${dv.movesLabel}</span>
-      ${dv.roundsLabel ? `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>🔁</span> ${escapeHtml(dv.roundsLabel)}</span>` : ""}
-      ${vm.gearLabel ? `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.18);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>🎒</span> ${vm.gearLabel}</span>` : ""}
-      ${dv.earnedXpLabel ? `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.28);border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>⭐</span> ${dv.earnedXpLabel}</span>` : ""}
+      <span style="display:inline-flex;align-items:center;gap:6px;background:var(--hero-chip,rgba(255,255,255,0.18));border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>⏱</span> ${dv.minsLabel || (dv.mins + " min")}</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;background:var(--hero-chip,rgba(255,255,255,0.18));border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>${emojiPresentation("⚡")}</span> ${dv.movesLabel}</span>
+      ${dv.roundsLabel ? `<span style="display:inline-flex;align-items:center;gap:6px;background:var(--hero-chip,rgba(255,255,255,0.18));border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>🔁</span> ${escapeHtml(dv.roundsLabel)}</span>` : ""}
+      ${vm.gearLabel ? `<span style="display:inline-flex;align-items:center;gap:6px;background:var(--hero-chip,rgba(255,255,255,0.18));border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>🎒</span> ${vm.gearLabel}</span>` : ""}
+      ${dv.earnedXpLabel ? `<span style="display:inline-flex;align-items:center;gap:6px;background:var(--hero-chip,rgba(255,255,255,0.28));border-radius:var(--radius-pill);padding:${chipPad};font-size:${chipFs}px;font-weight:800;"><span>⭐</span> ${dv.earnedXpLabel}</span>` : ""}
     </div>` : "";
 
   /* WHAT THE GROWN-UP IS BEING ASKED TO LOOK AT, on the screen they already
@@ -170,11 +171,11 @@ function dayPane(vm, wide) {
   const paceFlag = dv.paceNote ? `
     <div style="display:flex;gap:9px;align-items:flex-start;background:${dv.paceBand === "red" ? "rgba(226,86,78,0.20)" : "rgba(242,184,75,0.22)"};border:1.5px solid rgba(255,255,255,0.45);border-radius:12px;padding:10px 12px;margin-bottom:12px;">
       <span style="font-size:15px;flex-shrink:0;">${dv.paceBand === "red" ? "⚠️" : "🟡"}</span>
-      <span style="font-size:${wide ? 13 : 12}px;font-weight:700;line-height:1.4;">${escapeHtml(dv.paceNote)}</span>
+      <span style="font-size:13px;font-weight:700;line-height:1.4;">${escapeHtml(dv.paceNote)}</span>
     </div>` : "";
 
   const focus = dv.showFocus ? `
-    <div style="background:rgba(255,255,255,0.16);border-radius:14px;padding:${wide ? "11px 15px" : "10px 14px"};margin-bottom:${wide ? 16 : 14}px;display:flex;align-items:center;gap:9px;">
+    <div style="background:var(--hero-chip,rgba(255,255,255,0.16));border-radius:14px;padding:${wide ? "11px 15px" : "10px 14px"};margin-bottom:${wide ? 16 : 14}px;display:flex;align-items:center;gap:9px;">
       <span style="font-size:16px;flex-shrink:0;">⭐</span>
       <span style="font-weight:800;font-size:${wide ? 14 : 13}px;line-height:1.35;">Focus: ${vm.focusCue}</span>
     </div>` : "";
@@ -184,8 +185,8 @@ function dayPane(vm, wide) {
       ${imgWithFallbacks(photoSources(POSES.greatwork), `alt="" style="height:${wide ? 72 : 64}px;object-fit:contain;flex-shrink:0;"`)}
       <div style="display:flex;flex-direction:column;gap:1px;">
         <span style="font-weight:900;font-size:${wide ? 16 : 15}px;">✅ ${dv.doneHeadline}</span>
-        <span style="font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.85;">${dv.doneSub}</span>
-        ${dv.xpNote ? `<span style="font-size:${wide ? 13 : 12}px;font-weight:700;opacity:0.78;">${escapeHtml(dv.xpNote)}</span>` : ""}
+        <span style="font-size:${wide ? 14 : 13}px;font-weight:700;">${dv.doneSub}</span>
+        ${dv.xpNote ? `<span style="font-size:13px;font-weight:700;">${escapeHtml(dv.xpNote)}</span>` : ""}
       </div>
     </div>` : "";
 
@@ -194,32 +195,42 @@ function dayPane(vm, wide) {
       <span style="font-size:20px;flex-shrink:0;">✕</span>
       <div style="display:flex;flex-direction:column;gap:1px;">
         <span style="font-weight:900;font-size:${wide ? 16 : 15}px;">This one slipped by — that's okay!</span>
-        <span style="font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.85;">${dv.missedSub || "Every streak has bumps. Pick it back up whenever you\u2019re ready."}</span>
+        <span style="font-size:${wide ? 14 : 13}px;font-weight:700;">${dv.missedSub || "Every streak has bumps. Pick it back up whenever you\u2019re ready."}</span>
       </div>
     </div>` : "";
 
   const rest = dv.isRest ? `
     <div style="background:rgba(255,255,255,0.16);border-radius:18px;padding:${wide ? "16px 18px" : "14px 16px"};display:flex;flex-direction:column;gap:9px;margin-bottom:14px;">
-      <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;opacity:0.85;">TODAY'S RECOVERY</div>
+      <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;">TODAY'S RECOVERY</div>
       ${(dv.recoveryItems || []).map(r => `
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:15px;flex-shrink:0;">🧘</span>
           <span style="font-size:14px;font-weight:700;">${r.text}</span>
         </div>`).join("")}
-      <div style="font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.8;">No XP needed — recovery is part of the plan.</div>
+      <div style="font-size:${wide ? 14 : 13}px;font-weight:700;">No XP needed — recovery is part of the plan.</div>
     </div>` : "";
 
-  const blocksList = dv.showBlocksList ? `
-    <div style="font-size:11px;font-weight:900;letter-spacing:0.08em;opacity:0.85;margin-bottom:9px;">${dv.blocksHint}</div>
+  /* PHONE: the blocks fold behind one row, so "Let's go" is on the first
+     screen. Open/closed lives in main.js (toggleBlocks, ungated, not saved):
+     every block tap repaints the screen, and a native <details> would snap
+     shut each time. iPad keeps the list open, with no fold. */
+  const blocksOpen = wide || !!vm.blocksOpen;
+  const blocksFold = dv.showBlocksList && !wide ? `
+    <button type="button" data-action="toggleBlocks" aria-expanded="${blocksOpen ? "true" : "false"}" style="width:100%;min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 16px;margin-bottom:${blocksOpen ? 10 : 16}px;background:var(--hero-chip,rgba(255,255,255,0.24));border:none;border-radius:16px;cursor:pointer;color:var(--hero-text,#fff);font-family:inherit;font-weight:900;font-size:16px;text-align:left;">
+      <span>${blocksOpen ? "Hide the blocks" : "See the " + plural(vm.blocks.length, "block")}</span><span aria-hidden="true" style="font-size:18px;">${blocksOpen ? "▴" : "▾"}</span>
+    </button>` : "";
+
+  const blocksList = dv.showBlocksList && blocksOpen ? `
+    <div style="font-size:13px;font-weight:900;letter-spacing:0.08em;margin-bottom:9px;">${dv.blocksHint}</div>
     <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:${wide ? 18 : 16}px;">
       ${vm.blocks.map(b => `
         <div style="background:${b.rowBg};border-radius:16px;overflow:hidden;transition:background 0.15s ease;">
-          <button type="button" data-action="toggleBlock" data-arg="${b.key}" style="width:100%;display:flex;align-items:center;gap:${wide ? 11 : 10}px;padding:${wide ? "13px 15px" : "12px 14px"};background:none;border:none;cursor:pointer;color:#fff;transition:transform 0.1s ease;">
+          <button type="button" data-action="toggleBlock" data-arg="${b.key}" style="width:100%;min-height:56px;display:flex;align-items:center;gap:${wide ? 11 : 10}px;padding:${wide ? "13px 15px" : "12px 14px"};background:none;border:none;cursor:pointer;color:var(--hero-text,#fff);transition:transform 0.1s ease;">
             <span style="width:${wide ? 34 : 32}px;height:${wide ? 34 : 32}px;border-radius:50%;background:rgba(255,255,255,0.94);display:flex;align-items:center;justify-content:center;font-size:${wide ? 18 : 17}px;flex-shrink:0;box-shadow:0 2px 5px rgba(10,40,55,0.18);">${b.icon}</span>
-            <span style="font-weight:900;font-size:${wide ? 15 : 14}px;flex:1;text-align:left;display:flex;align-items:center;gap:6px;">${b.name}${b.isBlockDone ? `<span style="font-size:${wide ? 13 : 12}px;">✓</span>` : b.isBlockSkipped ? `<span style="font-size:${wide ? 11 : 10}px;font-weight:800;opacity:0.8;">skipped</span>` : ""}</span>
+            <span style="font-weight:900;font-size:${wide ? 15 : 14}px;flex:1;text-align:left;display:flex;align-items:center;gap:6px;">${b.name}${b.isBlockDone ? `<span style="font-size:13px;">✓</span>` : b.isBlockSkipped ? `<span style="font-size:13px;font-weight:800;">skipped</span>` : ""}</span>
             <!-- Under "REVIEW WHAT YOU DID", what she DID leads; what the block
                  asked for follows it. The panel used to show only the ask. -->
-            <span style="font-size:${wide ? 12 : 11}px;font-weight:800;opacity:0.85;text-align:right;">${b.doneLabel ? escapeHtml(b.doneLabel) + " · " : ""}${b.countLabel} · ${b.mins} min</span>
+            <span style="font-size:13px;font-weight:800;opacity:0.85;text-align:right;">${b.doneLabel ? escapeHtml(b.doneLabel) + " · " : ""}${b.countLabel} · ${b.mins} min</span>
             <span style="font-size:13px;transition:transform 0.2s;transform:rotate(${b.rot}deg);">▾</span>
           </button>
           <div style="${b.bodyStyle}">
@@ -227,7 +238,7 @@ function dayPane(vm, wide) {
               <!-- THE PER-MOVE REVIEW: what counted and why, one line each,
                    with the rule stated once at the top. Factual, never
                    scolding — see moveReviewReason in js/outcome.js. -->
-              <div style="font-size:11px;font-weight:800;opacity:0.85;line-height:1.35;padding:4px 0 6px;">${escapeHtml(vm.reviewLegend || "")}</div>
+              <div style="font-size:13px;font-weight:800;line-height:1.35;padding:4px 0 6px;">${escapeHtml(vm.reviewLegend || "")}</div>
               ${b.review.map(r => `
               <div style="display:flex;align-items:flex-start;gap:9px;padding:5px 0;font-size:${wide ? 14 : 13}px;font-weight:700;" data-move-review="${escapeHtml(r.status)}">
                 <span style="flex:1;min-width:0;">
@@ -235,9 +246,9 @@ function dayPane(vm, wide) {
                   <!-- More than one round: one line per short round, each
                        naming its slot, instead of round one's reason alone. -->
                   <span>${escapeHtml(r.name)}</span>
-                  ${r.shortRounds.map(l => `<span style="display:block;font-size:12px;font-weight:700;opacity:0.85;line-height:1.35;" data-short-round="${l.slot}">${escapeHtml(l.text)}</span>`).join("")}` : `
-                  <span>${escapeHtml(r.name)}${r.doseLabel ? ` <span style="opacity:0.85;font-weight:800;">· ${escapeHtml(r.doseLabel)}</span>` : ""}</span>
-                  ${r.reason ? `<span style="display:block;font-size:12px;font-weight:700;opacity:0.85;line-height:1.35;">${escapeHtml(r.reason)}</span>` : ""}`}
+                  ${r.shortRounds.map(l => `<span style="display:block;font-size:13px;font-weight:700;line-height:1.35;" data-short-round="${l.slot}">${escapeHtml(l.text)}</span>`).join("")}` : `
+                  <span>${escapeHtml(r.name)}${r.doseLabel ? ` <span style="font-weight:800;">· ${escapeHtml(r.doseLabel)}</span>` : ""}</span>
+                  ${r.reason ? `<span style="display:block;font-size:13px;font-weight:700;line-height:1.35;">${escapeHtml(r.reason)}</span>` : ""}`}
                 </span>
                 <span style="display:flex;gap:4px;flex-shrink:0;" data-round-slots="${r.slots.length}">
                   ${r.slots.map(sl => `<span style="${sl.style}" title="${escapeHtml(sl.title)}" aria-label="${escapeHtml(sl.title)}" data-round-slot="${sl.slot}">${sl.icon}</span>`).join("")}
@@ -248,21 +259,21 @@ function dayPane(vm, wide) {
                 <div style="display:flex;align-items:flex-start;gap:9px;font-size:${wide ? 15 : 14}px;font-weight:700;">
                   <span style="opacity:0.7;flex-shrink:0;">•</span><span style="flex:1;min-width:0;">${m.text}</span>
                 </div>
-                ${m.cue ? `<div style="font-family:var(--font-hand);font-size:14px;font-style:italic;opacity:0.85;margin:2px 0 0 18px;">"${m.cue}"</div>` : ""}
-                ${m.transfer ? `<div style="font-size:12px;font-weight:800;opacity:0.8;margin:2px 0 0 18px;">${COPY.transferMove} ${m.transfer}</div>` : ""}
+                ${m.cue ? `<div style="font-family:var(--font-hand);font-size:14px;font-style:italic;margin:2px 0 0 18px;">"${m.cue}"</div>` : ""}
+                ${m.transfer ? `<div style="font-size:13px;font-weight:800;margin:2px 0 0 18px;">${COPY.transferMove} ${m.transfer}</div>` : ""}
               </div>`).join("")}
           </div>
         </div>`).join("")}
     </div>` : "";
 
   const echo = dv.isActive ? `
-    <div style="font-family:var(--font-hand);font-size:${wide ? 20 : 18}px;font-weight:700;opacity:0.95;line-height:1.3;padding-top:2px;">${vm.echoLine}</div>` : "";
+    <div style="font-family:var(--font-hand);font-size:${wide ? 20 : 18}px;font-weight:700;line-height:1.3;padding-top:2px;">${vm.echoLine}</div>` : "";
 
   const future = dv.isFuture ? `
     <div style="background:rgba(255,255,255,0.16);border-radius:18px;padding:${wide ? 20 : 18}px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;margin-bottom:6px;">
       <span style="font-size:${wide ? 36 : 32}px;">🔒</span>
       <div style="font-weight:900;font-size:${wide ? 16 : 15}px;">${dv.futureHeadline}</div>
-      <div style="font-size:13px;font-weight:700;opacity:0.85;">Come back on this day to see the plan.</div>
+      <div style="font-size:13px;font-weight:700;">Come back on this day to see the plan.</div>
     </div>` : "";
 
   const footer = `
@@ -271,11 +282,11 @@ function dayPane(vm, wide) {
       <button type="button" data-action="${dv.ctaAction}" data-arg="${vm.selectedKey}" style="${dv.ctaButtonStyle}width:100%;">
         <span style="font-size:22px;">${dv.ctaIcon}</span> ${dv.ctaLabel}
       </button>
-      ${dv.ctaSubtext ? `<div style="text-align:center;font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.8;padding-top:8px;">${dv.ctaSubtext}</div>` : ""}
+      ${dv.ctaSubtext ? `<div style="text-align:center;font-size:${wide ? 14 : 13}px;font-weight:700;padding-top:8px;">${dv.ctaSubtext}</div>` : ""}
       ${dv.partialSkipLabel ? `
         <div style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;padding-top:8px;text-align:center;">
-          <span style="font-size:${wide ? 14 : 13}px;font-weight:700;opacity:0.85;">${dv.partialSkipLabel}</span>
-          <button type="button" data-action="goSessionRedo" data-arg="${vm.selectedKey}" style="min-height:44px;border-radius:var(--radius-pill);border:2px solid rgba(255,255,255,0.55);background:rgba(255,255,255,0.16);color:#fff;font-family:inherit;font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;">+ Add them back</button>
+          <span style="font-size:${wide ? 14 : 13}px;font-weight:700;">${dv.partialSkipLabel}</span>
+          <button type="button" data-action="goSessionRedo" data-arg="${vm.selectedKey}" style="min-height:44px;border-radius:var(--radius-pill);border:2px solid var(--hero-text,rgba(255,255,255,0.55));background:rgba(255,255,255,0.16);color:var(--hero-text,#fff);font-family:inherit;font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;">+ Add them back</button>
         </div>` : ""}` : ""}
     ${dv.startNote ? `<div role="status" style="margin-bottom:10px;background:rgba(255,255,255,0.18);border:2px solid rgba(255,255,255,0.55);border-radius:var(--radius-lg);padding:10px 14px;font-size:13px;font-weight:800;line-height:1.4;">ℹ️ ${dv.startNote}</div>` : ""}
     ${dv.showExplore ? `
@@ -283,29 +294,30 @@ function dayPane(vm, wide) {
         <button type="button" data-action="goExplore" data-arg="${vm.selectedKey}" style="${vm.practiceBtnStyle}">
           ${vm.practiceLinkLabel}
         </button>
-        <div style="text-align:center;font-size:12px;font-weight:700;opacity:0.8;padding-top:6px;">${vm.practiceHintLine}</div>
+        <div style="text-align:center;font-size:13px;font-weight:700;padding-top:6px;">${vm.practiceHintLine}</div>
       </div>` : ""}
   </div>`;
 
   return `
   <div style="padding:${pad};position:relative;z-index:2;">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
-      <span style="display:inline-block;background:rgba(255,255,255,0.22);border-radius:var(--radius-pill);padding:6px 14px;font-size:11px;font-weight:900;letter-spacing:0.08em;">${dv.badgeLabel}</span>
+      <span style="display:inline-block;background:var(--hero-chip,rgba(255,255,255,0.22));border-radius:var(--radius-pill);padding:6px 14px;font-size:13px;font-weight:900;letter-spacing:0.08em;">${dv.badgeLabel}</span>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-        <div style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.22);border-radius:var(--radius-pill);padding:6px 12px;" aria-label="Weather">
+        <div style="display:flex;align-items:center;gap:5px;background:var(--hero-chip,rgba(255,255,255,0.22));border-radius:var(--radius-pill);padding:6px 12px;" aria-label="Weather">
           <span style="font-size:15px;line-height:1;">${vm.weather.icon}</span>
           <span style="font-size:13px;font-weight:900;">${wide ? vm.weather.caption + " " : ""}${vm.weather.temp}°</span>
         </div>
       </div>
     </div>
     <div style="font-family:var(--font-display);font-weight:600;font-size:${titleSize}px;line-height:1.${wide ? "05" : "1"};margin:12px 0 12px;">${dv.title}</div>
-    ${dv.showBackToToday ? `<button type="button" data-action="selectDay" data-arg="${vm.todayKey}" style="background:none;border:none;color:rgba(255,255,255,0.85);font-size:13px;font-weight:800;text-decoration:underline;cursor:pointer;padding:0 0 12px;text-align:left;">← Back to today</button>` : ""}
+    ${dv.showBackToToday ? `<button type="button" data-action="selectDay" data-arg="${vm.todayKey}" style="background:none;border:none;color:var(--hero-text,rgba(255,255,255,0.85));font-size:13px;font-weight:800;text-decoration:underline;cursor:pointer;padding:0 0 12px;text-align:left;">← Back to today</button>` : ""}
     ${chips}
     ${focus}
     ${done}
     ${paceFlag}
     ${missed}
     ${rest}
+    ${blocksFold}
     ${blocksList}
     ${echo}
     ${future}
@@ -324,11 +336,7 @@ export function todayWide(vm) {
      the Quiz Deck one word per line. Above 900 the two columns are unchanged;
      at 810 they stack, which is the only honest thing to do with that width. */
   const tight = !!vm.tightColumn;
-  const open  = tight ? `<div style="flex:1;min-width:0;display:flex;flex-direction:column;">` : "";
-  const close = tight ? `</div>` : "";
-  return `${open}
-    <div style="flex:${tight ? "0 0 auto" : "1"};min-width:0;padding:${tight ? "18px 20px 0" : "24px 26px"};display:flex;flex-direction:column;">
-
+  const greeting = `
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:18px;">
         <div>
           <div style="display:flex;align-items:center;gap:10px;">
@@ -338,8 +346,8 @@ export function todayWide(vm) {
           <div style="font-family:var(--font-hand);font-weight:700;font-size:${tight ? 20 : 24}px;line-height:1.1;color:var(--aqua-ink);margin-top:5px;">${COPY.greeting}</div>
         </div>
         ${imgWithFallbacks(photoSources(POSES.welcome), `alt="" aria-hidden="true" style="height:104px;margin:-10px 8px -14px 0;object-fit:contain;flex-shrink:0;"`)}
-      </div>
-
+      </div>`;
+  const week = `
       <div style="margin-bottom:16px;">
         <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
           <span style="font-family:var(--font-display);font-weight:600;font-size:20px;color:var(--ink);">This week</span>
@@ -353,18 +361,37 @@ export function todayWide(vm) {
               <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${lg.label}</span>
             </div>`).join("")}
         </div>
-      </div>
-
+      </div>`;
+  /* Card A · Sunny pool: each app fills the hero slots (swim bright aqua → aqua,
+     skate blush rose), with dark hero-text. The old darkest stop is gone. */
+  const dayCard = (place) => `
+    <div style="${place}border-radius:26px;background:linear-gradient(165deg,var(--hero-from,var(--aqua-light)) 0%,var(--hero-to,var(--aqua)) 70%);color:var(--hero-text,#fff);display:flex;flex-direction:column;position:relative;overflow:hidden;">
+      ${dayPane(vm, true)}
+    </div>`;
+  /* Upright iPad: the day card straight after the greeting, so "Let's go" is on
+     the first screen; the week, stats, Quiz Deck and journey follow it. */
+  if (tight) return `<div style="flex:1;min-width:0;display:flex;flex-direction:column;">
+    <div style="padding:18px 20px 0;">${greeting}</div>
+    ${dayCard("width:auto;margin:0 20px 16px;")}
+    <div style="flex:0 0 auto;min-width:0;padding:0 20px 20px;display:flex;flex-direction:column;">
+      ${week}
       ${statChipsRow(vm, true)}
       ${quizDeckLaunch(true)}
       ${journeyMapWide(vm)}
     </div>
-
-    <div style="${tight ? "width:auto;margin:14px 20px 20px;" : "width:452px;flex-shrink:0;margin:14px;"}border-radius:26px;background:linear-gradient(165deg,var(--aqua-light) 0%,var(--aqua) 60%,var(--aqua-deep) 100%);color:#fff;display:flex;flex-direction:column;position:relative;overflow:hidden;">
-      ${dayPane(vm, true)}
-    </div>${close}`;
+  </div>`;
+  return `
+    <div style="flex:1;min-width:0;padding:24px 26px;display:flex;flex-direction:column;">
+      ${greeting}
+      ${week}
+      ${statChipsRow(vm, true)}
+      ${quizDeckLaunch(true)}
+      ${journeyMapWide(vm)}
+    </div>
+    ${dayCard("width:452px;flex-shrink:0;margin:14px;")}`;
 }
 
+/* Phone: greeting, then the day card first, then the week, stats, Quiz Deck and journey. */
 export function todayNarrow(vm) {
   const name = escapeHtml(vm.athleteName);
   return `
@@ -381,16 +408,16 @@ export function todayNarrow(vm) {
       ${imgWithFallbacks(photoSources(POSES.welcome), `alt="" aria-hidden="true" style="height:88px;object-fit:contain;flex-shrink:0;"`)}
     </div>
 
+    <div style="border-radius:24px;background:linear-gradient(165deg,var(--hero-from,var(--aqua-light)) 0%,var(--hero-to,var(--aqua)) 70%);color:var(--hero-text,#fff);box-shadow:0 14px 34px rgba(20,59,74,0.22);overflow:hidden;display:flex;flex-direction:column;">
+      ${dayPane(vm, false)}
+    </div>
+
     <div style="background:var(--surface);border-radius:20px;box-shadow:0 10px 26px rgba(20,59,74,0.12);padding:14px;">
       <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
         <span style="font-family:var(--font-display);font-weight:600;font-size:17px;color:var(--ink);">This week</span>
-        <span style="font-size:12px;font-weight:800;color:var(--ink-soft);white-space:nowrap;flex-shrink:0;">${vm.dateLine}</span>
+        <span style="font-size:13px;font-weight:800;color:var(--ink-soft);white-space:nowrap;flex-shrink:0;">${vm.dateLine}</span>
       </div>
       ${weekStrip(vm, false)}
-    </div>
-
-    <div style="border-radius:24px;background:linear-gradient(165deg,var(--aqua-light) 0%,var(--aqua) 60%,var(--aqua-deep) 100%);color:#fff;box-shadow:0 14px 34px rgba(20,59,74,0.22);overflow:hidden;display:flex;flex-direction:column;">
-      ${dayPane(vm, false)}
     </div>
 
     ${statChipsRow(vm, false)}
