@@ -113,7 +113,7 @@ Structural option (not approved, not done): a test that renders every screen, co
 | RD-2 Build the change (both apps, core identical) | COMPLETE | opus-worker 2026-10-04: core/outcome.js, core/vm/session.js, core/screens/session.js, core/vm/today.js, core/vm/progress.js, core/vm/grownup.js; sw.js swim v32 → v33, skate v28 → v29; FEATURES.md "Care / recovery days" |
 | RD-3 Run every test in both apps | COMPLETE | `npm test` exit 0 both repos, both TZs (dayrecords now 489 with the new CARE DAYS assertions; all other counts unchanged); `diff -rq core` empty |
 | RD-4 One draft PR per app | COMPLETE | opened ready for review by the main session 2026-10-04 after the user's "open the PRs and approve": lxyzh1019-cyber/Swimming-Dryland-Timer#79, lxyzh1019-cyber/Figure-Skate-Dryland-Timer#52 |
-| RD-5 Merge both PRs | NOT STARTED | the user: swim #79, skate #52 |
+| RD-5 Merge both PRs | BLOCKED — merging is the user's step (approved plan: no merge by Claude); CI was still running when the PRs opened | swim #79, skate #52 open and mergeable 2026-10-04 |
 | RD-6 Live site serves the new version | BLOCKED — waits on RD-5 (merge) | not started; check sw.js swim v33 / skate v29 after merge |
 | RD-7 Sunday recovery on the device (finish, Today, Progress, Grown-up) | BLOCKED — waits on RD-6 and the user's iPad | not started |
 
