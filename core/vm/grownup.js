@@ -524,16 +524,22 @@ export function buildGrownupVM(state) {
     byWeekday = WEEK_ORDER.map(k => {
       const r = records.filter(x => x.date === weekIsos[k]).sort((a, b) => rank(b) - rank(a) || mins(b) - mins(a))[0];
       const finished = !!(r && isTrainingRecord(r) && r.dayComplete);
-      const shown = !!(r && (isTrainingRecord(r) || r.recovery));
+      /* Any care record — Sunday included, which used to read "—" and 0 min —
+         is shown with its minutes, in the recovery colour (it used to wear the
+         yellow of "partial"), finished or part done on its careComplete. */
+      const care = !!(r && !isTrainingRecord(r) && (r.care || r.recovery));
+      const shown = !!(r && (isTrainingRecord(r) || care));
       const wMins = shown ? mins(r) : 0;
       const wMood = r && moodOf(r);
       return {
         k: DAY_SHORT[k], topic: DAYS[k].theme || DAYS[k].title,
         mood: wMood ? MOOD_EMOJI[wMood] : "·",
         done: finished, mins: wMins,
-        rowBg: finished ? "var(--surface)" : "var(--surface-2)",
-        statusChip: finished ? "✓ " + wMins + "m" : (shown ? (isTrainingRecord(r) ? "partial" : "recovery") : "—"),
-        statusStyle: "font-size:13px;font-weight:900;border-radius:var(--radius-pill);padding:3px 9px;white-space:nowrap;" + (finished ? "background:var(--mint-wash);color:var(--mint-ink);" : shown ? "background:var(--sun-wash);color:var(--sun-ink);" : "background:var(--surface-2);color:var(--ink-soft);")
+        rowBg: finished || (care && r.careComplete) ? "var(--surface)" : "var(--surface-2)",
+        statusChip: finished ? "✓ " + wMins + "m"
+          : care ? (r.careComplete ? "✓ recovery " + wMins + "m" : "recovery · part")
+          : shown ? "partial" : "—",
+        statusStyle: "font-size:13px;font-weight:900;border-radius:var(--radius-pill);padding:3px 9px;white-space:nowrap;" + (finished ? "background:var(--mint-wash);color:var(--mint-ink);" : care ? "background:var(--grape-wash);color:var(--grape-ink);" : shown ? "background:var(--sun-wash);color:var(--sun-ink);" : "background:var(--surface-2);color:var(--ink-soft);")
       };
     });
   } else {

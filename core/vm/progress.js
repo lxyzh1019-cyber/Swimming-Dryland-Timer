@@ -212,12 +212,14 @@ export function buildProgressVM(state) {
       plannedLabel: training && st ? Math.max(1, Math.round(estimateSessionSecs(st.circuits) / 60)) + "m"
         : isSpa && !arrived ? "spa" : "—",
       /* Both units, each under its own name: performances are every planned
-         instance (a main move once per round), movements are distinct moves. */
-      performancesLabel: care ? "care" : training ? rec.performances.performed + "/" + rec.performances.planned : "—",
-      movementsLabel: care ? "care" : training ? rec.movements.performed + "/" + rec.movements.planned : "—",
-      skippedLabel: care ? "—" : training ? String((rec.rows || []).filter(r => r && r.status === "skipped").length) : "—",
+         instance (a main move once per round), movements are distinct moves.
+         A care day fills them from its own record, against the recovery menu
+         (one pass, so the two are equal); "ended early" is its careComplete. */
+      performancesLabel: shown ? rec.performances.performed + "/" + rec.performances.planned : "—",
+      movementsLabel: shown ? rec.movements.performed + "/" + rec.movements.planned : "—",
+      skippedLabel: shown ? String((rec.rows || []).filter(r => r && r.status === "skipped").length) : "—",
       roundsLabel: care ? "n/a" : training ? rec.mainRoundsDone + "/" + rec.roundsPlanned : "—",
-      earlyLabel: care ? "—" : training ? (rec.dayComplete ? "No" : "Yes") : "—",
+      earlyLabel: care ? (rec.careComplete ? "No" : "Yes") : training ? (rec.dayComplete ? "No" : "Yes") : "—",
       paceLabel: care ? "Care" : band ? { green: "Full", amber: "Almost", yellow: "Short", red: "Very short" }[band] : "—",
       paceBand: care ? "care" : band || "",
       streakMark: rec && rec.countsForStreak ? "🔥" : rec && rec.streakFreeze ? "❄️" : shown ? "—" : ""

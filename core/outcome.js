@@ -70,7 +70,7 @@
 
 import { edmontonISO, todayISODate, DAY_MS } from "./util.js";
 import { DAYS } from "./data.js";
-import { roundsForLight, assembleCircuits, lockedLightFromLog, dayPlanState,
+import { roundsForLight, assembleCircuits, assembleRecoveryCircuit, lockedLightFromLog, dayPlanState,
          countExpectedWork, countExpectedByRound, DONE_WORK_FRACTION, MIN_EXERCISE_SECS } from "./engine.js";
 import { loadSessions, loadEvents, loadDayProgress, dayRoundsPlanned, settledXpByDate,
          XP_SHOWED_UP, XP_PER_ROUND } from "./store.js";
@@ -121,9 +121,9 @@ export const OUTCOME_VERSION = 6;
    menu is care, not training, so it cannot add to a training streak — but
    reporting soreness honestly must never break one either. The whole menu is
    what buys that protection: a recovery pass abandoned after two moves is not
-   a day's care. */
+   a day's care. "The whole menu" is `careComplete` (see deriveSessionOutcome),
+   the same verdict every screen reads — not 100% of every move's clock. */
 export const STREAK_WORK_FRACTION = 0.75;
-export const RECOVERY_STREAK_FRACTION = 1;
 
 /* ---- HOW WELL A MOVE WAS HELD, SAID OUT LOUD --------------------------------
 
@@ -598,13 +598,26 @@ export function deriveSessionOutcome(input = {}) {
     countsForStreak = false;                        // no work, or a safety stop
   }
 
+  /* A FINISHED RECOVERY PASS — one verdict, read by every screen.
+
+     Every move of the menu has a row, none of them was skipped, none came in
+     under half its dose (the same ROUND_ROW_FLOOR the whole-plan door above
+     uses), and the session was not ended early. It used to be 100% of every
+     move's clock, pro-rated: one Done tapped at 73 of 120 seconds on a roller
+     move turned a menu she did from start to finish into "you stopped
+     partway". The half-dose floor is what keeps brushing at every move — three
+     seconds of each hold — from counting as a day of care. */
+  const careComplete = state === "recovery" && expected !== null && expected > 0
+    && !explicitAbort
+    && !rows.some(l => l && l.status === "skipped")
+    && new Set(rows.filter(Boolean).map(logicalRowId)).size + banked >= expected
+    && rows.every(l => streakCredit(l, countPartial) >= ROUND_ROW_FLOOR);
+
   /* A finished recovery pass HOLDS the streak without adding to it, so a sore
-     day costs her nothing and buys her nothing. Judged on the same dose ratio,
-     so brushing at every move on the menu is not a day of care — which is what
-     counting rows made it. Pre-v2 records keep the old reading and are left
-     alone; the freeze is only ever offered, never required. */
-  const streakFreeze = streakJudged && state === "recovery"
-    && workRatio !== null && workRatio >= RECOVERY_STREAK_FRACTION;
+     day costs her nothing and buys her nothing. Pre-v2 records keep the old
+     reading and are left alone; the freeze is only ever offered, never
+     required. */
+  const streakFreeze = streakJudged && careComplete;
 
   return {
     state,
@@ -620,6 +633,7 @@ export function deriveSessionOutcome(input = {}) {
     countsAsTraining: isTraining,
     countsForStreak,
     streakFreeze,
+    careComplete,
     // What the streak was judged on, so a screen can say "3 more moves" rather
     // than leaving her to guess why a day she worked at did not count.
     workRatio,
@@ -868,6 +882,14 @@ export function shortRoundsFor(rows, block, name) {
    both sittings are counted together reads complete — and reads it the same way
    everywhere.
    ============================================================ */
+/* The fragments' ledgers as one workout's: merged per planned move from v4,
+   concatenated before it (see the gate in workoutOutcome). */
+export function workoutLedger(frags) {
+  const version = (frags || []).reduce((m, s) => Math.max(m, Number(s.outcomeVersion) || 0), 0) || null;
+  const raw = (frags || []).reduce((a, s) => a.concat(s.ledger || []), []);
+  return Number(version) >= 4 ? mergeLedgerRows(raw) : raw;
+}
+
 export function workoutOutcome(fragments) {
   // Oldest fragment first: it holds the plan the day was started against,
   // and the newest holds how the day actually ended.
@@ -890,8 +912,7 @@ export function workoutOutcome(fragments) {
 
      So records written before the numbering was fixed keep the concatenated
      reading they were written under, and records written since get the merge. */
-  const raw = frags.reduce((a, s) => a.concat(s.ledger || []), []);
-  const ledger = Number(version) >= 4 ? mergeLedgerRows(raw) : raw;
+  const ledger = workoutLedger(frags);
   /* The day's ask, not the sum of the sittings' asks. Adding them would count
      the same plan once per attempt and make a finished day read as a third
      of itself. Every fragment already carries the DAY's expectedWork (see
@@ -1229,12 +1250,25 @@ export function dayRecords(opts = {}) {
     const prog = live || dayProgress(dayKey, date);
     const liveProg = prog && (!prog.dayIso || prog.dayIso === date) ? prog : null;
     if (!frags.length && !live) {
+      /* A CARE DAY KEEPS ITS FACTS. It used to be filed with no rows and 0/0
+         moves, so a recovery menu done from start to finish read as nothing on
+         every screen. The merged care ledger is kept, and the moves are counted
+         against the recovery menu itself — one pass, so moves and times done
+         are the same number. `careComplete` is the care outcome's own verdict,
+         the same one the freeze and the finish screen read. */
+      const careRows = careOutcome ? workoutLedger(careFrags) : [];
+      const menu = assembleRecoveryCircuit(dayKey);
+      const menuNames = new Set(menu.flatMap(c => c.exercises.map(e => e.name)));
+      const performed = new Set(careRows.filter(l => l && l.status !== "skipped" && menuNames.has(l.name))
+        .map(l => l.name)).size;
+      const careMoves = { performed, planned: countExpectedWork(menu) };
       records.push({
         dayKey, date, weekday: dayKey, care: true, recovery, fragments: [], careFragments: careFrags,
-        rows: [], mainRounds: [], mainRoundsDone: 0, roundsPlanned: 0, light: null, lowestLight: null,
+        rows: careRows, mainRounds: [], mainRoundsDone: 0, roundsPlanned: 0, light: null, lowestLight: null,
         countsForStreak: false, streakFreeze, dayComplete: false, hadPainStop: false, safetyStop: false,
+        careComplete: !!(careOutcome && careOutcome.careComplete),
         overridden: false, minutes: Math.round(careSecs / 60), unsaved: false,
-        performances: { performed: 0, planned: 0 }, movements: { performed: 0, planned: 0 },
+        performances: { ...careMoves }, movements: { ...careMoves },
         xpByRounds: recovery ? XP_SHOWED_UP : 0,
         settledXp: 0, version: null, outcome: careOutcome
       });

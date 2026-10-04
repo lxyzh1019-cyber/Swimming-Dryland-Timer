@@ -213,10 +213,15 @@ export function buildSessionVM(state) {
   const streakShortBy = Number.isFinite(ratio)
     ? Math.max(1, Math.round((STREAK_WORK_FRACTION - ratio) * askSize))
     : null;
+  /* A care pass is "Recovery done" on the one care verdict (careComplete in
+     js/outcome.js) — the same one the Today card, Progress and the Grown-up
+     Zone read. It used to be the streak freeze's 100%-of-every-clock rule, so
+     one Done tapped early on a long roller move told her she stopped partway. */
+  const careComplete = completionState === "recovery" && !!liveOutcome.careComplete;
   const completionKey = explore ? "explore" : completionState === "partial"
     ? (streakEarned ? "partial-streak" : "partial-short")
     : completionState === "recovery"
-    ? (streakFrozen ? "recovery-held" : "recovery-short")
+    ? (careComplete ? "recovery-held" : "recovery-short")
     : completionState;
   const roundsDone = Math.max(0, Number(liveOutcome.mainRoundsDone) || 0);
 
@@ -250,7 +255,19 @@ export function buildSessionVM(state) {
     : streakEarned
       ? `You got ${donePercent}% of today done${skippedPhrase ? ", and " + skippedPhrase : ""}. Your streak keeps going — today counts. 🔥 ` + comeBackLine
       : `You got ${donePercent}% of today done${skippedPhrase ? ", and " + skippedPhrase : ""}. Everything you DID do is saved — the moves, the minutes and the XP for them. Today didn't reach the streak${Number.isFinite(streakShortBy) && streakShortBy > 0 ? ` — about ${plural(streakShortBy, "more move")} would do it` : ""}. Come back later today and finish the rest; it still counts for today. 💛`;
-  const completionNote = completionState === "partial" ? partialNote : null;
+  /* A care pass that is not complete says WHY: a skipped move by name, or a
+     move that came in very short. "Stopped partway" is the row's own words and
+     is only true when she ended the session early. */
+  const careRows = completionState === "recovery" ? (sess.savedEntry ? sess.savedEntry.ledger : sess.ledger) || [] : [];
+  const careMovesDone = new Set(careRows.filter(l => l && l.status !== "skipped").map(l => l.name)).size;
+  const careAsk = Number(liveOutcome.expectedWork) || 0;
+  const careEndedEarly = sess.savedEntry ? sess.savedEntry.endedEarly === true : sess.endedEarly === true;
+  const recoveryNote = completionState !== "recovery" || careComplete || careEndedEarly ? null
+    : (skippedPhrase
+        ? "You did most of the recovery menu, and " + skippedPhrase + "."
+        : "You went through the recovery menu, and a move came in very short.")
+      + " What you did is saved. Finishing the whole menu is what keeps your streak safe on a sore day — it's short and gentle, and it's worth coming back for. ❄️";
+  const completionNote = completionState === "partial" ? partialNote : recoveryNote;
 
   /* HOW WELL SHE HELD IT, which is a different question from how much of it
      there was, and one the finish screen has never asked. A thirty-second hold
@@ -883,6 +900,10 @@ export function buildSessionVM(state) {
     // into one number and labelled "rounds". A care session trains no rounds at
     // all, so it says nothing rather than "0 of 0".
     showRoundsLine: completionState !== "recovery" && !explore,
+    // A care pass has no rounds; it says how much of the menu she did instead.
+    careMovesLine: completionState === "recovery" && careAsk > 0
+      ? careMovesDone + " of " + careAsk + " moves" : "",
+    careComplete,
     roundsLine: `${dayRoundsDone} of ${dayRoundsAsked} main round${dayRoundsAsked === 1 ? "" : "s"}`,
     /* And WHY a round did not count, in her own words, one line each. A bare
        zero next to a session she remembers finishing is the thing that sent a

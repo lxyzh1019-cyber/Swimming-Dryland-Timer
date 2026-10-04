@@ -22,6 +22,7 @@ Single working record for this repository. Updated by the main session at the en
 
 - Plan v2 approved 2026-10-01 (R5, kids' colours + one button style + ripples/snow; plan file `plans/2026-10-01-plan-v1-colours-decor.md` in the swim repo; branch `claude/splash-colours-decor` in both repos): colour slots per the user's "Splash-colour-prompt.md" (hero-bg, journey-bg/-text, xp-bar, btn-primary/go/stop/neutral, ring-ready/work/rest -light/-fill/-ink, finish-bg) with fallbacks equal to today's look; one filled-button style (no border, 4px edge, radius-md, font-ui 900, 22px/64 main or 18px/56 rest, STOP 20px); corner, border and shadow tokens tinted per app (--shadow-frame, --scrim); no purple on kid screens (recovery excepted); hero decoration setting `heroDecorOn` (default on, gated toggle, decor layer z-index -1). User decisions 2026-10-01: skate --hero-chip rose-700 at 80%; selected outline = btn-primary-edge; bright red STOP 20px and the two small grown-up red buttons 19px bold; make the last-3-seconds pulse show (pre-existing bug, failing test first). Exactly one PR per repo (user: "only one PR, not 4"). Supersedes Pool calm (plan v4 R4), "Let's go"/"Back to Today" on sun (R4 PR 4/5) and STOP on stop-deep (R4 PR 7).
 
+- Plan v1 approved 2026-10-04 (care/recovery day record; plan file `plans/1-why-the-completion-rippling-valiant.md` in the swim repo; branch `claude/recovery-day-record` in both repos): one care-day verdict `careComplete` (every menu move has a row, none skipped, none under half its dose, not ended early) read by the finish screen, Today card, Progress table and Grown-up by-weekday row; the care day record keeps its rows and move counts against the recovery menu; Sunday and weekday recovery on one path. User choice: the streak freeze uses the same `careComplete` verdict (recommended option). Unchanged: XP (Sunday no-XP), `recovery` / `dayComplete` meanings, adherence, streak gap rules, training-day records, stored record shape.
 ## Pending
 - none
 
@@ -48,6 +49,7 @@ Single working record for this repository. Updated by the main session at the en
 | 17 | R4 2026-10-01 | PR 7 contrast and grown-up text sweep offered (finishes the plan's "Done when"; "say stop at PR 6" to skip) | done (PR 7) | user replied "merged, continue" |
 | 19 | R5 2026-10-01 | "Take a look at the new request, validate, and create the plan" (Splash-colour-prompt.md + Colour-combo-check.html: girls' colours, one button style, ripples/snow) | open | plan v1 → v2; 4 decisions answered (deep-rose chip, edge-colour ring, bright red with bigger words, make pulse show) |
 | 20 | R5 2026-10-01 | "only one PR, not 4" | done | plan v2: one build, exactly one PR per repo |
+| 21 | 2026-10-04 | Finished Sunday recovery shows as not done on every screen, and the finish screen says she "stopped partway" although she did every move | open — branch pushed, PR not opened | Plan v1; diagnosis: day record dropped care rows (0/0, dayComplete false), Today showed "Start Recovery", finish needed 100% of every clock; user: every screen looked wrong, she did every move; Today card must show a finished recovery day like any finished day |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Regressions caused | Workarounds/exceptions | Last symptom | Rewrite-vs-repair reviewed? |
@@ -60,6 +62,7 @@ Single working record for this repository. Updated by the main session at the en
 | Finish kid line | 1 | 0 | 0 | 0 | full-round line after a pain stop | no — one-line condition fix, failing test first (invariants S11) |
 | Timer last-3-seconds pulse | 1 | 0 | 0 | 0 | pulse / red label never shown (tick only recolours the arc) | no — failing test first (R5) |
 | Kids' colours and button style (R5) | 0 | 0 | 0 | 0 | n/a — redesign round, not a fix | n/a |
+| Care/recovery day record | 1 | 0 | 0 | 0 | finished recovery read as not done (Today "Start Recovery", Progress "care / n/a", Grown-up "—"); early tap → "stopped partway" | no — first fix round; failing tests first (dayrecords CARE DAYS) |
 Rule: 3 fix rounds, or 2 recurrences, or a fix causing a nearby regression → no further patch until the comparison is presented.
 
 Structural option (not approved, not done): a test that renders every screen, collects every `data-action` a kid can reach during a session, and fails if any is gated without being named in an explicit "adult-only" list — so a new kid button cannot silently ship behind the PIN.
@@ -105,7 +108,14 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R5-4 Review pass, FEATURES.md, regression table, one PR per repo | COMPLETE | review pass done (colour slots match the request + decisions; core identical; npm test exit 0 both repos after the contrast fixes); FEATURES.md updated by the worker; regression table below; PRs open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#76, lxyzh1019-cyber/Figure-Skate-Dryland-Timer#50 |
 | R5-5 Merge both PRs | COMPLETE | merged by the user 2026-10-01 (swim #76 → 6d11edf, skate #50 → 9e746a8; gh pr view: MERGED) |
 | R5-6 Live site serves new version | COMPLETE | curl 2026-10-01: live GitHub Pages sw.js serves v32 and the decor image answers HTTP 200 |
-| R5-7 iPad check | WAITING ON YOU — open the app on the iPad (reload twice so the new version installs) and look at Today, Body Check, a session, the finish screen, Progress and the Grown-up switch | |
+| R5-7 iPad check | BLOCKED — needs the user's iPad; Claude cannot reach the device | not run: open the app on the iPad (reload twice so the new version installs) and look at Today, Body Check, a session, the finish screen, Progress and the Grown-up switch |
+| RD-1 Failing tests first (both apps) | COMPLETE | `core/test/dayrecords.mjs` CARE DAYS (Sunday + weekday recovery × full / early tap / skip / ended early): before the change 142 failing assertions in each app (swim and skate, counted with a non-throwing copy of the suite run against the old code), 0 after |
+| RD-2 Build the change (both apps, core identical) | COMPLETE | opus-worker 2026-10-04: core/outcome.js, core/vm/session.js, core/screens/session.js, core/vm/today.js, core/vm/progress.js, core/vm/grownup.js; sw.js swim v32 → v33, skate v28 → v29; FEATURES.md "Care / recovery days" |
+| RD-3 Run every test in both apps | COMPLETE | `npm test` exit 0 both repos, both TZs (dayrecords now 489 with the new CARE DAYS assertions; all other counts unchanged); `diff -rq core` empty |
+| RD-4 One draft PR per app | COMPLETE | opened ready for review by the main session 2026-10-04 after the user's "open the PRs and approve": lxyzh1019-cyber/Swimming-Dryland-Timer#79, lxyzh1019-cyber/Figure-Skate-Dryland-Timer#52 |
+| RD-5 Merge both PRs | BLOCKED — merging is the user's step (approved plan: no merge by Claude); CI was still running when the PRs opened | swim #79, skate #52 open and mergeable 2026-10-04 |
+| RD-6 Live site serves the new version | BLOCKED — waits on RD-5 (merge) | not started; check sw.js swim v33 / skate v29 after merge |
+| RD-7 Sunday recovery on the device (finish, Today, Progress, Grown-up) | BLOCKED — waits on RD-6 and the user's iPad | not started |
 
 ## Checks and evidence
 - 2026-09-24 baseline `node core/test/run.mjs` → all suites green (before changes)
@@ -186,6 +196,11 @@ Structural option (not approved, not done): a test that renders every screen, co
 - 2026-10-01 R5 after changes: npm test exit 0 both repos, both TZs (design 2947, actions 333, shell +1; other suites unchanged); diff -rq core empty; mutants (Back to Today on sun, 3px edge, decor without aria-hidden, tick without pulse) each fail a suite; no rgba(20,59,74 / rgba(6,182,212 in core
 - 2026-10-01 R5 test changes: only plan items 1–19 (core/test/design.mjs, core/test/invariants.mjs:641 radius in the negative pattern, swim test/smoke.mjs:627 Explore 48 → 56); no other assertion removed or weakened
 - 2026-10-01 R5 not covered: grown-up red buttons (merge anyway, storage warning) at 19px not reached in a run (contrast by token: white on stop 3.45 swim / 3.70 skate, large text); phone size not in scope; live site and iPad untested
+- 2026-10-04 care/recovery day record — before: harness Sunday 2026-10-04 full menu → saved session 8/8 done, workRatio 1, but day record rows [], moves 0/0; new CARE DAYS assertions: 142 failing per app (Sunday full 19, early tap 24, skip 16, ended early 14; weekday full 18, early tap 23, skip 15, ended early 13)
+- 2026-10-04 after (opus-worker): `npm test` exit 0 in both repos, both TZs — swim: leadin-data 19, smoke 1401, actions 333, dayrecords 489, design 2947, integrity 48, interaction 18, invariants 593, landing 7, core leadin 42, session 325, shell 260; skate: leadin-data 11, smoke 317, actions 333, dayrecords 489, design 2947, integrity 48, interaction 18, invariants 596, landing 15, core leadin 42, session 327, shell 180; `diff -rq core` swim vs skate → empty
+- 2026-10-04 strings now shown (swim, VM/HTML output, not a browser): full Sunday — finish "Recovery done. That was care." / "Spa Sunday — Recovery Only · 11 min · 8 of 8 moves"; Today "SUN · COMPLETED ✓ | 8 of 8 moves | 11 of 11 min | Nice reset — recovery complete! | Do it again"; Progress 8/8, 8/8, skipped 0, n/a, early No, Care, ❄️; Grown-up "✓ recovery 11m" (grape). Early tap — identical. Skip — finish "Some care is better than none." + "You did most of the recovery menu, and 1 move got skipped (…)", "7 of 8 moves"; Today "SUN · PARTLY DONE ✓ … Finish recovery"; Grown-up "recovery · part". Weekday recovery — same, plus "+90 XP" show-up (unchanged pricing)
+- 2026-10-04 deviation: `careComplete` also requires every row at half its dose or more (ROUND_ROW_FLOOR) — without it the existing smoke check "brushing at every move on the menu freezes nothing" (test/smoke.mjs:1676) would fail; an early tap at ~60% passes the floor
+- 2026-10-04 not covered: live site and device untested; screens checked as VM/HTML output only
 
 ## Open questions / blockers
 - No visible deploy stamp on the page (rules require one) — flagged, out of scope this round.
@@ -373,4 +388,14 @@ Structural option (not approved, not done): a test that renders every screen, co
 | One main-button colour; one filled-button style (4px edge, radius-md, font-ui 900, 22/64 or 18/56, STOP 20); red only STOP / destructive grown-up / ring warning; corner rule; card borders 2px; shadows and scrim from per-app tokens; no purple on kid screens; ring slots; finish background; hero decoration setting (gated, default on, old backups on); last-3-seconds pulse shows | ➕ added |
 | Pool-calm Go (aqua-deep, white) and white outlined Pause/Skip; Let's go / Back to Today / prize on sun; STOP on stop-deep; Card A day card; journey painted sky; XP bar sun; grape quiz chevron, rep ring, explore banner, evening ring; navy rank card; Explore 48px outline | ⚠️ intentionally replaced (approved R5 plan v2) |
 | --hero-from, --hero-to, --journey-via, --journey-to | ⚠️ intentionally removed (plan "Removes") |
+| Missing | none found |
+
+## Regression table — care/recovery day record (R5 manifest → + care days)
+| Feature | Status |
+|---|---|
+| Training-day records, XP pricing (Sunday no-XP, weekday show-up), `recovery` / `dayComplete` meanings, adherence, streak gap rules, stored session shape | ✅ kept (all existing suites green unchanged) |
+| Finish order, kid line, move-review fold, Today order / phone fold, unfinished Sunday "Start Recovery" card, week-strip rest mark, Progress table in both places, size and contrast floors | ✅ kept |
+| `careComplete` verdict; care record rows and move counts; finish "N of M moves" line; Today finished-day card for care (COMPLETED / PARTLY DONE, Finish recovery); Progress care cells; Grown-up recovery chip in grape | ➕ added |
+| `RECOVERY_STREAK_FRACTION` (100% of every clock) and the separate `isSpaDay` paths on the done card | ⚠️ intentionally removed / merged (plan "Removes") |
+| Streak freeze rule | changed as approved — `streakJudged && careComplete` (an early-tapped weekday recovery now holds the streak) |
 | Missing | none found |
