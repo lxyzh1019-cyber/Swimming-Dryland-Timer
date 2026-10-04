@@ -108,14 +108,14 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R5-4 Review pass, FEATURES.md, regression table, one PR per repo | COMPLETE | review pass done (colour slots match the request + decisions; core identical; npm test exit 0 both repos after the contrast fixes); FEATURES.md updated by the worker; regression table below; PRs open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#76, lxyzh1019-cyber/Figure-Skate-Dryland-Timer#50 |
 | R5-5 Merge both PRs | COMPLETE | merged by the user 2026-10-01 (swim #76 → 6d11edf, skate #50 → 9e746a8; gh pr view: MERGED) |
 | R5-6 Live site serves new version | COMPLETE | curl 2026-10-01: live GitHub Pages sw.js serves v32 and the decor image answers HTTP 200 |
-| R5-7 iPad check | PARTIAL | not run yet — waiting on the user: open the app on the iPad (reload twice so the new version installs) and look at Today, Body Check, a session, the finish screen, Progress and the Grown-up switch |
+| R5-7 iPad check | BLOCKED — needs the user's iPad; Claude cannot reach the device | not run: open the app on the iPad (reload twice so the new version installs) and look at Today, Body Check, a session, the finish screen, Progress and the Grown-up switch |
 | RD-1 Failing tests first (both apps) | COMPLETE | `core/test/dayrecords.mjs` CARE DAYS (Sunday + weekday recovery × full / early tap / skip / ended early): before the change 142 failing assertions in each app (swim and skate, counted with a non-throwing copy of the suite run against the old code), 0 after |
 | RD-2 Build the change (both apps, core identical) | COMPLETE | opus-worker 2026-10-04: core/outcome.js, core/vm/session.js, core/screens/session.js, core/vm/today.js, core/vm/progress.js, core/vm/grownup.js; sw.js swim v32 → v33, skate v28 → v29; FEATURES.md "Care / recovery days" |
 | RD-3 Run every test in both apps | COMPLETE | `npm test` exit 0 both repos, both TZs (dayrecords now 489 with the new CARE DAYS assertions; all other counts unchanged); `diff -rq core` empty |
-| RD-4 One draft PR per app | PARTIAL | branch `claude/recovery-day-record` committed and pushed in both repos; PR not opened — `gh pr create --draft` refused by the git-guard hook (PRs open ready for review), and `gh pr create` without --draft denied by the permission system (auto-mode classifier). Open from GitHub, or allow it and re-run |
-| RD-5 Merge both PRs | NOT STARTED | the user |
-| RD-6 Live site serves the new version | NOT STARTED | after merge: sw.js swim v33 / skate v29 |
-| RD-7 Sunday recovery on the device (finish, Today, Progress, Grown-up) | NOT STARTED | the user |
+| RD-4 One draft PR per app | BLOCKED — opening a PR was denied by the permission system; needs the user's go-ahead or a PR opened on GitHub | branch `claude/recovery-day-record` committed and pushed in both repos; `gh pr create --draft` refused by the git-guard hook (PRs open ready for review), `gh pr create` denied by the permission system; not retried |
+| RD-5 Merge both PRs | BLOCKED — waits on RD-4; merging is the user's step | not started |
+| RD-6 Live site serves the new version | BLOCKED — waits on RD-5 (merge) | not started; check sw.js swim v33 / skate v29 after merge |
+| RD-7 Sunday recovery on the device (finish, Today, Progress, Grown-up) | BLOCKED — waits on RD-6 and the user's iPad | not started |
 
 ## Checks and evidence
 - 2026-09-24 baseline `node core/test/run.mjs` → all suites green (before changes)
