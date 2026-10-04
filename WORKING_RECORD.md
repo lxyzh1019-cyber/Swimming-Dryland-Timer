@@ -49,7 +49,7 @@ Single working record for this repository. Updated by the main session at the en
 | 17 | R4 2026-10-01 | PR 7 contrast and grown-up text sweep offered (finishes the plan's "Done when"; "say stop at PR 6" to skip) | done (PR 7) | user replied "merged, continue" |
 | 19 | R5 2026-10-01 | "Take a look at the new request, validate, and create the plan" (Splash-colour-prompt.md + Colour-combo-check.html: girls' colours, one button style, ripples/snow) | open | plan v1 → v2; 4 decisions answered (deep-rose chip, edge-colour ring, bright red with bigger words, make pulse show) |
 | 20 | R5 2026-10-01 | "only one PR, not 4" | done | plan v2: one build, exactly one PR per repo |
-| 21 | 2026-10-04 | Finished Sunday recovery shows as not done on every screen, and the finish screen says she "stopped partway" although she did every move | done (draft PRs open) | Plan v1; diagnosis: day record dropped care rows (0/0, dayComplete false), Today showed "Start Recovery", finish needed 100% of every clock; user: every screen looked wrong, she did every move; Today card must show a finished recovery day like any finished day |
+| 21 | 2026-10-04 | Finished Sunday recovery shows as not done on every screen, and the finish screen says she "stopped partway" although she did every move | open — branch pushed, PR not opened | Plan v1; diagnosis: day record dropped care rows (0/0, dayComplete false), Today showed "Start Recovery", finish needed 100% of every clock; user: every screen looked wrong, she did every move; Today card must show a finished recovery day like any finished day |
 
 ## Hotspot counter
 | Area / feature | Fix rounds | Recurrences | Regressions caused | Workarounds/exceptions | Last symptom | Rewrite-vs-repair reviewed? |
@@ -112,7 +112,7 @@ Structural option (not approved, not done): a test that renders every screen, co
 | RD-1 Failing tests first (both apps) | COMPLETE | `core/test/dayrecords.mjs` CARE DAYS (Sunday + weekday recovery × full / early tap / skip / ended early): before the change 142 failing assertions in each app (swim and skate, counted with a non-throwing copy of the suite run against the old code), 0 after |
 | RD-2 Build the change (both apps, core identical) | COMPLETE | opus-worker 2026-10-04: core/outcome.js, core/vm/session.js, core/screens/session.js, core/vm/today.js, core/vm/progress.js, core/vm/grownup.js; sw.js swim v32 → v33, skate v28 → v29; FEATURES.md "Care / recovery days" |
 | RD-3 Run every test in both apps | COMPLETE | `npm test` exit 0 both repos, both TZs (dayrecords now 489 with the new CARE DAYS assertions; all other counts unchanged); `diff -rq core` empty |
-| RD-4 One draft PR per app | COMPLETE | pushed `claude/recovery-day-record` in both repos; draft PRs opened (links in the record commit that follows) |
+| RD-4 One draft PR per app | PARTIAL | branch `claude/recovery-day-record` committed and pushed in both repos; PR not opened — `gh pr create --draft` refused by the git-guard hook (PRs open ready for review), and `gh pr create` without --draft denied by the permission system (auto-mode classifier). Open from GitHub, or allow it and re-run |
 | RD-5 Merge both PRs | NOT STARTED | the user |
 | RD-6 Live site serves the new version | NOT STARTED | after merge: sw.js swim v33 / skate v29 |
 | RD-7 Sunday recovery on the device (finish, Today, Progress, Grown-up) | NOT STARTED | the user |
