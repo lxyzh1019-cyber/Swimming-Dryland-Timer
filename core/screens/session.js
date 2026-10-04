@@ -275,9 +275,12 @@ const COMPLETION = {
     noteStyle: "color:var(--sun-ink);background:var(--sun-wash);",
     note: "You didn't finish the whole thing, and everything you DID do is saved — the moves, the minutes and the XP for them. Today didn't reach the streak, and it doesn't erase anything either. Coming back and finishing the rest is how it's meant to work. 💛"
   },
-  /* The freeze is earned by finishing the menu, so only the finished pass may
-     promise it. A recovery run abandoned after two moves is not a day's care,
-     and telling her it held the streak would be a promise the streak breaks. */
+  /* The freeze is earned by finishing the menu (careComplete: every move done,
+     none skipped, none under half its dose, not ended early), so only the
+     finished pass may promise it. A recovery run abandoned after two moves is
+     not a day's care, and telling her it held the streak would be a promise the
+     streak breaks. "recovery-short" keeps "stopped partway" for an early end;
+     a skip or a very short move gets the VM's own note (completionNote). */
   "recovery-held": {
     bg: "var(--aqua-wash)", ink: "var(--aqua-ink)", pose: "breath", poseH: 200,
     title: "Recovery done. That was care.", mantra: false,
@@ -357,7 +360,7 @@ function completeScreen(vm) {
       <div style="font-size:14px;font-weight:700;color:var(--ink);line-height:1.5;"><strong>Show this to a grown-up.</strong> In the Grown-up Zone they can free up space, and your progress for today is still saved — you can pick this session back up where you left it.</div>
     </div>` : ""}
     ${vm.leveledUp ? `<button type="button" data-action="openPrizeDraw" style="display:flex;align-items:center;gap:10px;${kidButton("primary", { big: true })}padding:0 26px;">🎁 Level up! Pick your prize</button>` : ""}
-    <div style="font-size:16px;font-weight:700;color:var(--ink-soft);" data-finish-summary="1">${vm.sessionDayTitle}${vm.explore ? "" : ` · ${vm.sessionMinutes} min`}${vm.showRoundsLine ? ` · ${vm.roundsLine}` : ""}${vm.xpLine ? ` · ⭐ ${escapeHtml(vm.xpLine)}` : ""}</div>
+    <div style="font-size:16px;font-weight:700;color:var(--ink-soft);" data-finish-summary="1">${vm.sessionDayTitle}${vm.explore ? "" : ` · ${vm.sessionMinutes} min`}${vm.showRoundsLine ? ` · ${vm.roundsLine}` : ""}${vm.careMovesLine ? ` · ${vm.careMovesLine}` : ""}${vm.xpLine ? ` · ⭐ ${escapeHtml(vm.xpLine)}` : ""}</div>
     ${vm.paceNote ? `
     <div style="display:flex;align-items:flex-start;gap:9px;max-width:480px;text-align:left;border-radius:var(--radius-lg);padding:10px 14px;font-size:14px;font-weight:800;line-height:1.45;${
       vm.paceBand === "red" ? "background:var(--stop-wash);color:var(--stop-ink);"

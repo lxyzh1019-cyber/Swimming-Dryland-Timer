@@ -10,7 +10,7 @@
    S1–S10 are the ten scenarios the prototype matched (scratchpad proof,
    2026-09-18); S11–S14 cover the three items it left unsettled and "start
    over". Run by `npm test`. */
-import { engine, store, outcome, util, data } from "./harness.mjs";
+import { engine, store, outcome, util, data, svm, sscreen, tvm, pvm, gvm } from "./harness.mjs";
 
 let passed = 0;
 const ok = (cond, msg) => { if (!cond) throw new Error("FAIL: " + msg); passed++; };
@@ -549,5 +549,128 @@ await scenario("heartbeat", T.start, T.read, async () => {
   same(prog.activeSecs, 0, "heartbeat: a saved row takes the seconds with it, so the record starts from zero");
   same(store.loadSessions()[0].bankedSecs, 0, "heartbeat: and a first sitting stamps no banked seconds");
 });
+
+/* ============================================================
+   CARE DAYS — a recovery day keeps its completion record
+
+   Sunday (spa) and a weekday whose light came out Recovery run the same menu
+   (assembleRecoveryCircuit). The saved session was always right; the day
+   record threw the moves away (rows [], 0/0 moves), so every screen read a
+   finished recovery as nothing — the Today card still said "Start Recovery",
+   Progress "care / n/a", the Grown-up row "—" — and one Done tapped early on a
+   long hold turned a finished menu into "stopped partway" on the finish
+   screen.
+
+   One verdict, `careComplete`: every move of the menu has a row, none was
+   skipped, none came in under half its dose, and the session was not ended
+   early. Every screen below reads it. XP, `recovery`, `dayComplete` and the
+   streak gap rules keep their meanings. Nothing here names a move.
+   ============================================================ */
+const CARE = [
+  { dayKey: "sunday", start: "2026-10-04T18:00:00Z", read: "2026-10-04T19:30:00Z", opts: { dayKey: "sunday" } },
+  { dayKey: "wednesday", start: "2026-09-30T18:00:00Z", read: "2026-09-30T19:30:00Z", opts: { dayKey: "wednesday", light: "recovery" } }
+];
+const careAnswer = s => { if (clean(s)) return true; if (s.phase === "repcheck") { engine.answerRepCheck("all"); return true; } return false; };
+const careRuns = {
+  full: () => (ms, s) => { careAnswer(s); },
+  /* One Done tapped on a long one-sided timed hold at about 65% of its clock:
+     a partial row (under the 80% done floor, over the half-dose floor). */
+  earlyTap: () => { let tapped = false; return (ms, s) => {
+    if (careAnswer(s)) return;
+    if (!tapped && s.phase === "work" && s.timerMax >= 60 && !s.sideLabel && !s.announceResolver && s.timerSecs > 0 && s.timerSecs <= Math.ceil(s.timerMax * 0.35)) {
+      tapped = true; engine.advance();
+    }
+  }; },
+  skip: () => { let skipped = false; return (ms, s) => {
+    if (careAnswer(s)) return;
+    if (!skipped && s.phase === "work" && s.timerMax > 0) { skipped = true; engine.skipCurrentExercise(); }
+  }; },
+  endedEarly: () => { let ended = false; return (ms, s) => {
+    if (careAnswer(s)) return;
+    if (!ended && s.running && s.ledger.length >= 2 && s.phase === "work") { ended = true; engine.endEarly(); }
+  }; }
+};
+const careRecordFor = dayKey => outcome.dayRecords().find(r => r.dayKey === dayKey && r.care) || null;
+const finishVm = () => svm.buildSessionVM({ inSession: true, isWide: true, detailOverlay: false, detailEx: null });
+for (const c of CARE) {
+  const menu = engine.assembleRecoveryCircuit(c.dayKey);
+  const menuSize = engine.countExpectedWork(menu);
+  const SHORT = data.DAY_SHORT[c.dayKey];
+  const label = (k) => "care " + c.dayKey + " " + k;
+  const isSpa = !!data.DAYS[c.dayKey].spa;
+  ok(menuSize >= 4, label("menu") + ": the recovery menu has moves to count");
+
+  for (const kind of ["full", "earlyTap", "skip", "endedEarly"]) {
+    await scenario(label(kind), c.start, c.read, () => drive(c.opts, careRuns[kind]()), (r) => {
+      const L = label(kind);
+      const complete = kind === "full" || kind === "earlyTap";
+      const rec = careRecordFor(c.dayKey);
+      ok(rec, L + ": the day has a care record");
+      if (kind === "earlyTap") ok(rec.rows.some(l => l.status === "partial"), L + ": the early tap left a partial row");
+      if (kind === "skip") ok(rec.rows.some(l => l.status === "skipped"), L + ": the skip left a skipped row");
+      /* THE RECORD keeps its facts. */
+      same(rec.careComplete, complete, L + ": careComplete");
+      same(rec.movements.planned, menuSize, L + ": moves measured against the recovery menu");
+      if (complete) {
+        same(rec.movements.performed, menuSize, L + ": every move performed");
+        same(rec.performances.performed + "/" + rec.performances.planned, menuSize + "/" + menuSize, L + ": every time done");
+        same(rec.rows.length, menuSize, L + ": the record keeps the menu's rows");
+      } else {
+        ok(rec.movements.performed < menuSize, L + ": fewer moves performed than the menu (" + rec.movements.performed + ")");
+      }
+      same(rec.streakFreeze, complete && rec.outcome.streakJudged, L + ": the freeze is the same verdict");
+      /* Unchanged meanings. */
+      same(rec.recovery, !isSpa, L + ": `recovery` still means a weekday recovery");
+      same(rec.dayComplete, false, L + ": `dayComplete` still means a finished TRAINING day");
+      same(rec.countsForStreak, false, L + ": care never adds a streak day");
+      same(rec.xpByRounds, isSpa ? 0 : store.XP_SHOWED_UP, L + ": XP priced as before (Sunday no-XP, weekday show-up)");
+
+      /* FINISH SCREEN. */
+      const fvm = finishVm();
+      same(fvm.completionState, "recovery", L + ": finish state");
+      same(fvm.completionKey, complete ? "recovery-held" : "recovery-short", L + ": finish key");
+      const fhtml = sscreen.sessionScreen(fvm);
+      const performedNow = r.snap.ledger.filter(l => l.status !== "skipped").length;
+      ok(fhtml.includes(performedNow + " of " + menuSize + " moves"), L + ": the finish summary says " + performedNow + " of " + menuSize + " moves");
+      if (complete) {
+        ok(/Recovery done/.test(fhtml), L + ": the finish screen says Recovery done");
+        ok(!/stopped partway/.test(fhtml), L + ": and never 'stopped partway'");
+      } else if (kind === "skip") {
+        ok(/got skipped/.test(fhtml) && !/stopped partway/.test(fhtml), L + ": the finish screen names the skip, not 'stopped partway'");
+      } else {
+        ok(/stopped partway/.test(fhtml), L + ": an early end says 'stopped partway'");
+      }
+
+      /* TODAY CARD — today's card, the finished-day card. */
+      const dv = tvm.buildTodayVM({ selectedDay: c.dayKey, expanded: {}, isWide: true }).dayView;
+      same(dv.badgeLabel, SHORT.toUpperCase() + (complete ? " · COMPLETED ✓" : " · PARTLY DONE ✓"), L + ": Today badge");
+      same(dv.movesLabel, rec.movements.performed + " of " + menuSize + " moves", L + ": Today moves");
+      same(dv.minsLabel, rec.minutes + " of " + tvm.planStats(c.dayKey, "recovery").mins + " min", L + ": Today minutes");
+      if (complete) {
+        same(dv.doneHeadline, "Nice reset — recovery complete!", L + ": Today headline");
+        same(dv.ctaLabel, "Do it again", L + ": Today CTA");
+        same(dv.ctaAction, "goExplore", L + ": which records nothing");
+      } else {
+        same(dv.ctaLabel, "Finish recovery", L + ": Today CTA");
+        same(dv.ctaAction, "goSession", L + ": which records");
+      }
+
+      /* PROGRESS TABLE. */
+      const pcol = pvm.buildProgressVM({}).analyticsWeek.find(d => d.key === c.dayKey);
+      same(pcol.movementsLabel, rec.movements.performed + "/" + menuSize, L + ": Progress moves");
+      same(pcol.performancesLabel, rec.performances.performed + "/" + menuSize, L + ": Progress times done");
+      same(pcol.roundsLabel, "n/a", L + ": Progress rounds stay n/a");
+      same(pcol.paceLabel, "Care", L + ": Progress pace stays Care");
+      same(pcol.earlyLabel, complete ? "No" : "Yes", L + ": Progress ended early");
+      same(pcol.skippedLabel, String(rec.rows.filter(l => l.status === "skipped").length), L + ": Progress skipped");
+
+      /* GROWN-UP ZONE, by weekday. */
+      const wd = gvm.buildGrownupVM({ gsScope: "week", grownupTab: "analytics" }).analytics.byWeekday.find(d => d.k === SHORT);
+      same(wd.statusChip, complete ? "✓ recovery " + rec.minutes + "m" : "recovery · part", L + ": Grown-up chip");
+      same(wd.mins, rec.minutes, L + ": Grown-up minutes");
+      ok(/grape/.test(wd.statusStyle) && !/sun/.test(wd.statusStyle), L + ": in the recovery colour, never partial's yellow");
+    });
+  }
+}
 
 console.log("✓ day records passed (" + passed + " assertions)");

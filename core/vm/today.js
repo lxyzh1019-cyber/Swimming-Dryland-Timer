@@ -517,10 +517,18 @@ export function buildTodayVM(state) {
   // One computed number, not the authored timeLo/timeHi. Those were written
   // against a runner that counted 10 reps for every prescription, so the card
   // promised 18–22 minutes for work the session screen then estimated at 30.
-  const stats = planStats(selectedKey, showActuals ? planState.light : null);
+  /* A DAY WITH A CARE RECORD — Sunday, or a weekday her check turned into
+     Recovery — gets the finished-day card like any other finished day, today
+     included: COMPLETED or PARTLY DONE on the record's own `careComplete`, its
+     moves and minutes against the recovery menu. It used to fall through to
+     "Start Recovery" (or the weekday's training card) with nothing she did on
+     it. The week strip keeps its recovery mark. */
+  const careRec = record && record.care && !isTrainingRecord(record) ? record : null;
+  const stats = planStats(selectedKey, careRec ? "recovery" : showActuals ? planState.light : null);
   const isSpaDay = !!(fullDay && fullDay.spa);
   let status = statuses[selectedKey];
   if (status === "rest" || status === "future") status = isSpaDay ? "rest" : "future";
+  if (careRec) status = careRec.careComplete ? "done" : "partial";
   // A partly-done day shares the "done" card, with copy that names what's left.
   const isPartial = status === "partial";
   if (isPartial) status = "done";
@@ -549,7 +557,7 @@ export function buildTodayVM(state) {
        resumable however much the log remembers about them. A Monday catch-up
        trained today IS today's record, so its leftovers are today's to finish. */
     const isToday = !!record && record.date === todayIso;
-    const resumeCircuits = isToday
+    const resumeCircuits = isToday && !careRec
       ? planResume(selectedKey, planState.light).circuits.filter(c => c.block !== "prep")
       : [];
     const remaining = [...new Set(resumeCircuits.map(c => c.name))];
@@ -582,7 +590,7 @@ export function buildTodayVM(state) {
        engine will ask, WHENEVER today's record holds a cut-short move — it
        used to be asked only when something else was still owed, which hid the
        offer exactly when everything left was a move she cut short. */
-    const redoCircuits = isToday
+    const redoCircuits = isToday && !careRec
       ? planResume(selectedKey, planState.light, { redoPartials: true })
           .circuits.filter(c => c.block !== "prep")
       : [];
@@ -622,7 +630,7 @@ export function buildTodayVM(state) {
        ROUNDS she finished — say so, and the two sentences stop fighting. */
     const dayRounds = record ? (Number(record.mainRoundsDone) || 0) : 0;
     const roundsAsked = record ? (Number(record.roundsPlanned) || 0) : 0;
-    const xpNote = (!earnedXp || isSpaDay) ? ""
+    const xpNote = (!earnedXp || careRec) ? ""
       : dayRounds > 0
         ? "+" + earnedXp + " XP is for the " + plural(dayRounds, "main round") + " you finished."
         : "+" + earnedXp + " XP for showing up.";
@@ -641,30 +649,42 @@ export function buildTodayVM(state) {
       : stats.mins + " min";
     const mv = showActuals ? record.movements : null;
     const pf = showActuals ? record.performances : null;
+    /* A care day's minutes and moves are its own record's, against the
+       recovery menu. "Finish recovery" (which records) only while it is still
+       today's to finish; a finished one offers the menu again with nothing
+       recorded. */
+    const careMins = careRec ? careRec.minutes + " of " + stats.mins + " min" : "";
+    const careMoves = careRec ? careRec.movements.performed + " of " + plural(careRec.movements.planned, "move") : "";
+    const careSkipped = careRec ? [...new Set((careRec.rows || []).filter(l => l && l.status === "skipped").map(l => l.name).filter(Boolean))] : [];
+    const careFinish = !!careRec && isPartial && isToday;
     dayView = {
       badgeLabel: shortU + (isPartial ? " · PARTLY DONE ✓" : " · COMPLETED ✓"),
       title: fullDay.title,
-      mins: stats.mins, minsLabel: timeLabel,
+      mins: stats.mins, minsLabel: careRec ? careMins : timeLabel,
       /* BOTH FACTS, IN PLAIN WORDS. "Moves" are distinct moves, counted once
          however many rounds they run; "times done" counts every planned
          instance, a main move once per round. The card printed one of them
          beside a Progress row that printed the other under the same word. */
-      movesLabel: (showActuals
+      movesLabel: careRec ? careMoves : (showActuals
         ? mv.performed + " of " + mv.planned + " moves · "
           + (pf.performed === pf.planned ? pf.performed + " times done"
                                          : pf.performed + " of " + pf.planned + " times done")
         : plural(planState.movements, "move")),
-      roundsLabel: (showActuals && !isSpaDay && roundsAsked > 0)
+      roundsLabel: (showActuals && !careRec && roundsAsked > 0)
         ? dayRounds + " of " + plural(roundsAsked, "main round") : "",
-      earnedXpLabel: isSpaDay || !earnedXp ? "" : "+" + earnedXp + " XP earned",
+      earnedXpLabel: !earnedXp ? "" : "+" + earnedXp + " XP earned",
       xpNote,
-      paceBand: (dayPace && dayPace.band) || "",
-      paceNote,
+      paceBand: careRec ? "" : (dayPace && dayPace.band) || "",
+      paceNote: careRec ? "" : paceNote,
       showChips: true, isDone: true,
-      doneHeadline: isSpaDay ? "Nice reset — recovery complete!"
+      doneHeadline: careRec ? (isPartial ? "Recovery partly done — what you did is saved." : "Nice reset — recovery complete!")
         : isPartial ? "You showed up — that counts!"
         : (allDone ? "Nice work — you crushed this one!" : "You got through most of it!"),
-      doneSub: isSpaDay ? "No XP today — rest is part of the plan."
+      doneSub: careRec
+        ? (isPartial
+            ? (careSkipped.length ? "Skipped: " + careSkipped.join(", ") + ". " : "")
+              + (careFinish ? "Finish the menu today and it's a full recovery day." : "The whole menu is what makes it a full recovery day.")
+            : earnedXp ? "Rest is part of the plan." : "No XP today — rest is part of the plan.")
         : isPartial ? ((streakEarned
             ? "This day counts toward your streak."
             : "Your work is saved" + (movesShort
@@ -682,14 +702,14 @@ export function buildTodayVM(state) {
            : resumable ? ("You skipped " + remainingLabel + " — finish up for XP.")
            : "Every round you finished is banked."),
       showCta: true,
-      ctaLabel: isSpaDay ? "Do it again" : (resumable ? "Finish remaining moves" : "Look at the moves"),
-      ctaIcon: isSpaDay ? "🧘" : (resumable ? "▶️" : "🧪"),
-      ctaVariant: (isSpaDay || !resumable) ? "secondary" : "primary",
-      ctaSubtext: isSpaDay ? "Doesn't change progress" : (resumable ? "" : "The session screen, nothing counting down, nothing recorded"),
-      ctaAction: (isSpaDay || !resumable) ? "goExplore" : "goSession",
+      ctaLabel: careFinish ? "Finish recovery" : careRec ? "Do it again" : (resumable ? "Finish remaining moves" : "Look at the moves"),
+      ctaIcon: careRec ? "🧘" : (resumable ? "▶️" : "🧪"),
+      ctaVariant: careFinish ? "primary" : (careRec || !resumable) ? "secondary" : "primary",
+      ctaSubtext: careFinish ? "" : careRec ? "Doesn't change progress" : (resumable ? "" : "The session screen, nothing counting down, nothing recorded"),
+      ctaAction: careFinish ? "goSession" : (careRec || !resumable) ? "goExplore" : "goSession",
       // Offered whenever today's record holds a move she cut short — with or
       // without anything else left to add it to.
-      partialSkipLabel: !isSpaDay ? partialSkipLabel : "",
+      partialSkipLabel: !careRec ? partialSkipLabel : "",
       showSettings: false
     };
   } else if (status === "missed") {
@@ -750,9 +770,9 @@ export function buildTodayVM(state) {
      rendered a second "🧪 Explore the moves" directly underneath it. */
   dayView.showExplore = canLaunch && dayView.ctaAction !== "goExplore";
   if (dayView.isActive && !dayView.ctaSubtext) dayView.ctaSubtext = (dayView.movesLabel || "") + " · about " + (dayView.mins || "?") + " min · that’s the whole thing — no surprises.";
-  dayView.showBlocksList = !!(dayView.isActive || dayView.isDone || dayView.isPreview || dayView.isMissed) && !isSpaDay;
+  dayView.showBlocksList = !!(dayView.isActive || dayView.isDone || dayView.isPreview || dayView.isMissed) && !isSpaDay && !careRec;
   dayView.blocksHint = dayView.isDone ? "REVIEW WHAT YOU DID 👀" : dayView.isPreview ? "PEEK AT WHAT'S COMING 👀" : dayView.isMissed ? "READY WHEN YOU ARE — PEEK INSIDE 👀" : "TAP A BLOCK TO PEEK INSIDE 👀";
-  dayView.showFocus = !!(dayView.isActive || dayView.isPreview) && !isSpaDay;
+  dayView.showFocus = !!(dayView.isActive || dayView.isPreview) && !isSpaDay && !careRec;
   /* "Let's go" is the screen's main action: the one main-button colour, 22px
      on 64px. The secondary CTA (a finished day's "Look at the moves") is a
      calm neutral button, 18px on 56px (R5). */
