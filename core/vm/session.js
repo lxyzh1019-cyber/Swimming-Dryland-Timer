@@ -542,7 +542,12 @@ export function buildSessionVM(state) {
     ? sess.listCircuits : circuits;
   const moveKey = (block, name) => block + "|" + name;
 
-  const historyRows = (sess.priorRows || []).concat(sess.ledger || []);
+  /* While she redoes a move after "◀ Back", the moves she passed keep their
+     rows set aside (see rewindTo) — and their marks: the one she went back to
+     is the only result that is open again. */
+  const passedAside = Object.keys(sess.aside || {})
+    .filter(k => Number(k) !== sess.redoStep).map(k => sess.aside[k]);
+  const historyRows = (sess.priorRows || []).concat(sess.ledger || [], passedAside);
   /* ONE MARK PER MOVE, ABOUT THE ROUND SHE IS IN — AND NOTHING ELSE.
 
      This used to grade a move across ALL its rounds: `done` only once every
