@@ -133,8 +133,13 @@ function blankSession() {
        ordered list of steps (see buildSteps) rather than three nested loops,
        which is what lets "back a move" exist at all: `stepIdx` is where she is,
        `backTo` is where she asked to return to, and the ledger holds exactly one
-       row per step already walked, so rewinding is a truncation. */
-    stepIdx: 0, totalSteps: 0, backTo: null, steps: [],
+       row per step already walked, in order. Going back sets aside the rows
+       from the target on (`aside`, by step): `redoStep` is the step she went
+       back to, `backFrom` the first step she had not reached. `asideSkips` are
+       the target's skip entries, `asideDropped` rows whose steps a tier drop
+       removed during a redo. */
+    stepIdx: 0, totalSteps: 0, backTo: null, steps: [], aside: {}, asideSkips: [], asideDropped: [],
+    redoStep: null, backFrom: null,
     /* EXPLORE — the same screen with nothing counting down and nothing saved.
        `holdResolver` is how a move ends in explore: not a clock, a tap, and
        `jumpTo` is the step a tap on the LIST asked for. */
@@ -224,7 +229,7 @@ export function tierDroppedRounds(currentRounds, wobblyStreak, roundInProgress) 
 function applyTierDrop(circuit, rounds, steps, s, moveName, round) {
   circuit.rounds = rounds;
   for (let k = steps.length - 1; k > s; k--) {
-    if (steps[k].circuit === circuit && steps[k].r > rounds) steps.splice(k, 1);
+    if (steps[k].circuit === circuit && steps[k].r > rounds) { steps.splice(k, 1); dropAsideStep(k); }
   }
   sess.totalSteps = steps.length;
   sess.tierDropped = (sess.tierDropped || 0) + 1;
@@ -1085,7 +1090,6 @@ function recordExercise(ex, circuit, ci, ei, r, wasSkipped) {
     status: exerciseStatus(ex, wasSkipped, actualSecs, plannedSecs),
     at: Date.now()
   };
-  sess.ledger.push(row);
   sess.repsCounted = 0; sess.repsTarget = 0; sess.repNow = 0;
   sess.segmentsDone = 0; sess.segmentsPlanned = 0;
   return row;
@@ -1887,30 +1891,152 @@ export function canGoBack() {
   return true;
 }
 
-/* Undo everything from step `target` on, so the loop can walk it again.
-   Every reached step wrote exactly one ledger row, in order, so the rows to
-   drop are the tail. Skips are tagged with the step they happened on. */
+/* Send the walk back to step `target`. Every reached step wrote exactly one
+   ledger row, in order, so the rows from the target on are the tail. Only the
+   TARGET's result is dropped: its row comes off the day's progress record. The
+   moves she passed keep their rows, set aside by step and still banked, and the
+   walk puts each done one back without asking for it again (see skipsOnReturn).
+   A redo she leaves unfinished by going back further is passed too, so its old
+   result goes back on the record. Skips are tagged with the step they
+   happened on. */
 function rewindTo(target) {
-  const dropped = sess.ledger.slice(target);
-  sess.ledger.length = Math.min(sess.ledger.length, target);
-  dropped.forEach(unbankMove);
-  sess.exDone = sess.ledger.length;
-  sess.skipped = (sess.skipped || []).filter(e => !(Number.isFinite(e.step) && e.step >= target));
-  // Replay the per-key status from the rows that remain.
-  sess.exStatus = {};
-  sess.ledger.forEach(row => {
-    const c = sess.circuits[row.ci] || {};
-    const key = row.ci + "-" + row.ei;
-    const r = row.round - (Number.isFinite(Number(c.roundBase)) ? Number(c.roundBase) : 1) + 1;
-    sess.exStatus[key] = row.status === "skipped" ? "skipped"
-      : r === c.rounds ? row.status : sess.exStatus[key];
-  });
+  // The first step with no row yet: from a rest that is the step after the
+  // one just recorded, so a second Back still returns past it.
+  sess.backFrom = Math.max(sess.backFrom == null ? -1 : sess.backFrom, sess.ledger.length);
+  const left = sess.redoStep;
+  if (left != null && left > target && sess.aside[left]) {
+    bankMove(sess.aside[left]);
+    sess.skipped = (sess.skipped || []).concat(sess.asideSkips);
+    sess.asideSkips = [];
+  }
+  sess.ledger.splice(target).forEach((row, i) => { sess.aside[target + i] = row; });
+  if (sess.aside[target]) unbankMove(sess.aside[target]);
+  sess.redoStep = target;
+  // The target's skip goes with its row, and comes back with it on a stop.
+  sess.asideSkips = sess.asideSkips.concat((sess.skipped || []).filter(e => e.step === target));
+  sess.skipped = (sess.skipped || []).filter(e => e.step !== target);
+  syncExDone();
+  replayExStatus();
   sess.backTo = null;
   sess.skipExercise = false; sess.justSkipped = false; sess.forceDone = false;
   sess.confirmSkip = false; sess.sideLabel = "";
   return target;
 }
 const wentBack = () => sess.backTo != null;
+
+/* After a redo, a step she had already done in full before going back is not
+   walked again: the runner returns to where she was. A partial or skipped
+   step between is walked again, so she can improve it. */
+const skipsOnReturn = (s) => sess.backFrom != null && s > sess.redoStep && s < sess.backFrom
+  && !!sess.aside[s] && sess.aside[s].status === "done";
+
+// The rows set aside for steps she passed, in step order — not the target's.
+const passedRows = () => Object.keys(sess.aside).map(Number).sort((a, b) => a - b)
+  .filter(k => k !== sess.redoStep).map(k => sess.aside[k]);
+
+// Moves done = rows on the ledger plus the passed rows set aside, so the
+// progress count does not fall back while she redoes one move.
+function syncExDone() { sess.exDone = sess.ledger.length + passedRows().length; }
+
+/* A tier drop removed step `k` during a redo: the set-aside rows and skip
+   marks after it move down one step, and its own row is kept for the end. */
+function dropAsideStep(k) {
+  if (sess.aside[k]) sess.asideDropped.push(sess.aside[k]);
+  const moved = {};
+  Object.keys(sess.aside).map(Number).forEach(i => {
+    if (i < k) moved[i] = sess.aside[i]; else if (i > k) moved[i - 1] = sess.aside[i];
+  });
+  sess.aside = moved;
+  if (sess.backFrom != null && sess.backFrom > k) sess.backFrom -= 1;
+  (sess.skipped || []).forEach(e => {
+    if (!Number.isFinite(e.step)) return;
+    if (e.step === k) e.step = -1; else if (e.step > k) e.step -= 1;
+  });
+}
+
+/* The row step `s` leaves. A first walk appends it and banks it. A step walked
+   again after "◀ Back" had a row set aside: the new row replaces it — unless the
+   old one was done and the new one is not. A Skip or an early Done on a move
+   she already did in full leaves it done, banked, with no skip on the list.
+   Returns the row the ledger now holds for the step. */
+function recordStepRow(s, row, wasSkipped) {
+  const old = sess.aside[s];
+  delete sess.aside[s];
+  const kept = old && old.status === "done" && row.status !== "done" ? old : row;
+  if (old && kept === row) unbankMove(old);
+  if (s === sess.redoStep) sess.asideSkips = [];
+  sess.ledger.push(kept);
+  bankMove(kept);
+  syncExDone();
+  if (old) {
+    // One skip entry per step at most, and only while its row is a skip she chose.
+    const mine = (sess.skipped || []).filter(e => e.step === s);
+    sess.skipped = (sess.skipped || []).filter(e => e.step !== s);
+    if (kept === row && wasSkipped && mine.length) sess.skipped.push(mine[mine.length - 1]);
+    replayExStatus();
+  }
+  return kept;
+}
+
+// The next step the walk will run, past the done ones it returns over.
+function walkedNext(steps, s) {
+  let i = s + 1;
+  while (i < steps.length && skipsOnReturn(i)) i++;
+  return steps[i] || null;
+}
+
+/* The round and block bookkeeping at the end of step `s`, on the plan's own
+   boundaries — run for a walked step and for a done one the walk returns
+   over, so it always sees the round's and the block's rows on the ledger. */
+function closeStep(steps, s) {
+  const st = steps[s];
+  const nx = steps[s + 1] || null;
+  // "Rounds" means MAIN rounds trained. Every one-round block used to add
+  // to this same counter, so the finish screen showed a green day as 8.
+  //
+  // The round has normally been committed already, as its last row landed.
+  // This is the safety net for the ragged shapes: a move capped by
+  // `ex.rounds` means the last exercise of a round is not always the last
+  // INDEX of the circuit, so "its last row" is not a position we can trust.
+  // commitRoundIfDone counts a round once however often it is asked.
+  if ((!nx || nx.ci !== st.ci || nx.r !== st.r) && st.circuit.block === "main") {
+    commitRoundIfDone(st.ci, st.absRound);
+    logRoundShort(st.ci, st.absRound);
+  }
+  if (!nx || nx.ci !== st.ci) {
+    if (blockHadWork(st.ci)) sess.blocksCompleted += 1;
+    recordBlockDone(st.circuit.block, st.ci);
+  }
+}
+
+/* A sitting that ends while rows are set aside keeps them: they go back on the
+   ledger in step order. The moves she passed were never dropped, and the
+   target's result is replaced only by a redo she finishes — a stop is not one,
+   so it goes back on the day's progress record too. */
+function foldAside() {
+  const t = sess.redoStep;
+  if (t != null && sess.aside[t]) {
+    bankMove(sess.aside[t]);
+    sess.skipped = (sess.skipped || []).concat(sess.asideSkips);
+  }
+  Object.keys(sess.aside).map(Number).sort((x, y) => x - y).forEach(k => sess.ledger.push(sess.aside[k]));
+  sess.asideDropped.forEach(row => sess.ledger.push(row));
+  sess.aside = {}; sess.asideSkips = []; sess.asideDropped = [];
+  sess.redoStep = null; sess.backFrom = null;
+  sess.exDone = sess.ledger.length;
+}
+
+// The per-key status, replayed from the ledger's rows and the passed ones.
+function replayExStatus() {
+  sess.exStatus = {};
+  [...sess.ledger, ...passedRows()].forEach(row => {
+    const c = sess.circuits[row.ci] || {};
+    const key = row.ci + "-" + row.ei;
+    const r = row.round - (Number.isFinite(Number(c.roundBase)) ? Number(c.roundBase) : 1) + 1;
+    sess.exStatus[key] = row.status === "skipped" ? "skipped"
+      : r === c.rounds ? row.status : sess.exStatus[key];
+  });
+}
 
 /* ============================================================
    MAIN RUNNER
@@ -2144,9 +2270,24 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
   for (let s = 0; s < steps.length; s++) {
     const st = steps[s];
     const { ci, r, ei, ex, circuit, absRound } = st;
-    let next = steps[s + 1] || null;
+    if (sess.backFrom != null && s >= sess.backFrom) { sess.backFrom = null; sess.redoStep = null; }
+    if (skipsOnReturn(s)) {
+      // Already done in full before she went back: it goes back on the ledger
+      // as it was, still banked, and is not asked for again.
+      const kept = sess.aside[s];
+      delete sess.aside[s];
+      sess.ledger.push(kept);
+      bankMove(kept);
+      syncExDone();
+      replayExStatus();
+      if (circuit.block === "main") commitRoundIfDone(ci, absRound);
+      closeStep(steps, s);
+      continue;
+    }
+    // `next` is the next step she will WALK (the rest and "Next:" name it);
+    // the round and block bookkeeping keeps to the plan's own boundaries.
+    let next = walkedNext(steps, s);
     let isLastOfRound = !next || next.ci !== ci || next.r !== r;
-    let isLastOfBlock = !next || next.ci !== ci;
 
     sess.stepIdx = s;
     sess.skipExercise = false;
@@ -2240,7 +2381,6 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     // to also swallow its rest (and the justSkipped minimum below).
     const wasSkipped = sess.skipExercise;
     sess.skipExercise = false;
-    sess.exDone += 1;
 
     // ---------- LEDGER ----------
     // What ACTUALLY happened, one row per exercise per round. The old code
@@ -2250,15 +2390,16 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     // produced a fully completed session.
     const row = recordExercise(ex, circuit, ci, ei, absRound, wasSkipped);
     // Banked NOW, not when the block ends — an interrupted session must keep
-    // every move it actually finished. See bankMove.
-    bankMove(row);
+    // every move it actually finished. See bankMove. A redo after "◀ Back"
+    // replaces the step's row but never a done one with a worse one.
+    const held = recordStepRow(s, row, wasSkipped);
     // And the ROUND is committed now too, for the same reason one move down:
     // everything between here and the next round — the form check below, the
     // round-rest speech, the rest itself — can abort, and each abort used to
     // discard a round she had already finished. See commitRoundIfDone.
     if (circuit.block === "main") commitRoundIfDone(ci, absRound);
-    sess.exStatus[key] = row.status === "skipped" ? "skipped"
-      : r === circuit.rounds ? row.status : sess.exStatus[key];
+    sess.exStatus[key] = held.status === "skipped" ? "skipped"
+      : r === circuit.rounds ? held.status : sess.exStatus[key];
 
     /* LANDING CHECK. A sport with a landing rule grades every gated jump before
        the rest starts — clean and frozen, or a bit wobbly. Two wobbly in a row
@@ -2274,9 +2415,8 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
         const dropped = tierDroppedRounds(circuit.rounds, sess.wobblyStreak, r);
         if (dropped < circuit.rounds) {
           applyTierDrop(circuit, dropped, steps, s, ex.name, r);
-          next = steps[s + 1] || null;
+          next = walkedNext(steps, s);
           isLastOfRound = !next || next.ci !== ci || next.r !== r;
-          isLastOfBlock = !next || next.ci !== ci;
           setUpNext(next);
           await speakAndWait("Two wobbly landings in a row — let's drop a round. Quality over quantity.");
           if (sess.abort) return finalize(false);
@@ -2388,22 +2528,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
       }
     }
 
-    // "Rounds" means MAIN rounds trained. Every one-round block used to add
-    // to this same counter, so the finish screen showed a green day as 8.
-    //
-    // The round has normally been committed already, as its last row landed.
-    // This is the safety net for the ragged shapes: a move capped by
-    // `ex.rounds` means the last exercise of a round is not always the last
-    // INDEX of the circuit, so "its last row" is not a position we can trust.
-    // commitRoundIfDone counts a round once however often it is asked.
-    if (isLastOfRound && circuit.block === "main") {
-      commitRoundIfDone(ci, absRound);
-      logRoundShort(ci, absRound);
-    }
-    if (isLastOfBlock) {
-      if (blockHadWork(ci)) sess.blocksCompleted += 1;
-      recordBlockDone(circuit.block, ci);
-    }
+    closeStep(steps, s);
   }
 
   // Skill-block extras: micro-loop Q&A + breath rehearsal. These are TRAINING
@@ -2611,6 +2736,7 @@ function settleDayProgressSecs(saved) {
    ("your progress is saved"), with endedEarly + pain flags.
    ============================================================ */
 export function finalize(completed) {
+  foldAside();
   sess.running = false;
   sess.paused = false;
   sess.pauseReasons = [];

@@ -399,3 +399,17 @@ Structural option (not approved, not done): a test that renders every screen, co
 | `RECOVERY_STREAK_FRACTION` (100% of every clock) and the separate `isSpaDay` paths on the done card | ⚠️ intentionally removed / merged (plan "Removes") |
 | Streak freeze rule | changed as approved — `streakJudged && careComplete` (an early-tapped weekday recovery now holds the streak) |
 | Missing | none found |
+
+## Round 2026-10-08 — Back a move keeps done moves
+- Plan, ledger rows and evidence live in the skate record (Figure-Skate-Dryland-Timer WORKING_RECORD.md, plan `plans/i-want-to-have-virtual-quasar.md` there). Same core change here on branch `claude/back-keeps-done` (commit c6892eb); sw.js v33 → v34.
+
+## Regression table — Back a move keeps done moves (care-days manifest → + Back keeps done moves)
+| Feature | Status |
+|---|---|
+| Back only inside the same block before the round is counted; Back from a rest redoes that move; Back from an unfinished move restarts it; lead-in Back (leadin.mjs) | ✅ kept |
+| One ledger row per walked step; round commit, exStatus, exDone, skipped count, resume, XP, streak, Today / Progress / Grown-up rules, stored record shape | ✅ kept (all existing suites green unchanged, both apps) |
+| Moves passed going back keep their results and stay banked; redo returns to where she was, skipping done moves; a done result is never downgraded by Skip or early Done; a stop during a redo keeps the old result; move list shows passed moves during a redo | ➕ added |
+| "Going back erases every result after the target" | ⚠️ intentionally replaced (plan "Removes") |
+| `core/` byte-identical with the other repo | ✅ kept — `diff -rq --strip-trailing-cr core` empty |
+| sw.js version bump | ✅ skate v29 → v30, swim v33 → v34 |
+| Missing | none found |
