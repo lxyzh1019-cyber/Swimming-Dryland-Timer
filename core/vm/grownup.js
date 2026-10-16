@@ -265,6 +265,34 @@ export function buildGrownupVM(state) {
         + (z.worst >= 4 ? "var(--stop)" : z.worst >= 3 ? "var(--coral)" : "var(--sun)") + ";"
     }));
 
+  /* ---- still tight after recovery ----
+     The "Still tight?" answers from recovery sessions (see tightLoop in
+     core/engine.js). A spot still tight after its extra rounds, or tight on a
+     zone she marked sore, is listed for the coach or physio, most often first. */
+  const tightByKey = new Map();
+  sessions.forEach(s => {
+    Object.entries(s.tightness || {}).forEach(([move, t]) => {
+      if (!t || !t.stillTight) return;
+      const zone = BODY_ZONES.find(b => b.n === t.zone);
+      const key = zone ? "z" + zone.n : "m" + move;
+      const cur = tightByKey.get(key) || { label: zone ? zone.label : move, times: 0, extra: 0, sore: 0, last: "" };
+      cur.times += 1;
+      cur.extra += Number(t.extra) || 0;
+      if (t.sore) cur.sore += 1;
+      const d = s.isoDate ? edmontonISO(new Date(s.isoDate)) : "";
+      if (d > cur.last) cur.last = d;
+      tightByKey.set(key, cur);
+    });
+  });
+  const stillTight = [...tightByKey.values()]
+    .sort((a, b) => b.times - a.times || (b.last > a.last ? 1 : -1))
+    .map(t => ({
+      label: t.label,
+      note: t.times + " recovery day" + (t.times === 1 ? "" : "s") + " · " + t.extra + " extra round" + (t.extra === 1 ? "" : "s")
+        + (t.sore ? " · sore " + t.sore + "×" : ""),
+      last: t.last ? dstr(t.last) : ""
+    }));
+
   /* ---- consistency cells ---- */
   /* One colour per DATE off the day record: done ⇔ the record is complete,
      partial ⇔ she trained but the day is not complete, rest ⇔ her check sent
@@ -859,6 +887,8 @@ export function buildGrownupVM(state) {
     grid2: "display:grid;grid-template-columns:" + (state.isWide ? "1fr 1fr" : "1fr") + ";gap:14px;",
     libGrid: "display:grid;grid-template-columns:" + (state.isWide ? "repeat(2,1fr)" : "1fr") + ";gap:14px;",
 
+    // The release this device runs: the service-worker cache name (see readAppVersion in core/main.js).
+    appVersion: state.appVersion || "",
     analytics: {
       indicators, isSheTrying, periodCovered,
       flags: flags.length ? flags : null,
@@ -868,6 +898,7 @@ export function buildGrownupVM(state) {
       loadOutcome, hasLoadReport: loadOutcome.length > 0,
       overrideRows, hasOverrides: overrideRows.length > 0,
       bodyMapTrend, hasBodyMap: bodyMapTrend.length > 0,
+      stillTight, hasStillTight: stillTight.length > 0,
       consistency: consistencyView,
       loadTitle, loadSubtitle, loadHeadline, loadTrend,
       acwr: acwrView,

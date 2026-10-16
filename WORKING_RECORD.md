@@ -108,14 +108,14 @@ Structural option (not approved, not done): a test that renders every screen, co
 | R5-4 Review pass, FEATURES.md, regression table, one PR per repo | COMPLETE | review pass done (colour slots match the request + decisions; core identical; npm test exit 0 both repos after the contrast fixes); FEATURES.md updated by the worker; regression table below; PRs open ready for review: lxyzh1019-cyber/Swimming-Dryland-Timer#76, lxyzh1019-cyber/Figure-Skate-Dryland-Timer#50 |
 | R5-5 Merge both PRs | COMPLETE | merged by the user 2026-10-01 (swim #76 → 6d11edf, skate #50 → 9e746a8; gh pr view: MERGED) |
 | R5-6 Live site serves new version | COMPLETE | curl 2026-10-01: live GitHub Pages sw.js serves v32 and the decor image answers HTTP 200 |
-| R5-7 iPad check | BLOCKED — needs the user's iPad; Claude cannot reach the device | not run: open the app on the iPad (reload twice so the new version installs) and look at Today, Body Check, a session, the finish screen, Progress and the Grown-up switch |
+| R5-7 iPad check | MITIGATED — iPad-size browser walk 2026-10-16 (chat build); a real iPad not run | |
 | RD-1 Failing tests first (both apps) | COMPLETE | `core/test/dayrecords.mjs` CARE DAYS (Sunday + weekday recovery × full / early tap / skip / ended early): before the change 142 failing assertions in each app (swim and skate, counted with a non-throwing copy of the suite run against the old code), 0 after |
 | RD-2 Build the change (both apps, core identical) | COMPLETE | opus-worker 2026-10-04: core/outcome.js, core/vm/session.js, core/screens/session.js, core/vm/today.js, core/vm/progress.js, core/vm/grownup.js; sw.js swim v32 → v33, skate v28 → v29; FEATURES.md "Care / recovery days" |
 | RD-3 Run every test in both apps | COMPLETE | `npm test` exit 0 both repos, both TZs (dayrecords now 489 with the new CARE DAYS assertions; all other counts unchanged); `diff -rq core` empty |
 | RD-4 One draft PR per app | COMPLETE | opened ready for review by the main session 2026-10-04 after the user's "open the PRs and approve": lxyzh1019-cyber/Swimming-Dryland-Timer#79, lxyzh1019-cyber/Figure-Skate-Dryland-Timer#52 |
-| RD-5 Merge both PRs | BLOCKED — merging is the user's step (approved plan: no merge by Claude); CI was still running when the PRs opened | swim #79, skate #52 open and mergeable 2026-10-04 |
-| RD-6 Live site serves the new version | BLOCKED — waits on RD-5 (merge) | not started; check sw.js swim v33 / skate v29 after merge |
-| RD-7 Sunday recovery on the device (finish, Today, Progress, Grown-up) | BLOCKED — waits on RD-6 and the user's iPad | not started |
+| RD-5 Merge both PRs | COMPLETE | merged: swim #79 (ec619e3), skate #52 (55c3b4a) — git log, checked 2026-10-16 |
+| RD-6 Live site serves the new version | NOT CHECKED — merged; the live page cannot be reached from the claude.ai chat (2026-10-16). The Grown-up Zone now shows the version each device runs. | |
+| RD-7 Sunday recovery on the device (finish, Today, Progress, Grown-up) | MITIGATED — Sunday walked in a browser at iPad landscape/portrait and phone sizes, both apps (2026-10-16, chat build); sound and screen lock not tested | |
 
 ## Checks and evidence
 - 2026-09-24 baseline `node core/test/run.mjs` → all suites green (before changes)
@@ -413,3 +413,23 @@ Structural option (not approved, not done): a test that renders every screen, co
 | `core/` byte-identical with the other repo | ✅ kept — `diff -rq --strip-trailing-cr core` empty |
 | sw.js version bump | ✅ skate v29 → v30, swim v33 → v34 |
 | Missing | none found |
+
+
+## Round 2026-10-16 — Recovery "Still tight?" + review fixes (claude.ai chat build)
+Approved in chat 2026-10-16 (hz-reviewer full audit + all checks; decisions D1 A all recovery moves, D2 A 2 extra rounds no day cap, D3 A no extra round on a sore zone, D4 B keep Sunday content, D5 A timer follows dose, D6 A "Is anything still tight?", D7 A build in chat, D8 A massage gun 4 × 30 s, D9 A swim Sunday 10–14 min). Branch `still-tight-check` in both repos; `core/` identical (diff -rq empty).
+
+| ID | Problem | Fix | Result |
+|---|---|---|---|
+| R1 F1 F2 | No "still tight?" step on recovery | Card after every recovery move, extra round, `tightness` on the record, Grown-up card | `core/test/tight.mjs` 37 checks |
+| F4 | Extra round on a sore area | No extra round on a zone sore in today's Body Check | tight.mjs §4 |
+| F5 | Repeats | Max 2 extra rounds per move, no day cap | tight.mjs §3 |
+| F6 F7 F8 L4 | Sunday Body Check said "Full 3 rounds" / "Start training" | Recovery card, "Start recovery", no override, rest-day intro | tight.mjs §9; browser walk |
+| L1 | Dose ≠ timer | Superman 3×8s and Streamline 2×20s counted holds; massage gun 120 s | estimate skate 11.8 → 13.3 min, swim 11.3 → 13.2 min |
+| L2 L3 | Training mantra on Sunday; "–°" offline | Day mantra; no chip without a reading | tight.mjs §10 |
+| S1 | Week strip 42px on phone | gap 5 → 2px | layout check TAP 6 → 0 |
+| S2 | Unused functions | 21 removed; 3 kept (used by swim `test/smoke.mjs`) | `npm test` green |
+| G1 | Core drift unchecked; README said `git subtree` | CI step "Shared core is the same in both apps"; README fixed | step dry-run: fails on a different core, passes on the same |
+| G2 | iPad never checked | Browser walk at iPad L/P and phone, both apps | 6 × 11 checks pass |
+| G4 | Stale BLOCKED / WAITING lines | Updated above | — |
+| G5 | No deploy stamp | Grown-up › Settings: "App version on this device" | — |
+| F3 G3 G6 | Coach stretches; public reads; old branches | Not fixing (D4 B; owner decision; destructive) | — |

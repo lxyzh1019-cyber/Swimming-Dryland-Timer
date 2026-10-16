@@ -128,7 +128,6 @@ const EXPENDABLE_KEYS = [LS_EVENTS, SKIP_HISTORY_KEY, LS_PRLOG];
 let _storageErrorHandler = null;
 let _lastStorageError = null;
 export function onStorageError(fn) { _storageErrorHandler = fn; }
-export function lastStorageError() { return _lastStorageError; }
 
 function reportStorageError(key, error) {
   _lastStorageError = { key, message: String(error && error.message || error), at: Date.now() };
@@ -343,11 +342,6 @@ export function patchSession(key, patch) {
   return writeStorage(LS_SESSIONS, all);
 }
 
-export function thisWeekSessions() {
-  // Edmonton's Mon–Sun week, like every other calendar grouping in the app.
-  const weekIsoSet = new Set(Object.values(edmontonWeekISODates()));
-  return loadSessions().filter(s => weekIsoSet.has(edmontonISO(s.isoDate)));
-}
 
 /* Did this record earn the kid a day of training?
    Fully completed sessions always count. A session ENDED EARLY counts too, as
@@ -386,11 +380,6 @@ export function streakFreezeDates(sessions) {
     .map(s => edmontonISO(s.isoDate)).filter(Boolean));
 }
 
-export function daysAgoCount(sessions, days) {
-  const cutoff = Date.now() - days * DAY_MS;
-  return sessions.filter(s => s.isoDate && new Date(s.isoDate).getTime() >= cutoff);
-}
-export function sumSecs(sessions) { return sessions.reduce((a, s) => a + (s.durationSecs || 0), 0); }
 
 /* Streak "freeze": a single rest/missed day between active days does NOT break
    the run (a gap of 1 or 2 calendar days both continue it). This stops the
@@ -501,11 +490,6 @@ export function longestStreakOf(sessions) {
 function pruneSkipHistory(items) {
   const cutoff = Date.now() - SKIP_RETENTION_MS;
   return (items || []).filter(item => item.createdAt >= cutoff);
-}
-export function loadSkipHistory() {
-  const cleaned = pruneSkipHistory(readStorage(SKIP_HISTORY_KEY, []));
-  writeStorage(SKIP_HISTORY_KEY, cleaned);
-  return cleaned;
 }
 export function addSkipRecord(record) {
   const all = pruneSkipHistory(readStorage(SKIP_HISTORY_KEY, []));
@@ -748,7 +732,6 @@ export function loadGate() {
 }
 export function saveGate(g) { writeStorage(LS_GATE, g); }
 export function gateLocked() { return !loadGate().unlocked; }
-export function gateCleanWeeks() { return loadGate().cleanWeeks.length; }
 
 /* The old bare counter can't say WHICH weeks were clean, and it was inflated by
    sessions that only had to not-skip the move. Credit at most one week for it
@@ -786,8 +769,6 @@ export function loadLadderRungs() { return readStorage(LS_LADDER, {}); }
 export function saveLadderRungs(r) { writeStorage(LS_LADDER, r); }
 
 /* ---- learning records + quiz ---- */
-export function loadLearning() { return readStorage(LS_LEARNING, []); }
-export function saveLearning(l) { writeStorage(LS_LEARNING, l); }
 
 /* Quiz blob. `items` is the per-MOVE mastery record the grown-up analytics
    reads. `qLedger` is the per-QUESTION XP ledger added alongside it: a move
@@ -1065,11 +1046,6 @@ export function quizBankStatus(quiz) {
 
 /* ---- PR log ---- */
 export function loadPrLog() { return readStorage(LS_PRLOG, []); }
-export function addPrLog(entry) {
-  const all = loadPrLog();
-  all.push(entry);
-  writeStorage(LS_PRLOG, all.slice(-60));
-}
 
 /* ---- 4-week tracker (PR board) ---- */
 export function loadTracker() {
@@ -2144,11 +2120,6 @@ export function settledXpByDate(sessions, opts = {}) {
   settledDayXp(sessions, opts).forEach(d => out.set(d.date, d.settled));
   return out;
 }
-export function settledXpInRange(sessions, from, to) {
-  return settledDayXp(sessions)
-    .filter(d => (!from || d.date >= from) && (!to || d.date <= to))
-    .reduce((sum, d) => sum + d.settled, 0);
-}
 
 /* XP THIS DEVICE HAS CALCULATED BUT CANNOT YET PROMISE.
 
@@ -2182,10 +2153,6 @@ export function noteSyncResult(ok) {
   if (!j) return;
   j.lastSyncAt = Date.now();
   saveJourney(j);
-}
-export function lastSyncFailed() { return _syncFailed; }
-export function hasEverSynced() {
-  return Number.isFinite((loadJourney() || {}).lastSyncAt);
 }
 
 /* How long a successful sync counts as evidence that there IS another device to
@@ -2410,15 +2377,6 @@ export function recordFormVerdict(move, pass, month) {
   saveFormChecks(fc);
   logEvent("form_check", { move, pass: !!pass, month });
   return fc;
-}
-export function clearFormVerdict(move, month) {
-  month = month || monthKeyOf();
-  const fc = loadFormChecks();
-  const m = fc.months[month];
-  if (!m || !m.moves[move]) return false;
-  delete m.moves[move];
-  saveFormChecks(fc);
-  return true;
 }
 export function formVerdicts(month) {
   return ((loadFormChecks().months[month || monthKeyOf()] || {}).moves) || {};

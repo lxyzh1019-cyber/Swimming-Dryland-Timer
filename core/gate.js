@@ -68,7 +68,7 @@ export const UNGATED_ACTIONS = [
   "goSession", "goSessionRedo", "goExplore", "exitExplore", "goBack", "goToMove",
   "advance", "pauseTimer", "skipEx", "stopNow", "resumeFromStop", "endFromStop",
   "askEnd", "cancelEnd", "confirmEndEarly",
-  "askSkip", "cancelSkip", "confirmSkipEx", "pickIntent", "answerMicro", "answerRepCheck",
+  "askSkip", "cancelSkip", "confirmSkipEx", "pickIntent", "answerMicro", "answerRepCheck", "answerTight",
   "pickClean", "pickWobbly", "skipFormCheck", "pickMood", "reflectWell",
   "reflectNext", "quizPick", "exitSession", "toggleMoveReview",
   "openDetail", "openDetailCur", "openDetailAt", "watchVideo", "closeDetail", "resumeFromDetail",

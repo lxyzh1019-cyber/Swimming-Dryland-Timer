@@ -63,6 +63,7 @@ export const state = {
   moveReviewOpen: false,        // the finish screen's "See every move" list
   blocksOpen: false,            // phone Today: the day card's blocks, folded until she opens them (not saved)
   weather: null,                // { icon, temp, caption } once fetched
+  appVersion: "",               // the service-worker cache this device runs, e.g. "splash-v35"
   backupNote: "", backupNoteOk: false,   // result line under Backup & restore
   walletRepairNote: "",         // result line under the prize wallet repair
   pendingRestore: null,         // { file, from, to } — a backup from another athlete, awaiting confirmation
@@ -618,6 +619,7 @@ Object.assign(RAW, {
   pickIntent(arg) { engine.pickIntentWord(arg); },
   answerMicro(arg) { engine.answerMicroLoop(arg); },
   answerRepCheck(arg) { engine.answerRepCheck(arg); },
+  answerTight(arg) { engine.answerTight(arg); },
   pickClean() { engine.pickClean(); },
   pickWobbly() { engine.pickWobbly(); },
   skipFormCheck() { engine.skipFormCheck(); },
@@ -1107,6 +1109,20 @@ window.addEventListener("resize", () => {
 });
 
 /* Weather chip (Red Deer, same source as the old app) — cosmetic, fails silently. */
+/* The release this device runs, for the Grown-up Zone: the newest
+   service-worker cache name ("splash-v35"). No cache yet (first visit, or a
+   browser without one) leaves it unknown. */
+async function readAppVersion() {
+  try {
+    if (typeof caches === "undefined") return;
+    const names = (await caches.keys()).filter(n => /-v\d+$/.test(n));
+    if (!names.length) return;
+    names.sort((a, b) => Number(b.match(/(\d+)$/)[1]) - Number(a.match(/(\d+)$/)[1]));
+    state.appVersion = names[0];
+    if (!state.inSession) render();
+  } catch { /* unknown is fine */ }
+}
+
 async function fetchWeather() {
   try {
     const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=52.1833&longitude=-113.8&current=temperature_2m,weather_code&timezone=America/Edmonton");
@@ -1129,6 +1145,7 @@ function boot() {
   if (!state.selectedDay) state.selectedDay = edmontonDayKey();
   render();
   fetchWeather();
+  readAppVersion();
   // Pull anything this device is missing back out of the cloud mirror (a wiped
   // or brand-new browser starts empty, but the history is still up there), then
   // repaint so the restored streak / XP / log show up straight away.

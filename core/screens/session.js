@@ -98,6 +98,18 @@ function promptCard(vm, size) {
       <div style="font-size:15px;font-weight:700;color:var(--ink);text-align:center;line-height:1.45;">${vm.cleanCheckQuestion}<br><span style="font-size:13px;color:var(--ink-soft);">${vm.checkNote}</span></div>
     </div>`;
   }
+  /* "Still tight?" after a recovery move: two answers, the move stays on screen. */
+  if (vm.phase === "tightcheck") {
+    return `
+    <div data-tight-check style="flex:0 1 ${size}px;max-width:${size}px;min-width:240px;min-height:${Math.round(size * 0.7)}px;border-radius:var(--radius-lg);background:var(--ring-work-fill,var(--aqua-wash));border:2px solid var(--ring-work,var(--aqua));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;box-sizing:border-box;">
+      <div style="font-family:var(--font-display);font-weight:600;font-size:24px;color:var(--ink);text-align:center;">${vm.tightQuestion}</div>
+      <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
+        <button type="button" data-action="answerTight" data-arg="loose" style="${kidButton("neutral")}">😌 Loose now</button>
+        <button type="button" data-action="answerTight" data-arg="tight" style="${kidButton("neutral")}">😣 Still tight</button>
+      </div>
+      <div style="font-size:13px;font-weight:800;color:var(--ring-work-ink,var(--aqua-ink));text-align:center;">${vm.tightNote}</div>
+    </div>`;
+  }
   /* Done before the coach's count finished. The card takes the rep ring's
      place — same work-ring colours, so it reads as part of the move — and
      asks once. */
@@ -538,7 +550,7 @@ function centerStack(vm, wide, tablet) {
      form photo above it pushed the countdown into the middle of a scrolling
      page; the ⓘ by the name opens the same photo (bigger, with the video)
      whenever she actually wants to look at it. */
-  const showPhoto = wide && !vm.tightColumn && vm.notResting && (!vm.isPrompt || vm.isFormCheck);
+  const showPhoto = wide && !vm.tightColumn && vm.notResting && (!vm.isPrompt || vm.isFormCheck || vm.isTightCheck);
   const capVh = wide ? (tablet ? 40 : 46) : 0;
   const ring = vm.isPrompt ? promptCard(vm, ringSize)
     : vm.timerIsReps ? repRing(vm, ringSize, capVh)

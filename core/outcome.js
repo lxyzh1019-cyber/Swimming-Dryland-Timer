@@ -1026,11 +1026,6 @@ export function streakDatesOf(sessions) {
 /* And the dates a finished recovery pass HOLDS without adding to — care is not
    training, so it cannot pay into a training streak, but the day she reports
    soreness honestly must not be the day the flame goes out. */
-export function freezeDatesOf(sessions) {
-  return new Set(workoutInstances(sessions)
-    .filter(w => w.outcome.streakFreeze)
-    .map(w => w.date).filter(Boolean));
-}
 
 /* ============================================================
    THE DAY RECORD — one authority, every screen a view of it
