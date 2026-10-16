@@ -3,7 +3,7 @@
    values from the engine's `sess` view-state.
    ============================================================ */
 
-import { sess, refTime, pausedByBackground, canGoBack } from "../engine.js";
+import { sess, refTime, pausedByBackground, canGoBack, tightAreaWord } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, BLOCK_LABEL, SESSION_QUIZ,
          TRAINING_QS, REFLECT_WELL, REFLECT_NEXT, exWork, doseLines, videoSearchUrl } from "../data.js";
 import { SKILL_BLOCK, COPY } from "../sport.js";
@@ -366,7 +366,9 @@ export function buildSessionVM(state) {
     });
 
   const isResting = phase === "rest" || phase === "roundRest" || phase === "sectionRest";
-  const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath" || phase === "formcheck" || phase === "repcheck";
+  const isPrompt = phase === "intent" || phase === "microloop" || phase === "breath" || phase === "formcheck" || phase === "repcheck" || phase === "tightcheck";
+  // "Still tight?" after a recovery move — see tightPrompt in core/engine.js.
+  const isTightCheck = phase === "tightcheck";
   // "Did you get all N?" — asked when Done lands before the coach's count
   // finishes. See repCheckPrompt in js/engine.js.
   const isRepCheck = phase === "repcheck";
@@ -747,6 +749,10 @@ export function buildSessionVM(state) {
     canGoBack: canGoBack(),
     canSkipExercise,
     isFormCheck,
+    isTightCheck,
+    tightQuestion: (() => { const w = tightAreaWord(sess.tightArea); return w ? "Is your " + w + " still tight?" : "Is anything still tight?"; })(),
+    tightMoveName: sess.tightMove || "",
+    tightNote: "Still tight = one more round of " + (sess.tightMove || "this move") + ".",
     checkKind: sess.checkKind || "form",
     formCheckTitle: sess.checkKind === "landing" ? "Landing check" : "How did that feel?",
     checkCleanLabel: sess.checkKind === "landing" ? "🧊 Clean & frozen" : "✓ Clean",
@@ -789,7 +795,7 @@ export function buildSessionVM(state) {
     // Only offer the instructions when there is actually a move to describe.
     // During the lead-in there is no current exercise, so the old ⓘ button
     // rendered there and did nothing at all when tapped.
-    canOpenDetail: !!sess.currentEx && !isResting && (!isPrompt || isFormCheck),
+    canOpenDetail: !!sess.currentEx && !isResting && (!isPrompt || isFormCheck || isTightCheck),
     stageTitle, blockBadgeVariant, blockLabel, roundLabelText,
     curExName: ex.name || "", curExDose, curExDoseSub,
     curExCue: isResting ? sess.restCue : (ex.cue || ""),
@@ -845,6 +851,7 @@ export function buildSessionVM(state) {
       // card's own buttons are the answers, and the label must not read as
       // a fourth one that means "all of them".
       : isRepCheck ? "Keep coach's count →"
+      : isTightCheck ? "Move on →"
       : sess.announceResolver ? "▶ Go"
       // During a move's lead-in a tap starts the move — it does not end it.
       : sess.leadIn ? "▶ Go"

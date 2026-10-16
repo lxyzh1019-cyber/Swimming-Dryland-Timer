@@ -74,7 +74,6 @@ export const BLOCK_CHANNEL = {
   main: "strength", prep: "strength", finisher: "strength",
   swimskill: "swim"
 };
-export const channelForBlock = b => COACH_CHANNELS[BLOCK_CHANNEL[b]] || COACH_CHANNELS.strength;
 
 export const EXERCISE_HOWTO = {
   // — 2026.2 swim-skill drills —
@@ -753,21 +752,21 @@ export const DAYS = {
     mantra: "Rest IS training.",
     poolLoad: "none",
     defaultLight: "recovery",
-    timeLo: 10, timeHi: 12,
+    timeLo: 10, timeHi: 14,
     spa: true,
     equipment: ["Foam roller", "Massage gun (parent-operated)", "Mat"],
     safety: "Roller slow (2–3 cm/sec), pause 20s on tender spots. NEVER roll the lower-back spine or neck. Massage gun is PARENT-OPERATED only, lowest speed, big muscles only — never on bones, joints, spine, neck, or growth plates.",
     recovery: [
-      { name: "Calves — foam roller", dose: "60s/side", why: "Kick + jump rope volume lands here." },
-      { name: "Quads — roller or gun", dose: "60s/side", why: "Power days (Wed/Sat)." },
-      { name: "Lats / upper back — roller, arms overhead", dose: "60s", why: "Pull work + overhead range." },
-      { name: "Glutes — foam roller", dose: "45s/side", why: "Bridge + landing absorption." },
-      { name: "Touch-up — massage gun (parent)", dose: "30–45s/muscle", why: "Lowest speed, comfort not pain." },
+      { name: "Calves — foam roller", area: 15, dose: "60s/side", why: "Kick + jump rope volume lands here." },
+      { name: "Quads — roller or gun", area: 8, dose: "60s/side", why: "Power days (Wed/Sat)." },
+      { name: "Lats / upper back — roller, arms overhead", area: 11, dose: "60s", why: "Pull work + overhead range." },
+      { name: "Glutes — foam roller", area: 13, dose: "45s/side", why: "Bridge + landing absorption." },
+      { name: "Touch-up — massage gun (parent)", work: 120, dose: "30–45s/muscle", why: "Lowest speed, comfort not pain." },
       { name: "Wind-down — Crocodile / 90-90 breathing", dose: "2 min", why: "Closes the week down-regulated." }
     ],
     recoveryHolds: [
-      X({ name: "Light Streamline Hold", block: "swimskill", driver: "time", work: 20, dose: "2×20s", cue: "Easy, long, relaxed." }),
-      X({ name: "Easy Single-Leg Balance", block: "swimskill", driver: "time", work: 40, eachSide: true, dose: "20s/side", cue: "Gentle, quiet foot." })
+      X({ name: "Light Streamline Hold", area: 2, prescription: { reps: 2, holdSeconds: 20 }, block: "swimskill", driver: "reps", repsDetail: "2×20s", dose: "2×20s", cue: "Easy, long, relaxed." }),
+      X({ name: "Easy Single-Leg Balance", area: 10, block: "swimskill", driver: "time", work: 40, eachSide: true, dose: "20s/side", cue: "Gentle, quiet foot." })
     ],
     blocks: { warmup: [], coordination: [], main: [], finisher: [], swimskill: [] },
     prepMenu: []
@@ -939,11 +938,6 @@ export const PRIZE_POOL = [
 ];
 
 /* Rank for a given level — highest ladder entry at or below the level. */
-export function rankForLevel(level) {
-  let rank = LADDER[0];
-  for (const r of LADDER) if (level >= r.level) rank = r;
-  return rank;
-}
 
 /* ------------------------------------------------------------
    KID COACHING — the watch-out and the fix, in her words.

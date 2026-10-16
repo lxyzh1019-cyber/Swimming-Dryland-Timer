@@ -11,6 +11,7 @@
 import { deriveSessionOutcome, mainRoundsFromLedger, mainRoundReport, OUTCOME_VERSION,
          mergeLedgerRows, logicalRowId, workoutDate, paceReport,
          moveReviewReason, moveReviewDose, roundIsShort } from "./outcome.js";
+import { BODY_ZONES } from "./data.js";
 import { DAYS, BLOCK_ORDER, BLOCK_LABEL, LIGHT_ROUNDS, LIGHT_SESSION_POLICY, SIDE_SWITCH_BUFFER, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BREATH_SAY, MANTRA,
          exWork, exRepsDetail, exPrescription, prescriptionSegments, repSeconds, doseLines,
          needsSetup, SETUP_SECONDS,
@@ -63,6 +64,8 @@ function blankSession() {
     byRepsResolver: null, intentResolver: null, microResolver: null,
     // The "Did you get all N?" card — see repCheckPrompt.
     repCheckResolver: null,
+    // The "Still tight?" card after a recovery move — see tightPrompt.
+    tightResolver: null, tightMove: null, tightArea: null, tight: {},
     announceResolver: null, lastTapAt: 0,
     savedEntry: false, saveFailed: false,
     currentEx: null, skipped: [], perExercise: [], justSkipped: false,
@@ -189,8 +192,8 @@ export function assembleRecoveryCircuit(dayKey) {
   const src = (day.recovery && day.recovery.length) ? day : (DAYS[RECOVERY_SOURCE_DAY] || {});
   const menu = (src.recovery || []).map(r => {
     const { secs, eachSide } = recoveryDoseSecs(r.dose);
-    return { name: r.name, block: "recovery", driver: "time", work: secs,
-      dose: r.dose, cue: r.why, eachSide, rest: 3 };
+    return { name: r.name, block: "recovery", driver: "time", work: r.work || secs,
+      dose: r.dose, cue: r.why, eachSide, rest: 3, area: r.area ?? null };
   });
   const exercises = menu.concat(src.recoveryHolds || []);
   if (!exercises.length) return [];
@@ -1470,6 +1473,131 @@ function recordBlockDone(blockKey, ci) {
 
    It is an explicit phase now. Rest does not begin until she has answered or
    skipped. Skipping records no verdict, so it can never become valgus credit. */
+/* ---- "Still tight?" (recovery) -------------------------------------------
+   After each recovery move: "Is your <area> still tight?" Loose now ends it.
+   Still tight runs the move once more and asks again, up to TIGHT_MAX_EXTRA
+   extra rounds. A zone she marked sore in today's Body Check gets no extra
+   round — sore is not tight, and more pressure is the wrong answer to pain.
+   Each move's answers are kept for the grown-up's "Still tight" list. */
+export const TIGHT_MAX_EXTRA = 2;
+export const TIGHT_CHECK_TIMEOUT_MS = 30000;
+
+export function tightAreaOf(ex) {
+  const n = ex && ex.area;
+  const z = n != null ? BODY_ZONES.find(b => b.n === n) : null;
+  return z ? { n: z.n, label: z.label } : null;
+}
+// The spoken and shown name of the area: "calf", or "anything" with no single area.
+export function tightAreaWord(area) {
+  return area ? area.label.replace(/\s*\(.*\)\s*$/, "").split(" / ")[0].toLowerCase() : "";
+}
+function soreToday(n) {
+  const zs = (sess.readinessDetail && sess.readinessDetail.zoneSev) || {};
+  return (Number(zs[n]) || 0) >= 2;
+}
+
+function tightPrompt(ex, area) {
+  return new Promise(resolve => {
+    sess.tightMove = ex.name;
+    sess.tightArea = area;
+    setPhase("tightcheck");
+    const word = tightAreaWord(area);
+    speakIfIdle(word ? "Is your " + word + " still tight?" : "Is anything still tight?");
+    const settle = (answer) => {
+      clearInterval(watchdog); clearTimeout(timeout);
+      sess.tightResolver = null;
+      resolve(answer);
+    };
+    const watchdog = setInterval(() => {
+      if (sess.abort) settle("abort");
+      else if (sess.backTo != null) settle("back");
+      else if (sess.skipExercise) { sess.skipExercise = false; settle(null); }
+    }, 200);
+    // Walking away is not an answer: no record, no extra round.
+    const timeout = setTimeout(() => settle(null), TIGHT_CHECK_TIMEOUT_MS);
+    sess.tightResolver = settle;
+  });
+}
+/* "loose" | "tight" — from the card's two buttons. */
+export function answerTight(answer) {
+  if (!sess.tightResolver) return;
+  sess.tightResolver(answer === "tight" ? "tight" : answer === "loose" ? "loose" : null);
+}
+
+/* The same move once more, as an extra round. Skip ends it; Back and STOP
+   behave as they do in any move. */
+async function runExtraRound(ex) {
+  sess.skipExercise = false;
+  resetExerciseClock();
+  if (ex.byReps) {
+    setPhase("reps");
+    await announce(ex.name + " — one more round. Go.");
+    if (sess.abort) return "abort";
+    if (sess.backTo != null) return "back";
+    const r = await runPrescribedReps(ex);
+    sess.skipExercise = false;
+    return r === "abort" ? "abort" : sess.backTo != null ? "back" : r === "skip" ? "skip" : "done";
+  }
+  const work = exWork(ex);
+  sess.timerSecs = work; sess.timerMax = work;
+  setPhase("work");
+  await announce(ex.name + " — one more round. Three, two, one, go.");
+  if (sess.abort) return "abort";
+  if (sess.backTo != null) return "back";
+  const run = async (secs) => {
+    const r = await countdown(secs);
+    if (r === "skip") sess.skipExercise = false;
+    return r;
+  };
+  if (ex.eachSide) {
+    const half = Math.floor(work / 2);
+    sess.sideLabel = `${half}s first side`;
+    const a = await run(half);
+    if (a !== "done") { sess.sideLabel = ""; return a; }
+    setPhase("sideswitch");
+    const switchSince = Date.now();
+    await speakAndWait("Switch sides.");
+    if (sess.abort) return "abort";
+    const b = await countdown(SIDE_SWITCH_BUFFER, { since: switchSince });
+    if (b === "abort" || b === "back") { sess.sideLabel = ""; return b; }
+    sess.sideLabel = `${half}s second side`;
+    setPhase("work");
+    const c = await run(half);
+    sess.sideLabel = "";
+    return c;
+  }
+  return run(work);
+}
+
+async function tightLoop(ex) {
+  const area = tightAreaOf(ex);
+  const rec = sess.tight[ex.name] || { zone: area ? area.n : null, asked: 0, tight: 0, extra: 0, stillTight: false, sore: false };
+  sess.tight[ex.name] = rec;
+  for (;;) {
+    const ans = await tightPrompt(ex, area);
+    sess.tightMove = null; sess.tightArea = null;
+    if (ans === "abort" || ans === "back") return ans;
+    if (ans === null) return "done";                  // moved on / no answer: nothing recorded
+    rec.asked += 1;
+    if (ans === "loose") { rec.stillTight = false; return "done"; }
+    rec.tight += 1;
+    rec.stillTight = true;
+    if (area && soreToday(area.n)) {
+      rec.sore = true;
+      await speakAndWait("That spot was sore today, so no extra round. Tell a grown-up.");
+      return sess.abort ? "abort" : "done";
+    }
+    if (rec.extra >= TIGHT_MAX_EXTRA) {
+      await speakAndWait("Good job. Still tight — tell a grown-up, we will note it.");
+      return sess.abort ? "abort" : "done";
+    }
+    const r = await runExtraRound(ex);
+    if (r === "abort" || r === "back") return r;
+    if (r === "skip") return "done";
+    rec.extra += 1;
+  }
+}
+
 function formCheckPrompt(moveName, kind = "form") {
   return new Promise(resolve => {
     sess.cleanCheckMove = moveName;
@@ -2401,6 +2529,18 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
     sess.exStatus[key] = held.status === "skipped" ? "skipped"
       : r === circuit.rounds ? held.status : sess.exStatus[key];
 
+    /* STILL TIGHT? Recovery only — Sunday and a weekday her check turned into
+       Recovery. After every move she did, she says whether that area is still
+       tight; "still tight" runs the move once more, up to TIGHT_MAX_EXTRA extra
+       rounds, never on a zone she marked sore in today's Body Check. The extra
+       rounds are care, not owed work: they add no ledger row, so "8 of 8 moves"
+       and the day's completion are unchanged. See tightLoop. */
+    if (isCareSession() && row.status !== "skipped") {
+      const tl = await tightLoop(ex);
+      if (tl === "abort" || sess.abort) return finalize(false);
+      if (tl === "back" || wentBack()) { back(); continue; }
+    }
+
     /* LANDING CHECK. A sport with a landing rule grades every gated jump before
        the rest starts — clean and frozen, or a bit wobbly. Two wobbly in a row
        drop the highest remaining main round, never the one in progress, and
@@ -2804,6 +2944,8 @@ export function finalize(completed) {
     dayPlannedSecs: sess.dayPlannedSecs || sess.plannedSecs,
     clean: sess.cleanCount, wobbly: sess.wobblyCount,
     formChecks: sess.formChecks || [],       // per-move verdicts from this run's spot-checks
+    // "Still tight?" answers, per move — recovery sessions only; see tightLoop.
+    ...(Object.keys(sess.tight || {}).length ? { tightness: sess.tight } : {}),
     // Only a sport with a landing rule writes these; the row shape elsewhere is unchanged.
     ...(FEATURES.landingCheck ? { landings: sess.landings || {}, tierDropped: sess.tierDropped || 0 } : {}),
     light: sess.light,
@@ -3109,6 +3251,7 @@ export function advance() {
   if (sess.phase === "microloop" && sess.microResolver) { sess.microResolver(null); return; }
   // Done on the "Did you get all N?" card: move on with the coach's count.
   if (sess.phase === "repcheck" && sess.repCheckResolver) { sess.repCheckResolver(null); return; }
+  if (sess.phase === "tightcheck" && sess.tightResolver) { sess.tightResolver(null); return; }
   if (["work", "rest", "roundRest", "sectionRest", "sideswitch", "getready", "greeting", "breath"].includes(sess.phase)) {
     /* THE TAP WAITS FOR THE CLOCK, because the clock is what she is tapping at.
        A rest stamps `since` at the moment its phase begins (see the rest

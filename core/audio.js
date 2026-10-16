@@ -21,7 +21,6 @@ const speech = window.speechSynthesis || null;
 let audioCtx = null;
 let calmMode = false;
 
-export function setCalmMode(on) { calmMode = !!on; }
 
 /* Three independent switches, because they answer to three different needs.
    Turning the coach's chatter off must not take the beeps she paces on with it,

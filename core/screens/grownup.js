@@ -138,12 +138,30 @@ function bodyMapCard(a, scopeLabel) {
     </div>`);
 }
 
+/* "Still tight" after recovery — the answers she gave after each recovery move. */
+function stillTightCard(a, scopeLabel) {
+  if (!a.hasStillTight) return "";
+  return card(`
+    ${secTitle("Still tight after recovery")}
+    <div style="font-size:13px;color:var(--ink-soft);margin:4px 0 14px;line-height:1.3;">Spots still tight after the extra rounds · ${esc(scopeLabel)}. Worth telling the coach or physio.</div>
+    <div style="display:flex;flex-direction:column;gap:9px;">
+      ${a.stillTight.map(t => `
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;background:var(--coral);"></span>
+          <span style="font-size:14px;font-weight:900;color:var(--ink);flex:1 1 auto;">${esc(t.label)}</span>
+          <span style="font-size:13px;font-weight:700;color:var(--ink-soft);">${esc(t.note)}</span>
+          <span style="font-size:13px;font-weight:700;color:var(--ink-soft);width:64px;text-align:right;flex-shrink:0;">${esc(t.last)}</span>
+        </div>`).join("")}
+    </div>`);
+}
+
 function overviewTab(vm) {
   const a = vm.analytics;
   return `
   <div style="display:flex;flex-direction:column;gap:14px;">
     ${flagsCard(a, vm.scopeLabel)}
     ${stopsCard(a, vm.scopeLabel)}
+    ${stillTightCard(a, vm.scopeLabel)}
     <div style="background:var(--surface);border:2px solid var(--aqua-light);border-radius:var(--radius-xl);padding:16px 18px;box-shadow:var(--shadow-soft);">
       ${secTitle("Messages from training 📣")}
       ${vm.guAlerts.map(ga => `
@@ -726,6 +744,7 @@ function settingsTab(vm) {
     <div style="border-top:1.5px solid var(--hairline);padding-top:16px;">
       <div style="font-size:15px;color:var(--stop-ink);line-height:1.5;font-weight:700;">🔴 Sharp pain, pinching, or numbness → STOP immediately and tell a grown-up.</div>
     </div>
+    <div data-app-version style="font-size:13px;font-weight:700;color:var(--ink-soft);">App version on this device: ${escapeHtml(vm.appVersion || "not known yet")}</div>
   </div>`;
 }
 

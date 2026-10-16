@@ -228,6 +228,8 @@ const STATES = {
   breath:       [snaps.breath || snaps.timed, { phase: "breath" }, {}],
   formcheck:    [snaps.formcheck || snaps.reps, { phase: "formcheck", pendingCleanCheck: true, cleanCheckMove: (snaps.reps.currentEx || {}).name || "" }, {}],
   repcheck:     [snaps.repcheck || snaps.reps, { phase: "repcheck", repsCounted: 3, repsTarget: 8 }, {}],
+  // The recovery "Still tight?" card (Oct 2026) — see tightPrompt in core/engine.js.
+  tightcheck:   [snaps.timed, { phase: "tightcheck", tightMove: "Calves — foam roller", tightArea: { n: 15, label: "Calf" } }, {}],
   detail:       [snaps.watch || snaps.timed, { running: true, paused: true },
                  { detailOverlay: true, detailEx: { ...((snaps.watch || snaps.timed).currentEx || {}),
                    cue: "Long and tall.", parentWatch: "Hips sag.", fix: "Squeeze the glutes.", transfer: "A stronger streamline." } }]
@@ -260,6 +262,11 @@ for (const [st, [snap, extra, state]] of Object.entries(STATES)) {
     ok(pause && CALM.test(pause.style), "session " + st + " " + layout + ": " + (st === "paused" ? "Resume" : "Pause") + " is on the neutral slots, no border");
     const skip = tags(html).find(t => t.tag === "button" && t.action === "askSkip");
     if (skip) { skipsSeen++; ok(CALM.test(skip.style), "session " + st + " " + layout + ": Skip is on the neutral slots, no border"); }
+    if (st === "tightcheck") {
+      const t = tags(html).filter(t => t.tag === "button" && t.action === "answerTight");
+      ok(t.length === 2 && t.every(b => pxOf(b.style, "min-height") >= KID_TAP_MIN && CALM.test(b.style)),
+         "session tightcheck " + layout + ": Loose now / Still tight are two 56px calm buttons");
+    }
     if (st === "repcheck") {
       const reps = tags(html).filter(t => t.tag === "button" && t.action === "answerRepCheck");
       ok(reps.length === 3 && reps.every(t => pxOf(t.style, "min-height") >= KID_TAP_MIN),

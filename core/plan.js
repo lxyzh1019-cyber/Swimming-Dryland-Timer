@@ -67,14 +67,6 @@ export function exPrescription(ex) {
 }
 /* Overload-adjusted dose string for display (bumps a leading rep count,
    or a leading seconds figure for timed work). */
-export function exDose(ex) {
-  if (ex.byReps || ex.driver === "reps") return exRepsDetail(ex) || ex.dose;
-  if (ex.driver === "time" && ex.work != null) {
-    const w = exWork(ex);
-    return ex.eachSide ? Math.floor(w / 2) + "s/side" : (ex.dose || w + "s");
-  }
-  return ex.dose;
-}
 
 /* ------------------------------------------------------------
    STRUCTURED PRESCRIPTION — what the runner actually counts.
@@ -301,6 +293,8 @@ export function X(o) {
     /* Needs gear fetched or rigged before the clock starts — see needsSetup.
        Set explicitly only where the NAME does not already say so. */
     setup: o.setup === true,
+    // The body-map zone it works — the recovery "Still tight?" check asks about it.
+    area: o.area ?? null,
     rest: o.rest != null ? o.rest : 5
   };
   if (driver === "reps") {

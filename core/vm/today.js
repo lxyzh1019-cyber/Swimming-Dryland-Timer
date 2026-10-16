@@ -788,7 +788,9 @@ export function buildTodayVM(state) {
 
   // Echo-back: her own last "next time" promise, remembered on the day card.
   const lastSaid = sessions.slice().reverse().map(h => h.nextTime).find(Boolean);
-  const echoLine = lastSaid ? ("Last time you said: “" + lastSaid + "” — let’s do it!") : "2–3 clean reps beat lots of sloppy ones.";
+  // A recovery day gets its own mantra — "2–3 clean reps" is a training line.
+  const echoLine = isSpaDay ? ((fullDay && fullDay.mantra) || "Rest IS training.")
+    : lastSaid ? ("Last time you said: “" + lastSaid + "” — let’s do it!") : "2–3 clean reps beat lots of sloppy ones.";
 
   // "Friday · July 10 · Week 6" (training week from the overload anchor)
   const now = new Date();
@@ -796,7 +798,8 @@ export function buildTodayVM(state) {
     + " · " + now.toLocaleDateString("en-US", { timeZone: "America/Edmonton", month: "long", day: "numeric" })
     + " · Week " + overloadWeek();
 
-  const weather = state.weather || { icon: "☀️", temp: "–", caption: COPY.weatherCaption };
+  // No reading (offline, or not fetched yet): no chip — never a made-up sun and "–°".
+  const weather = state.weather || null;
 
   const railNav = (active) => ({
     iconWrap: active ? "width:52px;height:52px;border-radius:18px;background:var(--aqua-wash);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px var(--aqua-light);" : "width:52px;height:52px;display:flex;align-items:center;justify-content:center;opacity:0.55;",

@@ -7,7 +7,7 @@
 
 import { READINESS_QS, BODY_ZONES, SEVERITY_LEVELS, LIGHT_META, BODY_RESULTS, LIGHT_ROUNDS, DAYS } from "../data.js";
 import { settings, loadReadiness } from "../store.js";
-import { ATHLETE_DEFAULT } from "../sport.js";
+import { ATHLETE_DEFAULT, COPY } from "../sport.js";
 import { dayRecordFor } from "../outcome.js";
 import { planResume, roundsForLight } from "../engine.js";
 import { plural, kidButton } from "../util.js";
@@ -258,6 +258,15 @@ export function buildReadinessVM(r, isWide) {
   const lightKey = r.light;
   const L = LIGHT_META[lightKey];
   const light = { ...L };
+  /* SUNDAY IS RECOVERY whatever the answers say — the engine runs the recovery
+     menu on a spa day for every light. The card used to say "Green Light — Full
+     power! Full 3 rounds" and "Start training" and then start recovery. On a
+     spa day it shows the Recovery card and button, and no light to change; the
+     sore zones she marks still matter: the "Still tight?" check gives them no
+     extra round (see tightLoop in core/engine.js). */
+  const spaDay = !r.practice && !!(DAYS[r.dayKey] || {}).spa;
+  if (spaDay) Object.assign(light, LIGHT_META.recovery,
+    { desc: "Sunday is recovery day — easy and gentle. A sore spot you mark gets no extra round." });
   const LIGHT_OPTS = [
     { key: "green", emoji: "🟢", label: "Green" },
     { key: "yellow", emoji: "🟡", label: "Yellow" },
@@ -329,7 +338,10 @@ export function buildReadinessVM(r, isWide) {
   })();
   const resultDesc = todayAsk ? todayAsk.desc : showBodyResult ? BR.desc : light.desc;
   // action encoded for the delegated handler: continue | retry | back
-  const resultCta = todayAsk && todayAsk.finished
+  const spaCta = { color: light.btnColor, deep: light.btnDeep, text: light.btnText || "#fff", icon: light.btnIcon, label: light.btnLabel,
+    action: "continue", secondaryLabel: "", secondaryAction: "" };
+  const resultCta = spaDay && !(showBodyResult && BR.action !== "continue") ? spaCta
+    : todayAsk && todayAsk.finished
     ? { color: light.btnColor, deep: light.btnDeep, text: light.btnText || "#fff", icon: "🏠", label: "Back to Today",
         action: "back", secondaryLabel: "", secondaryAction: "" }
     : showBodyResult
@@ -430,6 +442,9 @@ export function buildReadinessVM(r, isWide) {
     pendingZoneLabel: pz ? pz.label : "",
     popupOptions,
     popupHasMark: !!(pz && zoneSev[pendingZone]),
-    light, lightOptions
+    light, lightOptions,
+    // Sunday: no light to change, and a rest-day intro line.
+    spaDay, hideLightOverride: spaDay,
+    introLine: spaDay ? "A quick body check before recovery" : COPY.readinessIntro
   };
 }

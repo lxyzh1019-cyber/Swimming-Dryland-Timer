@@ -13,7 +13,7 @@ import { emojiPresentation } from "../vm/today.js";
 
 function weekStrip(vm, wide) {
   return `
-  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:${wide ? 8 : 5}px;">
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:${wide ? 8 : 2}px;">
     ${vm.week.map(d => `
       <button type="button" data-action="selectDay" data-arg="${d.key}" style="${d.cellStyle}">
         <div style="font-size:13px;font-weight:900;letter-spacing:0.0${wide ? 4 : 3}em;color:${d.labelColor};text-transform:uppercase;">${d.short}</div>
@@ -285,10 +285,10 @@ function dayPane(vm, wide) {
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
       <span style="display:inline-block;background:var(--hero-chip,rgba(255,255,255,0.22));border-radius:var(--radius-pill);padding:6px 14px;font-size:13px;font-weight:900;letter-spacing:0.08em;">${dv.badgeLabel}</span>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-        <div style="display:flex;align-items:center;gap:5px;background:var(--hero-chip,rgba(255,255,255,0.22));border-radius:var(--radius-pill);padding:6px 12px;" aria-label="Weather">
+        ${vm.weather ? `<div style="display:flex;align-items:center;gap:5px;background:var(--hero-chip,rgba(255,255,255,0.22));border-radius:var(--radius-pill);padding:6px 12px;" aria-label="Weather">
           <span style="font-size:15px;line-height:1;">${vm.weather.icon}</span>
           <span style="font-size:13px;font-weight:900;">${wide ? vm.weather.caption + " " : ""}${vm.weather.temp}°</span>
-        </div>
+        </div>` : ""}
       </div>
     </div>
     <div style="font-family:var(--font-display);font-weight:600;font-size:${titleSize}px;line-height:1.${wide ? "05" : "1"};margin:12px 0 12px;${heroShadow(vm.heroDecorOn)}">${dv.title}</div>

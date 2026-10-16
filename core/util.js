@@ -62,23 +62,8 @@ export function edmontonWeekISODates() {
   return out;
 }
 
-export function mondayOfThisWeek() {
-  const now = new Date();
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  const dow = d.getDay(); // 0=Sun..6=Sat
-  const diff = dow === 0 ? -6 : 1 - dow; // Monday-based week
-  d.setDate(d.getDate() + diff);
-  return d;
-}
 
 /* Timer digits: "05" under a minute, "1:05" above. */
-export function fmt(s) {
-  if (typeof s === "string") return s;
-  if (s < 60) return String(s).padStart(2, "0");
-  const m = Math.floor(s / 60), r = s % 60;
-  return `${m}:${String(r).padStart(2, "0")}`;
-}
 
 /* Always MM:SS. */
 export function fmtMMSS(secs) {
@@ -86,11 +71,6 @@ export function fmtMMSS(secs) {
   return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
 }
 
-export function fmtHHMM(secs) {
-  if (!secs || secs < 0) return "0m";
-  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-}
 
 export function plural(n, word) { return n + " " + word + (n === 1 ? "" : "s"); }
 

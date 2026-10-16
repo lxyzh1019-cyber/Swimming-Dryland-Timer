@@ -150,3 +150,17 @@ One care-day verdict, read by every screen; Sunday (spa) and a weekday whose lig
 | Feature | v<old> → v<new> | Note |
 |---|---|---|
 | <feature> | kept / added / intentionally removed / missing | <why, if not kept> |
+
+## Recovery — "Still tight?" (2026-10-16, claude.ai chat review + build)
+- After every move of a recovery session (Sunday, or a weekday the Body Check turned into Recovery) the card asks "Is your <area> still tight?" — `😌 Loose now` / `😣 Still tight`, two 56px calm buttons in the ring's spot (work-ring colours); Done reads "Move on →" and records nothing. Moves with no single area (massage-gun touch-up, breathing wind-down) ask "Is anything still tight?".
+- "Still tight" runs the same move once more ("one more round"), then asks again — at most `TIGHT_MAX_EXTRA` = 2 extra rounds per move, no day cap. After the cap: "tell a grown-up". A zone marked sore (severity ≥ 2) in today's Body Check gets no extra round.
+- Extra rounds add no ledger row: "N of N moves", the care-day completion and the 0 XP of a recovery day are unchanged. Skip ends an extra round; Back and STOP work as in any move; a walked-away card times out after 30 s with no answer.
+- Each recovery move names its body-map zone (`area`, the Body Check zone number). The answers are saved on the session as `tightness` (per move: zone, asked, tight, extra, stillTight, sore).
+- Grown-up Zone › Overview: "Still tight after recovery" card — each spot still tight after its extra rounds (or tight on a sore zone), most often first, with recovery days, extra rounds and the last date.
+- Sunday Body Check shows the 🟣 Recovery card and "Start recovery" (never "Green Light — Full power! Full 3 rounds"), no "change today's light", and the intro "A quick body check before recovery". A pain result (severity 4) keeps its own button.
+- Today on Sunday shows the day's mantra; with no weather reading there is no weather chip (was "☀️ –°").
+- Week strip gap 2px on phone, so each day button is ≥ 44px wide.
+- Grown-up Zone › Settings: "App version on this device: <cache name>" (the service-worker cache, e.g. the version in `sw.js`).
+- CI: "Shared core is the same in both apps" compares `core/` with the sibling repo's branch of the same name, or its main.
+- Tests: `core/test/tight.mjs` (37 checks, both apps); `core/test/design.mjs` draws the card in three layouts.
+- Sunday plan (swim): Light Streamline Hold is 2 counted 20s holds (was one 20s timer, half the dose); massage-gun touch-up 2:00 (30s × 4 muscles, was 30s); Sunday range 10–14 min (was 10–12), about 13 min.

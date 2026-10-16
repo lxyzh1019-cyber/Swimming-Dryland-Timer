@@ -125,7 +125,7 @@ Two apps are built on one engine: this one and the sibling Figure-Skate
 Dryland Timer. Everything that does not name the sport — the session engine,
 the store, the XP and prize rules, the grown-up gate, the sync, the screens,
 the service worker and four of the five test suites — lives under `core/`,
-which is byte-identical in both repositories and shared with `git subtree`.
+which is byte-identical in both repositories (CI checks it on every pull request).
 What makes this app *this* app is three files it owns:
 
 - `js/sport.js` — its identity: names, storage keys, the Firestore collection,
@@ -138,8 +138,11 @@ What makes this app *this* app is three files it owns:
   and the two-line `sw.js` that configures the shared worker — the design
   system and the shell.
 
-A change to the rules is made once, in `core/`, and reaches the sibling app
-with one `git subtree pull`. A change to how a level is priced is therefore
+A change to the rules is made once, in `core/`, and the same `core/` folder is
+copied to the sibling app in the same change: one pull request in each repo,
+on a branch with the same name. CI checks it: the "Shared core is the same in
+both apps" step compares this repo's `core/` with the sibling's branch of the
+same name (or its main) and fails on any difference. A change to how a level is priced is therefore
 the same change for both athletes by construction, not by a test.
 
 ## Running it

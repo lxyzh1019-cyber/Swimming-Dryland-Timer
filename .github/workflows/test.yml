@@ -23,3 +23,14 @@ jobs:
       - name: Service-worker version bumped when the shell changed
         if: github.event_name == 'pull_request'
         run: node core/tools/release-check.mjs origin/${{ github.base_ref }}
+      # The two apps run ONE shared core. A pull request that changes core/ here
+      # must carry the same core/ as the sibling app: its branch of the same name
+      # when one exists (both halves of a core change), otherwise its main.
+      - name: Shared core is the same in both apps
+        if: github.event_name == 'pull_request'
+        run: |
+          SIB=https://github.com/lxyzh1019-cyber/Figure-Skate-Dryland-Timer.git
+          BR="${{ github.head_ref }}"
+          if git ls-remote --exit-code --heads "$SIB" "$BR" >/dev/null 2>&1; then REF="$BR"; else REF=main; fi
+          git clone -q --depth 1 --branch "$REF" "$SIB" /tmp/sibling
+          diff -rq core /tmp/sibling/core && echo "core matches Figure-Skate-Dryland-Timer @ $REF"

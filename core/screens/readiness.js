@@ -99,7 +99,7 @@ function resultCard(vm, { areaLabel = "" } = {}) {
       <span style="font-size:14px;flex-shrink:0;line-height:1.45;" aria-hidden="true">🧑</span>
       <span style="font-size:13px;font-weight:800;color:var(--ink-soft);line-height:1.45;">${vm.suggestionLine}</span>
     </div>` : ""}
-    <details style="background:var(--surface-2);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:18px;"${vm.wasOverridden ? " open" : ""}>
+    ${vm.hideLightOverride ? "" : `<details style="background:var(--surface-2);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:18px;"${vm.wasOverridden ? " open" : ""}>
       <summary style="font-size:13px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;min-height:48px;"><span aria-hidden="true">🔒</span> Grown-up only — change today's light</summary>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
         ${vm.lightOptions.map(lo => `
@@ -108,7 +108,7 @@ function resultCard(vm, { areaLabel = "" } = {}) {
             <span style="font-weight:800;font-size:15px;letter-spacing:0.02em;">${lo.label}</span>
           </button>`).join("")}
       </div>
-    </details>
+    </details>`}
     ${vm.needsGrownupConfirm ? `
     <button type="button" data-action="rGrownupOk" style="width:100%;display:flex;align-items:center;gap:12px;background:${vm.grownupConfirmed ? "var(--mint-wash)" : "var(--surface-2)"};border:2px solid ${vm.grownupConfirmed ? "var(--mint)" : "var(--hairline)"};border-radius:var(--radius-lg);padding:14px 16px;cursor:pointer;text-align:left;margin-bottom:14px;min-height:56px;">
       <span style="font-size:24px;flex-shrink:0;">${vm.grownupConfirmed ? "☑️" : "⬜"}</span>
@@ -144,7 +144,7 @@ export function readinessScreen(vm) {
           ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:56px;height:56px;object-fit:contain;flex-shrink:0;" alt=""`)}
           <div style="min-width:0;">
             <div style="font-family:var(--font-display);font-weight:600;font-size:24px;line-height:1.1;display:flex;align-items:center;gap:8px;${heroShadow(vm.heroDecorOn)}">Body Check <span style="width:24px;height:24px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:var(--ink);font-size:19px;font-weight:900;line-height:1;text-shadow:none;">✓</span></span></div>
-            <div style="margin-top:3px;"><span style="display:inline-block;background:var(--hero-chip,transparent);border-radius:var(--radius-md);padding:2px 8px;font-size:13px;font-weight:700;line-height:1.3;">${COPY.readinessIntro}, ${name}!</span></div>
+            <div style="margin-top:3px;"><span style="display:inline-block;background:var(--hero-chip,transparent);border-radius:var(--radius-md);padding:2px 8px;font-size:13px;font-weight:700;line-height:1.3;">${vm.introLine}, ${name}!</span></div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">${stepper(vm, 7)}</div>
@@ -154,7 +154,7 @@ export function readinessScreen(vm) {
         ${backBtn}
         <!-- Title and subtitle at the top of the panel (R5), the mascot under them. -->
         <div style="font-family:var(--font-display);font-weight:600;font-size:32px;line-height:1.1;display:flex;align-items:center;gap:12px;margin-top:18px;${heroShadow(vm.heroDecorOn)}">Body Check <span style="width:30px;height:30px;border-radius:50%;background:var(--mint);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:var(--ink);font-size:19px;font-weight:900;line-height:1;text-shadow:none;">✓</span></span></div>
-        <div style="margin-top:8px;"><span style="display:inline-block;background:var(--hero-chip,transparent);border-radius:var(--radius-md);padding:4px 10px;font-size:15px;font-weight:700;line-height:1.4;">${COPY.readinessIntro}, ${name}!</span></div>
+        <div style="margin-top:8px;"><span style="display:inline-block;background:var(--hero-chip,transparent);border-radius:var(--radius-md);padding:4px 10px;font-size:15px;font-weight:700;line-height:1.4;">${vm.introLine}, ${name}!</span></div>
         ${imgWithFallbacks(photoSources(IMAGES.mascot), `style="width:140px;height:140px;object-fit:contain;margin:18px 0 0;" alt=""`)}
         <div style="margin-top:18px;display:flex;flex-direction:column;gap:12px;">${stepper(vm, 10)}</div>
         <div style="flex:1;"></div>
