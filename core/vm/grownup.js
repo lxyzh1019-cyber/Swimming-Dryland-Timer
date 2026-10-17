@@ -18,10 +18,10 @@
 
 import { DAYS, WEEK_ORDER, DAY_SHORT, STANDING_RULES, ENGAGEMENT_SYSTEMS, TOP7, PRIZE_POOL, BLOCK_LABEL, BLOCK_ORDER, BODY_ZONES, videoSearchUrl, fmtXp, doseLines } from "../data.js";
 import { redeemedPrizesForReview } from "../store.js";
-import { ATHLETE_DEFAULT, CSV_FILE_PREFIX } from "../sport.js";
+import { ATHLETE_DEFAULT, CSV_FILE_PREFIX, FEATURES } from "../sport.js";
 import { gateUnlocked, GATE_REASON } from "../gate.js";
 import { passkeySupported, hasPasskey } from "../passkey.js";
-import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, GATE_MOVE, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, QXP_TODAY, lastWalletTrim, loadJourney, levelFromXp,
+import { settings, loadSessions, loadEvents, loadQuiz, loadGate, GATE_WEEKS_REQUIRED, GATE_MOVE, GATE_LANDINGS_PER_WEEK, gateWeeksInARow, weekKeyFor, loadLadderRungs, loadTracker, getCurrentTrackerWeek, activeEngagement, activePrizePool, profileList, activeProfileId, quizBankStatus, quizPaidToday, quizXpToday, QXP_DAILY_CAP, QXP_TODAY, lastWalletTrim, loadJourney, levelFromXp,
          monthKeyOf, formVerdicts, latestFormVerdicts, loadReadinessLog } from "../store.js";
 import { dayRecords, workoutDate } from "../outcome.js";
 import { estimateSessionSecs } from "../engine.js";
@@ -123,7 +123,7 @@ export function buildGrownupVM(state) {
     + (active ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);box-shadow:" + PICKED_RING + ";" : "background:transparent;color:var(--ink-soft);");
   /* The chosen tab or period: the main colour with the 3px picked ring (R5;
      the cyan glow it had was swim's colour in both apps). */
-  const scopeTabStyle = (v) => "flex:1;min-height:48px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:15px;letter-spacing:0.03em;padding:0 14px;font-family:inherit;"
+  const scopeTabStyle = (v) => "flex:1;min-height:48px;border:none;border-radius:var(--radius-pill);cursor:pointer;font-weight:900;font-size:15px;letter-spacing:var(--ls-label);padding:0 14px;font-family:inherit;"
     + (scope === v ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);box-shadow:" + PICKED_RING + ";" : "background:transparent;color:var(--ink-soft);");
 
   /* ---- safety & flags ---- */
@@ -992,9 +992,15 @@ export function buildGrownupVM(state) {
       // to tick up whenever the floor move merely wasn't skipped — no clean
       // self-check, no separate weeks, nothing the sentence promised. (It also
       // named a swim move to a skater: see GATE_MOVE in core/store.js.)
-      gateProgress: (gate.cleanWeeks || []).length + " of " + GATE_WEEKS_REQUIRED
-        + " weeks with a clean " + GATE_MOVE + " logged"
-        + (gate.unlocked ? "" : " — a week counts when she does the move AND self-checks it clean, and a grown-up hasn't flagged it."),
+      showGate: FEATURES.valgusGate !== false,
+      gateProgress: (() => {
+        // D15: what is counted, in the words of the rule.
+        const wk = (gate.weeks || {})[weekKeyFor(new Date())] || { clean: 0, wobbly: 0 };
+        return Math.min(gateWeeksInARow(gate), GATE_WEEKS_REQUIRED) + " of " + GATE_WEEKS_REQUIRED + " clean weeks in a row"
+          + " · this week: " + wk.clean + " clean, " + wk.wobbly + " wobbly"
+          + (gate.unlocked ? "" : " — a week counts when " + GATE_MOVE + " has at least " + GATE_LANDINGS_PER_WEEK
+             + " graded landings, all clean, and a grown-up hasn't flagged it.");
+      })(),
       ladderRows, trackerWeek, tracker, prFields,
       engagement, engagementSystems: ENGAGEMENT_SYSTEMS
     }

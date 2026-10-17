@@ -118,7 +118,7 @@ function blankSession() {
     savedOutcome: null,
     blocksCompleted: 0, expectedByRound: {},
     repsCounted: 0, repsTarget: 0, repNow: 0, repsReachedCap: 0, segmentsDone: 0, segmentsPlanned: 0,
-    sideLabel: "", segmentLabel: "",
+    sideLabel: "", sideName: "", segmentLabel: "",
     /* Live coach state. The engine has always known all of this; it just never
        said it out loud anywhere she could see. Speech may announce it, but the
        VISUAL state is the source of truth — a device with no installed voice
@@ -192,8 +192,9 @@ export function assembleRecoveryCircuit(dayKey) {
   const src = (day.recovery && day.recovery.length) ? day : (DAYS[RECOVERY_SOURCE_DAY] || {});
   const menu = (src.recovery || []).map(r => {
     const { secs, eachSide } = recoveryDoseSecs(r.dose);
+    // The screen's COACH TIP is the how-to `cue`; `why` is the planner's note.
     return { name: r.name, block: "recovery", driver: "time", work: r.work || secs,
-      dose: r.dose, cue: r.why, eachSide, rest: 3, area: r.area ?? null };
+      dose: r.dose, cue: r.cue || r.why, why: r.why, eachSide, rest: 3, area: r.area ?? null };
   });
   const exercises = menu.concat(src.recoveryHolds || []);
   if (!exercises.length) return [];
@@ -544,6 +545,8 @@ function countdown(seconds, opts = {}) {
     const started = Date.now();
     const since = Math.min(started, Number(opts.since) || started);
     let deadline = started + seconds * 1000;
+    // A rest opens for skipping at its half-way point (see restLockedSecs).
+    if (REST_PHASES.includes(sess.phase)) sess.restLockUntil = started + seconds * 500;
     let lastWhole = seconds;
     const id = setInterval(() => {
       if (sess.abort)        { clearInterval(id); resolve("abort"); return; }
@@ -681,7 +684,7 @@ async function segmentBreak(seg) {
      seconds ran on. Every side, direction and set of every rep move passes
      through here. */
   const switchSince = Date.now();
-  const line = seg.transition === "side"      ? "Nice. Switch sides — five to reset."
+  const line = seg.transition === "side"      ? (seg.sideName ? `Nice. Switch to the ${seg.sideName} — five to reset.` : "Nice. Switch sides — five to reset.")
              : seg.transition === "direction" ? "Nice. Other direction — five to reset."
              :                                  "Nice. Next set — five to reset.";
   await speakAndWait(line);
@@ -815,6 +818,7 @@ async function runPrescribedReps(ex) {
       }
       sess.segmentLabel = seg.label;
       sess.sideLabel = seg.label;
+      sess.sideName = seg.sideName || "";
       sess.currentSegment = i + 1;
       sess.currentSet = seg.set; sess.currentSide = seg.side; sess.currentDirection = seg.dir;
       sess.repInSegment = 0; sess.repsInSegment = seg.reps;
@@ -836,7 +840,7 @@ async function runPrescribedReps(ex) {
   let result = await finished;
   stopped = true;
   await workLoop;
-  sess.sideLabel = "";
+  sess.sideLabel = ""; sess.sideName = "";
   sess.segmentLabel = "";
   sess.currentSet = 0; sess.totalSets = 0;
   sess.currentSide = 0; sess.totalSides = 0;
@@ -936,6 +940,9 @@ function stopElapsed() {
 /* ---- helpers ---- */
 function setPhase(phase) {
   sess.phase = phase;
+  // Half-rest lock (Oct 2026): a rest can't be skipped until half of it has
+  // passed. It starts locked; its countdown sets when it opens. See advance.
+  sess.restLockUntil = REST_PHASES.includes(phase) ? Infinity : 0;
   // A pending "Skip this move?" ask belongs to the phase it was raised in.
   // Left standing, a countdown that expires mid-ask would point the confirm at
   // whatever came next — so every transition clears it.
@@ -1540,8 +1547,9 @@ async function runExtraRound(ex) {
   }
   const work = exWork(ex);
   sess.timerSecs = work; sess.timerMax = work;
+  sess.sideName = ex.eachSide ? "left side" : "";
   setPhase("work");
-  await announce(ex.name + " — one more round. Three, two, one, go.");
+  await announce(ex.name + " — one more round." + (ex.eachSide ? " Left side first." : "") + " Three, two, one, go.");
   if (sess.abort) return "abort";
   if (sess.backTo != null) return "back";
   const run = async (secs) => {
@@ -1551,19 +1559,19 @@ async function runExtraRound(ex) {
   };
   if (ex.eachSide) {
     const half = Math.floor(work / 2);
-    sess.sideLabel = `${half}s first side`;
+    sess.sideLabel = `${half}s left side`; sess.sideName = "left side";
     const a = await run(half);
-    if (a !== "done") { sess.sideLabel = ""; return a; }
+    if (a !== "done") { sess.sideLabel = ""; sess.sideName = ""; return a; }
     setPhase("sideswitch");
     const switchSince = Date.now();
-    await speakAndWait("Switch sides.");
+    await speakAndWait("Switch to the right side.");
     if (sess.abort) return "abort";
     const b = await countdown(SIDE_SWITCH_BUFFER, { since: switchSince });
-    if (b === "abort" || b === "back") { sess.sideLabel = ""; return b; }
-    sess.sideLabel = `${half}s second side`;
+    if (b === "abort" || b === "back") { sess.sideLabel = ""; sess.sideName = ""; return b; }
+    sess.sideLabel = `${half}s right side`; sess.sideName = "right side";
     setPhase("work");
     const c = await run(half);
-    sess.sideLabel = "";
+    sess.sideLabel = ""; sess.sideName = "";
     return c;
   }
   return run(work);
@@ -2047,7 +2055,7 @@ function rewindTo(target) {
   replayExStatus();
   sess.backTo = null;
   sess.skipExercise = false; sess.justSkipped = false; sess.forceDone = false;
-  sess.confirmSkip = false; sess.sideLabel = "";
+  sess.confirmSkip = false; sess.sideLabel = ""; sess.sideName = "";
   return target;
 }
 const wentBack = () => sess.backTo != null;
@@ -2459,9 +2467,12 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
       if (result === "back" || wentBack()) { back(); continue; }
     } else {
       sess.timerSecs = work; sess.timerMax = work;
+      // LEFT first: named before the phase renders, so the ring says LEFT SIDE
+      // from the first word of the announcement.
+      sess.sideName = ex.eachSide ? "left side" : "";
       setPhase("work");
       if (hasLeadIn) await announce("Go.");
-      else if (!preAnnounced) await announce(openingLine(ex, "Three, two, one, go."));
+      else if (!preAnnounced) await announce(openingLine(ex, ex.eachSide ? "Left side first. Three, two, one, go." : "Three, two, one, go."));
       preAnnounced = false;
       if (sess.abort) return finalize(false);
       if (wentBack()) { back(); continue; }
@@ -2469,7 +2480,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
 
       if (ex.eachSide) {
         const half = Math.floor(work / 2);
-        sess.sideLabel = `${half}s first side`;
+        sess.sideLabel = `${half}s left side`; sess.sideName = "left side";
         const r3 = await countdown(half);
         if (r3 === "abort") return finalize(false);
         if (r3 === "back") { back(); continue; }
@@ -2478,16 +2489,16 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
           // Same as segmentBreak: the tap belongs to the switch, not to the
           // clock that starts once the coach has finished saying so.
           const switchSince = Date.now();
-          await speakAndWait("Nice. Switch sides — five to reset.");
+          await speakAndWait("Nice. Switch to the right side — five to reset.");
           if (sess.abort) return finalize(false);
           if (wentBack()) { back(); continue; }
           const r4 = await countdown(SIDE_SWITCH_BUFFER, { since: switchSince });
           if (r4 === "abort") return finalize(false);
           if (r4 === "back") { back(); continue; }
           if (r4 !== "skip") {
-            sess.sideLabel = `${half}s second side`;
+            sess.sideLabel = `${half}s right side`; sess.sideName = "right side";
             setPhase("work");
-            await announce(ex.name + " second side. Three, two, one, go.");
+            await announce(ex.name + " — right side. Three, two, one, go.");
             if (sess.abort) return finalize(false);
             if (wentBack()) { back(); continue; }
             const r5 = await countdown(half);
@@ -2495,7 +2506,7 @@ export async function startSession({ dayKey, light = "green", mode = null, sugge
             if (r5 === "back") { back(); continue; }
           }
         }
-        sess.sideLabel = "";
+        sess.sideLabel = ""; sess.sideName = "";
       } else {
         const r6 = await countdown(work);
         if (r6 === "abort") return finalize(false);
@@ -3231,6 +3242,17 @@ export function pausedByBackground() {
   return !!sess.paused && (sess.pauseReasons || []).includes(PAUSE_HIDDEN);
 }
 
+export const REST_PHASES = ["rest", "roundRest", "sectionRest"];
+/* Seconds until Skip Rest opens; 0 when it is open (or not a rest). */
+export function restLockedSecs() {
+  if (!REST_PHASES.includes(sess.phase) || sess.explore) return 0;
+  const until = sess.restLockUntil || 0;
+  // The rest's countdown hasn't started (the coach is still talking): locked,
+  // and the length isn't known yet — the button says "Resting…" with no number.
+  if (until === Infinity) return Infinity;
+  return Math.max(0, Math.ceil((until - Date.now()) / 1000));
+}
+
 export function advance() {
   // Tap the ring / Done: finishes a reps exercise early, ends a timed exercise
   // early (counts as done, not skipped), skips the current rest, or dismisses
@@ -3252,6 +3274,9 @@ export function advance() {
   // Done on the "Did you get all N?" card: move on with the coach's count.
   if (sess.phase === "repcheck" && sess.repCheckResolver) { sess.repCheckResolver(null); return; }
   if (sess.phase === "tightcheck" && sess.tightResolver) { sess.tightResolver(null); return; }
+  // "Rest is what buys the next round its quality": the first half of every
+  // rest can't be skipped (D14, Oct 2026).
+  if (restLockedSecs() > 0) return;
   if (["work", "rest", "roundRest", "sectionRest", "sideswitch", "getready", "greeting", "breath"].includes(sess.phase)) {
     /* THE TAP WAITS FOR THE CLOCK, because the clock is what she is tapping at.
        A rest stamps `since` at the moment its phase begins (see the rest

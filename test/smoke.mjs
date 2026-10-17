@@ -1769,19 +1769,24 @@ ok(store.loadJourney().prizesWon.length === 3, "and none of them is thrown away"
 localStorage.clear();
 store.migrate();
 ok(store.gateLocked() === true, "the gate starts locked");
+/* D15 (Oct 2026): a week counts only with >= 5 graded landings of the floor
+   move, all clean; the gate opens after 2 such weeks IN A ROW. A clean
+   self-check tap no longer counts. */
+const L = (iso, clean, wobbly = 0) => store.creditValgusWeek({ isoDate: iso,
+  ledger: [{ name: "Drop-and-Stick", status: "done" }], landings: { "Drop-and-Stick": { clean, wobbly } } });
 ok(store.creditValgusWeek({ isoDate: new Date().toISOString(),
-      ledger: [{ name: "Drop-and-Stick", status: "done" }], formChecks: [] }).cleanWeeks.length === 0,
-   "doing the move without a clean self-check earns nothing — that alone used to count");
-const g1 = store.creditValgusWeek({ isoDate: "2026-04-01T10:00:00.000Z",
-  ledger: [{ name: "Drop-and-Stick", status: "done" }], formChecks: [{ name: "Drop-and-Stick", clean: true }] });
-ok(g1.cleanWeeks.length === 1 && g1.unlocked === false, "one clean week is one week, not an unlock");
-const sameWeek = store.creditValgusWeek({ isoDate: "2026-04-02T10:00:00.000Z",
-  ledger: [{ name: "Drop-and-Stick", status: "done" }], formChecks: [{ name: "Drop-and-Stick", clean: true }] });
-ok(sameWeek.cleanWeeks.length === 1 && sameWeek.unlocked === false,
-   "a second session the same week doesn't buy a second week");
-const g2 = store.creditValgusWeek({ isoDate: "2026-04-09T10:00:00.000Z",
-  ledger: [{ name: "Drop-and-Stick", status: "done" }], formChecks: [{ name: "Drop-and-Stick", clean: true }] });
-ok(g2.unlocked === true, "two separate clean weeks unlock it, exactly as the screen promises");
+      ledger: [{ name: "Drop-and-Stick", status: "done" }], formChecks: [{ name: "Drop-and-Stick", clean: true }] }).cleanWeeks.length === 0,
+   "a clean self-check tap alone earns nothing — it used to count a whole week");
+ok(L("2026-04-01T10:00:00.000Z", 4).cleanWeeks.length === 0, "4 clean landings is not a week yet");
+const g1 = L("2026-04-02T10:00:00.000Z", 1);
+ok(g1.cleanWeeks.length === 1 && g1.unlocked === false, "the fifth clean landing makes one clean week, not an unlock");
+const skip = L("2026-04-15T10:00:00.000Z", 5);
+ok(skip.unlocked === false, "two clean weeks with a gap between them don't unlock it — they must be in a row");
+const wob = L("2026-04-22T10:00:00.000Z", 6, 1);
+ok(wob.unlocked === false && !wob.cleanWeeks.includes(store.weekKeyFor(new Date("2026-04-22T10:00:00.000Z"))),
+   "one wobbly landing spoils that week");
+const g2 = L("2026-04-08T10:00:00.000Z", 5);
+ok(g2.unlocked === true, "two clean weeks in a row unlock it, exactly as the screen promises");
 
 /* --- yesterday is SHOWN, never reused --------------------------------------
    The one-tap "same as yesterday" copied sleep, muscle freshness and energy

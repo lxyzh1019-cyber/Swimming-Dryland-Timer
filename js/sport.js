@@ -98,6 +98,8 @@ export const COPY = {
    on its landing check. */
 export const FEATURES = {
   landingCheck: false,
+  // No jump above Drop-and-Stick in the plan, so no valgus gate (D15, Oct 2026).
+  valgusGate: false,
   /* Every PNG this app shows has a WebP twin beside it (same pixels, ~90 %
      smaller); the screens ask for the twin first and fall back to the PNG.
      Off in an app that ships PNGs alone. */

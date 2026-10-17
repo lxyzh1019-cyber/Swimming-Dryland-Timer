@@ -122,6 +122,8 @@ const passkey = await import(base + "passkey.js");
 const main   = await import(base + "main.js");
 const rvm    = await import(base + "vm/readiness.js");
 const data   = await import(base + "data.js");
+// Only today's card trains (D13, Oct 2026): a GO is for today.
+const TODAY  = (await import(base + "util.js")).edmontonDayKey();
 const tvm    = await import(base + "vm/today.js");
 const svm    = await import(base + "vm/session.js");
 const sscreen= await import(base + "screens/session.js");
@@ -194,7 +196,7 @@ ok(main.state.selectedDay === "monday", "and leaves her on the day she was looki
 /* ...and closing it leaves nothing behind. The old arm flag survived the close,
    so every later GO reopened Try-It and she could not reach a real session
    without finding the toggle again. */
-main.actions.goSession("monday");
+main.actions.goSession(TODAY);
 ok(main.state.readiness !== null, "the next GO opens Body Check");
 ok(main.state.inSession === false, "not explore again");
 ok(store.loadSessions().length === 0, "and looking at the moves wrote no session record at all");
@@ -207,11 +209,11 @@ engine.exitSession();
 main.dispatch("goToMove", "0|0");
 ok(engine.sess.running === false, "tapping a move outside explore starts nothing");
 ok(main.actionNames().includes("goSessionRedo"), "and \"+ Add them back\" is a real action");
-main.actions.goSessionRedo("monday");
+main.actions.goSessionRedo(TODAY);
 ok(main.state.gateAsk === null && main.state.readiness !== null,
    "which a child can take on her own, through the same Body Check as GO");
 ok(main.state.redoPartials === true, "carrying her ask for the moves she cut short");
-main.actions.goSession("monday");
+main.actions.goSession(TODAY);
 ok(main.state.redoPartials === false, "and a plain GO clears it again");
 main.state.readiness = null;
 
@@ -226,7 +228,7 @@ store.saveDayProgress("monday", { done: ["warmup", "main", sport.SKILL_BLOCK], m
 const doneCard = tvm.buildTodayVM({ selectedDay: "monday", expanded: {}, isWide: true }).dayView;
 ok(doneCard.ctaAction !== "goSession" || !/Finish remaining/.test(doneCard.ctaLabel),
    "the Today card does not offer to finish moves the light never asked for");
-main.actions.goSession("monday");
+main.actions.goSession("monday");   // its fresh day progress lets it through the No-Debt guard
 ["q_sleep", "q_light", "q_ready", "q_pain"].forEach(q => main.actions.rAnswer(q + "|yes"));
 main.actions.rResultCta("continue");
 ok(main.state.inSession === false, "a GO with nothing to run steps back out instead of showing a dead session screen");
@@ -249,7 +251,7 @@ ok(main.state.readiness === null && main.state.inSession === false,
    leave by re-reporting a sore spot she had just said was fine. */
 localStorage.clear(); store.migrate();
 main.state.readiness = null;
-main.actions.goSession("monday");
+main.actions.goSession(TODAY);
 ["q_sleep", "q_light", "q_ready"].forEach(q => main.actions.rAnswer(q + "|yes"));
 main.actions.rAnswer("q_pain|no");
 ok(main.state.readiness && main.state.readiness.step === "bodyArea", "a sore answer opens the body map");
@@ -1080,7 +1082,7 @@ engine.exitSession();
   // The stub DOM has no session ring; the per-second tick writes skip it.
   const realGetById = document.getElementById;
   document.getElementById = (id) => (/^s-/.test(id) ? null : realGetById(id));
-  main.actions.goSession("monday");
+  main.actions.goSession(TODAY);
   ["q_sleep", "q_light", "q_ready", "q_pain"].forEach(q => main.actions.rAnswer(q + "|yes"));
   main.actions.rResultCta("continue");
   ok(main.state.inSession === true && main.state.moveReviewOpen === false, "the next session starts with the move review folded");

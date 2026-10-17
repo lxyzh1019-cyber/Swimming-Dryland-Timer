@@ -68,7 +68,7 @@ const JOURNEY_CHIP = "display:inline-block;background:var(--hero-chip,transparen
 function journeyRail(j, headerOffset) {
   return `
   <div data-journey-rail="1" style="position:relative;z-index:2;height:calc(100% - ${headerOffset}px);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.4) transparent;">
-    <div style="text-align:center;padding:8px 0 4px;"><span style="${JOURNEY_CHIP}padding:3px 10px;font-size:13px;font-weight:900;color:var(--journey-text,#fff);letter-spacing:0.08em;">${COPY.journeyMore}</span></div>
+    <div style="text-align:center;padding:8px 0 4px;"><span style="${JOURNEY_CHIP}padding:3px 10px;font-size:13px;font-weight:900;color:var(--journey-text,#fff);letter-spacing:var(--ls-loud);">${COPY.journeyMore}</span></div>
     <div style="position:relative;height:${j.pathHeight}px;">
       ${j.habitats.map(hb => `<div style="${hb.style}"></div>`).join("")}
       <svg viewBox="0 0 100 ${j.pathHeight}" preserveAspectRatio="none" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;z-index:1;">
@@ -102,7 +102,7 @@ function journeyMapWide(vm) {
   <div id="journey-map-card" data-action="nav" data-arg="progress" style="flex:1;min-height:420px;${HERO_HOST}border-radius:var(--radius-lg);overflow:hidden;cursor:pointer;box-shadow:var(--shadow-lift);background:var(--journey-bg,var(--aqua));transition:transform 0.2s var(--ease-out,ease),box-shadow 0.2s var(--ease-out,ease);">
     ${heroDecor(vm.heroDecorOn)}
     <div style="position:relative;z-index:2;padding:18px 22px 10px;color:var(--journey-text,#fff);">
-      <div><span style="${JOURNEY_CHIP}padding:3px 10px;font-size:13px;font-weight:900;letter-spacing:0.08em;${heroShadow(vm.heroDecorOn)}">${j.chapter}</span></div>
+      <div><span style="${JOURNEY_CHIP}padding:3px 10px;font-size:13px;font-weight:900;letter-spacing:var(--ls-loud);${heroShadow(vm.heroDecorOn)}">${j.chapter}</span></div>
       <div style="font-family:var(--font-display);font-weight:600;font-size:22px;line-height:1.2;margin:4px 0 8px;${heroShadow(vm.heroDecorOn)}">LVL ${j.level} · ${j.rankName}${j.atSummit ? " — top of the ladder 🏔️" : ` — ${j.xpToNextRank} XP to ${j.nextRankName}`}</div>
       ${journeyXpBar(j, 9)}
     </div>
@@ -116,7 +116,7 @@ function journeyMapNarrow(vm) {
   <div id="journey-map-card" data-action="nav" data-arg="progress" style="height:420px;flex-shrink:0;${HERO_HOST}border-radius:var(--radius-lg);overflow:hidden;cursor:pointer;box-shadow:var(--shadow-lift);background:var(--journey-bg,var(--aqua));">
     ${heroDecor(vm.heroDecorOn)}
     <div style="position:relative;z-index:2;padding:16px 18px 8px;color:var(--journey-text,#fff);">
-      <div><span style="${JOURNEY_CHIP}padding:3px 10px;font-size:13px;font-weight:900;letter-spacing:0.08em;${heroShadow(vm.heroDecorOn)}">${j.chapter}</span></div>
+      <div><span style="${JOURNEY_CHIP}padding:3px 10px;font-size:13px;font-weight:900;letter-spacing:var(--ls-loud);${heroShadow(vm.heroDecorOn)}">${j.chapter}</span></div>
       <div style="font-family:var(--font-display);font-weight:600;font-size:17px;line-height:1.2;margin:4px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${heroShadow(vm.heroDecorOn)}">LVL ${j.level} · ${j.rankName}</div>
       <div style="margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><span style="${JOURNEY_CHIP}padding:2px 10px;font-size:13px;font-weight:800;">${j.atSummit ? COPY.summit : `${j.xpToNextRank} XP to ${j.nextRankName}`}</span></div>
       ${journeyXpBar(j, 8)}
@@ -182,7 +182,7 @@ function dayPane(vm, wide) {
 
   const rest = dv.isRest ? `
     <div style="background:var(--hero-chip,rgba(255,255,255,0.16));border-radius:var(--radius-md);padding:${wide ? "16px 18px" : "14px 16px"};display:flex;flex-direction:column;gap:9px;margin-bottom:14px;">
-      <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;">TODAY'S RECOVERY</div>
+      <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);">TODAY'S RECOVERY</div>
       ${(dv.recoveryItems || []).map(r => `
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:15px;flex-shrink:0;">🧘</span>
@@ -202,7 +202,7 @@ function dayPane(vm, wide) {
     </button>` : "";
 
   const blocksList = dv.showBlocksList && blocksOpen ? `
-    <div style="margin-bottom:9px;"><span style="display:inline-block;background:var(--hero-chip,transparent);border-radius:var(--radius-pill);padding:4px 12px;font-size:13px;font-weight:900;letter-spacing:0.08em;">${dv.blocksHint}</span></div>
+    <div style="margin-bottom:9px;"><span style="display:inline-block;background:var(--hero-chip,transparent);border-radius:var(--radius-pill);padding:4px 12px;font-size:13px;font-weight:900;letter-spacing:var(--ls-loud);">${dv.blocksHint}</span></div>
     <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:${wide ? 18 : 16}px;">
       ${vm.blocks.map(b => `
         <div style="background:${b.rowBg};color:var(--hero-row-text,var(--hero-text,#fff));border-radius:var(--radius-md);overflow:hidden;transition:background 0.15s ease;">
@@ -283,7 +283,7 @@ function dayPane(vm, wide) {
   return `
   <div style="padding:${pad};position:relative;z-index:2;">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
-      <span style="display:inline-block;background:var(--hero-chip,rgba(255,255,255,0.22));border-radius:var(--radius-pill);padding:6px 14px;font-size:13px;font-weight:900;letter-spacing:0.08em;">${dv.badgeLabel}</span>
+      <span style="display:inline-block;background:var(--hero-chip,rgba(255,255,255,0.22));border-radius:var(--radius-pill);padding:6px 14px;font-size:13px;font-weight:900;letter-spacing:var(--ls-loud);">${dv.badgeLabel}</span>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
         ${vm.weather ? `<div style="display:flex;align-items:center;gap:5px;background:var(--hero-chip,rgba(255,255,255,0.22));border-radius:var(--radius-pill);padding:6px 12px;" aria-label="Weather">
           <span style="font-size:15px;line-height:1;">${vm.weather.icon}</span>

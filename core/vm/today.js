@@ -167,7 +167,7 @@ export function buildJourney() {
     showIcon: false, showCheck: false, showAvatar: true, icon: currentRank.icon, circleR: 30,
     circleStyle: "width:60px;height:60px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 5px rgba(255,255,255,0.25),var(--shadow-lift);overflow:hidden;animation:mapPulse 2.6s ease-in-out infinite;background:var(--aqua-deep);",
     nameStyle: "font-family:var(--font-display);font-weight:600;font-size:18px;color:var(--ink);",
-    captionStyle: "font-size:13px;font-weight:900;letter-spacing:0.07em;color:var(--aqua-ink);",
+    captionStyle: "font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--aqua-ink);",
     // "You are here" sits on a white pill, so it reads on any part of the map.
     labelPill: "background:rgba(255,255,255,0.6);border-radius:999px;padding:4px 10px;"
   });
@@ -509,7 +509,7 @@ export function buildTodayVM(state) {
     { icon: "⭐", iconStyle: legendCircle("var(--sun)"), label: "Today" },
     { icon: "✓", iconStyle: legendCircle("color-mix(in srgb, var(--mint) 55%, #fff)"), label: "Partly done" },
     { icon: "📋", iconStyle: "font-size:14px;", label: "Upcoming" },
-    { icon: "↺", iconStyle: legendCircle("var(--sun)"), label: "Catch up" }
+    { icon: "↺", iconStyle: legendCircle("var(--sun)"), label: "Missed" }
   ];
 
   // ---- Right-pane day view ----
@@ -718,10 +718,11 @@ export function buildTodayVM(state) {
     // worse than none: it tells her the app isn't really watching.
     const warmupDone = !!(record && (record.rows || [])
       .some(l => l && l.block === "warmup" && l.status === "done"));
-    dayView = { badgeLabel: shortU + " · CATCH UP", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"), showChips: true, isMissed: true, showCta: true, ctaLabel: "Catch Up Now", ctaIcon: "↺", showSettings: false, ctaAction: "goSession",
-      missedSub: warmupDone
-        ? "You still got the warm-up in — every streak has bumps."
-        : "Every streak has bumps. Pick it back up whenever you're ready." };
+    /* NO-DEBT (D13, Oct 2026): only today's card can be trained. A missed day
+       is never made up on another day — it can be looked at, not run. */
+    dayView = { badgeLabel: shortU + " · MISSED", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"), showChips: true, isMissed: true, showCta: false, showSettings: false, ctaAction: "",
+      missedSub: (warmupDone ? "You still got the warm-up in. " : "")
+        + "No debt — a missed day is never made up. Today’s card is the one to train." };
   } else if (status === "rest") {
     const recov = (fullDay && fullDay.recovery) || [];
     dayView = {
@@ -737,10 +738,8 @@ export function buildTodayVM(state) {
     if (hasPlan) {
       dayView = {
         badgeLabel: shortU + " · UPCOMING", title: fullDay.title, mins: stats.mins, movesLabel: plural(stats.moves, "move"),
-        showChips: true, isPreview: true, showCta: true, ctaVariant: "secondary",
-        ctaLabel: "Start Early", ctaIcon: "▶️",
-        ctaSubtext: "Can’t wait? Starting now still counts for " + DAY_LONG[selectedKey] + ".",
-        ctaAction: "goSession", showSettings: false
+        // Only today's card trains (D13): a coming day can only be looked at.
+        showChips: true, isPreview: true, showCta: false, ctaAction: "", showSettings: false
       };
     } else {
       dayView = { badgeLabel: shortU + " · LOCKED", title: fullDay.title, showChips: false, isFuture: true, showCta: false, showSettings: false,

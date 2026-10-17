@@ -27,7 +27,7 @@ import { weekTable } from "./progress.js";
 const esc = (v) => escapeHtml(v == null ? "" : String(v));
 
 const card = (inner, extra = "") => `<div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:18px;box-shadow:var(--shadow-soft);${extra}">${inner}</div>`;
-const secTitle = (t) => `<div style="font-weight:900;font-size:13px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">${t}</div>`;
+const secTitle = (t) => `<div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;">${t}</div>`;
 const divider = (t) => `
   <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
     <span style="font-family:var(--font-display);font-weight:600;font-size:19px;color:var(--ink);white-space:nowrap;flex-shrink:0;">${t}</span>
@@ -49,7 +49,7 @@ function flagsCard(a, scopeLabel) {
 function stopsCard(a, scopeLabel) {
   return a.hasStops ? `
   <div style="background:var(--stop-wash);border:2px solid var(--stop);border-radius:var(--radius-xl);padding:16px 18px;box-shadow:var(--shadow-soft);">
-    <div style="font-weight:900;font-size:13px;letter-spacing:0.05em;color:var(--stop-ink);text-transform:uppercase;">🔴 Stop-rule events · ${esc(scopeLabel)}</div>
+    <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);color:var(--stop-ink);text-transform:uppercase;">🔴 Stop-rule events · ${esc(scopeLabel)}</div>
     ${a.stopEvents.map(se => `
       <div style="display:flex;gap:10px;align-items:flex-start;margin-top:10px;">
         <span style="font-size:16px;line-height:1.3;flex-shrink:0;">🛑</span>
@@ -173,26 +173,26 @@ function overviewTab(vm) {
     <div style="${vm.guStatsGrid}">
       <div style="background:var(--aqua-wash);border-radius:var(--radius-lg);padding:16px;text-align:center;">
         <div style="font-family:var(--font-display);font-size:28px;font-weight:600;color:var(--aqua-ink);line-height:1;">${a.adherence}%</div>
-        <div style="font-size:13px;font-weight:900;color:var(--aqua-ink);letter-spacing:0.04em;text-transform:uppercase;margin-top:5px;">Adherence · ${esc(vm.scopeLabel)}</div>
+        <div style="font-size:13px;font-weight:900;color:var(--aqua-ink);letter-spacing:var(--ls-label);text-transform:uppercase;margin-top:5px;">Adherence · ${esc(vm.scopeLabel)}</div>
       </div>
       <div style="background:var(--surface-2);border-radius:var(--radius-lg);padding:16px;text-align:center;">
         <div style="font-family:var(--font-display);font-size:28px;font-weight:600;color:var(--ink);line-height:1;">${a.sessions}/${a.scheduled}</div>
-        <div style="font-size:13px;font-weight:900;color:var(--ink-soft);letter-spacing:0.04em;text-transform:uppercase;margin-top:5px;">Sessions done</div>
+        <div style="font-size:13px;font-weight:900;color:var(--ink-soft);letter-spacing:var(--ls-label);text-transform:uppercase;margin-top:5px;">Sessions done</div>
       </div>
       <div style="background:var(--mint-wash);border-radius:var(--radius-lg);padding:16px;text-align:center;">
         <div style="font-family:var(--font-display);font-size:28px;font-weight:600;color:var(--mint-ink);line-height:1;">${a.avgMins}</div>
-        <div style="font-size:13px;font-weight:900;color:var(--mint-ink);letter-spacing:0.04em;text-transform:uppercase;margin-top:5px;">Avg min/session</div>
+        <div style="font-size:13px;font-weight:900;color:var(--mint-ink);letter-spacing:var(--ls-label);text-transform:uppercase;margin-top:5px;">Avg min/session</div>
       </div>
       <div style="background:var(--surface-2);border-radius:var(--radius-lg);padding:16px;text-align:center;">
         <div style="font-family:var(--font-display);font-size:28px;font-weight:600;color:var(--ink);line-height:1;">${a.totalMins}</div>
-        <div style="font-size:13px;font-weight:900;color:var(--ink-soft);letter-spacing:0.04em;text-transform:uppercase;margin-top:5px;">Total minutes</div>
+        <div style="font-size:13px;font-weight:900;color:var(--ink-soft);letter-spacing:var(--ls-label);text-transform:uppercase;margin-top:5px;">Total minutes</div>
       </div>
     </div>
     ${readinessCard(a, vm.scopeLabel, false)}
     <div style="background:var(--aqua-wash);border-radius:var(--radius-xl);padding:16px 18px;display:flex;gap:12px;align-items:flex-start;">
       <span style="font-size:22px;flex-shrink:0;">🧑‍🏫</span>
       <div>
-        <div style="font-weight:900;font-size:13px;color:var(--aqua-ink);text-transform:uppercase;letter-spacing:0.04em;">Coach's read</div>
+        <div style="font-weight:900;font-size:13px;color:var(--aqua-ink);text-transform:uppercase;letter-spacing:var(--ls-label);">Coach's read</div>
         <div style="font-size:15px;font-weight:700;color:var(--ink);line-height:1.5;margin-top:3px;">${esc(a.read)}</div>
       </div>
     </div>
@@ -222,12 +222,12 @@ function formCheckTab(vm) {
       <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-top:10px;">
         <div style="display:flex;flex-direction:column;align-items:center;background:var(--surface-2);border-radius:16px;padding:11px 18px;">
           <span style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);line-height:1;">${f.selfPct == null ? "—" : f.selfPct + "%"}</span>
-          <span style="font-size:13px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;">she reports</span>
+          <span style="font-size:13px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:var(--ls-label);">she reports</span>
         </div>
         <span style="font-size:20px;color:var(--ink-soft);">vs</span>
         <div style="display:flex;flex-direction:column;align-items:center;background:${f.gap != null && f.gap <= -15 ? "color-mix(in srgb, var(--coral) 12%, #fff)" : "var(--mint-wash)"};border-radius:16px;padding:11px 18px;">
           <span style="font-family:var(--font-display);font-weight:600;font-size:28px;color:${f.gap != null && f.gap <= -15 ? "var(--coral-ink)" : "var(--mint-ink)"};line-height:1;">${f.verifiedPct == null ? "—" : f.verifiedPct + "%"}</span>
-          <span style="font-size:13px;font-weight:900;color:${f.gap != null && f.gap <= -15 ? "var(--coral-ink)" : "var(--mint-ink)"};text-transform:uppercase;letter-spacing:0.04em;">you verified</span>
+          <span style="font-size:13px;font-weight:900;color:${f.gap != null && f.gap <= -15 ? "var(--coral-ink)" : "var(--mint-ink)"};text-transform:uppercase;letter-spacing:var(--ls-label);">you verified</span>
         </div>
         <div style="flex:1;min-width:220px;font-size:14px;font-weight:800;color:var(--ink);line-height:1.45;">${esc(f.headline)}</div>
       </div>
@@ -242,13 +242,13 @@ function formCheckTab(vm) {
         </div>
         <div style="display:flex;gap:9px;align-items:flex-start;background:var(--surface-2);border-radius:12px;padding:10px 12px;">
           <span style="font-size:15px;flex-shrink:0;">👁</span>
-          <div><span style="font-size:13px;font-weight:900;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;">Watch for</span>
+          <div><span style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;">Watch for</span>
           <div style="font-size:14px;font-weight:800;color:var(--ink);line-height:1.4;">${escapeHtml(c.watch)}</div></div>
         </div>
         ${c.fix ? `
         <div style="display:flex;gap:9px;align-items:flex-start;background:var(--aqua-wash);border-radius:12px;padding:10px 12px;">
           <span style="font-size:15px;flex-shrink:0;">🔧</span>
-          <div><span style="font-size:13px;font-weight:900;letter-spacing:0.06em;color:var(--aqua-ink);text-transform:uppercase;">The fix</span>
+          <div><span style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--aqua-ink);text-transform:uppercase;">The fix</span>
           <div style="font-size:14px;font-weight:800;color:var(--aqua-ink);line-height:1.4;">${escapeHtml(c.fix)}</div></div>
         </div>` : ""}
         <div style="display:flex;gap:9px;">
@@ -275,7 +275,7 @@ function analyticsTab(vm) {
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span style="font-family:var(--font-display);font-weight:600;font-size:20px;color:var(--ink);">Coach analytics</span>
-        <span style="font-size:13px;font-weight:900;letter-spacing:0.04em;background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);padding:5px 12px;text-transform:uppercase;">${esc(vm.scopeLabel)}</span>
+        <span style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);padding:5px 12px;text-transform:uppercase;">${esc(vm.scopeLabel)}</span>
       </div>
       <button type="button" data-action="exportCsv" style="min-height:48px;border:2px solid var(--aqua);background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">⬇︎ Export CSV</button>
     </div>
@@ -286,8 +286,8 @@ function analyticsTab(vm) {
       <div style="font-size:13px;color:var(--ink-soft);margin:4px 0 12px;line-height:1.3;">Every number here answers to the period toggle above.</div>
       <div style="display:grid;grid-template-columns:1fr auto auto;gap:0 14px;align-items:baseline;">
         <div></div>
-        <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;text-align:right;padding-bottom:6px;">Total</div>
-        <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;text-align:right;padding-bottom:6px;">Average</div>
+        <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;text-align:right;padding-bottom:6px;">Total</div>
+        <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;text-align:right;padding-bottom:6px;">Average</div>
         ${a.indicators.map(ind => `
           <div style="font-size:13px;font-weight:800;color:var(--ink-soft);padding:7px 0;border-top:1px solid var(--hairline);">${esc(ind.label)}</div>
           <div style="font-size:15px;font-weight:900;color:var(--ink);text-align:right;padding:7px 0;border-top:1px solid var(--hairline);white-space:nowrap;">${esc(ind.total)}</div>
@@ -304,7 +304,7 @@ function analyticsTab(vm) {
       <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:10px;">
         <div style="display:flex;flex-direction:column;align-items:center;background:var(--aqua-wash);border-radius:18px;padding:12px 18px;flex-shrink:0;">
           <span style="font-family:var(--font-display);font-weight:600;font-size:34px;color:var(--aqua-ink);line-height:1;">${a.isSheTrying.avg == null ? "—" : a.isSheTrying.avg}</span>
-          <span style="font-size:13px;font-weight:900;letter-spacing:0.04em;color:var(--aqua-ink);text-transform:uppercase;">${esc(a.isSheTrying.band)}</span>
+          <span style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--aqua-ink);text-transform:uppercase;">${esc(a.isSheTrying.band)}</span>
         </div>
         ${a.isSheTrying.hasTrend ? `
         <div style="display:flex;align-items:flex-end;gap:5px;height:74px;flex:1;min-width:120px;max-width:280px;">
@@ -398,7 +398,7 @@ function analyticsTab(vm) {
           <span style="font-size:15px;font-weight:800;color:var(--ink-soft);white-space:nowrap;">pauses · ${esc(vm.scopeLabel)}</span>
         </div>
         ${a.pauses.where.length ? `
-        <div style="font-size:13px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.04em;margin:8px 0 8px;">Where they happen</div>
+        <div style="font-size:13px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:var(--ls-label);margin:8px 0 8px;">Where they happen</div>
         <div style="display:flex;flex-direction:column;gap:9px;">
           ${a.pauses.where.map(pw => `
             <div style="display:flex;align-items:center;gap:10px;">
@@ -420,7 +420,7 @@ function analyticsTab(vm) {
             <div style="display:flex;align-items:center;gap:10px;">
               <div style="flex:1;min-width:0;">
                 <div style="font-size:14px;font-weight:800;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(sm.name)}</div>
-                <div style="font-size:13px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.03em;">${esc(sm.block)}</div>
+                <div style="font-size:13px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:var(--ls-label);">${esc(sm.block)}</div>
               </div>
               <div style="${sm.barStyle}"></div>
               <span style="font-size:13px;font-weight:900;color:var(--grape-ink);flex-shrink:0;width:24px;text-align:right;">×${sm.count}</span>
@@ -544,7 +544,7 @@ function analyticsTab(vm) {
       </div>` : `<div style="font-size:14px;font-weight:700;color:var(--ink-soft);">No Quiz Deck runs yet — scores land here after the first one.</div>`}
       <div style="margin-top:16px;padding-top:14px;border-top:2px solid var(--hairline);">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-          <span style="font-size:13px;font-weight:900;letter-spacing:0.05em;color:var(--ink-soft);">QUIZ XP BUDGET</span>
+          <span style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--ink-soft);">QUIZ XP BUDGET</span>
           <span style="font-size:13px;font-weight:900;color:var(--grape-ink);">${a.quizBudget.xpSpent} / ${a.quizBudget.xpTotal} XP · ${a.quizBudget.mastered}/${a.quizBudget.total} mastered</span>
         </div>
         <div style="height:10px;background:var(--surface-2);border-radius:10px;overflow:hidden;margin:8px 0 8px;">
@@ -559,14 +559,14 @@ function analyticsTab(vm) {
       <div style="background:var(--aqua-wash);border-radius:var(--radius-xl);padding:16px 18px;display:flex;gap:12px;align-items:flex-start;">
         <span style="font-size:22px;flex-shrink:0;">🧑‍🏫</span>
         <div>
-          <div style="font-weight:900;font-size:13px;color:var(--aqua-ink);text-transform:uppercase;letter-spacing:0.04em;">Coach's read</div>
+          <div style="font-weight:900;font-size:13px;color:var(--aqua-ink);text-transform:uppercase;letter-spacing:var(--ls-label);">Coach's read</div>
           <div style="font-size:15px;font-weight:700;color:var(--ink);line-height:1.5;margin-top:3px;">${esc(a.read)}</div>
         </div>
       </div>
       <div style="background:var(--mint-wash);border-radius:var(--radius-xl);padding:16px 18px;display:flex;gap:12px;align-items:flex-start;">
         <span style="font-size:22px;flex-shrink:0;">🎯</span>
         <div>
-          <div style="font-weight:900;font-size:13px;color:var(--mint-ink);text-transform:uppercase;letter-spacing:0.04em;">Coach's next-step suggestion</div>
+          <div style="font-weight:900;font-size:13px;color:var(--mint-ink);text-transform:uppercase;letter-spacing:var(--ls-label);">Coach's next-step suggestion</div>
           <div style="font-size:15px;font-weight:700;color:var(--ink);line-height:1.5;margin-top:3px;">${esc(a.suggest)}</div>
         </div>
       </div>
@@ -612,7 +612,7 @@ function settingsTab(vm) {
   return `
   <div style="background:var(--surface);border:1.5px solid var(--hairline);border-radius:var(--radius-xl);padding:22px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:22px;max-width:520px;">
     <div>
-      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Grown-up passkey 🔐</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Grown-up passkey 🔐</div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:9px;line-height:1.5;">${esc(vm.passkeyLine)}</div>
       ${vm.passkeySupported ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button type="button" data-action="${vm.hasPasskey ? "forgetPasskey" : "enrollPasskey"}" style="min-height:48px;border:2px solid var(--hairline);border-radius:var(--radius-pill);background:${vm.hasPasskey ? "transparent" : "var(--aqua-wash)"};color:${vm.hasPasskey ? "var(--ink-soft)" : "var(--aqua-ink)"};font-weight:900;font-size:14px;padding:0 16px;cursor:pointer;font-family:inherit;">${vm.hasPasskey ? "Remove the passkey" : "Set up a passkey"}</button>
@@ -620,11 +620,11 @@ function settingsTab(vm) {
       ${vm.passkeyNote ? `<div style="margin-top:8px;font-size:13px;font-weight:800;line-height:1.45;color:${vm.passkeyNoteOk ? "var(--mint-ink)" : "var(--stop-ink)"};">${escapeHtml(vm.passkeyNote)}</div>` : ""}
     </div>
     <div>
-      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Athlete name</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Athlete name</div>
       <input type="text" value="${escapeHtml(vm.settingsName)}" data-input="athleteName" style="width:100%;min-height:48px;padding:13px 15px;border-radius:var(--radius-md);border:2px solid var(--hairline);font-size:16px;font-weight:700;color:var(--ink);background:var(--surface-2);box-sizing:border-box;font-family:var(--font-ui);">
     </div>
     <div>
-      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Who's training 🧑‍🤝‍🧑</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Who's training 🧑‍🤝‍🧑</div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:9px;line-height:1.5;">Each athlete keeps her own sessions, XP, streak and prizes. Switching reloads the app.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         ${vm.profiles.map(p => `<button type="button" data-action="pickAthlete" data-arg="${escapeHtml(p.id)}" style="${p.style}">${p.active ? "✓ " : ""}${escapeHtml(p.name)}</button>`).join("")}
@@ -636,40 +636,40 @@ function settingsTab(vm) {
     </div>
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Coach voice 🎧</div>
+        <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);">Coach voice 🎧</div>
         <button type="button" data-action="toggleCoachVoice" aria-label="Toggle coach voice" style="${vm.toggleHit}"><span style="${vm.coachTrack}"><span style="${vm.coachKnob}"></span></span></button>
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The coach will: announce the next exercise · remind you to breathe · warn about common mistakes · prompt a self-check.</div>
     </div>
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Timer sounds 🔔</div>
+        <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);">Timer sounds 🔔</div>
         <button type="button" data-action="toggleTimerSounds" aria-label="Toggle timer sounds" style="${vm.toggleHit}"><span style="${vm.timerTrack}"><span style="${vm.timerKnob}"></span></span></button>
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The beeps and rep ticks she paces on. These stay on when the coach's voice is off.</div>
     </div>
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">${escapeHtml(HERO_DECOR_LABEL)} ✨</div>
+        <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);">${escapeHtml(HERO_DECOR_LABEL)} ✨</div>
         <button type="button" data-action="toggleHeroDecor" aria-label="Toggle ${escapeHtml(HERO_DECOR_LABEL.toLowerCase())}" aria-pressed="${vm.heroDecorOn ? "true" : "false"}" style="${vm.toggleHit}"><span style="${vm.heroDecorTrack}"><span style="${vm.heroDecorKnob}"></span></span></button>
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">The picture behind the big coloured cards on Today, the journey, Body Check, the timer's side panel and the level card. Never behind the timer itself.</div>
     </div>
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);">Safety voice 🛟</div>
+        <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);">Safety voice 🛟</div>
         <button type="button" data-action="toggleSafetyVoice" aria-label="Toggle safety voice" style="${vm.toggleHit}"><span style="${vm.safetyTrack}"><span style="${vm.safetyKnob}"></span></span></button>
       </div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:6px;line-height:1.5;">Pain checks and stop confirmations. Spoken even in quiet mode — leave this on.</div>
     </div>
     <div>
-      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Voice style</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Voice style</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         ${vm.voiceStyleOpts.map(vs => `<button type="button" data-action="setVoiceStyle" data-arg="${esc(vs.key)}" style="${vs.style}">${esc(vs.label)}</button>`).join("")}
       </div>
     </div>
     <div>
-      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Voice speed</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Voice speed</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         ${vm.voiceSpeedOpts.map(vs => `<button type="button" data-action="setVoiceSpeed" data-arg="${esc(vs.key)}" style="${vs.style}">${esc(vs.label)}</button>`).join("")}
       </div>
@@ -679,7 +679,7 @@ function settingsTab(vm) {
        ["Rest between rounds", "roundRestSeconds", vm.settingsRndRest, 5, 10, 90],
        ["Rest between sections", "sectionRestSeconds", vm.settingsSecRest, 5, 10, 90]].map(([label, key, val, step, min, max]) => `
     <div>
-      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">${label}</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">${label}</div>
       <div style="display:flex;align-items:center;gap:16px;">
         <button type="button" data-action="bumpRest" data-arg="${key}|-${step}|${min}|${max}" style="${vm.stepperBtn}">−</button>
         <span style="font-weight:900;font-size:20px;min-width:56px;text-align:center;color:var(--ink);">${val}s</span>
@@ -687,7 +687,7 @@ function settingsTab(vm) {
       </div>
     </div>`).join("")}
     <div>
-      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Prize pool 🎁 ${vm.isDefaultPool ? '<span style="color:var(--ink-soft);">(default)</span>' : ""}</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px;">Prize pool 🎁 ${vm.isDefaultPool ? '<span style="color:var(--ink-soft);">(default)</span>' : ""}</div>
       <div class="list-wrap">
         <div data-list="1" style="max-height:240px;display:flex;flex-direction:column;gap:6px;padding-bottom:8px;">
           ${vm.prizePool.map((p, i) => `
@@ -726,7 +726,7 @@ function settingsTab(vm) {
       ${!vm.isDefaultPool ? `<button type="button" data-action="resetPrizePool" style="margin-top:8px;min-height:48px;border:none;background:none;color:var(--ink-soft);font-weight:800;font-size:13px;text-decoration:underline;cursor:pointer;font-family:inherit;">Reset to default pool</button>` : ""}
     </div>
     <div style="border-top:1.5px solid var(--hairline);padding-top:16px;">
-      <div style="font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Backup &amp; restore 💾</div>
+      <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);margin-bottom:7px;">Backup &amp; restore 💾</div>
       <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:9px;line-height:1.5;">A full copy of <strong>${escapeHtml(vm.settingsName)}</strong>'s data — sessions, XP, prizes, quiz mastery, trackers. Restoring only adds; nothing already on this device is overwritten. Each athlete backs up separately.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <button type="button" data-action="downloadBackup" style="min-height:48px;border:2px solid var(--aqua);background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);font-weight:900;font-size:13px;padding:0 16px;cursor:pointer;font-family:inherit;">⬇︎ Download backup</button>
@@ -753,7 +753,7 @@ function coachingTab(vm) {
   const rungBtn = (name, lvl, cur) => `<button type="button" data-action="setLadderRung" data-arg="${escapeHtml(name)}|${lvl}" style="width:48px;height:48px;min-height:48px;border-radius:50%;border:2px solid ${lvl <= cur ? "var(--btn-primary-bg,var(--aqua))" : "var(--hairline)"};background:${lvl <= cur ? "var(--btn-primary-bg,var(--aqua))" : "var(--surface)"};color:${lvl <= cur ? "var(--btn-primary-text,#fff)" : "var(--ink-soft)"};font-weight:900;font-size:15px;cursor:pointer;font-family:inherit;">${lvl}</button>`;
   return `
   <div style="display:flex;flex-direction:column;gap:14px;">
-    ${card(`
+    ${!c.showGate ? "" : card(`
       ${secTitle("Valgus gate 🔒")}
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;flex-wrap:wrap;">
         <div style="flex:1;min-width:220px;">
@@ -830,7 +830,7 @@ export function grownupScreen(vm) {
         </div>
         ${(tab === "overview" || tab === "analytics") ? `
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-          <span style="font-size:13px;font-weight:900;letter-spacing:0.04em;color:var(--ink-soft);text-transform:uppercase;">Period</span>
+          <span style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;">Period</span>
           <div style="display:flex;background:var(--surface-2);border-radius:var(--radius-pill);padding:3px;gap:3px;min-width:210px;">
             ${vm.scopeTabs.map(st => `<button type="button" data-action="setGsScope" data-arg="${esc(st.key)}" style="${st.style}">${esc(st.label)}</button>`).join("")}
           </div>

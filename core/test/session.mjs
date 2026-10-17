@@ -81,7 +81,7 @@ setSpeechDelay(3000);
     onTick: (ms, sess) => {
       if (answerChecks(sess)) return;
       // in the beat between the coach's "Rest. Next: …" and the clock, which is where a real tap lands
-      if (skippedAt < 0 && sess.phase === "rest" && !speechInFlight() && sess.upNextName) {
+      if (skippedAt < 0 && sess.phase === "rest" && !speechInFlight() && sess.upNextName && engine.restLockedSecs() === 0) {
         skippedAt = ms; nextName = sess.upNextName; spokenBefore = spoken.length; engine.advance();
       }
     }
@@ -115,8 +115,11 @@ setSpeechDelay(3000);
   });
   ok(tapAt > 0, "Done was tapped while the coach was still saying \"Rest. Next: …\"");
   ok(leftAt > 0, "the rest ended");
-  ok(lo === Infinity || lo >= hi - 1,
-     "and it ended without counting down — the tap was honoured the moment the clock could read it ("
+  /* D14 (Oct 2026): the first half of a rest can't be skipped — the lesson
+     she studies says rest buys the next round its quality. A tap at the top of
+     the rest is ignored, and the rest counts down. */
+  ok(hi > 0 && lo <= Math.ceil(hi / 2),
+     "and the early tap was ignored — the rest counted down past half-way ("
      + (lo === Infinity ? "the countdown never got a tick in" : lo + "s left of " + hi + "s") + ")");
 }
 
@@ -997,12 +1000,9 @@ const stopInRoundTwo = (reason) => ({
   const RETIRED = [
     [/\bCircuit\b/, "Circuit — the repeating unit is a Round, and the block is Main"],
     [/\bSection\b/i, "Section — the coach says Block, so the screen says Block"],
-    /* The coach strip may not INVENT a side — it does not know which one she
-       started on. Content that names a side (a physio said the right ankle is
-       the stiff one) is a different thing and is allowed; this bans the strip's
-       uppercase form only. */
-    [/(?:SET|REP) \d+ OF \d+[^<]*(?:LEFT|RIGHT) SIDE|>\s*(?:LEFT|RIGHT) SIDE\s*</,
-     "an uppercase LEFT/RIGHT SIDE on the coach strip — the runner only knows first and second"],
+    /* Oct 2026: the coach now always starts on the LEFT and says so, so the
+       strip names LEFT / RIGHT. The retired words are the old FIRST / SECOND. */
+    [/>\s*(?:FIRST|SECOND) SIDE\s*</, "FIRST/SECOND SIDE — the coach starts on the left, so the strip says LEFT/RIGHT"],
     [/TIMED SET/, "TIMED SET — a set is the prescription unit, counted elsewhere"],
     [/\bworkout\b/i, "workout — this is a session"],
     [/\bexercises?\b/i, "exercise — the kid-facing word is move"],

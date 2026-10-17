@@ -3,7 +3,7 @@
    values from the engine's `sess` view-state.
    ============================================================ */
 
-import { sess, refTime, pausedByBackground, canGoBack, tightAreaWord } from "../engine.js";
+import { sess, refTime, pausedByBackground, canGoBack, tightAreaWord, restLockedSecs } from "../engine.js";
 import { DAYS, CHEERS, INTENT_WORDS, MICRO_LOOP, BREATH_REHEARSAL, BLOCK_META, BLOCK_LABEL, SESSION_QUIZ,
          TRAINING_QS, REFLECT_WELL, REFLECT_NEXT, exWork, doseLines, videoSearchUrl } from "../data.js";
 import { SKILL_BLOCK, COPY } from "../sport.js";
@@ -779,8 +779,12 @@ export function buildSessionVM(state) {
        "15s first side"), but it only ever reached the small italic dose line —
        the LEFT/RIGHT chips are gated on phase === "reps". The ring label can
        carry it at the same size as the phase word. */
-    timerSideWord: (sess.totalSides > 1 && /first side/i.test(sess.sideLabel || "")) ? "FIRST SIDE"
-      : (sess.totalSides > 1 && /second side/i.test(sess.sideLabel || "")) ? "SECOND SIDE" : "",
+    /* LEFT / RIGHT on every two-sided move, timed or counted (Oct 2026): the
+       coach always starts on the left, so the app knows the side it names. */
+    timerSideWord: (phase === "work" || phase === "reps") && sess.sideName ? sess.sideName.toUpperCase() : "",
+    // The big side word in the ring: "LEFT", "RIGHT LEG" — readable from the mat.
+    sideBig: (phase === "work" || phase === "reps") && sess.sideName
+      ? sess.sideName.replace(/ side$/, "").toUpperCase() : "",
     railOpen: state.railOpen !== false,
     confirmRestart: !!sess.confirmRestart,
     restartExercises: sess.exDone || 0,
@@ -814,11 +818,10 @@ export function buildSessionVM(state) {
        no way to know which set or which side she was on. */
     coachSetLine: sess.totalSets > 1 ? `SET ${sess.currentSet} OF ${sess.totalSets}` : "",
     coachSideLine: sess.totalSides > 1
-      /* FIRST / SECOND, never LEFT / RIGHT. Nothing in the plan, the engine or
-         the ledger records which side she starts on, and the coach only ever
-         says "first side" / "second side" — so naming a left knee was the
-         screen asserting something the app cannot know. */
-      ? (sess.currentSide === 1 ? "FIRST SIDE" : "SECOND SIDE") : "",
+      /* LEFT / RIGHT (Oct 2026, replacing FIRST / SECOND): the coach now
+         always starts on the left and says so, so the side named on screen is
+         the side she is on. */
+      ? (sess.sideName ? sess.sideName.toUpperCase() : (sess.currentSide === 1 ? "LEFT SIDE" : "RIGHT SIDE")) : "",
     coachDirectionLine: sess.totalDirections > 1
       ? `DIRECTION ${sess.currentDirection} OF ${sess.totalDirections}` : "",
     coachRepLine: sess.repsInSegment > 0 ? `REP ${sess.repInSegment} OF ${sess.repsInSegment}` : "",
@@ -844,8 +847,10 @@ export function buildSessionVM(state) {
        first tap looked like it had been ignored and the second one, landing on
        a move that had only just started, looked like it had skipped something.
        Same button, same action, honest label. */
+    // The first half of a rest can't be skipped (D14) — the button says so.
+    doneLocked: isResting && !explore && restLockedSecs() > 0,
     doneLabel: explore ? "Next move ▶"
-      : isResting ? "⏭ Skip Rest"
+      : isResting ? (restLockedSecs() === Infinity ? "Resting…" : restLockedSecs() > 0 ? "Resting… " + restLockedSecs() : "⏭ I'm ready")
       : isFormCheck ? "Move on →"
       // On the rep question, Done means "the coach's count is fine" — the
       // card's own buttons are the answers, and the label must not read as

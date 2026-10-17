@@ -237,6 +237,14 @@ const ORDINAL = ["", "first", "second", "third", "fourth"];
 /* The ordered list of stretches of work the runner walks through. One segment
    per set × side × direction, each carrying how it should be announced and
    whether reaching it means switching sides. */
+/* The name of side n of a two-sided move: "left side", "right leg", or the
+   move's own side names ("inside edge"). Left is always first. */
+export function sideNameOf(p, side) {
+  if (p.sideNames) return p.sideNames[side - 1] + " side";
+  if (p.sides === 2) return (side === 1 ? "left " : "right ") + (p.sideWord || "side");
+  return (ORDINAL[side] || side) + " side";
+}
+
 export function prescriptionSegments(p) {
   const out = [];
   for (let set = 1; set <= p.sets; set++) {
@@ -244,11 +252,14 @@ export function prescriptionSegments(p) {
       for (let dir = 1; dir <= p.dirs; dir++) {
         const bits = [];
         if (p.sets  > 1) bits.push(`set ${ORDINAL[set] || set}`);
-        if (p.sides > 1) bits.push(p.sideNames ? `${p.sideNames[side - 1]} side` : `${ORDINAL[side] || side} side`);
+        /* LEFT FIRST, always (Oct 2026). The coach decides the order, so the app
+           knows the side and can name it: "left leg", then "right leg". */
+        const sideName = p.sides > 1 ? sideNameOf(p, side) : "";
+        if (p.sides > 1) bits.push(sideName);
         if (p.dirs  > 1) bits.push(`${ORDINAL[dir] || dir} direction`);
         const prev = out[out.length - 1];
         out.push({
-          set, side, dir, reps: (p.sideReps ? p.sideReps[side - 1] : p.reps),
+          set, side, dir, sideName, reps: (p.sideReps ? p.sideReps[side - 1] : p.reps),
           label: bits.join(", "),
           // What changed since the last segment decides what the coach says.
           transition: !prev ? null
@@ -467,7 +478,7 @@ export function spokenDose(ex) {
     let said = p.sideReps
       ? (p.sideNames
           ? `${p.sideReps[0]} on the ${p.sideNames[0]} and ${p.sideReps[1]} on the ${p.sideNames[1]}`
-          : `${p.sideReps[0]} on the first side and ${p.sideReps[1]} on the second`)
+          : `${p.sideReps[0]} on the left and ${p.sideReps[1]} on the right`)
       : p.sets > 1
         ? `${p.sets} sets of ${lead}${p.repsHigh ? p.reps + " to " + p.repsHigh : p.reps}`
         : `${lead}${p.repsHigh ? p.reps + " to " + p.repsHigh : p.reps} ${unit}`;
