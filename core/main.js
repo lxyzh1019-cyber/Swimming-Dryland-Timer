@@ -31,7 +31,7 @@ import { requireGrownup, answerPin, choosePin, allowPinChoice, clearPinChoice,
          hasGrownupPin, isFreshDevice, PIN_MIN_DIGITS, PIN_MAX_DIGITS,
          GATE_REASON, GATE_UNLOCK_MS, setBootstrapState, bootstrapState, gateNeedsOfflineSetup } from "./gate.js";
 import { passkeySupported, hasPasskey, enrollPasskey, verifyPasskey, forgetPasskey } from "./passkey.js";
-import { loadSessions } from "./store.js";
+import { loadSessions, loadDayProgress } from "./store.js";
 import { loadGate, saveGate, loadLadderRungs, saveLadderRungs, loadTracker, saveTracker, getCurrentTrackerWeek, setEngagementPick, switchProfile, addProfile, renameProfile, activeProfileId, LS_SESSIONS, recordFormVerdict, repairPrizeWallet, redeemedPrizesForReview, restorePrize } from "./store.js";
 
 export const state = {
@@ -447,6 +447,14 @@ Object.assign(RAW, {
   },
   goSession(arg) {
     const dayKey = arg || state.selectedDay || edmontonDayKey();
+    /* NO-DEBT (D13): only today's card trains. Any other day opens to look at. */
+    // (A bout begun before midnight and still fresh may still be finished.)
+    if (dayKey !== edmontonDayKey() && !loadDayProgress(dayKey)) {
+      state.startNote = ""; state.redoPartials = false; state.readiness = null;
+      state.selectedDay = dayKey; state.detailOverlay = false; state.detailEx = null;
+      launchSession({ dayKey, mode: "explore" });
+      return;
+    }
     // GO always means GO. Looking at the moves has its own button, so nothing
     // can re-point this one at the move list behind her.
     state.startNote = "";
@@ -460,6 +468,7 @@ Object.assign(RAW, {
      this is how she says she wants one back. */
   goSessionRedo(arg) {
     const dayKey = arg || state.selectedDay || edmontonDayKey();
+    if (dayKey !== edmontonDayKey() && !loadDayProgress(dayKey)) return;   // NO-DEBT (D13): today's card only
     state.startNote = "";
     state.redoPartials = true;
     state.readiness = newReadinessFlow(dayKey);
@@ -916,6 +925,9 @@ Object.assign(RAW, {
     // The valgus gate decides whether she is jumping at all. That is not hers.
     const g = loadGate();
     g.unlocked = !g.unlocked;
+    // Re-locking starts the count again: the 2 clean weeks in a row are earned
+    // from here (D15).
+    if (!g.unlocked) { g.weeks = {}; g.cleanWeeks = []; }
     saveGate(g);
     render();
   },

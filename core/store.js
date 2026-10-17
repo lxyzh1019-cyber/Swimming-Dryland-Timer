@@ -745,21 +745,46 @@ export function migrateGateWeeks() {
   return true;
 }
 
-/* Credit this session's week toward the gate, if it earned it. Returns the
-   gate. Unlocking is automatic once the two weeks are banked. */
+/* THE VALGUS GATE (D15, Oct 2026). The written rule — "jumps stay at the floor
+   move until landings are clean" — is now what the code counts. A week counts
+   only when the floor move has at least GATE_LANDINGS_PER_WEEK graded landings
+   that week and every one was clean; the gate opens after GATE_WEEKS_REQUIRED
+   such weeks IN A ROW, and never while a grown-up has flagged the move. It used
+   to open after any two weeks with a single "clean" tap each. Landings are
+   graded by the landing check (FEATURES.landingCheck); an app without it has
+   no gate (FEATURES.valgusGate). A gate already open stays open; "Re-lock the
+   gate" in the Grown-up Zone closes it. */
+export const GATE_LANDINGS_PER_WEEK = 5;
+export function gateWeekPasses(w) {
+  return !!w && (w.clean || 0) >= GATE_LANDINGS_PER_WEEK && (w.wobbly || 0) === 0;
+}
+function weeksInARow(keys) {
+  let best = 0, run = 0, prev = null;
+  keys.slice().sort().forEach(k => {
+    const gap = prev ? Math.round((new Date(k + "T12:00:00Z") - new Date(prev + "T12:00:00Z")) / (7 * DAY_MS)) : null;
+    run = gap === 1 ? run + 1 : 1;
+    best = Math.max(best, run); prev = k;
+  });
+  return best;
+}
+export function gateWeeksInARow(g) {
+  return weeksInARow(Object.keys((g && g.weeks) || {}).filter(k => gateWeekPasses(g.weeks[k])));
+}
 export function creditValgusWeek(entry) {
-  const rows = (entry && entry.ledger) || [];
-  const didIt = rows.some(l => l && l.name === GATE_MOVE && l.status === "done");
-  const wasClean = (entry.formChecks || []).some(f => f && f.name === GATE_MOVE && f.clean);
-  // A grown-up who watched the move fail outranks her own self-report — that
-  // verdict is the whole reason the monthly form check exists.
-  const parentSaysNo = flaggedMoves().includes(GATE_MOVE);
-  if (!didIt || !wasClean || parentSaysNo) return loadGate();
   const g = loadGate();
+  const lg = entry && entry.landings && entry.landings[GATE_MOVE];
+  if (!lg || !((lg.clean || 0) + (lg.wobbly || 0))) return g;
   const week = weekKeyFor(new Date(entry.isoDate || Date.now()));
-  if (!g.cleanWeeks.includes(week)) g.cleanWeeks.push(week);
-  g.cleanWeeks = g.cleanWeeks.slice(-8);
-  if (g.cleanWeeks.length >= GATE_WEEKS_REQUIRED) g.unlocked = true;
+  g.weeks = g.weeks || {};
+  const w = g.weeks[week] || { clean: 0, wobbly: 0 };
+  w.clean += lg.clean || 0; w.wobbly += lg.wobbly || 0;
+  g.weeks[week] = w;
+  const keys = Object.keys(g.weeks).sort();
+  while (keys.length > 8) delete g.weeks[keys.shift()];
+  g.cleanWeeks = keys.filter(k => gateWeekPasses(g.weeks[k]));
+  // A grown-up who watched the move fail outranks her own grades.
+  const parentSaysNo = flaggedMoves().includes(GATE_MOVE);
+  if (!parentSaysNo && gateWeeksInARow(g) >= GATE_WEEKS_REQUIRED) g.unlocked = true;
   saveGate(g);
   return g;
 }

@@ -320,7 +320,7 @@ export function quizDeckHtml(qd) {
           ${qd.bank ? `
           <div style="width:100%;background:var(--surface-2);border-radius:var(--radius-lg);padding:12px 14px;box-sizing:border-box;">
             <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:7px;">
-              <span style="font-size:13px;font-weight:900;letter-spacing:0.05em;color:var(--ink-soft);">MOVES MASTERED</span>
+              <span style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--ink-soft);">MOVES MASTERED</span>
               <span style="font-size:13px;font-weight:900;color:var(--aqua-ink);">${qd.bank.mastered} / ${qd.bank.total}</span>
             </div>
             <div style="height:10px;background:var(--surface);border-radius:10px;overflow:hidden;">
@@ -373,7 +373,7 @@ export function quizDeckHtml(qd) {
 
       <div style="background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lift);padding:24px;display:flex;flex-direction:column;gap:16px;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:13px;font-weight:900;letter-spacing:0.06em;background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);padding:5px 12px;">${cur.tag}</span>
+          <span style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);background:var(--aqua-wash);color:var(--aqua-ink);border-radius:var(--radius-pill);padding:5px 12px;">${cur.tag}</span>
           <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${cur.label || cur.move}</span>
         </div>
         <div style="font-family:var(--font-display);font-weight:600;font-size:23px;color:var(--ink);line-height:1.25;">${cur.prompt}</div>
@@ -424,7 +424,7 @@ export function prizeDrawHtml(pd) {
   return `
   <div style="position:fixed;inset:0;z-index:85;background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;">
     <div style="position:relative;background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-pop);padding:26px;width:100%;max-width:540px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;">
-      <div style="font-size:13px;font-weight:900;letter-spacing:0.08em;color:var(--sun-ink);background:var(--sun-wash);border-radius:var(--radius-pill);padding:6px 14px;">🎉 LEVEL UP REWARD</div>
+      <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-loud);color:var(--sun-ink);background:var(--sun-wash);border-radius:var(--radius-pill);padding:6px 14px;">🎉 LEVEL UP REWARD</div>
       <div style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);line-height:1.1;">Pick a prize envelope!</div>
       <button type="button" data-action="closePrizeDraw" aria-label="Close" style="position:absolute;top:12px;right:12px;width:48px;height:48px;min-height:48px;border-radius:50%;border:none;background:var(--surface-2);color:var(--ink-soft);font-size:18px;font-weight:900;cursor:pointer;">✕</button>
       ${hasPicked && !pd.waiting ? `<div style="font-family:var(--font-hand);font-size:22px;font-weight:700;color:var(--aqua-ink);">You picked — enjoy it! 🌟</div>` : ""}

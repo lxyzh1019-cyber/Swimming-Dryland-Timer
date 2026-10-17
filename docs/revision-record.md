@@ -1,7 +1,7 @@
 # Revision record (hz-change-guard)
 
-Version: v35
-Built on: v34
+Version: v36
+Built on: v35
 Owner: claude.ai chat "Swimming / Figure Skate Dryland Timer deep check" (2026-10-16)
 
 The full feature list is `FEATURES.md`; this record names the features the revision gate checks by phrase.
@@ -16,6 +16,11 @@ F6 Shared core check in CI | Shared core is the same in both apps
 F7 Back a move keeps done moves | Back a move keeps done moves
 F8 Care / recovery day record | careComplete
 F9 Coach's Quiz on the finish screen | sessionQuizOf
+
+F10 Left and right sides named | sideNameOf; Left side first
+F11 Only today's card trains | No debt — a missed day is never made up
+F12 Half-rest lock | restLockedSecs; I'm ready
+F13 Recovery how-to tips | Roll ankle to knee, slow
 
 ## Open problems
 P1 Live site not checked from the chat — check the Grown-up version line after merge

@@ -64,8 +64,8 @@ function bodyMap(vm, view) {
   const badges = view === "front" ? FRONT_BADGES : BACK_BADGES;
   const img = view === "front" ? IMAGES.bodyFront : IMAGES.bodyBack;
   const pill = view === "front"
-    ? `<span style="background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);font-size:13px;font-weight:900;letter-spacing:0.06em;padding:6px 16px;border-radius:var(--radius-pill);margin-bottom:8px;">FRONT VIEW</span>`
-    : `<span style="background:var(--btn-primary-bg,var(--sea));color:var(--btn-primary-text,#fff);font-size:13px;font-weight:900;letter-spacing:0.06em;padding:6px 16px;border-radius:var(--radius-pill);margin-bottom:8px;">BACK VIEW</span>`;
+    ? `<span style="background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);font-size:13px;font-weight:900;letter-spacing:var(--ls-label);padding:6px 16px;border-radius:var(--radius-pill);margin-bottom:8px;">FRONT VIEW</span>`
+    : `<span style="background:var(--btn-primary-bg,var(--sea));color:var(--btn-primary-text,#fff);font-size:13px;font-weight:900;letter-spacing:var(--ls-label);padding:6px 16px;border-radius:var(--radius-pill);margin-bottom:8px;">BACK VIEW</span>`;
   return `
   <div style="flex:1;background:var(--bg);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
     ${pill}
@@ -83,7 +83,7 @@ function resultCard(vm, { areaLabel = "" } = {}) {
   const c = vm.resultCta;
   return `
   <div data-body-result style="width:100%;max-width:${areaLabel ? 680 : 720}px;box-sizing:border-box;margin-top:${areaLabel ? "18px" : "40px"};${areaLabel ? "margin-left:auto;margin-right:auto;" : ""}background:var(--surface);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-lift);border-top:6px solid ${vm.light.color};">
-    ${areaLabel ? `<div style="font-size:13px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:10px;">${areaLabel}</div>` : ""}
+    ${areaLabel ? `<div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);margin-bottom:10px;">${areaLabel}</div>` : ""}
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
       <div style="font-size:56px;line-height:1;">${vm.light.emoji}</div>
       <div>
@@ -100,7 +100,7 @@ function resultCard(vm, { areaLabel = "" } = {}) {
       <span style="font-size:13px;font-weight:800;color:var(--ink-soft);line-height:1.45;">${vm.suggestionLine}</span>
     </div>` : ""}
     ${vm.hideLightOverride ? "" : `<details style="background:var(--surface-2);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:18px;"${vm.wasOverridden ? " open" : ""}>
-      <summary style="font-size:13px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;min-height:48px;"><span aria-hidden="true">🔒</span> Grown-up only — change today's light</summary>
+      <summary style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;min-height:48px;"><span aria-hidden="true">🔒</span> Grown-up only — change today's light</summary>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
         ${vm.lightOptions.map(lo => `
           <button type="button" data-action="rPickLight" data-arg="${lo.key}" style="${lo.style}">
@@ -163,7 +163,7 @@ export function readinessScreen(vm) {
     <div style="${vm.bodyContentStyle}">
       <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:720px;">
         ${vm.hasYesterday ? `
-          <div style="display:flex;align-items:center;gap:8px;font-weight:900;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);padding:0 4px;">
+          <div style="display:flex;align-items:center;gap:8px;font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);padding:0 4px;">
             <span style="font-size:15px;">📋</span> Yesterday — for reference. Today still needs your answer.
           </div>` : ""}
         ${vm.questions.map(q => `
@@ -171,7 +171,7 @@ export function readinessScreen(vm) {
             <div style="flex:1 1 200px;font-weight:700;font-size:17px;line-height:1.4;color:var(--ink);">${q.text}</div>
             ${vm.hasYesterday ? `
               <div style="flex-shrink:0;min-width:92px;text-align:center;">
-                <div style="font-size:13px;font-weight:900;letter-spacing:0.05em;text-transform:uppercase;color:var(--ink-soft);">Yesterday</div>
+                <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);">Yesterday</div>
                 <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-top:2px;">${q.yesterday}</div>
               </div>` : ""}
             <div style="flex:1 1 100%;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -205,7 +205,7 @@ export function readinessScreen(vm) {
         ${bodyMap(vm, "back")}
         <div style="${vm.legendStyle}">
           ${vm.legendRows.map(lg => lg.isHeader
-            ? `<div style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);padding:10px 4px 2px;">${lg.label}</div>`
+            ? `<div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);padding:10px 4px 2px;">${lg.label}</div>`
             : `<button type="button" data-action="rPickZone" data-arg="${lg.num}" style="${lg.rowStyle}">
                  <span style="${lg.badgeStyle}">${lg.num}</span>
                  <span style="font-size:14px;font-weight:800;color:var(--ink);text-align:left;line-height:1.2;">${lg.label}</span>

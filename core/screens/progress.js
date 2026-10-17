@@ -71,7 +71,7 @@ export function weekTable(vm) {
               <span style="font-size:20px;line-height:1;">🔥</span>
               <span style="display:inline-flex;flex-direction:column;align-items:flex-start;">
                 <span style="font-family:var(--font-display);font-weight:600;font-size:20px;color:var(--coral-ink);line-height:1;">${vm.dayStreakVal}</span>
-                <span style="font-size:13px;font-weight:900;color:var(--coral-ink);letter-spacing:0.03em;line-height:1.1;white-space:nowrap;">DAY STREAK</span>
+                <span style="font-size:13px;font-weight:900;color:var(--coral-ink);letter-spacing:var(--ls-label);line-height:1.1;white-space:nowrap;">DAY STREAK</span>
               </span>
             </span>
           </th>
@@ -117,13 +117,13 @@ export function progressScreen(vm) {
       <div data-progress-top="${vm.stackPrizes ? "stacked" : "side"}" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;${vm.stackPrizes ? "flex-direction:column;" : ""}">
         <div style="${vm.stackPrizes ? "width:100%;box-sizing:border-box;" : "flex:2;min-width:280px;"}background:var(--surface);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow-soft);">
           <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:2px;">
-            <span style="font-weight:900;font-size:13px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">This week</span>
+            <span style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;">This week</span>
             <span style="font-size:13px;font-weight:800;color:var(--ink-soft);">${vm.sessionsLabel} · ${vm.minAvgVal} min avg</span>
           </div>
           ${weekTable(vm)}
         </div>
         <div data-prizes="1" style="${vm.stackPrizes ? "width:100%;box-sizing:border-box;" : "flex:1;min-width:220px;"}background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-lg);padding:16px 18px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;">
-          <div style="font-weight:900;font-size:13px;letter-spacing:0.05em;color:var(--sun-ink);text-transform:uppercase;">My prizes 🎁</div>
+          <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);color:var(--sun-ink);text-transform:uppercase;">My prizes 🎁</div>
           ${vm.pendingDraws > 0 ? `
           <button type="button" data-action="openPrizeDraw" style="width:100%;flex-shrink:0;${kidButton("primary", { big: true })}padding:10px 16px;">${escapeHtml(vm.pendingDrawLabel)}</button>` : ""}
           ${vm.hasPrizes ? `
@@ -145,7 +145,7 @@ export function progressScreen(vm) {
 
       <div style="background:var(--surface);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow-soft);margin-bottom:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
-          <div style="font-weight:900;font-size:13px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">How it's going</div>
+          <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;">How it's going</div>
           <div style="display:flex;background:var(--surface-2);border-radius:var(--radius-pill);padding:3px;gap:3px;">
             ${vm.periodStats.tabs.map(t => `<button type="button" data-action="progressScope" data-arg="${t.key}" style="${t.style}">${t.label}</button>`).join("")}
           </div>
@@ -153,16 +153,16 @@ export function progressScreen(vm) {
         <div style="font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:12px;">${vm.periodStats.rangeLabel}</div>
         ${vm.periodStats.hasData ? `
         <div style="display:grid;grid-template-columns:1fr auto auto;gap:0 14px;align-items:baseline;">
-          <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;padding-bottom:6px;"></div>
-          <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;text-align:right;padding-bottom:6px;">Total</div>
-          <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;text-align:right;padding-bottom:6px;">Average</div>
+          <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;padding-bottom:6px;"></div>
+          <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;text-align:right;padding-bottom:6px;">Total</div>
+          <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;text-align:right;padding-bottom:6px;">Average</div>
           ${vm.periodStats.rows.map(r => `
             <div style="font-size:13px;font-weight:800;color:var(--ink-soft);padding:7px 0;border-top:1px solid var(--hairline);">${r.label}</div>
             <div style="font-size:15px;font-weight:900;color:var(--ink);text-align:right;padding:7px 0;border-top:1px solid var(--hairline);white-space:nowrap;">${r.total}</div>
             <div style="font-size:13px;font-weight:800;color:var(--aqua-ink);text-align:right;padding:7px 0;border-top:1px solid var(--hairline);white-space:nowrap;">${r.avg}</div>`).join("")}
         </div>
         <div style="margin-top:16px;">
-          <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;margin-bottom:6px;">XP per day</div>
+          <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;margin-bottom:6px;">XP per day</div>
           <div style="display:flex;align-items:flex-end;gap:2px;height:48px;">
             ${vm.periodStats.xpByDay.map(d => `<div style="${d.barStyle}" title="${d.iso}: ${d.xp} XP"></div>`).join("")}
           </div>
@@ -174,7 +174,7 @@ export function progressScreen(vm) {
       </div>
 
       <div style="background:var(--surface);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow-soft);margin-bottom:16px;">
-        <div style="font-weight:900;font-size:13px;letter-spacing:0.05em;color:var(--ink-soft);margin-bottom:14px;text-transform:uppercase;">Milestones</div>
+        <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);color:var(--ink-soft);margin-bottom:14px;text-transform:uppercase;">Milestones</div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;">
           ${vm.milestones.map(ms => `<div style="${ms.style}">${escapeHtml(ms.icon)} ${escapeHtml(ms.label)}</div>`).join("")}
         </div>
@@ -182,7 +182,7 @@ export function progressScreen(vm) {
 
       <div style="background:var(--surface);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow-soft);margin-bottom:16px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-          <div style="font-weight:900;font-size:13px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">Training log</div>
+          <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;">Training log</div>
           <div style="display:flex;background:var(--surface-2);border-radius:var(--radius-pill);padding:3px;gap:3px;">
             ${vm.logScopeTabs.map(lt => `<button type="button" data-action="logScope" data-arg="${lt.key}" style="${lt.style}">${lt.label}</button>`).join("")}
           </div>
@@ -216,7 +216,7 @@ export function progressScreen(vm) {
         <div data-level-card="1" style="display:flex;align-items:center;gap:16px;background:var(--hero-bg,linear-gradient(135deg,var(--ink),var(--aqua-ink)));border-radius:var(--radius-lg);padding:16px 18px;color:var(--hero-text,#fff);${HERO_HOST}overflow:hidden;flex-wrap:wrap;">
           ${heroDecor(vm.heroDecorOn)}
           <div style="width:66px;height:66px;border-radius:50%;background:var(--hero-chip,rgba(255,255,255,0.18));display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;border:3px solid rgba(255,255,255,0.5);">
-            <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;">LVL</div>
+            <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);">LVL</div>
             <div style="font-family:var(--font-display);font-size:28px;font-weight:600;line-height:1;">${vm.level.levelNum}</div>
           </div>
           <div style="flex:1;min-width:200px;">
@@ -228,7 +228,7 @@ export function progressScreen(vm) {
           </div>
         </div>
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:16px;">
-          <div style="font-weight:900;font-size:13px;letter-spacing:0.05em;color:var(--ink-soft);text-transform:uppercase;">${COPY.storyTitle}</div>
+          <div style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;">${COPY.storyTitle}</div>
           <div style="font-family:var(--font-hand);font-size:19px;font-weight:700;color:var(--aqua-ink);">${COPY.storyTagline}</div>
         </div>
         <div class="rail-wrap">
@@ -238,7 +238,7 @@ export function progressScreen(vm) {
                 <div style="display:flex;align-items:center;gap:12px;">
                   <div style="${os.iconBubbleStyle}">${os.icon}</div>
                   <div style="flex:1;min-width:0;">
-                    <div style="font-size:13px;font-weight:900;letter-spacing:0.05em;color:var(--aqua-ink);text-transform:uppercase;">${os.chapter}</div>
+                    <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--aqua-ink);text-transform:uppercase;">${os.chapter}</div>
                     <div style="font-family:var(--font-display);font-weight:600;font-size:22px;color:var(--ink);line-height:1;margin-top:2px;">${os.name}</div>
                   </div>
                 </div>
@@ -250,7 +250,7 @@ export function progressScreen(vm) {
                   <span style="font-size:13px;font-weight:800;color:var(--aqua-ink);line-height:1.4;">${os.transfer}</span>
                 </div>
                 <div style="background:var(--surface-2);border-radius:var(--radius-md);padding:9px 11px;margin-top:8px;">
-                  <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;">Did you know?</div>
+                  <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;">Did you know?</div>
                   <div style="font-size:13px;font-weight:700;color:var(--ink);line-height:1.4;margin-top:3px;">${os.fact}</div>
                 </div>` : ""}
               </div>`).join("")}

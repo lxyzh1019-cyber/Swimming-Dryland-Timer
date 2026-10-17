@@ -433,3 +433,18 @@ Approved in chat 2026-10-16 (hz-reviewer full audit + all checks; decisions D1 A
 | G4 | Stale BLOCKED / WAITING lines | Updated above | — |
 | G5 | No deploy stamp | Grown-up › Settings: "App version on this device" | — |
 | F3 G3 G6 | Coach stretches; public reads; old branches | Not fixing (D4 B; owner decision; destructive) | — |
+
+## Round 2026-10-17 — Rules check + sides + tips (claude.ai chat build)
+Approved in chat 2026-10-17: D11 A (dose text 60s), D12 A (new tips), D13 (only today's card trains — no catch-up on another day, no Start Early), D14 A (half-rest lock), D15 A (gate rule; swim gate removed). Branch `rules-sides-tips` in both repos; `core/` identical.
+
+| ID | Problem | Fix | Proof |
+|---|---|---|---|
+| S-1 | Per-side moves never said which side in the ring (timed path never set it) | LEFT first, named in voice and ring | rules.mjs §2; browser walk |
+| S-2 | Recovery COACH TIP showed planning notes | how-to `cue` per move | rules.mjs §3 |
+| R1 | "Missed day never doubled" vs Catch Up Now / Start Early | only today's card trains (D13) | rules.mjs §5; actions.mjs |
+| R2/R3 | Gate opened after any 2 weeks with one clean tap; swim gate controlled nothing | ≥5 landings all clean, 2 weeks in a row; swim gate off | rules.mjs §6; smoke.mjs |
+| R4 | Lesson "don't skip rest" vs Skip Rest from second 0 | half-rest lock (D14) | rules.mjs §4; session.mjs |
+| R5 | MIN_REST defined twice | one definition | npm test |
+| Plan | Streamline Hold "20s each side" ran one 40 s timer; Butt Kicks/Ankle Dribbles "15s" ran 60 s | eachSide; text 60s | dose check all days |
+Tests changed to the new rules: session.mjs (side guard, early rest tap), actions.mjs (GO is for today), design.mjs (Add-them-back fixture), smoke.mjs (gate rule, swim only).
+| C-1 | Big LEFT word used the display font (the only uppercase display-font word in the app); 7 letter-spacing values on labels; MOVES untracked | Label style + `--ls-label` / `--ls-loud` tokens | computed-style audit: 0 uppercase display-font words; design.mjs |

@@ -79,7 +79,7 @@ export function logEntryView(r) {
     // She stopped for pain and came back: said, not hidden and not the verdict.
     painNote: r.hadPainStop && !r.safetyStop ? "paused for pain" : "",
     lightLabel, note,
-    lightChipStyle: "font-size:13px;font-weight:900;letter-spacing:0.04em;border-radius:var(--radius-pill);padding:4px 9px;white-space:nowrap;background:" + (LIGHT_CHIP[lightLabel] || LIGHT_CHIP.GREEN) + ";"
+    lightChipStyle: "font-size:13px;font-weight:900;letter-spacing:var(--ls-label);border-radius:var(--radius-pill);padding:4px 9px;white-space:nowrap;background:" + (LIGHT_CHIP[lightLabel] || LIGHT_CHIP.GREEN) + ";"
   };
 }
 
@@ -146,7 +146,7 @@ export function buildProgressVM(state) {
         : isDone ? "background:var(--surface);border:2px solid var(--mint);box-shadow:var(--shadow-soft);"
         : "background:var(--surface-2);border:2px dashed var(--hairline);"),
       badge: isCurrent ? "YOU ARE HERE" : isDone ? "✓ UNLOCKED · LVL " + r.level : "LVL " + r.level,
-      badgeStyle: "font-size:13px;font-weight:900;letter-spacing:0.05em;border-radius:var(--radius-pill);padding:4px 10px;white-space:nowrap;"
+      badgeStyle: "font-size:13px;font-weight:900;letter-spacing:var(--ls-label);border-radius:var(--radius-pill);padding:4px 10px;white-space:nowrap;"
         + (isCurrent ? "background:var(--btn-primary-bg,var(--aqua));color:var(--btn-primary-text,#fff);" : isDone ? "background:var(--mint-wash);color:var(--mint-ink);" : "background:var(--surface-2);color:var(--ink-soft);")
     };
   });

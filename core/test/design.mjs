@@ -316,10 +316,10 @@ for (const [st, [snap, extra, state]] of Object.entries(STATES)) {
 for (const st of ["timed", "rest", "getready"].filter(k => snaps[k])) {
   for (const layout of Object.keys(LAYOUTS)) {
     const html = draw(snaps[st], layout);
-    const label = (html.match(/letter-spacing:0\.12em;color:([^;]*);text-align:center;">/) || [])[1];
+    const label = (html.match(/letter-spacing:var\(--ls-loud\);color:([^;]*);text-align:center;">/) || [])[1];
     const arc = (html.match(/id="s-ring-arc"[^>]*\sstroke="([^"]*)"/) || [])[1];
     const zone = ((label || "").match(/^var\(--ring-(ready|work|rest)-ink,var\(--(?:aqua|sun|mint)-ink\)\)$/) || [])[1];
-    ok(zone && /font-size:13px;font-weight:900;letter-spacing:0\.12em;/.test(html),
+    ok(zone && /font-size:13px;font-weight:900;letter-spacing:var\(--ls-loud\);/.test(html),
        st + " " + layout + ": the ring's zone label is 13px in its ring slot's -ink (" + label + ")");
     ok(arc === "url(#s-ring-grad-" + zone + ")"
        && new RegExp('<linearGradient id="s-ring-grad-' + zone + '"[^>]*>\\s*<stop offset="0" style="stop-color:var\\(--ring-' + zone + '-light,[^"]*"></stop>\\s*<stop offset="1" style="stop-color:var\\(--ring-' + zone + ',').test(html)
@@ -820,7 +820,7 @@ guScan("empty");
 /* ---- 7. TODAY: "+ Add them back" on a partly skipped day is 56px -------- */
 {
   const tv = tvm.buildTodayVM({ selectedDay: today, expanded: {}, isWide: true });
-  const html = tscreen.todayWide({ ...tv, dayView: { ...tv.dayView, partialSkipLabel: "2 moves skipped" } });
+  const html = tscreen.todayWide({ ...tv, dayView: { ...tv.dayView, showCta: true, ctaAction: "goSession", ctaLabel: "Finish", partialSkipLabel: "2 moves skipped" } });
   const redo = tags(html).find(t => t.tag === "button" && t.action === "goSessionRedo");
   ok(redo && pxOf(redo.style, "min-height") >= KID_TAP_MIN && />\+ Add them back</.test(html), "today: + Add them back is 56px");
   ok(tv.dayView.isActive ? html.includes("<span>⏱️</span> ") : true, "today: the minutes chip asks for emoji ⏱️");

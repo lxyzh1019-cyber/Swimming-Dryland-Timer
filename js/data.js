@@ -313,13 +313,13 @@ export const REFLECT_NEXT = ["Slow down", "Breathe out loud", "Point my toes", "
 const FINISHER = () => [
   X({ name: "Scap Pull-Up + Dead Hang", leadInSeconds: 5, block: "finisher", driver: "time", work: 30,
       dose: "30s", reset: "Hang tall, shoulders ready.",
-      cue: "Shoulders slide DOWN, hang and decompress.",
+      cue: "Shoulders slide DOWN, then let your body hang long.",
       swimTransfer: "Shoulder control / decompression" })
 ];
 
 const SWIMSKILL_A = () => [
   X({ name: "Chair High-Elbow Catch", setup: true, block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
-      cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm. [free/back/fly]",
+      cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm.",
       swimTransfer: "High-elbow catch", searchableName: "high elbow catch drill chair" }),
   X({ name: "Towel-Band Catch Pull", block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
       cue: "Bent elbow leads, pull long, finish PAST the hip.",
@@ -330,13 +330,13 @@ const SWIMSKILL_A = () => [
   X({ name: "Side-Lying Breath Rehearsal", block: "swimskill", driver: "reps", repsDetail: "2×6/side", dose: "2×6/side",
       cue: "Exhale/hum face-down, rotate (one ear in water), quick sip, neutral.",
       swimTransfer: "Breath timing", searchableName: "side lying breathing drill swimming" }),
-  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "20s each side",
+  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, eachSide: true, dose: "20s each side",
       cue: "Ribs down, long body, hum the breath.",
       swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
 ];
 const SWIMSKILL_B = () => [
   X({ name: "Chair High-Elbow Catch", setup: true, block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
-      cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm. [free/back/fly]",
+      cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm.",
       swimTransfer: "High-elbow catch", searchableName: "high elbow catch drill chair" }),
   X({ name: "Forearm Plank Dolphin Undulation", block: "swimskill", driver: "reps", repsDetail: "~24", dose: "~24",
       cue: "Wave from chest/hip, not the knees.",
@@ -344,15 +344,15 @@ const SWIMSKILL_B = () => [
   X({ name: "Breaststroke Kick Shape", block: "swimskill", driver: "reps", repsDetail: "~20", note: "kick only, no arms",
       cue: "Heels to seat, sweep, snap together — kick only, no arms.",
       swimTransfer: "Breaststroke kick", searchableName: "breaststroke kick technique on land" }),
-  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "20s each side",
+  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, eachSide: true, dose: "20s each side",
       cue: "Ribs down, long body, hum the breath.",
       swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
 ];
 const SWIMSKILL_SAT = () => [
   X({ name: "Chair High-Elbow Catch", setup: true, block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
-      cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm. [free/back/fly]",
+      cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm.",
       swimTransfer: "High-elbow catch", searchableName: "high elbow catch drill chair" }),
-  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, dose: "20s each side",
+  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, eachSide: true, dose: "20s each side",
       cue: "Ribs down, long body, hum the breath.",
       swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
 ];
@@ -566,8 +566,8 @@ export const DAYS = {
       ],
       coordination: [
         X({ name: "A-March", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m", cue: "Knee up, toe up, foot down under hip." }),
-        X({ name: "Butt Kicks", block: "coordination", driver: "time", work: 60, dose: "15s", cue: "Heels recover fast under the butt." }),
-        X({ name: "Ankle Dribbles", block: "coordination", driver: "time", work: 60, dose: "15s", cue: "Low, fast, stiff ankle." })
+        X({ name: "Butt Kicks", block: "coordination", driver: "time", work: 60, dose: "60s", cue: "Heels recover fast under the butt." }),
+        X({ name: "Ankle Dribbles", block: "coordination", driver: "time", work: 60, dose: "60s", cue: "Low, fast, stiff ankle." })
       ],
       main: [
         X({ name: "Hollow Tuck Flutter", block: "main", driver: "time", work: 30, dose: "30s", note: "Parent Echo — count out loud",
@@ -757,12 +757,12 @@ export const DAYS = {
     equipment: ["Foam roller", "Massage gun (parent-operated)", "Mat"],
     safety: "Roller slow (2–3 cm/sec), pause 20s on tender spots. NEVER roll the lower-back spine or neck. Massage gun is PARENT-OPERATED only, lowest speed, big muscles only — never on bones, joints, spine, neck, or growth plates.",
     recovery: [
-      { name: "Calves — foam roller", area: 15, dose: "60s/side", why: "Kick + jump rope volume lands here." },
-      { name: "Quads — roller or gun", area: 8, dose: "60s/side", why: "Power days (Wed/Sat)." },
-      { name: "Lats / upper back — roller, arms overhead", area: 11, dose: "60s", why: "Pull work + overhead range." },
-      { name: "Glutes — foam roller", area: 13, dose: "45s/side", why: "Bridge + landing absorption." },
-      { name: "Touch-up — massage gun (parent)", work: 120, dose: "30–45s/muscle", why: "Lowest speed, comfort not pain." },
-      { name: "Wind-down — Crocodile / 90-90 breathing", dose: "2 min", why: "Closes the week down-regulated." }
+      { name: "Calves — foam roller", area: 15, dose: "60s/side", cue: "Roll ankle to knee, slow. Stop on tight spots, breathe.", why: "Kick + jump rope volume lands here." },
+      { name: "Quads — roller or gun", area: 8, dose: "60s/side", cue: "Roll hip to knee, slow. Stop on tight spots, breathe.", why: "Power days (Wed/Sat)." },
+      { name: "Lats / upper back — roller, arms overhead", area: 11, dose: "60s", cue: "Arms overhead, roll slowly. Never on the low back.", why: "Pull work + overhead range." },
+      { name: "Glutes — foam roller", area: 13, dose: "45s/side", cue: "Sit on it, ankle on knee, lean that way, roll slowly.", why: "Bridge + landing absorption." },
+      { name: "Touch-up — massage gun (parent)", work: 120, dose: "30–45s/muscle", cue: "Lowest speed, comfort not pain. No spine or neck.", why: "Lowest speed, comfort not pain." },
+      { name: "Wind-down — Crocodile / 90-90 breathing", dose: "2 min", cue: "On your belly: breathe in so your back rises, out slow.", why: "Closes the week down-regulated." }
     ],
     recoveryHolds: [
       X({ name: "Light Streamline Hold", area: 2, prescription: { reps: 2, holdSeconds: 20 }, block: "swimskill", driver: "reps", repsDetail: "2×20s", dose: "2×20s", cue: "Easy, long, relaxed." }),
@@ -776,7 +776,6 @@ export const DAYS = {
 export const STANDING_RULES = [
   "No-Debt / Stop: a missed day is never doubled. Quality over quantity.",
   "Jump rope: single / no-pool days only — never double-pool days.",
-  "Valgus gate: all jumps stay at Drop-and-Stick until 5/5 clean landings ×2 weeks.",
   "Parent Echo: hum/count out loud on anti-extension holds. Can't hear it = the rep doesn't count.",
   "Coordination / sprint always FRESH — first after warm-up, never to fatigue."
 ];
@@ -836,7 +835,6 @@ export function needsSetup(ex) {
   return SETUP_NAME.test(String(ex.name || ""));
 }
 
-export const MIN_REST = 3;
 /* Re-exported from util so the constant has exactly one definition. */
 export { SIDE_SWITCH_BUFFER } from "../core/util.js";
 export const ROUND_REST = 25;   // flat all weeks (settings can override)

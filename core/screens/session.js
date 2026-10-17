@@ -42,8 +42,9 @@ function timerRing(vm, size, capVh) {
         stroke-dasharray="${c}" stroke-dashoffset="${offset}" style="transition:stroke-dashoffset 0.9s linear;"></circle>
     </svg>
     <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;">
-      <span id="s-ring-label" style="font-size:13px;font-weight:900;letter-spacing:0.12em;color:${labelInk};text-align:center;">${vm.timerZone}${vm.timerSideWord ? ` · ${vm.timerSideWord}` : ""}</span>
+      <span id="s-ring-label" style="font-size:13px;font-weight:900;letter-spacing:var(--ls-loud);color:${labelInk};text-align:center;">${vm.timerZone}</span>
       <span id="s-timer-text" style="font-family:var(--font-display);font-weight:600;font-size:${size >= 300 ? "clamp(44px, 6.5vw, 76px)" : "46px"};line-height:1;color:${vm.timerUrgent ? "var(--stop-deep)" : "var(--ink)"};">${vm.timerDisplay}</span>
+      ${vm.sideBig ? `<span data-side-big style="font-weight:900;font-size:${size >= 300 ? "clamp(26px, 3.4vw, 36px)" : "22px"};line-height:1.1;letter-spacing:var(--ls-loud);color:${labelInk};">${vm.sideBig}</span>` : ""}
       ${vm.timerIsPaused ? `<span style="font-size:13px;font-weight:900;color:var(--sun-ink);">PAUSED</span>` : ""}
     </div>
   </div>`;
@@ -53,8 +54,9 @@ function repRing(vm, size, capVh) {
   const border = size >= 300 ? 10 : 8;
   return `
   <div data-action="advance" title="Tap the ring when you're done" style="cursor:pointer;flex:0 1 ${size}px;max-width:${capVh ? `min(${size}px, ${capVh}vh)` : `${size}px`};min-width:${size >= 300 ? 220 : 160}px;aspect-ratio:1;border-radius:50%;background:var(--ring-work-fill,var(--aqua-wash));border:${border}px solid var(--ring-work,var(--aqua));display:flex;flex-direction:column;align-items:center;justify-content:center;box-sizing:border-box;padding:${size >= 300 ? 26 : 14}px;">
-    <div style="font-weight:900;font-size:${size >= 300 ? 15 : 13}px;letter-spacing:0.1em;color:var(--ring-work-ink,var(--aqua-ink));">BY REPS</div>
+    <div style="font-weight:900;font-size:${size >= 300 ? 15 : 13}px;letter-spacing:var(--ls-loud);color:var(--ring-work-ink,var(--aqua-ink));">BY REPS</div>
     <div style="font-family:var(--font-display);font-size:${(String(vm.curExDose || "").length > 6 ? (size >= 300 ? 26 : 20) : (size >= 300 ? 50 : 32))}px;font-weight:600;color:var(--ring-work-ink,var(--aqua-ink));text-align:center;line-height:1.05;margin:${size >= 300 ? 8 : 4}px 0;">${vm.curExDose}</div>
+    ${vm.sideBig ? `<div data-side-big style="font-weight:900;font-size:${size >= 300 ? 32 : 22}px;line-height:1.1;letter-spacing:var(--ls-loud);color:var(--ring-work-ink,var(--aqua-ink));">${vm.sideBig}</div>` : ""}
     ${vm.showClock ? `<div style="font-weight:900;font-size:${size >= 300 ? 20 : 14}px;color:var(--ring-work-ink,var(--aqua-ink));">⏱ <span id="s-timer-text">${vm.exActualDisplay}</span></div>` : ""}
     <div style="font-size:13px;font-weight:800;color:var(--ring-work-ink,var(--aqua-ink));margin-top:6px;">${vm.explore ? "No clock here — tap Next when you've had a look" : "Tap the ring when you're done"}</div>
   </div>`;
@@ -144,7 +146,7 @@ function badge(variant, label) {
     work: ["var(--ring-work-fill,var(--aqua-wash))", "var(--ring-work-ink,var(--aqua-ink))"]
   };
   const [bg, ink] = map[variant] || map.aqua;
-  return `<span style="display:inline-flex;align-items:center;background:${bg};color:${ink};border-radius:var(--radius-pill);padding:4px 12px;font-size:13px;font-weight:900;letter-spacing:0.04em;">${label}</span>`;
+  return `<span style="display:inline-flex;align-items:center;background:${bg};color:${ink};border-radius:var(--radius-pill);padding:4px 12px;font-size:13px;font-weight:900;letter-spacing:var(--ls-label);">${label}</span>`;
 }
 
 /* Exercise photo slot — photos land at assets/exercises/<name> - Timer Image.png;
@@ -232,18 +234,18 @@ export function detailOverlayHtml(vm) {
         <a href="${vm.detailVideoUrl}" target="_blank" rel="noopener" data-action="watchVideo" style="align-self:flex-start;display:flex;align-items:center;gap:8px;box-sizing:border-box;text-decoration:none;${kidButton("primary")}padding:12px 22px;">▶ Watch the move</a>
         ${vm.detailCue ? `
         <div style="background:var(--aqua-wash);border-radius:var(--radius-md);padding:12px 14px;">
-          <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--aqua-ink);margin-bottom:4px;">Coach tip</div>
+          <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--aqua-ink);margin-bottom:4px;">Coach tip</div>
           <div style="font-size:16px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.detailCue}</div>
         </div>` : ""}
         ${vm.detailWatchFor ? `
         <div style="background:var(--sun-wash);border-radius:var(--radius-md);padding:12px 14px;">
-          <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sun-ink);margin-bottom:4px;">👀 Watch for</div>
+          <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--sun-ink);margin-bottom:4px;">👀 Watch for</div>
           <div style="font-size:15px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.detailWatchFor}</div>
           ${vm.detailFix ? `<div style="font-size:14px;color:var(--ink-soft);line-height:1.4;margin-top:5px;">🔧 ${vm.detailFix}</div>` : ""}
         </div>` : ""}
         ${vm.detailTransfer ? `
         <div style="background:var(--sea-wash);border-radius:var(--radius-md);padding:12px 14px;">
-          <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sea-ink);margin-bottom:4px;">${COPY.transferHeading}</div>
+          <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--sea-ink);margin-bottom:4px;">${COPY.transferHeading}</div>
           <div style="font-size:15px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.detailTransfer}</div>
         </div>` : ""}
         ${vm.detailShowResume ? `
@@ -402,13 +404,13 @@ function completeScreen(vm) {
     <div style="display:flex;flex-direction:column;gap:14px;background:var(--surface);border-radius:var(--radius-lg);padding:16px 22px;box-shadow:var(--shadow-soft);max-width:600px;">
       <div style="font-family:var(--font-display);font-weight:600;font-size:18px;color:var(--ink);">Think &amp; improve 💭</div>
       <div style="display:flex;flex-direction:column;gap:7px;align-items:center;">
-        <div style="font-size:13px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.05em;">What went well?</div>
+        <div style="font-size:13px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:var(--ls-label);">What went well?</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
           ${vm.reflectWellOpts.map(rw => `<button type="button" data-action="reflectWell" data-arg="${rw.label}" style="${rw.style}">${rw.label}</button>`).join("")}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:7px;align-items:center;">
-        <div style="font-size:13px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.05em;">Next time I'll…</div>
+        <div style="font-size:13px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:var(--ls-label);">Next time I'll…</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
           ${vm.reflectNextOpts.map(rn => `<button type="button" data-action="reflectNext" data-arg="${rn.label}" style="${rn.style}">${rn.label}</button>`).join("")}
         </div>
@@ -507,7 +509,7 @@ function coachStrip(vm, wide) {
     <div style="display:flex;align-items:stretch;gap:8px;">
       ${vm.curExCue ? `
       <div style="flex:1;min-width:0;background:var(--aqua-wash);border-radius:var(--radius-md);padding:10px 14px;box-sizing:border-box;">
-        <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--aqua-ink);margin-bottom:3px;">Coach tip</div>
+        <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--aqua-ink);margin-bottom:3px;">Coach tip</div>
         <div style="font-size:17px;font-weight:700;color:var(--ink);line-height:1.35;">${vm.curExCue}</div>
       </div>` : `<div style="flex:1;"></div>`}
       ${hasWarn ? `
@@ -520,7 +522,7 @@ function coachStrip(vm, wide) {
     </div>
     ${open ? `
     <div id="s-watch" style="background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-md);padding:12px 14px;box-sizing:border-box;text-align:left;">
-      <div style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--sun-ink);margin-bottom:4px;">👀 Watch for</div>
+      <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--sun-ink);margin-bottom:4px;">👀 Watch for</div>
       <div style="font-size:16px;font-weight:700;color:var(--ink);line-height:1.4;">${vm.curExWatchFor}</div>
       ${vm.curExFix ? `<div style="font-size:15px;color:var(--ink-soft);line-height:1.4;margin-top:5px;">🔧 ${vm.curExFix}</div>` : ""}
     </div>` : ""}
@@ -536,7 +538,7 @@ function upNext(vm, wide) {
   const label = wide ? 15 : 13;
   return `
   <div style="width:100%;flex-shrink:0;display:flex;align-items:baseline;justify-content:center;gap:${wide ? 14 : 8}px;flex-wrap:wrap;text-align:center;${wide ? "border-top:1.5px solid var(--hairline);padding-top:10px;" : ""}">
-    <span style="font-size:${label}px;font-weight:900;color:var(--aqua-ink);text-transform:uppercase;letter-spacing:0.08em;">Up next</span>
+    <span style="font-size:${label}px;font-weight:900;color:var(--aqua-ink);text-transform:uppercase;letter-spacing:var(--ls-loud);">Up next</span>
     <span style="font-family:var(--font-display);font-size:${wide ? 24 : 17}px;font-weight:600;color:var(--ink);line-height:1.2;">${vm.upNextName}</span>
     <span style="font-family:var(--font-hand);font-size:${wide ? 20 : 16}px;color:var(--aqua-ink);line-height:1.2;">${vm.upNextDose}</span>
   </div>`;
@@ -597,8 +599,8 @@ function centerStack(vm, wide, tablet) {
   ${vm.showCoachState ? `
   <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;width:100%;max-width:480px;flex-shrink:0;">
     ${[vm.coachSetLine, vm.coachSideLine, vm.coachDirectionLine, vm.coachRepLine].filter(Boolean).map(t =>
-      `<span style="font-size:13px;font-weight:900;letter-spacing:0.06em;border-radius:var(--radius-pill);padding:4px 11px;background:var(--surface-2);color:var(--ink-soft);white-space:nowrap;">${t}</span>`).join("")}
-    ${vm.coachNextLine ? `<span style="font-size:13px;font-weight:900;letter-spacing:0.06em;border-radius:var(--radius-pill);padding:4px 11px;background:var(--sun-wash);color:var(--sun-ink);white-space:nowrap;">${vm.coachNextLine}</span>` : ""}
+      `<span style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);border-radius:var(--radius-pill);padding:4px 11px;background:var(--surface-2);color:var(--ink-soft);white-space:nowrap;">${t}</span>`).join("")}
+    ${vm.coachNextLine ? `<span style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);border-radius:var(--radius-pill);padding:4px 11px;background:var(--sun-wash);color:var(--sun-ink);white-space:nowrap;">${vm.coachNextLine}</span>` : ""}
   </div>` : ""}
 
   ${vm.showCleanCheck ? `
@@ -627,7 +629,8 @@ function controls(vm, wide) {
      stop slots at 20px, Pause / Resume, Skip and the rest on the calm neutral
      slots at 18px / 56px. */
   const rowBtn = (action, label, kind = "neutral", opts = {}) => `<button type="button" data-action="${action}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;${kidButton(kind, opts)}">${label}</button>`;
-  const doneBtn = `<button type="button" data-action="advance" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;${kidButton("go", { big: true })}">${vm.doneLabel}</button>`;
+  // First half of a rest: shown, but not tappable (D14, Oct 2026).
+  const doneBtn = `<button type="button" data-action="advance" data-done-btn${vm.doneLocked ? ' aria-disabled="true" data-locked' : ""} style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;${kidButton("go", { big: true })}${vm.doneLocked ? "opacity:.55;cursor:default;" : ""}">${vm.doneLabel}</button>`;
   const backBtn = vm.canGoBack ? rowBtn("goBack", "◀ Back a move", "neutral", { minH: 48 }) : "";
 
   /* EXPLORE: Next, Back, Skip, Done looking. Nothing here pauses, stops or
@@ -687,7 +690,7 @@ function exList(vm, wide, tablet) {
   return legend + vm.sessionExList.map(sitem => sitem.isHeader ? `
     <div style="display:flex;align-items:center;gap:8px;margin:${wide ? "10px 0 4px" : "8px 0 4px"};background:var(--surface);border-radius:var(--radius-pill);padding:4px 12px;width:fit-content;max-width:100%;box-sizing:border-box;">
       <span style="width:${wide ? 10 : 9}px;height:${wide ? 10 : 9}px;border-radius:50%;background:${sitem.color};flex-shrink:0;"></span>
-      <span style="font-weight:900;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;color:${sitem.color};">${sitem.name}</span>
+      <span style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:${sitem.color};">${sitem.name}</span>
       ${(sitem.roundDots || []).length ? `<div style="display:flex;gap:4px;margin-left:auto;">${sitem.roundDots.map(rd => `<span style="${rd.style}"></span>`).join("")}</div>` : ""}
     </div>` : `
     <button type="button" data-action="${sitem.jumpAction ? "goToMove" : "openDetailAt"}" data-arg="${sitem.ci}|${sitem.ei}" title="${sitem.jumpAction ? "Jump to this move" : "See detail photo &amp; video"}" ${sitem.isCur ? 'data-ex-cur="1" ' : ""}style="${rowOpen}${sitem.cardStyle}">
@@ -759,16 +762,16 @@ export function sessionScreen(vm) {
       <div style="width:46px;flex-shrink:0;background:var(--hero-bg,var(--surface-2));${HERO_HOST}border-right:1.5px solid var(--hairline);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:12px;">
         ${heroDecor(vm.heroDecorOn)}
         ${railToggle(true)}
-        <span style="writing-mode:vertical-rl;font-size:13px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-soft);background:var(--surface);border-radius:var(--radius-pill);padding:10px 4px;">${vm.progressLabel}</span>
+        <span style="writing-mode:vertical-rl;font-size:13px;font-weight:900;letter-spacing:var(--ls-loud);text-transform:uppercase;color:var(--ink-soft);background:var(--surface);border-radius:var(--radius-pill);padding:10px 4px;">${vm.progressLabel}</span>
       </div>`}
       <div style="width:${railW};flex-shrink:0;overflow-y:auto;padding:18px 16px;background:var(--hero-bg,var(--surface-2));${HERO_HOST}border-right:1.5px solid var(--hairline);box-sizing:border-box;display:${vm.railOpen ? "flex" : "none"};flex-direction:column;gap:14px;">
         ${heroDecor(vm.heroDecorOn && vm.railOpen)}
         <div style="background:var(--surface);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:10px 12px;box-sizing:border-box;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
-            <span style="font-weight:900;font-size:13px;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;">${vm.sessionDayTitle}${vm.explore ? " · Explore" : ` · <span id="s-elapsed">${vm.elapsedDisplay}</span>`}</span>
+            <span style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;">${vm.sessionDayTitle}${vm.explore ? " · Explore" : ` · <span id="s-elapsed">${vm.elapsedDisplay}</span>`}</span>
             ${railToggle(false)}
           </div>
-          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:900;color:var(--ink-soft);margin-bottom:4px;"><span>MOVES</span><span>${vm.progressLabel}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:900;letter-spacing:var(--ls-label);color:var(--ink-soft);margin-bottom:4px;"><span>MOVES</span><span>${vm.progressLabel}</span></div>
           <div style="height:8px;background:var(--surface);border:1px solid var(--hairline);border-radius:8px;overflow:hidden;">
             <div style="width:${Math.round(vm.progressValue / vm.progressMax * 100)}%;height:100%;background:var(--xp-bar,var(--mint));border-radius:8px;"></div>
           </div>
@@ -777,7 +780,7 @@ export function sessionScreen(vm) {
         ${vm.showClock ? `
         <div style="flex-shrink:0;background:var(--surface);border:2px solid var(--hairline);border-radius:var(--radius-lg);padding:12px 14px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;gap:8px;box-sizing:border-box;">
           <div style="display:flex;justify-content:space-between;align-items:baseline;">
-            <span style="font-size:13px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);">Session time</span>
+            <span style="font-size:13px;font-weight:900;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);">Session time</span>
             <span style="font-weight:900;font-size:14px;color:var(--aqua-ink);"><span id="s-elapsed2">${vm.elapsedDisplay}</span> <span style="color:var(--ink-soft);font-weight:700;font-size:13px;">/ ~${vm.sessionPlannedDisplay} · estimate</span></span>
           </div>
           <div style="height:8px;background:var(--surface-2);border-radius:8px;overflow:hidden;">
@@ -788,7 +791,7 @@ export function sessionScreen(vm) {
         <!-- No box of its own on the hero rail: the rows carry their own
              see-through white, so the ripples / snow show between them. -->
         <div style="flex:1 1 auto;min-height:220px;display:flex;flex-direction:column;box-sizing:border-box;">
-          <div style="align-self:flex-start;background:var(--surface);border-radius:var(--radius-pill);padding:4px 12px;font-weight:900;font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;flex-shrink:0;">Today's moves</div>
+          <div style="align-self:flex-start;background:var(--surface);border-radius:var(--radius-pill);padding:4px 12px;font-weight:900;font-size:13px;letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;flex-shrink:0;">Today's moves</div>
           <div data-ex-list style="flex:1;min-height:0;overflow-y:auto;">${exList(vm, true, tablet)}</div>
         </div>
 
@@ -815,7 +818,7 @@ export function sessionScreen(vm) {
     <div style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;box-sizing:border-box;">
       <div style="padding:14px 16px 0;flex-shrink:0;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-          <span style="font-weight:900;font-size:13px;letter-spacing:0.06em;color:var(--ink-soft);text-transform:uppercase;">${vm.sessionDayTitle}${vm.explore ? ` · ${vm.progressLabel}` : ` · <span id="s-elapsed">${vm.elapsedDisplay}</span> / ~${vm.sessionPlannedDisplay} · estimate`}</span>
+          <span style="font-weight:900;font-size:13px;letter-spacing:var(--ls-label);color:var(--ink-soft);text-transform:uppercase;">${vm.sessionDayTitle}${vm.explore ? ` · ${vm.progressLabel}` : ` · <span id="s-elapsed">${vm.elapsedDisplay}</span> / ~${vm.sessionPlannedDisplay} · estimate`}</span>
         </div>
         <div style="height:8px;background:var(--surface-2);border-radius:8px;overflow:hidden;">
           <div id="s-sess-fill" style="width:${vm.explore ? Math.round(vm.progressValue / vm.progressMax * 100) : vm.sessionTimePct}%;height:100%;background:var(--btn-primary-bg,var(--aqua));border-radius:8px;"></div>
@@ -865,5 +868,14 @@ export function updateSessionTick(vm) {
     if (label) label.style.color = vm.timerUrgent ? "var(--stop-ink)" : vm.timerRing.ink;
     const time = document.getElementById("s-timer-text");
     if (time) time.style.color = vm.timerUrgent ? "var(--stop-deep)" : "var(--ink)";
+  }
+  /* The rest button counts down its lock every second and opens at half-way
+     (D14): the tick is the only thing that runs during a rest. */
+  const done = document.querySelector('[data-done-btn]');
+  if (done) {
+    done.textContent = vm.doneLabel;
+    done.style.opacity = vm.doneLocked ? ".55" : "";
+    done.style.cursor = vm.doneLocked ? "default" : "pointer";
+    if (vm.doneLocked) done.setAttribute("aria-disabled", "true"); else done.removeAttribute("aria-disabled");
   }
 }
