@@ -18,7 +18,8 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(gh pr create:*)",
-      "Bash(gh pr ready:*)"
+      "Bash(gh pr ready:*)",
+      "Read(~/.cache/hz-rules/**)"
     ]
   },
   "hooks": {
@@ -45,7 +46,18 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|Agent|Task|WebFetch|ExitPlanMode|mcp__.*",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|Agent|Task|Workflow|WebFetch|ExitPlanMode|AskUserQuestion|ScheduleWakeup|SubagentHandback|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'p=$(command -v python3 || command -v python); exec \"$p\" -B \"$CLAUDE_PROJECT_DIR/.claude/hz-loader.py\" dispatch.py'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|mcp__.*pull_request.*",
         "hooks": [
           {
             "type": "command",
