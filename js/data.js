@@ -82,11 +82,11 @@ export const EXERCISE_HOWTO = {
     search: "high elbow catch drill on land chair"
   },
   "Towel-Band Catch Pull": {
-    text: "Hold a towel or band anchored high. Lead with a bent elbow, pull long and finish the stroke PAST your hip — feel the lats, not the shoulders.",
+    text: "Hold a towel or band anchored high, one end in each hand. Pull with both arms together. Lead with a bent elbow, pull long and finish the stroke PAST your hip — feel the lats, not the shoulders.",
     search: "band lat pull swimming catch drill"
   },
   "Long-Axis Rotation Roll": {
-    text: "Lie in a back-streamline (arms overhead, legs lifted). Roll your whole body as one unit side to side, driving the rotation from the hips — no bending in the middle.",
+    text: "Lie in a back-streamline (arms overhead, legs lifted). LEFT SIDE: roll your whole body as one unit to your left and back. Do all the left rolls, then roll to your right. Drive the rotation from the hips — no bending in the middle.",
     search: "long axis rotation core drill swimming"
   },
   "Side-Lying Breath Rehearsal": {
@@ -182,9 +182,9 @@ export const EXERCISE_HOWTO = {
   "Knee-to-Wall Ankle": { search: "knee to wall ankle mobility drill tutorial" },
   "Short-Foot": { search: "short foot exercise arch activation tutorial" },
   "Shoulder CARs": { search: "shoulder CARs controlled articular rotations tutorial" },
-  "Hip Circles": { search: "standing hip circles mobility drill tutorial" },
-  "Band Ankle 4-Way": { search: "resistance band ankle four way mobility drill" },
-  "World's Greatest Stretch": { search: "world's greatest stretch full body warm up tutorial" },
+  "Hip Circles": { text: "Stand on one leg, hold a wall. LEFT SIDE: draw big slow circles with your left knee, one way, then the other way. Then the right leg.", search: "standing hip circles mobility drill tutorial" },
+  "Band Ankle 4-Way": { text: "Band around one foot. LEFT SIDE: left foot points up, down, in and out against the band. Then the right foot.", search: "resistance band ankle four way mobility drill" },
+  "World's Greatest Stretch": { text: "Lunge forward, hand down inside the front foot, reach the other arm up and rotate. LEFT SIDE: left foot forward. Do all the left reps, then the right foot forward.", search: "world's greatest stretch full body warm up tutorial" },
   // — coordination / running mechanics (biased toward Chari Hawkins' drill demos) —
   "A-March": { search: "A march running drill technique Chari Hawkins" },
   "A-Skip": { search: "A skip running drill technique Chari Hawkins" },
@@ -200,11 +200,11 @@ export const EXERCISE_HOWTO = {
   // — main / finisher / prep strength & core (biased toward The Prehab Guys' short form demos) —
   "Hollow Tuck Flutter": { search: "hollow body hold flutter kick exercise tutorial" },
   "Clean Pull-Ups": { search: "strict pull up correct form tutorial" },
-  "Dead Bug": { search: "dead bug exercise correct form The Prehab Guys" },
-  "Glute Bridge March": { search: "glute bridge march exercise The Prehab Guys" },
+  "Dead Bug": { text: "Lie on your back, arms up, knees over hips. LEFT SIDE: your left leg and right arm reach out, then come back. Do all the left reps, then the right side.", search: "dead bug exercise correct form The Prehab Guys" },
+  "Glute Bridge March": { text: "Lift into a bridge and hold it. LEFT SIDE: lift your left knee, put it down, again. Do all the left reps, then the right knee.", search: "glute bridge march exercise The Prehab Guys" },
   "Single-Leg Balance Reach": { search: "single leg balance reach exercise The Prehab Guys" },
   "Band Row": { search: "resistance band row exercise form tutorial" },
-  "Bird Dog": { search: "bird dog exercise correct form The Prehab Guys" },
+  "Bird Dog": { text: "On hands and knees. LEFT SIDE: your left leg and right arm reach long, hold, come back. Do all the left reps, then the right side.", search: "bird dog exercise correct form The Prehab Guys" },
   "Hip Hinge": { search: "hip hinge dowel drill exercise tutorial" },
   "Superman": { search: "superman exercise back extension correct form" },
   "Drop-and-Stick": { search: "depth drop soft landing mechanics drill" },
@@ -321,7 +321,7 @@ const SWIMSKILL_A = () => [
   X({ name: "Chair High-Elbow Catch", setup: true, block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
       cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm.",
       swimTransfer: "High-elbow catch", searchableName: "high elbow catch drill chair" }),
-  X({ name: "Towel-Band Catch Pull", block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
+  X({ name: "Towel-Band Catch Pull", block: "swimskill", driver: "reps", repsDetail: "2×8", dose: "2×8",
       cue: "Bent elbow leads, pull long, finish PAST the hip.",
       swimTransfer: "Catch-to-finish pull", searchableName: "band lat pulldown swim catch" }),
   X({ name: "Long-Axis Rotation Roll", block: "swimskill", driver: "reps", repsDetail: "6/side", dose: "6/side",
@@ -330,7 +330,7 @@ const SWIMSKILL_A = () => [
   X({ name: "Side-Lying Breath Rehearsal", block: "swimskill", driver: "reps", repsDetail: "2×6/side", dose: "2×6/side",
       cue: "Exhale/hum face-down, rotate (one ear in water), quick sip, neutral.",
       swimTransfer: "Breath timing", searchableName: "side lying breathing drill swimming" }),
-  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, eachSide: true, dose: "20s each side",
+  X({ name: "Streamline Hold", prescription: { reps: 2, holdSeconds: 20 }, block: "swimskill", driver: "reps", repsDetail: "2×20s", dose: "2×20s",
       cue: "Ribs down, long body, hum the breath.",
       swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
 ];
@@ -344,7 +344,7 @@ const SWIMSKILL_B = () => [
   X({ name: "Breaststroke Kick Shape", block: "swimskill", driver: "reps", repsDetail: "~20", note: "kick only, no arms",
       cue: "Heels to seat, sweep, snap together — kick only, no arms.",
       swimTransfer: "Breaststroke kick", searchableName: "breaststroke kick technique on land" }),
-  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, eachSide: true, dose: "20s each side",
+  X({ name: "Streamline Hold", prescription: { reps: 2, holdSeconds: 20 }, block: "swimskill", driver: "reps", repsDetail: "2×20s", dose: "2×20s",
       cue: "Ribs down, long body, hum the breath.",
       swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
 ];
@@ -352,7 +352,7 @@ const SWIMSKILL_SAT = () => [
   X({ name: "Chair High-Elbow Catch", setup: true, block: "swimskill", driver: "reps", repsDetail: "2×8/side", dose: "2×8/side",
       cue: "Forearm turns IN, elbow stays HIGH, fingertips down — fixes straight-arm.",
       swimTransfer: "High-elbow catch", searchableName: "high elbow catch drill chair" }),
-  X({ name: "Streamline Hold", block: "swimskill", driver: "time", work: 40, eachSide: true, dose: "20s each side",
+  X({ name: "Streamline Hold", prescription: { reps: 2, holdSeconds: 20 }, block: "swimskill", driver: "reps", repsDetail: "2×20s", dose: "2×20s",
       cue: "Ribs down, long body, hum the breath.",
       swimTransfer: "Tighter streamline", searchableName: "streamline position hold" })
 ];
@@ -382,7 +382,7 @@ export const DAYS = {
         X({ name: "Jump Rope", block: "warmup", driver: "time", work: 75, dose: "60–90s", cue: "Off the toes, quiet, tall." }),
         X({ name: "Band Pass-Through", block: "warmup", driver: "reps", repsDetail: "8–10", dose: "8–10", cue: "Wide, slow, no shrug." }),
         X({ name: "Cat-Camel", block: "warmup", driver: "reps", repsDetail: "8 cycles", dose: "8 cycles", cue: "Move segment by segment." }),
-        X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Knees lead, sit tall." }),
+        X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "12", dose: "12", cue: "Knees lead, sit tall — switch side to side, 12 switches." }),
         X({ name: "Leg Swings", block: "warmup", driver: "reps", cue: "Relaxed, build range.",
             prescription: { reps: 8, sides: 2, dirs: 2, sideWord: "leg" } })
       ],
@@ -435,7 +435,7 @@ export const DAYS = {
       warmup: [
         X({ name: "Wall Slides", block: "warmup", driver: "reps", repsDetail: "8", dose: "8", cue: "Back on wall, ribs down — no arching." }),
         X({ name: "Open-Book / T-Rotation", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Hips stacked, rotate from the spine." }),
-        X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Knees lead, sit tall." }),
+        X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "12", dose: "12", cue: "Knees lead, sit tall — switch side to side, 12 switches." }),
         X({ name: "Knee-to-Wall Ankle", block: "warmup", driver: "reps", repsDetail: "8/side", dose: "8/side", cue: "Heel flat, knee past toes." }),
         X({ name: "Short-Foot", block: "warmup", driver: "time", work: 20, dose: "20s", cue: "Spread toes, dome the arch." })
       ],
@@ -498,7 +498,7 @@ export const DAYS = {
         X({ name: "Jump Rope", block: "warmup", driver: "time", work: 75, dose: "60–90s", cue: "Off the toes, quiet, tall." }),
         X({ name: "Wall Slides", block: "warmup", driver: "reps", repsDetail: "8", dose: "8", cue: "Back on wall, ribs down — no arching." }),
         X({ name: "Open-Book / T-Rotation", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Hips stacked, rotate from the spine." }),
-        X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Knees lead, sit tall." }),
+        X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "12", dose: "12", cue: "Knees lead, sit tall — switch side to side, 12 switches." }),
         X({ name: "Knee-to-Wall Ankle", block: "warmup", driver: "reps", repsDetail: "8/side", dose: "8/side", cue: "Heel flat, knee past toes." })
       ],
       coordination: [
@@ -558,9 +558,9 @@ export const DAYS = {
         X({ name: "Shoulder CARs", block: "warmup", driver: "reps", cue: "Slow full circle, control the range.",
             prescription: { reps: 3, sides: 2, dirs: 2, sideWord: "arm" } }),
         X({ name: "Hip Circles", block: "warmup", driver: "reps", cue: "Big slow circles.",
-            prescription: { reps: 8, dirs: 2 } }),
+            prescription: { reps: 8, sides: 2, dirs: 2 } }),
         X({ name: "Band Ankle 4-Way", block: "warmup", driver: "reps", cue: "Slow, full range each direction.",
-            prescription: { reps: 8, dirs: 4 } }),
+            prescription: { reps: 8, sides: 2, dirs: 4 } }),
         X({ name: "Leg Swings", block: "warmup", driver: "reps", cue: "Relaxed, build range.",
             prescription: { reps: 8, sides: 2, dirs: 2, sideWord: "leg" } })
       ],
@@ -688,9 +688,9 @@ export const DAYS = {
         X({ name: "Jump Rope", block: "warmup", driver: "time", work: 75, dose: "60–90s", cue: "Off the toes, quiet, tall." }),
         X({ name: "World's Greatest Stretch", block: "warmup", driver: "reps", repsDetail: "4/side", dose: "4/side", cue: "Lunge, reach, rotate — whole body opens." }),
         X({ name: "Open-Book / T-Rotation", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Hips stacked, rotate from the spine." }),
-        X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "6/side", dose: "6/side", cue: "Knees lead, sit tall." }),
+        X({ name: "90/90 Hip Switch", block: "warmup", driver: "reps", repsDetail: "12", dose: "12", cue: "Knees lead, sit tall — switch side to side, 12 switches." }),
         X({ name: "Band Ankle 4-Way", block: "warmup", driver: "reps", cue: "Slow, full range each direction.",
-            prescription: { reps: 8, dirs: 4 } })
+            prescription: { reps: 8, sides: 2, dirs: 4 } })
       ],
       coordination: [
         X({ name: "C-Skip", block: "coordination", driver: "time", work: 60, dose: "60s", note: "about 10 m", cue: "Paw the ground back under the hip." }),

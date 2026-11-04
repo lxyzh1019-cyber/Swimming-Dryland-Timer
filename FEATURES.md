@@ -172,5 +172,18 @@ One care-day verdict, read by every screen; Sunday (spa) and a weekday whose lig
 - Rest lock (D14): the first half of every rest shows "Resting… N" and can't be tapped; then "⏭ I'm ready".
 - Minimum rest (3 s) has one definition (`core/store.js`).
 - Tests: `core/test/rules.mjs`.
-- Valgus gate (D15): removed in this app — no jump above Drop-and-Stick is planned (FEATURES.valgusGate false). Streamline Hold is 20 s left + 20 s right; Butt Kicks / Ankle Dribbles dose text 60s (D11 A).
+- Valgus gate (D15): removed in this app — no jump above Drop-and-Stick is planned (FEATURES.valgusGate false). Butt Kicks / Ankle Dribbles dose text 60s (D11 A).
 - Consistency: every uppercase label's letter-spacing uses the design tokens (`--ls-label` 0.04em, `--ls-loud` 0.08em for ring words) instead of 7 hand-typed values; the MOVES label is tracked like the others.
+
+## Prize pick lock and week side check (2026-11-04)
+- Prize draw: one pick per level. Once she opens an envelope the ✕ is gone; only "Add to my prizes ⭐" is left. The three envelopes and the pick are saved per athlete on the device (`loadOpenDraw` / `saveOpenDraw` in `core/store.js`), so closing the pop-up or the app brings back the same envelopes and the same pick. The saved draw is cleared when the prize is claimed. The "waiting for your other device" message keeps its ✕; the pick stays saved.
+- Streamline Hold (Mon–Sat): 2 holds of 20s, no LEFT / RIGHT (was split 20s left + 20s right after a dose-text mistake on 19 Sep; same shape as Sunday's Light Streamline Hold).
+- Towel-Band Catch Pull: both arms together, 2 sets of 8 (was 2×8 per side).
+- 90/90 Hip Switch: one count of 12 switches, side to side, no LEFT / RIGHT (was 6/side).
+- Band Ankle 4-Way and Hip Circles: LEFT then RIGHT (they trained one side only). Band Ankle 4-Way 8 × 4 ways each side, 64 reps; Hip Circles 8 × 2 ways each side, 32 reps.
+- Every other two-sided move keeps LEFT then RIGHT inside each round, doses unchanged. How-to text says what LEFT SIDE means for Dead Bug, Bird Dog (left leg + right arm), Glute Bridge March (left knee), Long-Axis Rotation Roll (roll to the left), World's Greatest Stretch (left foot forward).
+- A saved draw is stamped with how many prizes were claimed when it was dealt; if a prize is claimed some other way (the other device, a wallet repair) the saved draw is thrown away, so a later level always deals new envelopes.
+- A counted hold says its length: the ring line under the count reads "20s hold each" and the coach says "2 holds of 20 seconds" (Streamline Hold, Light Streamline Hold; `doseLines` / `spokenDose` in `core/plan.js`).
+- Band Ankle 4-Way and Hip Circles how-to text says what LEFT SIDE means (left foot in the band; circles with the left knee).
+- Session length on green after this change: Mon 30, Tue 33, Wed 30, Thu 40 (was about 37), Fri 33, Sat 35 (was about 33), Sun 13 min.
+- Tests: `test/smoke.mjs` week side check (each named move pinned one- or two-sided; a "/side" dose always runs both sides); `core/test/actions.mjs` prize pick kept across close, app close and a second tap; `core/test/design.mjs` no ✕ after a pick.

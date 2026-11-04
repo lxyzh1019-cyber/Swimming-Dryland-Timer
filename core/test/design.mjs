@@ -512,10 +512,13 @@ for (const [st, vm] of Object.entries(FINISH)) {
 /* ---- 2c. THE PRIZE DRAW (R4 PR 7): envelopes, then a picked prize ------ */
 {
   const pd = overlays.newPrizeDraw();
-  for (const [st, d] of [["envelopes", pd], ["picked", { ...pd, picked: 0 }]]) {
+  for (const [st, d] of [["envelopes", pd], ["picked", { ...pd, picked: 0 }], ["waiting", { ...pd, picked: 0, waiting: true }]]) {
     const html = overlays.prizeDrawHtml(d);
     clean("prize draw " + st, html, { kid: true });
     const close = tags(html).find(t => t.tag === "button" && t.action === "closePrizeDraw");
+    // One pick per draw (Nov 2026): no ✕ once an envelope is open, except
+    // while the claim waits on the other device.
+    if (st === "picked") { ok(!close, "prize draw picked: no ✕ — the pick is final"); continue; }
     ok(close && pxOf(close.style, "width") >= 48 && pxOf(close.style, "height") >= 48 && pxOf(close.style, "min-height") >= 48,
        "prize draw " + st + ": the ✕ is a 48px round close");
   }

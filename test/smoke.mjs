@@ -4683,13 +4683,14 @@ store.setOnlineForTest(true);
     ok(data.spokenDose(ex), ex.name + ": the coach has something to say");
   });
   const ankle = repEx.find(e => e.name === "Band Ankle 4-Way");
-  ok(ankle && ankle.prescription.totalReps === 32, "Band Ankle 4-Way is thirty-two reps");
-  ok(data.doseLines(ankle).big === "8 \u00d7 4 ways", "the ring says how many ways: " + data.doseLines(ankle).big);
-  ok(data.doseLines(ankle).sub === "32 reps in total", "and the line below says the total");
-  ok(data.spokenDose(ankle) === "8 reps in each of 4 directions, 32 in total",
+  // Both ankles since Nov 2026 (it trained one ankle only).
+  ok(ankle && ankle.prescription.totalReps === 64, "Band Ankle 4-Way is 8 \u00d7 4 ways on each ankle: sixty-four reps");
+  ok(data.doseLines(ankle).big === "8 \u00d7 4 ways, each side", "the ring says how many ways: " + data.doseLines(ankle).big);
+  ok(data.doseLines(ankle).sub === "64 reps in total", "and the line below says the total");
+  ok(data.spokenDose(ankle) === "8 reps per side in each of 4 directions, 64 in total",
      "and the coach says the same thing: " + data.spokenDose(ankle));
   const hip = repEx.find(e => e.name === "Hip Circles");
-  ok(hip && hip.prescription.dirs === 2 && hip.prescription.totalReps === 16,
+  ok(hip && hip.prescription.dirs === 2 && hip.prescription.sides === 2 && hip.prescription.totalReps === 32,
      "Hip Circles states its two directions rather than inheriting a guess");
 
   /* A clock is a clock: no timed move may wear a rep-shaped dose. */
@@ -4697,6 +4698,33 @@ store.setOnlineForTest(true);
     .concat(d.prepMenu || [])).filter(e => !e.byReps && e.work > 0);
   timed.forEach(ex => ok(!/\breps?\b|\/dir|\/leg/.test(ex.dose || ""),
     ex.name + ": a timed move does not promise reps: " + JSON.stringify(ex.dose)));
+}
+
+/* ---- WEEK SIDE CHECK (Nov 2026) ------------------------------------------
+   Streamline Hold was split LEFT / RIGHT after "2×20s" became "20s each side"
+   by mistake (19 Sep), then the side update made it real (17 Oct). Every move
+   named here is pinned: two-sided or not. */
+{
+  const moves = Object.values(data.DAYS).flatMap(d =>
+    [...Object.values(d.blocks || {}).flat(), ...(d.prepMenu || []), ...(d.recoveryHolds || [])]);
+  const twoSided = ex => !!ex.eachSide || !!(ex.prescription && ex.prescription.sides > 1);
+  const ONE = ["Streamline Hold", "Light Streamline Hold", "Towel-Band Catch Pull", "90/90 Hip Switch",
+               "Band Pass-Through", "Band Row", "Wall Slides", "Cat-Camel", "Superman"];
+  const TWO = ["Band Ankle 4-Way", "Hip Circles", "Dead Bug", "Bird Dog", "Glute Bridge March",
+               "Long-Axis Rotation Roll", "Single-Arm Band Row", "Chair High-Elbow Catch",
+               "Single-Leg Balance Reach", "Leg Swings", "Shoulder CARs", "Side-Lying Breath Rehearsal"];
+  ONE.forEach(n => { const m = moves.filter(e => e.name === n);
+    ok(m.length > 0 && m.every(e => !twoSided(e)), n + ": no LEFT / RIGHT"); });
+  TWO.forEach(n => { const m = moves.filter(e => e.name === n);
+    ok(m.length > 0 && m.every(twoSided), n + ": LEFT then RIGHT"); });
+  moves.filter(e => e.name === "Streamline Hold").forEach(e =>
+    ok(e.prescription.reps === 2 && e.prescription.holdSeconds === 20 && e.dose === "2×20s", "Streamline Hold is 2 holds of 20s"));
+  const sh = moves.find(e => e.name === "Streamline Hold");
+  ok(data.doseLines(sh).big === "2" && data.doseLines(sh).sub === "20s hold each", "the ring says how long each hold is: " + JSON.stringify(data.doseLines(sh)));
+  ok(data.spokenDose(sh) === "2 holds of 20 seconds", "and the coach says it: " + data.spokenDose(sh));
+  // A dose written "/side" or "each side" runs both sides.
+  moves.forEach(e => { const said = String(e.dose || e.repsDetail || "");
+    if (/\/side|each side/i.test(said)) ok(twoSided(e), e.name + ": its dose says per side, so it runs both sides"); });
 }
 
 console.log(`\n✓ smoke tests passed (${passed} assertions)\n`);

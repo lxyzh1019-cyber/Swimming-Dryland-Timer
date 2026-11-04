@@ -448,3 +448,15 @@ Approved in chat 2026-10-17: D11 A (dose text 60s), D12 A (new tips), D13 (only 
 | Plan | Streamline Hold "20s each side" ran one 40 s timer; Butt Kicks/Ankle Dribbles "15s" ran 60 s | eachSide; text 60s | dose check all days |
 Tests changed to the new rules: session.mjs (side guard, early rest tap), actions.mjs (GO is for today), design.mjs (Add-them-back fixture), smoke.mjs (gate rule, swim only).
 | C-1 | Big LEFT word used the display font (the only uppercase display-font word in the app); 7 letter-spacing values on labels; MOVES untracked | Label style + `--ls-label` / `--ls-loud` tokens | computed-style audit: 0 uppercase display-font words; design.mjs |
+
+## Round 2026-11-04 — Prize pick lock + week side check
+Plan v1 Rev 3 approved 2026-11-04 (decisions: lock the pick; Towel-Band Catch Pull is the band move; keep LEFT SIDE words; keep left-then-right in each round; waiting message keeps ✕; 90/90 Hip Switch one count; Band Ankle 4-Way and Hip Circles get both sides). Branch `claude/sides-prize-lock` in both repos; `core/` identical. Setup update PR #83.
+
+| ID | Problem | Fix | Proof |
+|---|---|---|---|
+| P-1 | Prize ✕ after a pick, then reopen, dealt 3 new envelopes and a second pick | ✕ only before a pick or while waiting; draw saved until claimed | actions.mjs, design.mjs |
+| W-1 | Streamline Hold LEFT / RIGHT: 19 Sep "2×20s" → "20s each side", 17 Oct made the side real | 2 holds of 20s | smoke.mjs week side check |
+| W-2 | Towel-Band Catch Pull split per side | both arms, 2×8 | smoke.mjs |
+| W-3 | 90/90 Hip Switch: each switch already changes side | 12 switches, one count | smoke.mjs |
+| W-4 | Band Ankle 4-Way, Hip Circles trained one side | both sides | smoke.mjs (64 / 32 reps) |
+| W-5 | Left-then-right moves had no words for what LEFT means | how-to text | data review |
