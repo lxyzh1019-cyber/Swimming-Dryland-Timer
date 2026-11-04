@@ -1160,5 +1160,40 @@ engine.exitSession();
   resetGateState();
 }
 
+/* ---- ONE PICK PER PRIZE DRAW (Nov 2026) -----------------------------------
+   The ✕ used to close the draw and throw it away, so opening it again dealt
+   three new envelopes and a second pick. The draw and the pick are kept. */
+{
+  localStorage.clear(); store.migrate();
+  const ov = await import(base + "screens/overlays.js");
+  const lvlXp = n => { let x = 0; for (let i = 1; i < n; i++) x += data.levelCost(i); return x; };
+  store.saveJourney({ xp: 0, sessionXp: 0, prizesWon: [], pendingDraws: 0 });
+  store.addXp(lvlXp(2));
+  ok(store.pendingDrawCount() === 1, "one level gained: one draw owed");
+  main.actions.openPrizeDraw();
+  const dealt = main.state.prizeDraw.cards.map(c => c.label).join("|");
+  ok(/data-action="closePrizeDraw"/.test(ov.prizeDrawHtml(main.state.prizeDraw)), "before a pick, the ✕ is there");
+  main.actions.pickPrize(1);
+  ok(!/data-action="closePrizeDraw"/.test(ov.prizeDrawHtml(main.state.prizeDraw)), "after a pick, the ✕ is gone");
+  main.actions.closePrizeDraw();
+  main.actions.openPrizeDraw();
+  ok(main.state.prizeDraw.cards.map(c => c.label).join("|") === dealt && main.state.prizeDraw.picked === 1,
+     "closed and opened again: the same envelopes, the same pick");
+  main.actions.pickPrize(0);
+  ok(main.state.prizeDraw.picked === 1, "a second tap cannot change the pick");
+  main.state.prizeDraw = null;   // the app closed
+  ok(store.loadOpenDraw().picked === 1, "the pick is saved on the device");
+  main.actions.openPrizeDraw();
+  ok(main.state.prizeDraw.picked === 1, "after the app closes, the pick comes back");
+  ok(/data-action="closePrizeDraw"/.test(ov.prizeDrawHtml({ ...main.state.prizeDraw, waiting: true })),
+     "the waiting-for-the-other-device message keeps its ✕");
+  const won = main.state.prizeDraw.cards[1].label;
+  main.actions.claimPrize();
+  ok(store.loadJourney().prizesWon.length === 1 && store.loadJourney().prizesWon[0].label === won,
+     "the picked prize is the one added");
+  ok(store.loadOpenDraw() === null && store.pendingDrawCount() === 0, "claimed: the saved draw is cleared");
+  localStorage.clear(); store.migrate();
+}
+
 console.log(`✓ action-layer tests passed (${passed} assertions)`);
 process.exit(0);

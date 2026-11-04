@@ -1531,6 +1531,19 @@ export function pendingDrawCount() {
   return j ? pendingDrawsFor(j) : 0;
 }
 
+/* THE OPEN DRAW IS KEPT (Nov 2026). Closing the prize pop-up used to throw
+   the three envelopes away, so opening it again dealt three new ones and a
+   second pick. The envelopes and the pick stay saved (per athlete, this
+   device) until the prize is claimed. */
+export const LS_OPEN_DRAW = K.journey + "_openDraw";
+export function loadOpenDraw() {
+  const d = readStorage(LS_OPEN_DRAW, null);
+  return d && Array.isArray(d.cards) && d.cards.length ? d : null;
+}
+export function saveOpenDraw(pd) {
+  return writeStorage(LS_OPEN_DRAW, pd ? { cards: pd.cards, picked: pd.picked ?? null } : null);
+}
+
 /* A draw is owed but cannot be claimed yet, because this device has not been
    able to settle the day's XP against the other one. Separate from "no draw
    owed" so the screen can say which it is — "not yet" and "nothing here" are

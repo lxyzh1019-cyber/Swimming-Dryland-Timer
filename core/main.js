@@ -6,7 +6,7 @@
    delegated click listener below.
    ============================================================ */
 
-import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS, migratePrizeAmnesty } from "./store.js";
+import { migrate, settings, updateSettings, saveReadiness, addXp, patchSession, pendingDrawCount, saveOpenDraw, onStorageError, payQuizQuestion, quizQuestionKey, REDEEM_UNDO_MS, migratePrizeAmnesty } from "./store.js";
 import { edmontonDayKey, escapeHtml, kidButton } from "./util.js";
 import { APP_NAME, ATHLETE_DEFAULT, COPY } from "./sport.js";
 import { DAYS } from "./data.js";
@@ -515,7 +515,8 @@ Object.assign(RAW, {
   },
   exitQuizDeck() { state.quizDeck = null; render(); },
   pickPrize(arg) {
-    if (state.prizeDraw && state.prizeDraw.picked == null) { state.prizeDraw.picked = Number(arg); render(); }
+    // One pick per draw: it is saved, so a closed pop-up or app shows it again.
+    if (state.prizeDraw && state.prizeDraw.picked == null) { state.prizeDraw.picked = Number(arg); saveOpenDraw(state.prizeDraw); render(); }
   },
   closePrizeDraw() { state.prizeDraw = null; render(); },
   claimPrize() {

@@ -8,7 +8,7 @@ import { PRIZE_POOL } from "../data.js";
 import { COPY, IMAGES, EMOJI } from "../sport.js";
 import { settings, loadQuiz, saveQuiz, logEvent, addXp, addPrize, pendingDrawCount, drawIsWaitingOnSync,
          movePool, rankPool, questionBank, unlockedBank, quizPaidToday, quizBankStatus,
-         quizQuestionKey, payQuizQuestion, payTodayQuestion, loadSessions } from "../store.js";
+         quizQuestionKey, payQuizQuestion, payTodayQuestion, loadSessions, loadOpenDraw, saveOpenDraw } from "../store.js";
 import { todayISODate, escapeHtml, imgWithFallbacks, photoSources, kidButton, markedAnswer } from "../util.js";
 
 /* ---- quiz engine (port of _movePool/_makeQ/_buildQuizDeck) ----
@@ -397,8 +397,17 @@ export function quizDeckHtml(qd) {
 
 /* ---- prize draw ---- */
 export function newPrizeDraw() {
+  // A draw already dealt (and maybe picked) comes back as it was: closing the
+  // pop-up or the app must never deal new envelopes for the same level.
+  const kept = loadOpenDraw();
+  if (kept && pendingDrawCount() > 0) {
+    const picked = kept.picked != null && kept.cards[kept.picked] ? Number(kept.picked) : null;
+    return { cards: kept.cards, picked };
+  }
   const pool = (Array.isArray(settings.prizePool) && settings.prizePool.length) ? settings.prizePool : PRIZE_POOL;
-  return { cards: shuffle(pool).slice(0, 3), picked: null };
+  const pd = { cards: shuffle(pool).slice(0, 3), picked: null };
+  saveOpenDraw(pd);
+  return pd;
 }
 
 export function claimPrize(pd) {
@@ -416,7 +425,10 @@ export function claimPrize(pd) {
   pd.waiting = false;
   const won = pd.cards[pd.picked];
   logEvent("prize_won", { label: won.label });
-  return addPrize(won);
+  const added = addPrize(won);
+  // Claimed: the next level's draw deals new envelopes.
+  if (added) saveOpenDraw(null);
+  return added;
 }
 
 export function prizeDrawHtml(pd) {
@@ -426,7 +438,7 @@ export function prizeDrawHtml(pd) {
     <div style="position:relative;background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-pop);padding:26px;width:100%;max-width:540px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;">
       <div style="font-size:13px;font-weight:900;letter-spacing:var(--ls-loud);color:var(--sun-ink);background:var(--sun-wash);border-radius:var(--radius-pill);padding:6px 14px;">🎉 LEVEL UP REWARD</div>
       <div style="font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);line-height:1.1;">Pick a prize envelope!</div>
-      <button type="button" data-action="closePrizeDraw" aria-label="Close" style="position:absolute;top:12px;right:12px;width:48px;height:48px;min-height:48px;border-radius:50%;border:none;background:var(--surface-2);color:var(--ink-soft);font-size:18px;font-weight:900;cursor:pointer;">✕</button>
+      ${!hasPicked || pd.waiting ? `<button type="button" data-action="closePrizeDraw" aria-label="Close" style="position:absolute;top:12px;right:12px;width:48px;height:48px;min-height:48px;border-radius:50%;border:none;background:var(--surface-2);color:var(--ink-soft);font-size:18px;font-weight:900;cursor:pointer;">✕</button>` : ""}
       ${hasPicked && !pd.waiting ? `<div style="font-family:var(--font-hand);font-size:22px;font-weight:700;color:var(--aqua-ink);">You picked — enjoy it! 🌟</div>` : ""}
       ${pd.waiting ? `<div role="status" style="background:var(--sun-wash);border:2px solid var(--sun);border-radius:var(--radius-lg);padding:10px 14px;font-size:14px;font-weight:800;color:var(--sun-ink);line-height:1.45;max-width:420px;">Your prize is safe. The app is waiting to check in with your other device before it adds it — try again in a moment, or close this and pick it up later with the 🎁 prize-draw button on your Progress page.</div>` : ""}
       <div style="display:flex;gap:12px;width:100%;justify-content:center;flex-wrap:wrap;">
