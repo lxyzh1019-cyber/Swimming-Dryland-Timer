@@ -4719,6 +4719,9 @@ store.setOnlineForTest(true);
     ok(m.length > 0 && m.every(twoSided), n + ": LEFT then RIGHT"); });
   moves.filter(e => e.name === "Streamline Hold").forEach(e =>
     ok(e.prescription.reps === 2 && e.prescription.holdSeconds === 20 && e.dose === "2×20s", "Streamline Hold is 2 holds of 20s"));
+  const sh = moves.find(e => e.name === "Streamline Hold");
+  ok(data.doseLines(sh).big === "2" && data.doseLines(sh).sub === "20s hold each", "the ring says how long each hold is: " + JSON.stringify(data.doseLines(sh)));
+  ok(data.spokenDose(sh) === "2 holds of 20 seconds", "and the coach says it: " + data.spokenDose(sh));
   // A dose written "/side" or "each side" runs both sides.
   moves.forEach(e => { const said = String(e.dose || e.repsDetail || "");
     if (/\/side|each side/i.test(said)) ok(twoSided(e), e.name + ": its dose says per side, so it runs both sides"); });

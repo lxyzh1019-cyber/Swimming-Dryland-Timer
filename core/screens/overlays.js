@@ -8,7 +8,7 @@ import { PRIZE_POOL } from "../data.js";
 import { COPY, IMAGES, EMOJI } from "../sport.js";
 import { settings, loadQuiz, saveQuiz, logEvent, addXp, addPrize, pendingDrawCount, drawIsWaitingOnSync,
          movePool, rankPool, questionBank, unlockedBank, quizPaidToday, quizBankStatus,
-         quizQuestionKey, payQuizQuestion, payTodayQuestion, loadSessions, loadOpenDraw, saveOpenDraw } from "../store.js";
+         quizQuestionKey, payQuizQuestion, payTodayQuestion, loadSessions, loadOpenDraw, saveOpenDraw, loadJourney, drawsClaimed } from "../store.js";
 import { todayISODate, escapeHtml, imgWithFallbacks, photoSources, kidButton, markedAnswer } from "../util.js";
 
 /* ---- quiz engine (port of _movePool/_makeQ/_buildQuizDeck) ----
@@ -425,9 +425,11 @@ export function claimPrize(pd) {
   pd.waiting = false;
   const won = pd.cards[pd.picked];
   logEvent("prize_won", { label: won.label });
+  const before = drawsClaimed(loadJourney());
   const added = addPrize(won);
-  // Claimed: the next level's draw deals new envelopes.
-  if (added) saveOpenDraw(null);
+  // Claimed: the next level's draw deals new envelopes. A claim that did not
+  // reach the wallet keeps the draw (and the pick) for another try.
+  if (drawsClaimed(loadJourney()) > before) saveOpenDraw(null);
   return added;
 }
 

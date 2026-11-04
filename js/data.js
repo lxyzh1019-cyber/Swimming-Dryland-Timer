@@ -182,8 +182,8 @@ export const EXERCISE_HOWTO = {
   "Knee-to-Wall Ankle": { search: "knee to wall ankle mobility drill tutorial" },
   "Short-Foot": { search: "short foot exercise arch activation tutorial" },
   "Shoulder CARs": { search: "shoulder CARs controlled articular rotations tutorial" },
-  "Hip Circles": { search: "standing hip circles mobility drill tutorial" },
-  "Band Ankle 4-Way": { search: "resistance band ankle four way mobility drill" },
+  "Hip Circles": { text: "Stand on one leg, hold a wall. LEFT SIDE: draw big slow circles with your left knee, one way, then the other way. Then the right leg.", search: "standing hip circles mobility drill tutorial" },
+  "Band Ankle 4-Way": { text: "Band around one foot. LEFT SIDE: left foot points up, down, in and out against the band. Then the right foot.", search: "resistance band ankle four way mobility drill" },
   "World's Greatest Stretch": { text: "Lunge forward, hand down inside the front foot, reach the other arm up and rotate. LEFT SIDE: left foot forward. Do all the left reps, then the right foot forward.", search: "world's greatest stretch full body warm up tutorial" },
   // — coordination / running mechanics (biased toward Chari Hawkins' drill demos) —
   "A-March": { search: "A march running drill technique Chari Hawkins" },

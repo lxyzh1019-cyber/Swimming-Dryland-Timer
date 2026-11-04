@@ -1192,6 +1192,19 @@ engine.exitSession();
   ok(store.loadJourney().prizesWon.length === 1 && store.loadJourney().prizesWon[0].label === won,
      "the picked prize is the one added");
   ok(store.loadOpenDraw() === null && store.pendingDrawCount() === 0, "claimed: the saved draw is cleared");
+
+  /* A saved draw goes stale when a prize is claimed some other way (the other
+     device's claim arriving in a merge): the next level deals new envelopes. */
+  store.addXp(data.levelCost(2));
+  ok(store.pendingDrawCount() === 1, "a second level: one draw owed");
+  main.actions.openPrizeDraw(); main.actions.pickPrize(2); main.actions.closePrizeDraw();
+  { const j = store.loadJourney(); j.prizesWon = [{ icon: "🎁", label: "from the iPad", date: "2026-11-04", redeemed: false, id: "x" }, ...j.prizesWon]; store.saveJourney(j); }
+  store.addXp(data.levelCost(3));
+  ok(store.pendingDrawCount() === 1, "the other device claimed it, a third level owes a new draw");
+  main.actions.openPrizeDraw();
+  ok(main.state.prizeDraw.picked === null && /data-action="closePrizeDraw"/.test(ov.prizeDrawHtml(main.state.prizeDraw)),
+     "the stale draw is not shown again: three new envelopes, nothing picked");
+  main.actions.closePrizeDraw();
   localStorage.clear(); store.migrate();
 }
 

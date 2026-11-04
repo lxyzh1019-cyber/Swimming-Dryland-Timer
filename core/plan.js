@@ -444,7 +444,9 @@ export function doseLines(ex) {
   const note = (ex && ex.note) || "";
   const sideways = p.sideReps ? "" : d.divisors.map(x => x.short).filter(Boolean).join(", ");
   const big = [d.count, d.unit !== "reps" ? d.unit : "", sideways].filter(Boolean).join(" ").trim();
-  const sub = d.total ? d.total + " " + d.unit + " in total" : "";
+  /* "2" on its own is not a hold: a counted hold says how long each one is. */
+  const holdOnly = p.holdSeconds > 0 && p.segments === 1 && !d.total;
+  const sub = d.total ? d.total + " " + d.unit + " in total" : holdOnly ? p.holdSeconds + "s hold each" : "";
   /* When the counts already name the sides ("8 left, 10 right") the side
      divisor has been said — repeating it gives "8 left, 10 right reps each
      side", which is nobody's sentence. */
@@ -481,7 +483,9 @@ export function spokenDose(ex) {
           : `${p.sideReps[0]} on the left and ${p.sideReps[1]} on the right`)
       : p.sets > 1
         ? `${p.sets} sets of ${lead}${p.repsHigh ? p.reps + " to " + p.repsHigh : p.reps}`
-        : `${lead}${p.repsHigh ? p.reps + " to " + p.repsHigh : p.reps} ${unit}`;
+        : p.holdSeconds > 0 && p.segments === 1 && !p.repsHigh
+          ? `${lead}${p.reps} ${plural(p.reps, "hold")} of ${p.holdSeconds} seconds`
+          : `${lead}${p.repsHigh ? p.reps + " to " + p.repsHigh : p.reps} ${unit}`;
     if (p.sides > 1 && !p.sideReps) said += " per side";
     if (p.dirs > 1) said += ` in each of ${p.dirs} directions`;
     /* The total is only worth saying when the segments make it surprising —
